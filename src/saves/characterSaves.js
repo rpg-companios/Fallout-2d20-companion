@@ -324,6 +324,7 @@ export const buildSnapshot = () => {
     attributesSaved: state.attributesSaved,
     skillsSaved: state.skillsSaved,
     selectedPerks: state.selectedPerks,
+    usedMagazineEffects: state.usedMagazineEffects || [],
     conditions: state.conditions,
     chemDosesLog: state.chemDosesLog,
     sceneRiskStates: state.sceneRiskStates,

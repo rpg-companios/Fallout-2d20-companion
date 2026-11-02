@@ -39,15 +39,10 @@ import {
   isEnvEntryVisibleInFolder,
   sortEnvEntries,
 } from '../../../domain/envCombatPresets';
-import {
-  ENV_DIRECTIVE_KIND,
-  evaluateStrengthAmount,
-  rollHitZoneForCharacter,
-} from '../../../modules/fallout/gm/gmEnvCombat';
+import { ENV_DIRECTIVE_KIND } from '../../../modules/fallout/gm/gmEnvCombat';
 import { formatGm, tGm } from '../../../modules/fallout/gm/gmI18n';
 import {
   deleteGmEnvEntryFromCloudIfEnabled,
-  openCloudFolderInDrive,
   syncAllCharactersWithCloud,
   syncGmEnvEntryToCloudIfEnabled,
 } from '../../cloudSync/googleDriveSync';
@@ -56,28 +51,30 @@ import { FEATURE_IDS, guardAdminAction } from '../../../src/premium/adminAccessG
 import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText from '../../lootTrade/LootTradeIconText';
+import AdminTile from '../../admin/AdminTile';
+import { ADMIN_MODAL_PALETTE } from '../../admin/adminModalTheme';
 import EnvMechanicModal from './modals/EnvMechanicModal';
 
 const NUM_COLS = 3;
 const MENU_WIDTH = 230;
 
 const MECHANIC_TILE_META = Object.freeze({
-  [ENV_MECHANIC_TYPE.WEATHER]: { icon: 'weather-lightning-rainy', color: '#38bdf8' },
-  [ENV_MECHANIC_TYPE.RADIATION]: { icon: 'radioactive', color: '#4ade80' },
-  [ENV_MECHANIC_TYPE.INJURY]: { icon: 'bone', color: '#f87171' },
-  [ENV_MECHANIC_TYPE.ATTACK_FAIL]: { icon: 'pistol', color: '#fbbf24' },
+  [ENV_MECHANIC_TYPE.WEATHER]: { icon: 'weather-lightning-rainy' },
+  [ENV_MECHANIC_TYPE.RADIATION]: { icon: 'radioactive' },
+  [ENV_MECHANIC_TYPE.INJURY]: { icon: 'bone' },
+  [ENV_MECHANIC_TYPE.ATTACK_FAIL]: { icon: 'pistol' },
 });
 
 const formatPresetFormulaBadge = (preset, locale) => {
   const p = preset?.payload || {};
   if (preset?.mechanicType === ENV_MECHANIC_TYPE.WEATHER || preset?.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
-    const val = p.valueMode === 'cd' ? `${p.value ?? 1} {CD}` : `${p.value ?? 1}`;
+    const val = `${p.value ?? 1}`;
     const u = p.durationUnit || 'once';
     if (u === 'once') return `${val} · ${tGm('envCombat.duration.shortUnits.once', locale)}`;
     return `${val} × ${p.totalIntervals ?? 1} ${tGm(`envCombat.duration.shortUnits.${u}`, locale)}`;
   }
   if (preset?.mechanicType === ENV_MECHANIC_TYPE.INJURY) {
-    return p.zoneKey ? `${p.zoneKey}` : 'd20';
+    return !p.zoneKey || p.zoneKey === 'auto' ? 'd20' : `${p.zoneKey}`;
   }
   if (preset?.mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL) {
     return tGm(`envCombat.attackFail.outcomes.${p.outcome || 'weaponJam'}.title`, locale);
@@ -96,8 +93,14 @@ const chunkIntoRows = (items, cols = NUM_COLS) => {
 };
 
 export default function EnvCombatScreen() {
-  const { locale, setLocale } = useLocale();
+  const locale = useLocale();
+  const localeLabel = (code) => getLocaleLabel({
+    code,
+    displayLocale: locale,
+    translate: tHomeScreen,
+  });
   const setUiMode = useAppSettingsStore((s) => s.setUiMode);
+  const setSettingValue = useAppSettingsStore((s) => s.setValue);
   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
   const roomsMap = useRoomStore((s) => s.rooms);
   const sendGmDirective = useRoomStore((s) => s.sendGmDirective);
@@ -109,7 +112,6 @@ export default function EnvCombatScreen() {
   const [currentFolderId, setCurrentFolderId] = useState(null);
 
   const [syncing, setSyncing] = useState(false);
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
 
   // Модалка механики
   const [activeMechanic, setActiveMechanic] = useState(null); // { mechanicType, initialPayload?, initialPresetMeta? }
@@ -228,30 +230,26 @@ export default function EnvCombatScreen() {
   const dispatchEnvDirective = async ({ kind, targetCharacterId = null, envPayload = {} }) => {
     if (!guardAdminAction(FEATURE_IDS.GM_ENV_COMBAT)) return;
 
+    if (!selectedRoomCode || !activeRoom || activeRoom.joined === false) {
+      showRawAlert({ title: tGm('envCombat.screenTitle', locale), message: tGm('envCombat.requiresLiveRoom', locale) });
+      return;
+    }
+    if ((kind === ENV_DIRECTIVE_KIND.INJURY_APPLY || kind === ENV_DIRECTIVE_KIND.ATTACK_FAIL)
+      && selectedTargetId === 'all') {
+      showRawAlert({
+        title: tGm('envCombat.screenTitle', locale),
+        message: kind === ENV_DIRECTIVE_KIND.INJURY_APPLY
+          ? tGm('envCombat.injury.chooseCharacterFirst', locale)
+          : tGm('envCombat.chooseCharacterFirst', locale),
+      });
+      return;
+    }
+
     const effectiveTarget = targetCharacterId
       ? { targetType: 'character', targetCharacterId }
       : (selectedTargetId === 'all'
           ? { targetType: 'all', targetCharacterId: null }
           : { targetType: 'character', targetCharacterId: selectedTargetId });
-
-    // Настольный режим (офлайн без комнаты): показываем расчёт на экране Ведущего
-    if (!selectedRoomCode || !activeRoom) {
-      const lines = [];
-      if (envPayload.valueMode) {
-        const rolled = evaluateStrengthAmount({ valueMode: envPayload.valueMode, value: envPayload.value ?? 1 });
-        lines.push(`${tGm('envCombat.valueMode.label', locale)}: ${rolled.amount}${rolled.rolls ? ` [${rolled.rolls.join(', ')}]` : ''}`);
-      }
-      if (kind === ENV_DIRECTIVE_KIND.INJURY_APPLY) {
-        const z = rollHitZoneForCharacter({}, locale);
-        lines.push(`d20 = ${z.roll} → ${z.zone?.label || envPayload.zoneKey}`);
-      }
-      showRawAlert({
-        title: tGm('envCombat.tabletopResultTitle', locale),
-        message: lines.join('\n') || 'OK',
-      });
-      setActiveMechanic(null);
-      return;
-    }
 
     try {
       await sendGmDirective({
@@ -306,6 +304,14 @@ export default function EnvCombatScreen() {
 
   const handleApplySavedPreset = (preset) => {
     const p = { ...(preset.payload || {}), customTitle: preset.name };
+    if (preset.mechanicType === ENV_MECHANIC_TYPE.WEATHER || preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
+      p.valueMode = 'fixed';
+      if (preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
+        delete p.presetKey;
+        delete p.radResistMode;
+        delete p.hitZone;
+      }
+    }
     const kind = preset.mechanicType === ENV_MECHANIC_TYPE.WEATHER
       ? ENV_DIRECTIVE_KIND.WEATHER_APPLY
       : preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION
@@ -396,7 +402,6 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.WEATHER,
       title: tGm('envCombat.tiles.weather.title', locale),
-      subtitle: tGm('envCombat.tiles.weather.subtitle', locale),
       badge: roomHazardCounts.weather > 0
         ? formatGm(tGm('envCombat.tiles.weather.activeBadge', locale), { count: roomHazardCounts.weather })
         : null,
@@ -404,13 +409,11 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.RADIATION,
       title: tGm('envCombat.tiles.radiation.title', locale),
-      subtitle: tGm('envCombat.tiles.radiation.subtitle', locale),
       badge: null,
     },
     {
       mechanicType: ENV_MECHANIC_TYPE.INJURY,
       title: tGm('envCombat.tiles.injury.title', locale),
-      subtitle: tGm('envCombat.tiles.injury.subtitle', locale),
       badge: roomHazardCounts.injuries > 0
         ? formatGm(tGm('envCombat.tiles.injury.activeBadge', locale), { count: roomHazardCounts.injuries })
         : null,
@@ -418,73 +421,63 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.ATTACK_FAIL,
       title: tGm('envCombat.tiles.attackFail.title', locale),
-      subtitle: tGm('envCombat.tiles.attackFail.subtitle', locale),
       badge: null,
     },
   ];
 
-  const savedGridCells = useMemo(() => {
-    const cells = [];
-    if (!currentFolderId) {
-      cells.push({ type: 'newFolder' });
-    }
-    visibleSavedEntries.forEach((entry) => {
-      cells.push({ type: 'entry', entry });
-    });
-    return chunkIntoRows(cells, NUM_COLS);
-  }, [visibleSavedEntries, currentFolderId]);
-
-  const baseTileRows = useMemo(() => chunkIntoRows(baseTiles, NUM_COLS), [locale, roomHazardCounts]);
+  const tileGridRows = chunkIntoRows([
+    ...baseTiles.map((tile) => ({ type: 'mechanic', tile })),
+    ...(!currentFolderId ? [{ type: 'newFolder' }] : []),
+    ...visibleSavedEntries.map((entry) => ({ type: 'entry', entry })),
+  ], NUM_COLS);
 
   return (
     <View style={styles.container}>
-      {/* Верхняя шапка в едином стиле с «Добыча/Торговля» и «Список кампаний» */}
-      <View style={homeStyles.headerBar}>
-        <View style={{ flex: 1 }}>
-          <Text style={homeStyles.headerTitle} numberOfLines={1}>
-            {tGm('envCombat.screenTitle', locale)}
-          </Text>
-          <Text style={localStyles.headerSubtitle} numberOfLines={1}>
-            {tGm('envCombat.screenSubtitle', locale)}
-          </Text>
+      {/* Верхняя шапка — тот же каркас, что на экране «Добыча/Торговля» */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.syncIconButton}
+          onPress={handleSyncCloud}
+          disabled={syncing}
+          accessibilityLabel={tHomeScreen('cloud.sync')}
+        >
+          {syncing ? (
+            <ActivityIndicator size="small" color="#f0e68c" />
+          ) : (
+            <MaterialCommunityIcons name="cloud-sync-outline" size={20} color="#f0e68c" />
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.headerCenter}>
+          <Pressable style={styles.adminButton} onPress={handleToggleExitGm}>
+            <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#f0e68c" />
+            <Text style={styles.adminButtonText}>{tHomeScreen('gm.exit')}</Text>
+          </Pressable>
         </View>
 
-        <View style={homeStyles.headerActions}>
-          <TouchableOpacity
-            style={homeStyles.iconBtn}
-            onPress={handleSyncCloud}
-            disabled={syncing}
-            accessibilityLabel={tHomeScreen('cloud.sync')}
-          >
-            {syncing ? (
-              <ActivityIndicator size="small" color="#f0e68c" />
-            ) : (
-              <MaterialCommunityIcons name="cloud-sync-outline" size={20} color="#f0e68c" />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={homeStyles.iconBtn}
-            onPress={() => openCloudFolderInDrive().catch(() => {})}
-            accessibilityLabel="Google Drive"
-          >
-            <MaterialCommunityIcons name="google-drive" size={20} color="#d1d5db" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={homeStyles.langBtn}
-            onPress={() => setLanguageMenuOpen(true)}
-          >
-            <Text style={homeStyles.langBtnText}>{getLocaleLabel(locale)}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[homeStyles.adminButton, homeStyles.adminButtonActive]}
-            onPress={handleToggleExitGm}
-          >
-            <MaterialCommunityIcons name="account-cog" size={20} color="#111827" />
-          </TouchableOpacity>
+        <View style={homeStyles.languageContainer}>
+          {SUPPORTED_LOCALES.map((code, idx) => (
+            <Pressable
+              key={code}
+              style={[
+                homeStyles.langSegment,
+                idx === 0 && homeStyles.langSegmentLeft,
+                idx === SUPPORTED_LOCALES.length - 1 && homeStyles.langSegmentRight,
+                locale === code && homeStyles.langSegmentActive,
+              ]}
+              onPress={() => setSettingValue('language', code)}
+            >
+              <Text style={[homeStyles.langSegmentText, locale === code && homeStyles.langSegmentTextActive]}>
+                {localeLabel(code)}
+              </Text>
+            </Pressable>
+          ))}
         </View>
+      </View>
+
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>{tGm('envCombat.screenTitle', locale)}</Text>
+        <Text style={styles.subtitle}>{tGm('envCombat.screenSubtitle', locale)}</Text>
       </View>
 
       {/* Панель выбора комнаты, получателя и продвижения времени */}
@@ -574,74 +567,52 @@ export default function EnvCombatScreen() {
 
       {/* Основное полотно плиток */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
-        {/* Раздел 1: 4 базовые плитки конструктора */}
-        <Text style={localStyles.sectionTitle}>{tGm('envCombat.tilesSectionTitle', locale)}</Text>
-        {baseTileRows.map((row, rIdx) => (
-          <View key={`base-row-${rIdx}`} style={styles.row}>
-            {row.map((tile, cIdx) => {
-              if (!tile) return <View key={`empty-base-${cIdx}`} style={styles.emptyCell} />;
-              const meta = MECHANIC_TILE_META[tile.mechanicType];
-              return (
-                <TouchableOpacity
-                  key={tile.mechanicType}
-                  testID={`env-tile-${tile.mechanicType}`}
-                  style={[styles.cardCell, localStyles.mechanicTile]}
-                  activeOpacity={0.8}
-                  onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
-                >
-                  <View style={localStyles.tileTopRow}>
-                    <MaterialCommunityIcons name={meta.icon} size={26} color={meta.color} />
-                    {tile.badge ? (
-                      <View style={localStyles.activePillBadge}>
-                        <Text style={localStyles.activePillText}>{tile.badge}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.cardName} numberOfLines={1}>{tile.title}</Text>
-                  <Text style={localStyles.tileDesc} numberOfLines={3}>{tile.subtitle}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-
-        {/* Раздел 2: Папки и сохранённые плитки состояний */}
-        <View style={localStyles.savedHeaderRow}>
-          <Text style={localStyles.sectionTitle}>
-            {currentFolder
-              ? `📁 ${currentFolder.name}`
-              : tGm('envCombat.savedSectionTitle', locale)}
-          </Text>
-          {currentFolder ? (
+        {currentFolder ? (
+          <View style={localStyles.folderContext}>
+            <Text style={localStyles.folderContextTitle}>{currentFolder.name}</Text>
             <TouchableOpacity
               style={localStyles.backBtn}
               onPress={() => setCurrentFolderId(null)}
             >
               <Text style={localStyles.backBtnText}>{tGm('envCombat.backToRoot', locale)}</Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
         {currentFolder?.description ? (
           <Text style={localStyles.folderHeaderDesc}>{currentFolder.description}</Text>
         ) : null}
 
-        {savedGridCells.map((row, rIdx) => (
-          <View key={`saved-row-${rIdx}`} style={styles.row}>
+        {tileGridRows.map((row, rIdx) => (
+          <View key={`tile-row-${rIdx}`} style={styles.row}>
             {row.map((cell, cIdx) => {
-              if (!cell) return <View key={`saved-empty-${cIdx}`} style={styles.emptyCell} />;
+              if (!cell) return <View key={`tile-empty-${cIdx}`} style={styles.emptyCell} />;
+
+              if (cell.type === 'mechanic') {
+                const { tile } = cell;
+                const meta = MECHANIC_TILE_META[tile.mechanicType];
+                return (
+                  <AdminTile
+                    key={tile.mechanicType}
+                    testID={`env-tile-${tile.mechanicType}`}
+                    iconName={meta.icon}
+                    iconColor="#5a5a5a"
+                    label={tile.title}
+                    badge={tile.badge}
+                    onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
+                  />
+                );
+              }
 
               if (cell.type === 'newFolder') {
                 return (
-                  <TouchableOpacity
+                  <AdminTile
                     key="create-folder-cell"
                     testID="env-create-folder-tile"
-                    style={styles.createCell}
-                    activeOpacity={0.75}
+                    iconName="folder-plus-outline"
+                    iconColor="#5a5a5a"
+                    label={tGm('envCombat.newFolderBtn', locale)}
                     onPress={() => setFolderModal({ mode: 'create', name: '', description: '' })}
-                  >
-                    <MaterialCommunityIcons name="folder-plus-outline" size={40} color="#5a5a5a" />
-                    <Text style={styles.createLabel}>{tGm('envCombat.newFolderBtn', locale)}</Text>
-                  </TouchableOpacity>
+                  />
                 );
               }
 
@@ -651,54 +622,22 @@ export default function EnvCombatScreen() {
               const nestedCount = isFolder ? countPresetsInFolder(entries, entry.id) : 0;
 
               return (
-                <TouchableOpacity
+                <AdminTile
                   key={entry.id}
                   testID={`env-saved-${entry.id}`}
-                  style={[styles.cardCell, isFolder && localStyles.folderCard]}
-                  activeOpacity={0.82}
+                  iconName={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
+                  iconColor="#5a5a5a"
+                  label={entry.name}
+                  detail={isFolder
+                    ? formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })
+                    : formatPresetFormulaBadge(entry, locale)}
                   onPress={() => {
-                    if (isFolder) {
-                      setCurrentFolderId(entry.id);
-                    } else {
-                      handleApplySavedPreset(entry);
-                    }
+                    if (isFolder) setCurrentFolderId(entry.id);
+                    else handleApplySavedPreset(entry);
                   }}
-                >
-                  <View style={localStyles.tileTopRow}>
-                    <MaterialCommunityIcons
-                      name={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
-                      size={24}
-                      color={isFolder ? '#f0e68c' : (meta?.color || '#f0e68c')}
-                    />
-                    <TouchableOpacity
-                      ref={(r) => { menuRefs.current[entry.id] = r; }}
-                      style={localStyles.dotsBtn}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        openEntryMenu(entry);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="dots-vertical" size={18} color="#d1d5db" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.cardName} numberOfLines={2}>{entry.name}</Text>
-                  {entry.description ? (
-                    <Text style={localStyles.tileDesc} numberOfLines={2}>{entry.description}</Text>
-                  ) : null}
-
-                  <View style={{ marginTop: 'auto', paddingTop: 6 }}>
-                    {isFolder ? (
-                      <Text style={localStyles.formulaBadge}>
-                        {formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })}
-                      </Text>
-                    ) : (
-                      <IconText style={localStyles.formulaBadge}>
-                        {formatPresetFormulaBadge(entry, locale)}
-                      </IconText>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                  actionRef={(r) => { menuRefs.current[entry.id] = r; }}
+                  onActionPress={() => openEntryMenu(entry)}
+                />
               );
             })}
           </View>
@@ -962,32 +901,6 @@ export default function EnvCombatScreen() {
         </View>
       </Modal>
 
-      {/* Меню выбора языка */}
-      <Modal
-        visible={languageMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLanguageMenuOpen(false)}
-      >
-        <Pressable style={localStyles.menuBackdrop} onPress={() => setLanguageMenuOpen(false)}>
-          <View style={[localStyles.modalCard, { maxWidth: 260, alignSelf: 'center', marginTop: 80 }]}>
-            {SUPPORTED_LOCALES.map((loc) => (
-              <TouchableOpacity
-                key={loc}
-                style={localStyles.folderPickRow}
-                onPress={() => {
-                  setCurrentLocale(loc);
-                  setLanguageMenuOpen(false);
-                }}
-              >
-                <Text style={[localStyles.folderPickText, loc === locale && { color: '#f0e68c', fontWeight: '700' }]}>
-                  {getLocaleLabel(loc)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* Модалка настройки 4 механик */}
       <EnvMechanicModal
@@ -998,7 +911,7 @@ export default function EnvCombatScreen() {
         folders={folders}
         roomCharacters={roomCharacters}
         selectedTargetId={selectedTargetId}
-        hasLiveRoom={Boolean(selectedRoomCode && activeRoom)}
+        hasLiveRoom={Boolean(selectedRoomCode && activeRoom && activeRoom.joined !== false)}
         onClose={() => setActiveMechanic(null)}
         onDispatchDirective={dispatchEnvDirective}
         onSavePresetTile={handleSavePresetFromModal}
@@ -1008,11 +921,6 @@ export default function EnvCombatScreen() {
 }
 
 const localStyles = StyleSheet.create({
-  headerSubtitle: {
-    color: '#9ca3af',
-    fontSize: 11,
-    marginTop: 1,
-  },
   targetBar: {
     backgroundColor: 'rgba(24, 27, 32, 0.94)',
     borderBottomWidth: 1,
@@ -1051,8 +959,8 @@ const localStyles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   pillActive: {
     borderColor: '#f0e68c',
@@ -1088,19 +996,16 @@ const localStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  sectionTitle: {
-    color: '#f0e68c',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  savedHeaderRow: {
+  folderContext: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 10,
+  },
+  folderContextTitle: {
+    color: '#5a5a5a',
+    fontSize: 14,
+    fontWeight: '700',
   },
   folderHeaderDesc: {
     color: '#9ca3af',
@@ -1121,49 +1026,6 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  mechanicTile: {
-    minHeight: 118,
-    justifyContent: 'flex-start',
-  },
-  folderCard: {
-    borderColor: 'rgba(240, 230, 140, 0.5)',
-    backgroundColor: 'rgba(38, 43, 50, 0.96)',
-  },
-  tileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 6,
-  },
-  tileDesc: {
-    color: '#9ca3af',
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 3,
-  },
-  activePillBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  activePillText: {
-    color: '#fca5a5',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  formulaBadge: {
-    color: '#f0e68c',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dotsBtn: {
-    padding: 4,
-    borderRadius: 4,
-  },
   emptyHint: {
     color: '#9ca3af',
     fontSize: 12,
@@ -1178,10 +1040,10 @@ const localStyles = StyleSheet.create({
   },
   menuPopup: {
     position: 'absolute',
-    backgroundColor: '#1f2328',
-    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.45)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     paddingVertical: 4,
     elevation: 8,
   },
@@ -1193,12 +1055,12 @@ const localStyles = StyleSheet.create({
     paddingVertical: 9,
   },
   menuItemText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -1206,30 +1068,30 @@ const localStyles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#1f2328',
-    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.45)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 16,
     gap: 8,
   },
   modalTitle: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   inputLabel: {
-    color: '#d1d5db',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   textInput: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    color: '#f9fafb',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1245,11 +1107,11 @@ const localStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   cancelBtnText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1257,10 +1119,10 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 5,
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
   },
   saveBtnText: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1271,11 +1133,11 @@ const localStyles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 5,
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     marginBottom: 4,
   },
   folderPickText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
 });

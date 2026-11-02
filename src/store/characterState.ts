@@ -127,6 +127,8 @@ export interface CharacterPersistedData {
   selectedPerks: SelectedPerkRecord[];
   /** Tagged-навыки, чья стартовая награда уже выдана. */
   rewardedSkills: string[];
+  /** Одноразовые эффекты журналов, уже использованные персонажем. */
+  usedMagazineEffects: string[];
   robot: RobotState;
   /** Поля расширений сеттингов ({ survival } у Fallout и т.д.), патч 209. */
   stateExtensions: Record<string, unknown>;
@@ -191,6 +193,7 @@ export const CHARACTER_PERSISTED_KEYS = [
   'effects',
   'selectedPerks',
   'rewardedSkills',
+  'usedMagazineEffects',
   'robot',
   'stateExtensions',
   'equipment',

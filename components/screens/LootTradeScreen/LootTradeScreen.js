@@ -122,6 +122,7 @@ const ContainerCardCell = ({
 }) => {
   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
   const isHub = container.kind === CONTAINER_KIND.HUB;
+  const isTerminal = container.kind === CONTAINER_KIND.TERMINAL;
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
 
@@ -182,7 +183,7 @@ const ContainerCardCell = ({
   const hubLockedCount = (container.links || []).filter((l) => l.locked).length;
   const heroIconName = isHub
     ? 'map-marker-multiple'
-    : (isMerchant ? 'sack' : 'treasure-chest');
+    : (isTerminal ? 'console' : (isMerchant ? 'sack' : 'treasure-chest'));
 
   return (
     <TouchableOpacity
@@ -243,6 +244,10 @@ const ContainerCardCell = ({
               </Text>
             )}
           </>
+        ) : isTerminal ? (
+          <Text style={styles.cardMeta} numberOfLines={1}>
+            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty, length: container.difficulty + 4 })}
+          </Text>
         ) : (
           <>
             <Text style={styles.cardMeta} numberOfLines={1}>
@@ -444,6 +449,12 @@ export default function LootTradeScreen() {
     () => containers.find((c) => c.id === activeContainerId) || null,
     [containers, activeContainerId],
   );
+  const activeTerminalStates = useMemo(() => {
+    if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL) return [];
+    return Object.entries(roomRooms || {})
+      .map(([code, room]) => ({ code, terminal: room?.terminalStates?.[activeContainer.id] }))
+      .filter((entry) => entry.terminal);
+  }, [activeContainer?.id, activeContainer?.kind, roomRooms]);
 
   useEffect(() => {
     if (!loading && activeContainerId && !containers.some((c) => c.id === activeContainerId)) {
@@ -581,6 +592,27 @@ export default function LootTradeScreen() {
 
     // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
     const liveEntries = getActiveLiveEntriesForContainer(saved);
+    if (saved.kind === CONTAINER_KIND.TERMINAL) {
+      for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
+        if (!roomEntry?.terminalStates?.[saved.id]) continue;
+        try {
+          await ensureGmRoomConnected(liveCode);
+          await useRoomStore.getState().issueTerminal({
+            code: liveCode,
+            ownerToken: roomByCode[liveCode]?.ownerToken,
+            config: {
+              containerId: saved.id,
+              name: saved.name,
+              description: saved.description,
+              difficulty: saved.difficulty,
+              lockOnFailure: saved.lockOnFailure,
+            },
+          });
+        } catch (e) {
+          debugLog('lootTrade.terminalConfigSync:failed', { message: e?.message });
+        }
+      }
+    }
     for (const { roomCode: liveCode, session: live } of liveEntries) {
       try {
         if (saved.kind === CONTAINER_KIND.HUB) {
@@ -628,6 +660,10 @@ export default function LootTradeScreen() {
               nodeName: saved.name,
               nodeDescription: saved.description,
               nodeItems: saved.items,
+              ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
+                nodeDifficulty: saved.difficulty,
+                nodeLockOnFailure: saved.lockOnFailure,
+              } : {}),
               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
                 caps: saved.caps,
                 saleMarkupPercent: saved.saleMarkupPercent,
@@ -981,25 +1017,39 @@ export default function LootTradeScreen() {
       const freshSource = (await db.getGmContainerById(issueTargetContainer.id)) || issueTargetContainer;
       const freshAllContainers = await db.getGmContainersList();
       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
-      await useRoomStore.getState().openRoomSession({
-        code: effectiveRoomCode,
-        ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
-        session: {
-          containerId: freshSource.id,
-          kind: freshSource.kind,
-          name: freshSource.name,
-          description: freshSource.description,
-          targetType,
-          targetCharacterId,
-          targetCharacterName,
-          caps: freshSource.caps,
-          saleMarkupPercent: freshSource.saleMarkupPercent,
-          buyDepreciationPercent: freshSource.buyDepreciationPercent,
-          characterOverrides: {},
-          items: isHub ? [] : freshSource.items,
-          ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
-        },
-      });
+      if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+        await useRoomStore.getState().issueTerminal({
+          code: effectiveRoomCode,
+          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+          config: {
+            containerId: freshSource.id,
+            name: freshSource.name,
+            description: freshSource.description,
+            difficulty: freshSource.difficulty,
+            lockOnFailure: freshSource.lockOnFailure,
+          },
+        });
+      } else {
+        await useRoomStore.getState().openRoomSession({
+          code: effectiveRoomCode,
+          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+          session: {
+            containerId: freshSource.id,
+            kind: freshSource.kind,
+            name: freshSource.name,
+            description: freshSource.description,
+            targetType,
+            targetCharacterId,
+            targetCharacterName,
+            caps: freshSource.caps,
+            saleMarkupPercent: freshSource.saleMarkupPercent,
+            buyDepreciationPercent: freshSource.buyDepreciationPercent,
+            characterOverrides: {},
+            items: isHub ? [] : freshSource.items,
+            ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
+          },
+        });
+      }
       setIssueTargetContainer(null);
       setRateScopeCharId(null);
     } catch (error) {
@@ -1329,6 +1379,7 @@ export default function LootTradeScreen() {
     { type: 'createHub', id: '__create_hub__' },
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
+    { type: 'createTerminal', id: '__create_terminal__' },
     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
   ];
 
@@ -1472,6 +1523,16 @@ export default function LootTradeScreen() {
                         />
                       );
                     }
+                    if (cell.type === 'createTerminal') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="console"
+                          label={tLootTrade('actions.createTerminal')}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null })}
+                        />
+                      );
+                    }
                     if (cell.type === 'empty') {
                       return <View key={cell.id} style={styles.emptyCell} />;
                     }
@@ -1591,7 +1652,7 @@ export default function LootTradeScreen() {
                 name={
                   activeContainer.kind === CONTAINER_KIND.HUB
                     ? 'map-marker-multiple'
-                    : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest')
+                    : (activeContainer.kind === CONTAINER_KIND.TERMINAL ? 'console' : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest'))
                 }
                 size={22}
                 color="#f0e68c"
@@ -1615,6 +1676,38 @@ export default function LootTradeScreen() {
 
             {Boolean(activeContainer.description) && (
               <Text style={styles.detailDescText}>{activeContainer.description}</Text>
+            )}
+
+            {activeContainer.kind === CONTAINER_KIND.TERMINAL && (
+              <View style={styles.terminalAdminPanel}>
+                <Text style={styles.terminalAdminText}>
+                  {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                    difficulty: activeContainer.difficulty,
+                    length: activeContainer.difficulty + 4,
+                  })}
+                  {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
+                </Text>
+                {activeTerminalStates.map(({ code, terminal }) => (
+                  <View key={code} style={styles.terminalAdminStateRow}>
+                    <Text style={styles.terminalAdminText}>
+                      {`${formatSingleRoomName(code)} · ${terminal.locked ? tLootTrade('terminal.locked') : tLootTrade('terminal.available')}`}
+                    </Text>
+                    {terminal.locked && (
+                      <TouchableOpacity
+                        style={styles.terminalUnlockButton}
+                        onPress={() => useRoomStore.getState().actOnTerminal({
+                          code,
+                          containerId: activeContainer.id,
+                          action: 'unlock',
+                          ownerToken: roomByCode[code]?.ownerToken,
+                        }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }))}
+                      >
+                        <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.unlock')}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
             )}
 
             {activeContainer.kind === CONTAINER_KIND.MERCHANT && (
@@ -1868,7 +1961,7 @@ export default function LootTradeScreen() {
                             <View style={styles.itemRowMain}>
                               <View style={styles.itemRowTitleLine}>
                                 <MaterialCommunityIcons
-                                  name={childIsMerch ? 'sack' : 'treasure-chest'}
+                                  name={child.kind === CONTAINER_KIND.TERMINAL ? 'console' : (childIsMerch ? 'sack' : 'treasure-chest')}
                                   size={18}
                                   color="#2b2b2b"
                                 />
@@ -1958,6 +2051,10 @@ export default function LootTradeScreen() {
                 )}
               </ScrollView>
             </>
+          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? (
+            <View style={styles.terminalAdminPanel}>
+              <Text style={styles.terminalAdminText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
+            </View>
           ) : (
             <>
               <TouchableOpacity
@@ -2117,6 +2214,7 @@ export default function LootTradeScreen() {
           void ensureGmRoomConnected(code).catch(() => {});
         }}
         onConfirmIssue={handleConfirmIssue}
+        roomWideOnly={issueTargetContainer?.kind === CONTAINER_KIND.TERMINAL || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL))}
         onClose={() => setIssueTargetContainer(null)}
       />
 

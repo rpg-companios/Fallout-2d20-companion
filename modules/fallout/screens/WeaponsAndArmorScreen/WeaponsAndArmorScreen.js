@@ -542,6 +542,9 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
     // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
     // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
     const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
+    // Keep every hook above the empty-slot return: kits replace empty weapon
+    // slots with populated weapons as character creation progresses.
+    const updateItem = useCharacterStore((state) => state.updateItem);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -629,7 +632,6 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
       || (durabilityLossEnabled && displayWeapon?.durabilityTracked && Number(durabilityValue) <= 0),
     );
     const isJammed = Boolean(displayWeapon?.jammed);
-    const updateItem = useCharacterStore((state) => state.updateItem);
     const storeWeaponKey = displayWeapon?.instanceId || displayWeapon?.uniqueId || displayWeapon?.id;
     const showDurability = ((randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon)) || isForceBroken;
 

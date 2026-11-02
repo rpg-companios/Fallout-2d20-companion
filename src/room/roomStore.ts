@@ -34,6 +34,7 @@ export interface RoomStateEntry {
   joined?: boolean;
   snapshots?: Record<string, RoomSnapshotEntry>;
   activeSession?: ActiveLootTradeSession | null;
+  terminalStates?: Record<string, any>;
   directives?: RoomDirectiveEntry[];
 }
 
@@ -49,6 +50,7 @@ interface JoinRoomResult {
   members: RoomMember[];
   snapshots: RoomSnapshotEntry[];
   activeSession?: ActiveLootTradeSession | null;
+  terminalStates?: Record<string, any>;
   directives?: RoomDirectiveEntry[];
 }
 
@@ -81,6 +83,8 @@ interface RoomStoreState {
     code: string;
     characterId: string;
   }) => Promise<void>;
+  issueTerminal: (input: { code: string; config: Record<string, unknown>; ownerToken?: string }) => Promise<any>;
+  actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
   openRoomSession: (input: {
     code: string;
     session: Record<string, unknown>;
@@ -104,6 +108,8 @@ interface RoomStoreState {
     nodeName?: string;
     nodeDescription?: string;
     nodeItems?: unknown[];
+    nodeDifficulty?: number;
+    nodeLockOnFailure?: boolean;
     locked?: boolean;
     lockLabel?: string;
   }) => Promise<ActiveLootTradeSession>;
@@ -360,6 +366,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     ) {
       applySessionEnvelopeToStore(message);
     }
+    if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
+      const code = message.roomCode;
+      const terminal = message.payload?.terminal;
+      const current = code ? get().rooms[code] : null;
+      if (code && current && terminal?.containerId) {
+        set({ rooms: {
+          ...get().rooms,
+          [code]: {
+            ...current,
+            terminalStates: {
+              ...(current.terminalStates || {}),
+              [terminal.containerId]: terminal,
+            },
+          },
+        } });
+      }
+    }
     if (
       message.type === ROOM_MESSAGE.GM_DIRECTIVE
       || message.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
@@ -525,6 +548,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             joined: Boolean(prev?.joined && requestedCode),
             snapshots: prev?.snapshots || {},
             activeSession: prev?.activeSession ?? null,
+            terminalStates: prev?.terminalStates || {},
             directives: prev?.directives || [],
           },
         },
@@ -545,6 +569,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           members: existing.members,
           snapshots: Object.values(existing.snapshots || {}),
           activeSession: existing.activeSession ?? null,
+          terminalStates: existing.terminalStates || {},
           directives: existing.directives || [],
         };
       }
@@ -557,6 +582,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         const payloadRooms = response.payload;
         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
+        const terminalStates = payloadRooms.terminalStates && typeof payloadRooms.terminalStates === 'object'
+          ? payloadRooms.terminalStates as Record<string, any>
+          : {};
         const directives = Array.isArray(payloadRooms.directives)
           ? (payloadRooms.directives as RoomDirectiveEntry[])
           : [];
@@ -575,6 +603,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               joined: true,
               snapshots: snapshotsMap,
               activeSession,
+              terminalStates,
               directives,
             },
           },
@@ -622,6 +651,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           members: payloadRooms.members || [],
           snapshots: Object.values(snapshotsMap),
           activeSession,
+          terminalStates,
           directives,
         };
       } finally {
@@ -693,6 +723,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           },
         });
       }
+    },
+
+    issueTerminal: async ({ code, config, ownerToken }) => {
+      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+      const payload: Record<string, unknown> = { code, config };
+      if (ownerToken) payload.ownerToken = ownerToken;
+      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ISSUE, payload, code);
+      return response.payload?.terminal;
+    },
+
+    actOnTerminal: async ({ code, containerId, action, characterId, value, ownerToken }) => {
+      const payload: Record<string, unknown> = { code, containerId, action };
+      if (characterId) payload.characterId = characterId;
+      if (value) payload.value = value;
+      if (ownerToken) payload.ownerToken = ownerToken;
+      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
+      return response.payload?.terminal;
     },
 
     openRoomSession: async ({ code, session, ownerToken }) => {

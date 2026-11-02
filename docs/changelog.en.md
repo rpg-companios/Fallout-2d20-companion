@@ -1,5 +1,21 @@
 # Changelog
 ---
+## Environment/Combat card redesign and manual exposure effects (patch 484)
+
+- Aligned the screen header and cards with the Character and Loot/Trade sections: vector icons, matching header structure and card borders; RU/EN selection now persists in settings.
+- Radiation is configured manually as damage per tick, interval count, and interval unit (for example, 3 damage per scene for 3 scenes). Removed source categories, protection-mode selection, and GM-side outcome previews. Effects require a connected room; protection and immunity resolve on the character side.
+- Sealed armor is automatically respected by weather effects on the character. Ghouls remain radiation-immune and recover 1 HP for each 3 points of radiation damage received.
+- Injuries apply to one selected character. Injury presets save a character-neutral zone; body or chassis locations are selected/adapted for the actual target when applied, including robots.
+
+---
+## Fix opening the GM "Environment/Combat" tab (patch 483)
+
+Fixed an error when opening the GM's third tab: the screen incorrectly destructured
+`useLocale()` and passed an empty locale to the language-label formatter. It now
+reads the locale as a string and switches languages through the standard
+`setCurrentLocale` function.
+
+---
 ## Environment/Combat, saved state presets, and room-neighbor First Aid (patch 482)
 
 - Added the GM workspace’s third tab, **Environment/Combat**, with separate Weather, Radiation, Injury, and Attack Failure tiles, room/recipient selection, room-wide time advancement, and tabletop-only calculation.

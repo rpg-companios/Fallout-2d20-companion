@@ -109,6 +109,7 @@ export interface CharacterActions {
   setChemDosesLog: UpdaterSetter<CharacterPersistedData['chemDosesLog']>;
   setLastDiseaseResistAt: UpdaterSetter<number | null>;
   setSceneRiskStates: UpdaterSetter<CharacterPersistedData['sceneRiskStates']>;
+  setUsedMagazineEffects: UpdaterSetter<string[]>;
   setEquipment: UpdaterSetter<EquipmentKit | null>;
   setEquippedWeapons: UpdaterSetter<CharacterPersistedData['equippedWeapons']>;
   setEquippedArmor: UpdaterSetter<EquippedArmor>;
@@ -155,6 +156,7 @@ export interface CharacterActions {
   reducePersistentDiseaseRanks: (amount: number) => { healed: boolean; diseasesLeft: number };
   resistDisease: (conditionId: string) => ResistDiseaseOutcome;
   applyDiseaseExposureEvent: (eventId: string) => Record<string, unknown> | null;
+  markMagazineEffectUsed: (effectId: string) => void;
 
   // ── Силовая броня: таймер расхода блока (§5.3/§5.4) ──
   tickPowerArmorCore: (tickMs: number) => void;
@@ -309,6 +311,7 @@ export const SETTER_UPDATER_KEYS = [
   'setChemDosesLog',
   'setLastDiseaseResistAt',
   'setSceneRiskStates',
+  'setUsedMagazineEffects',
   'setEquipment',
   'setEquippedWeapons',
   'setEquippedArmor',
@@ -350,6 +353,7 @@ export const NAMED_OP_KEYS = [
   'reducePersistentDiseaseRanks',
   'resistDisease',
   'applyDiseaseExposureEvent',
+  'markMagazineEffectUsed',
   'tickPowerArmorCore',
   'resetCharacter',
   'resetCharacterStore',

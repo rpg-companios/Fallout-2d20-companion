@@ -132,5 +132,6 @@ export const CHARACTER_SAVE_KEYS = [
   'rewardedSkills',
   'sceneRiskStates',
   'lastDiseaseResistAt',
+  'usedMagazineEffects',
   'schemaVersion',
 ] as const;

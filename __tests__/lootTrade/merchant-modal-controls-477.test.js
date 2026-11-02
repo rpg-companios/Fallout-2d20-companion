@@ -48,12 +48,12 @@ const collectText = (node) => {
   return '';
 };
 
-describe('Patch 477 — Merchant modal controls: no ±10 buttons, white dice-d20 icon, and full-height CD icon', () => {
+describe('Patch 477 — Merchant modal controls: no ±10 buttons, dark dice-d20 icon, and full-height CD icon', () => {
   beforeEach(() => {
     setCurrentLocale('ru-RU');
   });
 
-  it('removes −10 and +10 caps buttons, keeps − and +, renders full-height CdIcon and white dice-d20 icon', () => {
+  it('removes −10 and +10 caps buttons, keeps − and +, renders full-height CdIcon and dark dice-d20 icon', () => {
     const onSave = vi.fn();
     let renderer;
 
@@ -110,12 +110,12 @@ describe('Patch 477 — Merchant modal controls: no ±10 buttons, white dice-d20
     expect(cdImgStyle.height).toBe(38);
     expect(cdImgStyle.width).toBe(38);
 
-    // D20 button renders white MaterialCommunityIcons dice-d20 instead of "d20" text
+    // D20 button renders a dark MaterialCommunityIcons dice-d20 icon instead of "d20" text
     const d20Btn = renderer.root.findByProps({ testID: `merchant-unit-${QUANTITY_UNIT.D20}` });
     expect(collectText(d20Btn)).not.toContain('d20');
     const d20Icon = d20Btn.findByType('MaterialCommunityIcons');
     expect(d20Icon.props.name).toBe('dice-d20');
-    expect(d20Icon.props.color).toBe('#ffffff');
+    expect(d20Icon.props.color).toBe('#111111');
 
     // Selecting D20 and saving rolls d20 caps cleanly
     const nameInput = renderer.root.findByProps({ testID: 'container-form-name' });

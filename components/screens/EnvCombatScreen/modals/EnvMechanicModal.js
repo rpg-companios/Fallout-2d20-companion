@@ -6,8 +6,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   ScrollView,
-  StyleSheet,
   Switch,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -16,20 +16,17 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
 import IconText from '../../../lootTrade/LootTradeIconText';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { ENV_MECHANIC_TYPE } from '../../../../domain/envCombatPresets';
 import {
   ATTACK_FAIL_OUTCOMES,
   DURATION_UNITS,
   ENV_DIRECTIVE_KIND,
-  RADIATION_PRESETS,
   WEATHER_CONDITIONS,
-  computeRadiationExposure,
   describeInjuryEffect,
-  evaluateStrengthAmount,
   getCharacterZonesForInjury,
   resolveCharacterImmunityContext,
   rollCdValue,
-  rollHitZoneForCharacter,
 } from '../../../../modules/fallout/gm/gmEnvCombat';
 import { formatGm, tGm } from '../../../../modules/fallout/gm/gmI18n';
 
@@ -71,17 +68,13 @@ export default function EnvMechanicModal({
 
   // Общие поля силы и длительности (для Погоды и Радиации, а также урона Взрыва/Рикошета)
   const [conditionKey, setConditionKey] = useState('heat');
-  const [radPresetKey, setRadPresetKey] = useState('dirtyWater');
-  const [radResistMode, setRadResistMode] = useState('minBody');
   const [valueMode, setValueMode] = useState('fixed');
   const [value, setValue] = useState(2);
   const [durationUnit, setDurationUnit] = useState('scenes');
   const [totalIntervals, setTotalIntervals] = useState(3);
-  const [shelterProtected, setShelterProtected] = useState(true);
 
   // Зона попадания / увечья
-  const [zoneKey, setZoneKey] = useState('body');
-  const [rolledD20Info, setRolledD20Info] = useState('');
+  const [zoneKey, setZoneKey] = useState('auto');
   const [bleedDice, setBleedDice] = useState(1);
 
   // Провал атаки
@@ -92,7 +85,7 @@ export default function EnvMechanicModal({
   const [ricochetTargetMode, setRicochetTargetMode] = useState('self');
   const [ricochetChosenCharId, setRicochetChosenCharId] = useState('');
 
-  // Настольный бросок {CD} и форма сохранения пресета
+  // Настройка значений и форма сохранения пресета
   const [rolledCdLine, setRolledCdLine] = useState('');
   const [savePanelOpen, setSavePanelOpen] = useState(false);
   const [presetName, setPresetName] = useState('');
@@ -101,13 +94,13 @@ export default function EnvMechanicModal({
 
   const primaryCharacter = useMemo(() => {
     if (selectedTargetId && selectedTargetId !== 'all') {
-      return roomCharacters.find((c) => c.characterId === selectedTargetId) || roomCharacters[0] || null;
+      return roomCharacters.find((c) => c.characterId === selectedTargetId) || null;
     }
-    return roomCharacters[0] || null;
+    return null;
   }, [roomCharacters, selectedTargetId]);
 
   const charZones = useMemo(
-    () => getCharacterZonesForInjury(primaryCharacter?.snapshot || {}, locale),
+    () => (primaryCharacter ? getCharacterZonesForInjury(primaryCharacter.snapshot || {}, locale) : []),
     [primaryCharacter, locale],
   );
 
@@ -143,29 +136,22 @@ export default function EnvMechanicModal({
   useEffect(() => {
     if (!visible) return;
     setRolledCdLine('');
-    setRolledD20Info('');
     const p = initialPayload || {};
 
     if (mechanicType === ENV_MECHANIC_TYPE.WEATHER) {
       const def = WEATHER_CONDITIONS.find((c) => c.key === (p.conditionKey || 'heat')) || WEATHER_CONDITIONS[0];
       setConditionKey(def.key);
-      setValueMode(p.valueMode || def.defaultMode);
+      setValueMode('fixed');
       setValue(p.value ?? def.defaultValue);
       setDurationUnit(p.durationUnit || def.defaultUnit);
       setTotalIntervals(p.totalIntervals ?? def.defaultIntervals);
-      setShelterProtected(p.shelterProtected !== false);
     } else if (mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
-      const def = RADIATION_PRESETS.find((r) => r.key === (p.presetKey || 'dirtyWater')) || RADIATION_PRESETS[0];
-      setRadPresetKey(def.key);
-      setRadResistMode(p.radResistMode || def.resistMode);
-      setValueMode(p.valueMode || def.defaultMode);
-      setValue(p.value ?? def.defaultValue);
-      setDurationUnit(p.durationUnit || def.defaultUnit);
-      setTotalIntervals(p.totalIntervals ?? def.defaultIntervals);
-      setZoneKey(p.hitZone || 'body');
+      setValueMode('fixed');
+      setValue(p.value ?? 3);
+      setDurationUnit(p.durationUnit && p.durationUnit !== 'once' ? p.durationUnit : 'scenes');
+      setTotalIntervals(p.totalIntervals ?? 3);
     } else if (mechanicType === ENV_MECHANIC_TYPE.INJURY) {
-      const firstZ = charZones[0]?.key || 'body';
-      setZoneKey(p.zoneKey && charZones.some((z) => z.key === p.zoneKey) ? p.zoneKey : firstZ);
+      setZoneKey(p.zoneKey && charZones.some((z) => z.key === p.zoneKey) ? p.zoneKey : 'auto');
       setBleedDice(p.bleedDice ?? 1);
     } else if (mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL) {
       setAttackOutcome(p.outcome || 'weaponJam');
@@ -176,7 +162,7 @@ export default function EnvMechanicModal({
       setExplodeRepairable(p.repairable !== false);
       setRicochetTargetMode(p.ricochetTargetMode || 'self');
       setRicochetChosenCharId(p.ricochetChosenCharId || roomCharacters[0]?.characterId || '');
-      setZoneKey(p.hitZone || 'body');
+      setZoneKey(p.hitZone || 'auto');
     }
 
     if (initialPresetMeta) {
@@ -190,7 +176,7 @@ export default function EnvMechanicModal({
       setPresetFolderId(null);
       setSavePanelOpen(false);
     }
-  }, [visible, mechanicType, initialPayload, initialPresetMeta]);
+  }, [visible, mechanicType, initialPayload, initialPresetMeta, charZones]);
 
   useEffect(() => {
     if (targetWeapons.length > 0 && !targetWeapons.some((w) => w.id === selectedWeaponId)) {
@@ -202,19 +188,10 @@ export default function EnvMechanicModal({
 
   const selectWeatherCond = (cond) => {
     setConditionKey(cond.key);
-    setValueMode(cond.defaultMode);
+    setValueMode('fixed');
     setValue(cond.defaultValue);
     setDurationUnit(cond.defaultUnit);
     setTotalIntervals(cond.defaultIntervals);
-  };
-
-  const selectRadPreset = (rp) => {
-    setRadPresetKey(rp.key);
-    setRadResistMode(rp.resistMode);
-    setValueMode(rp.defaultMode);
-    setValue(rp.defaultValue);
-    setDurationUnit(rp.defaultUnit);
-    setTotalIntervals(rp.defaultIntervals);
   };
 
   const handleRollCdPreview = () => {
@@ -223,17 +200,6 @@ export default function EnvMechanicModal({
       total: res.total,
       faces: res.rolls.join(', '),
     }));
-  };
-
-  const handleRollZoneD20 = () => {
-    const r = rollHitZoneForCharacter(primaryCharacter?.snapshot || {}, locale);
-    if (r.zone) {
-      setZoneKey(r.zone.key);
-      setRolledD20Info(formatGm(tGm('envCombat.injury.rolledZone', locale), {
-        roll: r.roll,
-        zone: r.zone.label,
-      }));
-    }
   };
 
   const handleRandomAttackOutcome = () => {
@@ -249,18 +215,14 @@ export default function EnvMechanicModal({
         value,
         durationUnit,
         totalIntervals: durationUnit === 'once' ? 1 : totalIntervals,
-        shelterProtected,
       };
     }
     if (mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
       return {
-        presetKey: radPresetKey,
-        radResistMode,
-        hitZone: zoneKey,
-        valueMode,
+        valueMode: 'fixed',
         value,
         durationUnit,
-        totalIntervals: durationUnit === 'once' ? 1 : totalIntervals,
+        totalIntervals,
       };
     }
     if (mechanicType === ENV_MECHANIC_TYPE.INJURY) {
@@ -281,7 +243,7 @@ export default function EnvMechanicModal({
       repairable: explodeRepairable,
       ricochetTargetMode,
       ricochetChosenCharId: ricochetChosenCharId || null,
-      hitZone: zoneKey,
+      hitZone: zoneKey === 'auto' ? null : zoneKey,
     };
   };
 
@@ -292,7 +254,9 @@ export default function EnvMechanicModal({
     return ENV_DIRECTIVE_KIND.ATTACK_FAIL;
   };
 
+  const requiresCharacter = mechanicType === ENV_MECHANIC_TYPE.INJURY || mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL;
   const handleApply = () => {
+    if (!hasLiveRoom || (requiresCharacter && !primaryCharacter)) return;
     const envPayload = buildCurrentEnvPayload();
     if (presetName.trim()) {
       envPayload.customTitle = presetName.trim();
@@ -320,27 +284,29 @@ export default function EnvMechanicModal({
     const defaultName = mechanicType === ENV_MECHANIC_TYPE.WEATHER
       ? tGm(`envCombat.weather.conditions.${conditionKey}.title`, locale)
       : mechanicType === ENV_MECHANIC_TYPE.RADIATION
-        ? tGm(`envCombat.radiation.presets.${radPresetKey}`, locale)
+        ? tGm('envCombat.radiation.modalTitle', locale)
         : mechanicType === ENV_MECHANIC_TYPE.INJURY
-          ? `${tGm('envCombat.tiles.injury.title', locale)}: ${charZones.find((z) => z.key === zoneKey)?.label || zoneKey}`
+          ? tGm('envCombat.tiles.injury.title', locale)
           : tGm(`envCombat.attackFail.outcomes.${attackOutcome}.title`, locale);
+    const presetPayload = buildCurrentEnvPayload();
+    if (mechanicType === ENV_MECHANIC_TYPE.INJURY) presetPayload.zoneKey = 'auto';
     onSavePresetTile?.({
       id: initialPresetMeta?.id || undefined,
       mechanicType,
       name: presetName.trim() || defaultName,
       description: presetDesc.trim(),
       parentFolderId: presetFolderId || null,
-      payload: buildCurrentEnvPayload(),
+      payload: presetPayload,
     });
     setSavePanelOpen(false);
   };
 
-  const renderStrengthAndDuration = ({ showDuration = true } = {}) => {
+  const renderStrengthAndDuration = ({ showDuration = true, fixedOnly = false, intervalOnly = false, valueLabel = null, stepperLabel = null } = {}) => {
     const valSummary = valueMode === 'cd' ? `${value} {CD}` : `${value}`;
     return (
       <View style={styles.blockBox}>
-        <IconText style={styles.sectionLabel}>{tGm('envCombat.valueMode.label', locale)}</IconText>
-        <View style={styles.chipsRow}>
+        <IconText style={styles.sectionLabel}>{valueLabel || tGm('envCombat.valueMode.label', locale)}</IconText>
+        {!fixedOnly ? <View style={styles.chipsRow}>
           {['fixed', 'cd'].map((m) => {
             const active = valueMode === m;
             return (
@@ -363,9 +329,9 @@ export default function EnvMechanicModal({
               </IconText>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </View> : null}
         <StepperRow
-          label={valueMode === 'cd' ? `{CD}` : '#'}
+          label={stepperLabel || (valueMode === 'cd' ? `{CD}` : '#')}
           value={value}
           min={1}
           max={30}
@@ -379,7 +345,7 @@ export default function EnvMechanicModal({
               {tGm('envCombat.duration.label', locale)}
             </Text>
             <View style={styles.chipsRow}>
-              {DURATION_UNITS.map((u) => {
+              {DURATION_UNITS.filter((u) => !intervalOnly || u !== 'once').map((u) => {
                 const active = durationUnit === u;
                 return (
                   <TouchableOpacity
@@ -394,7 +360,7 @@ export default function EnvMechanicModal({
                 );
               })}
             </View>
-            {durationUnit !== 'once' ? (
+            {durationUnit !== 'once' || intervalOnly ? (
               <>
                 <StepperRow
                   label={tGm('envCombat.duration.intervalsLabel', locale)}
@@ -470,19 +436,7 @@ export default function EnvMechanicModal({
                   })}
                 </View>
 
-                {renderStrengthAndDuration({ showDuration: true })}
-
-                <View style={styles.switchRow}>
-                  <Text style={styles.fieldLabel}>
-                    {tGm('envCombat.weather.shelterProtectedLabel', locale)}
-                  </Text>
-                  <Switch
-                    value={shelterProtected}
-                    onValueChange={setShelterProtected}
-                    trackColor={{ false: '#374151', true: '#a16207' }}
-                    thumbColor={shelterProtected ? '#f0e68c' : '#9ca3af'}
-                  />
-                </View>
+                {renderStrengthAndDuration({ showDuration: true, fixedOnly: true })}
 
                 {hasLiveRoom ? (
                   <View style={styles.inlineBtnsRow}>
@@ -509,146 +463,71 @@ export default function EnvMechanicModal({
               </>
             ) : null}
 
-            {/* 2. РАДИАЦИЯ */}
+            {/* 2. РАДИАЦИЯ: задаётся только урон за тик и его интервал/длительность */}
             {mechanicType === ENV_MECHANIC_TYPE.RADIATION ? (
               <>
-                <Text style={styles.sectionLabel}>{tGm('envCombat.radiation.presetsLabel', locale)}</Text>
-                <View style={styles.chipsRow}>
-                  {RADIATION_PRESETS.map((rp) => {
-                    const active = radPresetKey === rp.key;
-                    return (
-                      <TouchableOpacity
-                        key={rp.key}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => selectRadPreset(rp)}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {tGm(`envCombat.radiation.presets.${rp.key}`, locale)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <Text style={[styles.sectionLabel, { marginTop: 8 }]}>
-                  {tGm('envCombat.radiation.resistModeLabel', locale)}
+                {renderStrengthAndDuration({
+                  showDuration: true,
+                  fixedOnly: true,
+                  intervalOnly: true,
+                  valueLabel: tGm('envCombat.radiation.damagePerInterval', locale),
+                  stepperLabel: tGm('envCombat.radiation.damageLabel', locale),
+                })}
+                <Text style={styles.hintText}>
+                  {tGm('envCombat.radiation.resolvedOnCharacter', locale)}
                 </Text>
-                <View style={styles.chipsRow}>
-                  {['minBody', 'zone', 'direct'].map((rm) => {
-                    const active = radResistMode === rm;
-                    return (
-                      <TouchableOpacity
-                        key={rm}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => setRadResistMode(rm)}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {tGm(`envCombat.radiation.resistModes.${rm}`, locale)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {radResistMode === 'zone' ? (
-                  <View style={styles.blockBox}>
-                    <View style={styles.chipsRow}>
-                      {charZones.map((z) => {
-                        const active = zoneKey === z.key;
-                        return (
-                          <TouchableOpacity
-                            key={z.key}
-                            style={[styles.chip, active && styles.chipActive]}
-                            onPress={() => setZoneKey(z.key)}
-                          >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                              {z.label} ({z.hitRangeLabel})
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
-                        <MaterialCommunityIcons name="dice-d20" size={17} color="#ffffff" />
-                        <Text style={styles.diceBtnText}>{tGm('envCombat.radiation.rollZoneBtn', locale)}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
-                  </View>
-                ) : null}
-
-                {renderStrengthAndDuration({ showDuration: true })}
-
-                {roomCharacters.length > 0 ? (
-                  <View style={styles.blockBox}>
-                    <Text style={styles.sectionLabel}>{tGm('envCombat.radiation.previewTitle', locale)}</Text>
-                    {roomCharacters
-                      .filter((c) => selectedTargetId === 'all' || c.characterId === selectedTargetId)
-                      .map((c) => {
-                        const estRaw = valueMode === 'cd' ? value : value;
-                        const exp = computeRadiationExposure(c.snapshot || {}, estRaw, {
-                          resistMode: radResistMode,
-                          hitZone: zoneKey,
-                        });
-                        return (
-                          <View key={c.characterId} style={styles.previewRow}>
-                            <Text style={styles.previewName}>{c.name || '—'}</Text>
-                            <Text style={[styles.previewVal, exp.immune && { color: '#4ade80' }]}>
-                              {exp.immune
-                                ? tGm('envCombat.radiation.previewImmune', locale)
-                                : formatGm(tGm('envCombat.radiation.previewRow', locale), {
-                                    dr: exp.dr,
-                                    net: valueMode === 'cd' ? `max(${value}CD − ${exp.dr})` : exp.netRad,
-                                  })}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                  </View>
-                ) : null}
               </>
             ) : null}
 
             {/* 3. УВЕЧЬЕ */}
             {mechanicType === ENV_MECHANIC_TYPE.INJURY ? (
               <>
+                {!primaryCharacter ? (
+                  <Text style={styles.hintText}>{tGm('envCombat.injury.chooseCharacterFirst', locale)}</Text>
+                ) : null}
                 {targetIsRobot ? (
                   <Text style={styles.robotHint}>{tGm('envCombat.injury.robotAdaptedHint', locale)}</Text>
                 ) : null}
 
                 <View style={styles.chipsRow}>
-                  <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
-                    <MaterialCommunityIcons name="dice-d20" size={18} color="#ffffff" />
-                    <Text style={styles.diceBtnText}>{tGm('envCombat.injury.rollD20Btn', locale)}</Text>
+                  <TouchableOpacity
+                    style={[styles.chip, zoneKey === 'auto' && styles.chipActive]}
+                    onPress={() => setZoneKey('auto')}
+                  >
+                    <Text style={[styles.chipText, zoneKey === 'auto' && styles.chipTextActive]}>
+                      {tGm('envCombat.injury.autoZone', locale)}
+                    </Text>
                   </TouchableOpacity>
-                  {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
                 </View>
 
-                <View style={styles.optionGrid}>
-                  {charZones.map((z) => {
-                    const active = zoneKey === z.key;
-                    const effectDesc = describeInjuryEffect(
-                      z.key,
-                      { isRobotZone: z.isRobotZone, bleedDice, stage: 'active' },
-                      locale,
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={z.key}
-                        style={[styles.optionCard, active && styles.optionCardActive]}
-                        onPress={() => setZoneKey(z.key)}
-                      >
-                        <View style={styles.optionHeader}>
-                          <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>
-                            {z.label} (d20: {z.hitRangeLabel})
-                          </Text>
-                        </View>
-                        <IconText style={styles.optionDesc}>{effectDesc}</IconText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {primaryCharacter ? (
+                  <View style={styles.optionGrid}>
+                    {charZones.map((z) => {
+                      const active = zoneKey === z.key;
+                      const effectDesc = describeInjuryEffect(
+                        z.key,
+                        { isRobotZone: z.isRobotZone, bleedDice, stage: 'active' },
+                        locale,
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={z.key}
+                          style={[styles.optionCard, active && styles.optionCardActive]}
+                          onPress={() => setZoneKey(z.key)}
+                        >
+                          <View style={styles.optionHeader}>
+                            <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>
+                              {z.label} (d20: {z.hitRangeLabel})
+                            </Text>
+                          </View>
+                          <IconText style={styles.optionDesc}>{effectDesc}</IconText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
 
-                {['body', 'torso', 'chassis', 'hull'].includes(String(zoneKey).toLowerCase()) ? (
+                {zoneKey === 'auto' || ['body', 'torso', 'chassis', 'hull'].includes(String(zoneKey).toLowerCase()) ? (
                   <View style={styles.blockBox}>
                     <StepperRow
                       label={tGm('envCombat.injury.bleedLabel', locale)}
@@ -660,17 +539,19 @@ export default function EnvMechanicModal({
                   </View>
                 ) : null}
 
-                {hasLiveRoom ? (
+                {hasLiveRoom && primaryCharacter ? (
                   <View style={styles.inlineBtnsRow}>
-                    <TouchableOpacity
-                      style={styles.ghostDangerBtn}
-                      onPress={() => onDispatchDirective?.({
-                        kind: ENV_DIRECTIVE_KIND.INJURY_CLEAR,
-                        envPayload: { zoneKey },
-                      })}
-                    >
-                      <Text style={styles.ghostDangerText}>{tGm('envCombat.injury.clearZoneBtn', locale)}</Text>
-                    </TouchableOpacity>
+                    {zoneKey !== 'auto' ? (
+                      <TouchableOpacity
+                        style={styles.ghostDangerBtn}
+                        onPress={() => onDispatchDirective?.({
+                          kind: ENV_DIRECTIVE_KIND.INJURY_CLEAR,
+                          envPayload: { zoneKey },
+                        })}
+                      >
+                        <Text style={styles.ghostDangerText}>{tGm('envCombat.injury.clearZoneBtn', locale)}</Text>
+                      </TouchableOpacity>
+                    ) : null}
                     <TouchableOpacity
                       style={styles.ghostDangerBtn}
                       onPress={() => onDispatchDirective?.({
@@ -800,7 +681,7 @@ export default function EnvMechanicModal({
                           thumbColor={explodeRepairable ? '#f0e68c' : '#fca5a5'}
                         />
                       </View>
-                      <Text style={[styles.hintText, !explodeRepairable && { color: '#fca5a5' }]}>
+                      <Text style={[styles.hintText, !explodeRepairable && { color: ADMIN_MODAL_PALETTE.danger }]}>
                         {tGm(explodeRepairable ? 'envCombat.attackFail.repairableYesHint' : 'envCombat.attackFail.repairableNoHint', locale)}
                       </Text>
                     </View>
@@ -847,13 +728,6 @@ export default function EnvMechanicModal({
                           })}
                         </View>
                       ) : null}
-                      <View style={[styles.chipsRow, { marginTop: 8 }]}>
-                        <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
-                          <MaterialCommunityIcons name="dice-d20" size={17} color="#ffffff" />
-                          <Text style={styles.diceBtnText}>{tGm('envCombat.radiation.rollZoneBtn', locale)}</Text>
-                        </TouchableOpacity>
-                        {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
-                      </View>
                     </View>
                     {renderStrengthAndDuration({ showDuration: false })}
                   </>
@@ -921,20 +795,31 @@ export default function EnvMechanicModal({
             ) : null}
           </ScrollView>
 
+          {!hasLiveRoom ? (
+            <Text style={styles.hintText}>{tGm('envCombat.requiresLiveRoom', locale)}</Text>
+          ) : (requiresCharacter && !primaryCharacter ? (
+            <Text style={styles.hintText}>
+              {mechanicType === ENV_MECHANIC_TYPE.INJURY
+                ? tGm('envCombat.injury.chooseCharacterFirst', locale)
+                : tGm('envCombat.chooseCharacterFirst', locale)}
+            </Text>
+          ) : null)}
           <View style={styles.footerRow}>
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => setSavePanelOpen((v) => !v)}
             >
-              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color="#f0e68c" />
-              <Text style={[styles.secondaryBtnText, { color: '#f0e68c' }]}>
+              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color={ADMIN_MODAL_PALETTE.accent} />
+              <Text style={[styles.secondaryBtnText, { color: ADMIN_MODAL_PALETTE.text }]}>
                 {tGm('envCombat.presetModal.saveAsTileBtn', locale)}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleApply}>
-              <Text style={styles.primaryBtnText}>
-                {hasLiveRoom ? tGm('envCombat.applyBtn', locale) : tGm('envCombat.rollTabletopBtn', locale)}
-              </Text>
+            <TouchableOpacity
+              style={[styles.primaryBtn, (!hasLiveRoom || (requiresCharacter && !primaryCharacter)) && { opacity: 0.45 }]}
+              onPress={handleApply}
+              disabled={!hasLiveRoom || (requiresCharacter && !primaryCharacter)}
+            >
+              <Text style={styles.primaryBtnText}>{tGm('envCombat.applyBtn', locale)}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -946,7 +831,7 @@ export default function EnvMechanicModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.78)',
+    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 12,
@@ -955,10 +840,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 640,
     maxHeight: '92%',
-    backgroundColor: '#1f2328',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.42)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 14,
   },
   headerRow: {
@@ -967,10 +852,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: ADMIN_MODAL_PALETTE.border,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 17,
     fontWeight: '700',
     flex: 1,
@@ -989,15 +874,15 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   optionCard: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     padding: 10,
   },
   optionCardActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: 'rgba(240, 230, 140, 0.1)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   optionHeader: {
     flexDirection: 'row',
@@ -1006,34 +891,34 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   optionTitle: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
   optionTitleActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
   },
   optionDesc: {
-    color: '#9ca3af',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     lineHeight: 16,
   },
   blockBox: {
-    backgroundColor: '#181b20',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     padding: 10,
     gap: 7,
   },
   sectionLabel: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   fieldLabel: {
-    color: '#d1d5db',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
   chipsRow: {
@@ -1047,35 +932,35 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   chipActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   chipText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   diceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#374151',
-    borderColor: '#6b7280',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   diceBtnText: {
-    color: '#ffffff',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1094,36 +979,36 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 5,
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 17,
     fontWeight: '700',
   },
   stepValue: {
-    color: '#ffffff',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 15,
     fontWeight: '700',
     minWidth: 28,
     textAlign: 'center',
   },
   rolledInfo: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   robotHint: {
-    color: '#60a5fa',
+    color: '#1d4ed8',
     fontSize: 12,
     fontWeight: '600',
   },
   hintText: {
-    color: '#9ca3af',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -1138,15 +1023,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 3,
     borderBottomWidth: 1,
-    borderBottomColor: '#272c33',
+    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
   previewName: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   previewVal: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
   },
   inlineBtnsRow: {
@@ -1164,24 +1049,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.1)',
   },
   ghostDangerText: {
-    color: '#fca5a5',
+    color: ADMIN_MODAL_PALETTE.danger,
     fontSize: 12,
     fontWeight: '600',
   },
   savePresetBox: {
-    backgroundColor: '#181b20',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 10,
     gap: 8,
   },
   input: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    color: '#f9fafb',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1192,7 +1077,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: ADMIN_MODAL_PALETTE.border,
     gap: 8,
   },
   secondaryBtn: {
@@ -1203,11 +1088,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   secondaryBtnText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1215,10 +1100,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 5,
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
   },
   primaryBtnText: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 13,
     fontWeight: '700',
   },

@@ -176,8 +176,6 @@ export const GM_DICTIONARIES = {
         step1d: '+1 сут',
         timeStepApplied: 'Время продвинуто: {label}',
       },
-      tilesSectionTitle: 'Системные механики',
-      savedSectionTitle: 'Папки и сохранённые состояния',
       newFolderBtn: '+ Папка',
       backToRoot: '← Назад к корню',
       emptySaved: 'Сохранённых состояний пока нет. Откройте любую из 4 плиток выше, настройте параметры и нажмите «Сохранить как плитку», чтобы применять любимые заготовки в один клик.',
@@ -220,21 +218,17 @@ export const GM_DICTIONARIES = {
       tiles: {
         weather: {
           title: 'Погода',
-          subtitle: 'Жара, холод, пыльная буря, туман, рад-шторм, кислотный дождь',
           activeBadge: 'Активно: {count}',
         },
         radiation: {
           title: 'Радиация',
-          subtitle: 'Облучение среды или зоны с учётом СУ брони и иммунитетов',
         },
         injury: {
           title: 'Увечье',
-          subtitle: 'Травмы конечностей и узлов роботов (ручной выбор или d20)',
           activeBadge: 'Увечий: {count}',
         },
         attackFail: {
           title: 'Провал атаки',
-          subtitle: 'Потеря патронов, клин, поломка, взрыв оружия, рикошет, потеря оружия',
         },
       },
       valueMode: {
@@ -268,7 +262,6 @@ export const GM_DICTIONARIES = {
         modalTitle: 'Погодное условие',
         clearAllBtn: 'Снять всю погоду',
         clearThisBtn: 'Снять это условие',
-        shelterProtectedLabel: 'Учитывать герметичную СБ / защиту от среды',
         conditions: {
           heat: {
             title: 'Сильная жара',
@@ -298,29 +291,17 @@ export const GM_DICTIONARIES = {
       },
       radiation: {
         modalTitle: 'Воздействие радиации',
-        presetsLabel: 'Источник облучения',
-        presets: {
-          dirtyWater: 'Грязная вода / брод',
-          background: 'Фоновая зона',
-          barrel: 'Бочка / реактор',
-          radBurst: 'Рад-всплеск',
-          custom: 'Свой источник',
-        },
-        resistModeLabel: 'Режим учёта защиты',
-        resistModes: {
-          minBody: 'Фоновое (наименьшее СУ рад. по телу)',
-          zone: 'В конкретную зону (или d20)',
-          direct: 'Напрямую (игнорировать броню)',
-        },
-        rollZoneBtn: 'Зона d20',
-        previewTitle: 'Предпросмотр по персонажам',
-        previewImmune: 'Иммунитет (0 рад)',
-        previewRow: 'СУ рад: {dr} → итог за тик: +{net} рад',
+        damagePerInterval: 'Урон радиацией за промежуток',
+        damageLabel: 'Урон',
+        genericTitle: 'Воздействие радиации',
+        resolvedOnCharacter: 'Сопротивление и иммунитет определяются на листе персонажа при каждом тике.',
+        immuneResult: 'Иммунитет: радиация не добавлена.',
+        immuneHealed: 'Иммунитет к радиации: восстановлено {heal} ОЗ.',
       },
       injury: {
         modalTitle: 'Увечье зоны тела / узла корпуса',
-        rollD20Btn: 'Бросить d20 зоны',
-        rolledZone: 'Бросок d20 = {roll} → {zone}',
+        autoZone: 'Определить зону на персонаже (d20)',
+        chooseCharacterFirst: 'Для применения увечья выберите одного персонажа в строке «Получатель».',
         robotAdaptedHint: 'Цель — робот: зоны автоматически адаптированы под его корпус.',
         bleedLabel: 'Кровотечение / утечка торса ({CD} за интервал)',
         clearZoneBtn: 'Вылечить выбранную зону',
@@ -387,8 +368,8 @@ export const GM_DICTIONARIES = {
         },
       },
       applyBtn: 'Применить',
-      rollTabletopBtn: 'Рассчитать за столом',
-      tabletopResultTitle: 'Расчёт за столом',
+      requiresLiveRoom: 'Для применения нужен подключённый зал. Настройку можно сохранить пресетом.',
+      chooseCharacterFirst: 'Выберите одного персонажа в строке «Получатель» для применения эффекта.',
       weaponBadges: {
         jammed: 'Заклинило',
         clearJamBtn: 'Устранить осечку',
@@ -601,8 +582,6 @@ export const GM_DICTIONARIES = {
         step1d: '+1 day',
         timeStepApplied: 'Time advanced: {label}',
       },
-      tilesSectionTitle: 'System Mechanics',
-      savedSectionTitle: 'Folders & Saved States',
       newFolderBtn: '+ Folder',
       backToRoot: '← Back to root',
       emptySaved: 'No saved states yet. Open any of the 4 tiles above, configure its parameters, and click "Save as Tile" to apply your favorite presets in one tap.',
@@ -645,21 +624,17 @@ export const GM_DICTIONARIES = {
       tiles: {
         weather: {
           title: 'Weather',
-          subtitle: 'Heat, cold, dust storm, fog, rad-storm, acid rain',
           activeBadge: 'Active: {count}',
         },
         radiation: {
           title: 'Radiation',
-          subtitle: 'Ambient or targeted exposure with armor Rad DR and immunities',
         },
         injury: {
           title: 'Injury',
-          subtitle: 'Limb & robot chassis injuries (manual pick or d20 roll)',
           activeBadge: 'Injuries: {count}',
         },
         attackFail: {
           title: 'Attack Failure',
-          subtitle: 'Ammo loss, jam, weapon break, weapon explosion, ricochet, drop weapon',
         },
       },
       valueMode: {
@@ -693,7 +668,6 @@ export const GM_DICTIONARIES = {
         modalTitle: 'Weather Condition',
         clearAllBtn: 'Clear All Weather',
         clearThisBtn: 'Clear This Condition',
-        shelterProtectedLabel: 'Respect sealed PA / hazard protection',
         conditions: {
           heat: {
             title: 'Extreme Heat',
@@ -723,29 +697,17 @@ export const GM_DICTIONARIES = {
       },
       radiation: {
         modalTitle: 'Radiation Exposure',
-        presetsLabel: 'Radiation Source',
-        presets: {
-          dirtyWater: 'Dirty Water / Wade',
-          background: 'Ambient Zone',
-          barrel: 'Waste Barrel / Reactor',
-          radBurst: 'Rad Burst',
-          custom: 'Custom Source',
-        },
-        resistModeLabel: 'Protection Mode',
-        resistModes: {
-          minBody: 'Ambient (lowest Rad DR across body)',
-          zone: 'Specific Hit Location (or d20)',
-          direct: 'Direct (ignore armor)',
-        },
-        rollZoneBtn: 'Roll d20',
-        previewTitle: 'Character Preview',
-        previewImmune: 'Immune (0 rad)',
-        previewRow: 'Rad DR: {dr} → net per tick: +{net} rad',
+        damagePerInterval: 'Radiation damage per interval',
+        damageLabel: 'Damage',
+        genericTitle: 'Radiation exposure',
+        resolvedOnCharacter: 'Resistance and immunity are resolved on the character sheet at each tick.',
+        immuneResult: 'Radiation immunity: no radiation was added.',
+        immuneHealed: 'Radiation immunity: restored {heal} HP.',
       },
       injury: {
         modalTitle: 'Body Location / Chassis Injury',
-        rollD20Btn: 'Roll d20 Location',
-        rolledZone: 'd20 roll = {roll} → {zone}',
+        autoZone: 'Roll the hit location on the character (d20)',
+        chooseCharacterFirst: 'Select one character in the Recipient row before applying an injury.',
         robotAdaptedHint: 'Target is a robot: locations automatically adapted to its chassis.',
         bleedLabel: 'Torso Bleed / Leak ({CD} per interval)',
         clearZoneBtn: 'Heal Selected Location',
@@ -812,8 +774,8 @@ export const GM_DICTIONARIES = {
         },
       },
       applyBtn: 'Apply',
-      rollTabletopBtn: 'Calculate at Table',
-      tabletopResultTitle: 'Tabletop Calculation',
+      requiresLiveRoom: 'A connected room is required to apply this effect. You can still save it as a preset.',
+      chooseCharacterFirst: 'Select one character in the Recipient row before applying this effect.',
       weaponBadges: {
         jammed: 'Jammed',
         clearJamBtn: 'Clear Jam',

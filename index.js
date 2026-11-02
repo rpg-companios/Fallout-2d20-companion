@@ -2,7 +2,7 @@ import 'expo-font';
 import * as Font from 'expo-font';
 import { registerRootComponent } from 'expo';
 import React from 'react';
-import { Platform, View, Text } from 'react-native';
+import { Platform, View, Text, ScrollView } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 
 import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
@@ -94,20 +94,30 @@ import App from './App';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: '', errorStack: '' };
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
-    debugLog('app.crash', { error, info });
+    const componentStack = String(info?.componentStack || '').trim();
+    const errorStack = String(error?.stack || '');
+    this.setState({ componentStack, errorStack });
+    debugLog('app.crash', { error: errorStack || String(error), componentStack });
   }
   render() {
     if (this.state.hasError) {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', padding: 20 }}>
           <Text style={{ color: '#ff4444', fontSize: 16, marginBottom: 10 }}>App Error</Text>
-          <Text style={{ color: '#ffffff', fontSize: 12 }}>{String(this.state.error)}</Text>
+          <Text selectable style={{ color: '#ffffff', fontSize: 12 }}>{String(this.state.error)}</Text>
+          {(this.state.componentStack || this.state.errorStack) ? (
+            <ScrollView style={{ width: '100%', maxWidth: 720, maxHeight: '65%', marginTop: 12 }}>
+              <Text selectable style={{ color: '#c5c5c5', fontSize: 10, fontFamily: 'monospace' }}>
+                {this.state.componentStack || this.state.errorStack}
+              </Text>
+            </ScrollView>
+          ) : null}
         </View>
       );
     }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ADMIN_MODAL_PALETTE } from '../admin/adminModalTheme';
 import {
   Modal,
   View,
@@ -112,7 +113,7 @@ export default function GmCommandModal({
                   : tGm('commands.modalTitleRoom', locale)}
               </Text>
               <TouchableOpacity onPress={onClose} style={styles.closeIconBtn}>
-                <MaterialCommunityIcons name="close" size={20} color="#d4d4d4" />
+                <MaterialCommunityIcons name="close" size={20} color={ADMIN_MODAL_PALETTE.text} />
               </TouchableOpacity>
             </View>
 
@@ -142,7 +143,7 @@ export default function GmCommandModal({
                         <MaterialCommunityIcons
                           name={spec.icon}
                           size={18}
-                          color={active ? '#f0e68c' : '#bdbdbd'}
+                          color={active ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
                         />
                         <Text style={[styles.kindBtnText, active && styles.kindBtnTextActive]}>
                           {tGm(`commands.kinds.${spec.kind}.title`, locale)}
@@ -286,7 +287,7 @@ export default function GmCommandModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 18,
@@ -295,7 +296,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     maxHeight: '90%',
-    backgroundColor: '#232323',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderWidth: 1,
     borderColor: '#6b6335',
     borderRadius: 5,
@@ -310,12 +311,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1b1b1b',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#444444',
+    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
   headerTitle: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 16,
     fontWeight: '700',
     flex: 1,
@@ -330,10 +331,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   targetBanner: {
-    color: '#dcdcdc',
-    backgroundColor: '#2d2d2d',
+    color: ADMIN_MODAL_PALETTE.text,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
-    borderColor: '#4a4a4a',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionLabel: {
-    color: '#cfcfcf',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 6,
@@ -359,24 +360,24 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4d4d4d',
-    backgroundColor: '#2b2b2b',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   kindBtnActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#36341f',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   kindBtnText: {
-    color: '#e0e0e0',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
   kindBtnTextActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   hintText: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 8,
@@ -402,23 +403,23 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#666666',
-    backgroundColor: '#2e2e2e',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 20,
     fontWeight: '700',
   },
   amountInput: {
     width: 104,
     height: 40,
-    backgroundColor: '#191919',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
-    color: '#f5f5f5',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
@@ -436,26 +437,26 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#555555',
-    backgroundColor: '#2b2b2b',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   presetBtnActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#3a3820',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   presetBtnText: {
-    color: '#dcdcdc',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   presetBtnTextActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
   },
   noteInput: {
-    backgroundColor: '#191919',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderWidth: 1,
     borderColor: '#555555',
     borderRadius: 5,
-    color: '#f5f5f5',
+    color: ADMIN_MODAL_PALETTE.text,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
@@ -465,12 +466,12 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#3e3e3e',
-    backgroundColor: '#1b1b1b',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     gap: 5,
   },
   recentHeader: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 2,
@@ -481,12 +482,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   recentLabel: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   recentAck: {
-    color: '#9ca3af',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
   },
   footer: {
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1b1b1b',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderTopWidth: 1,
     borderTopColor: '#444444',
   },
@@ -505,10 +506,10 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#555555',
-    backgroundColor: '#2c2c2c',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   cancelBtnText: {
-    color: '#dcdcdc',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -518,13 +519,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#d4af37',
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
   },
   submitBtnDisabled: {
     opacity: 0.6,
   },
   submitBtnText: {
-    color: '#1a1a1a',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 13,
     fontWeight: '700',
   },
