@@ -41,6 +41,8 @@ const MESSAGE = Object.freeze({
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
   STORAGE_ADD_KEY: 'storage.addKey',
+  // Патч 517: общие на комнату события доступа (ворота).
+  ACCESS_STATE: 'access.state',
   ERROR: 'error',
 });
 
@@ -56,6 +58,8 @@ const ERROR_CODE = Object.freeze({
   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
   CONTAINER_LOCKED: 'CONTAINER_LOCKED',
+  // Патч 516: точка требует ключевую запись, которой нет на складе.
+  KEY_REQUIRED: 'KEY_REQUIRED',
   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',

@@ -1,0 +1,1182 @@
+diff --git a/__tests__/room/key-items-cards-511.test.js b/__tests__/room/key-items-cards-511.test.js
+index d769382..12234e7 100644
+--- a/__tests__/room/key-items-cards-511.test.js
++++ b/__tests__/room/key-items-cards-511.test.js
+@@ -35,10 +35,15 @@ describe('511: ключи как карточки на экране «Добыч
+   it('форма сделана в стиле ContainerFormModal: тема, поля, комнаты, предпросмотр, футер', () => {
+     const form = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
+     const containerForm = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+-    for (const marker of ['ADMIN_MODAL_PALETTE', 'KeyboardAvoidingView', 'ScrollView', 'form.cancel']) {
++    // Патч 512: каркас не копируется, а импортируется из соседней формы.
++    expect(form).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
++    expect(containerForm).toContain('export const lootTradeFormStyles');
++    for (const marker of ['KeyboardAvoidingView', 'ScrollView', 'form.cancel', 'styles.overlay', 'styles.card', 'styles.title', 'styles.footer']) {
+       expect(form).toContain(marker);
+-      expect(containerForm).toContain(marker);
++      expect(containerForm).toContain(marker === 'styles.overlay' ? 'styles.overlay' : marker);
+     }
++    expect(form).toContain('styles.roomChips');
++    expect(form).toContain('styles.multilineInput');
+     expect(form).toContain("tLootTrade('form.nameLabel')");
+     expect(form).toContain("tLootTrade('form.roomsMultiLabel')");
+     expect(form).toContain("'form.createKeyItemTitle'");
+@@ -61,6 +66,10 @@ describe('511: ключи как карточки на экране «Добыч
+     expect(card).toContain('testID={`key-item-card-${keyItem.id}`}');
+     expect(card).toContain('key-item-edit-');
+     expect(card).toContain('key-item-issue-');
++    expect(card).toContain('cardStyles.cardActionButton');
++    expect(card).toContain('cardStyles.actionMenu');
++    expect(card).toContain('cardStyles.actionMenuItem');
++    expect(card).toContain('dots-vertical');
+   });
+ 
+   it('сохранение остаётся в экране, выдача идёт в общее хранилище', () => {
+diff --git a/__tests__/ui/modal-design-reuse-512.test.js b/__tests__/ui/modal-design-reuse-512.test.js
+new file mode 100644
+index 0000000..e431773
+--- /dev/null
++++ b/__tests__/ui/modal-design-reuse-512.test.js
+@@ -0,0 +1,90 @@
++// Предохранитель патча 512 (просьба владельца): «если создаёшь модалки, то
++// хотя бы ориентируйся на дизайн других модалок, которые рядом или делают
++// что-то похожее». Проверяем не «похожесть на глаз», а факт переиспользования
++// каркаса соседней формы и карточки, плюс наличие зафиксированного правила.
++import { describe, expect, it } from 'vitest';
++import { existsSync, readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const MODALS = 'components/screens/LootTradeScreen/modals';
++
++describe('512: новая модалка берёт каркас у ближайшего образца', () => {
++  const form = read(`${MODALS}/KeyItemFormModal.js`);
++  const containerForm = read(`${MODALS}/ContainerFormModal.js`);
++
++  it('каркас экспортируется образцом и импортируется новой формой', () => {
++    expect(containerForm).toContain('export const lootTradeFormStyles = StyleSheet.create({');
++    expect(containerForm).toContain('const styles = lootTradeFormStyles;');
++    expect(form).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
++  });
++
++  it('форма не задаёт базовые стили заново', () => {
++    // Ровно один StyleSheet.create — только для уникальных элементов.
++    expect((form.match(/StyleSheet\.create\(/g) || []).length).toBe(1);
++    expect(form).toContain('const extraStyles = StyleSheet.create({');
++    const extra = form.slice(form.indexOf('const extraStyles'));
++    for (const key of ['overlay:', 'card:', 'title:', 'label:', 'input:', 'footer:', 'btn:', 'saveBtn:', 'cancelBtn:', 'roomChip']) {
++      expect(extra).not.toContain(key);
++    }
++  });
++
++  it('все общие части окна берутся из styles образца', () => {
++    for (const key of [
++      'styles.overlay', 'styles.card', 'styles.title', 'styles.scroll',
++      'styles.scrollContent', 'styles.label', 'styles.input',
++      'styles.multilineInput', 'styles.warnText', 'styles.hintText',
++      'styles.roomChips', 'styles.roomChip', 'styles.roomChipActive',
++      'styles.roomChipName', 'styles.roomChipCode', 'styles.roomChipTextActive',
++      'styles.footer', 'styles.btn', 'styles.saveBtn', 'styles.saveBtnText',
++      'styles.cancelBtn', 'styles.cancelBtnText',
++    ]) {
++      expect(form).toContain(key);
++    }
++    // Подписи и порядок кнопок — как в форме контейнера.
++    expect(form).toContain("tLootTrade('form.save')");
++    expect(form).toContain("tLootTrade('form.cancel')");
++    expect(form.indexOf('key-item-form-save')).toBeLessThan(form.indexOf('key-item-form-cancel'));
++    expect(containerForm.indexOf('container-form-save')).toBeLessThan(containerForm.indexOf("tLootTrade('form.cancel')"));
++  });
++
++  it('карточка повторяет паттерн ⋮-меню карточки контейнера', () => {
++    const card = read('components/lootTrade/KeyItemCardCell.js');
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(card).toContain('cardStyles.cardCell');
++    expect(card).toContain('cardStyles.cardActionButton');
++    expect(card).toContain('cardStyles.menuBackdrop');
++    expect(card).toContain('cardStyles.actionMenu');
++    expect(card).toContain('cardStyles.actionMenuItem');
++    expect(card).toContain('cardStyles.actionMenuText');
++    expect(card).toContain('dots-vertical');
++    expect(card).toContain('measureInWindow');
++    // У образца тот же паттерн.
++    expect(screen).toContain('dots-vertical');
++    expect(screen).toContain('styles.actionMenu');
++    expect(screen).toContain('measureInWindow');
++  });
++
++  it('правило зафиксировано в документации для агента', () => {
++    const rules = read('docs/ui-modals-rules.md');
++    expect(rules).toContain('Новая модалка не рисуется с нуля');
++    expect(rules).toContain('переиспользовать их каркас');
++    expect(rules).toContain('Чек-лист перед сдачей патча');
++    expect(rules).toContain('Урок патча 511');
++    expect(rules).toContain('ContainerFormModal.js');
++    expect(rules).toContain('LootTradeScreen.styles.js');
++    expect(existsSync(path.join(ROOT, 'docs/ui-alerts-rules.md'))).toBe(true);
++
++    expect(read('docs/agents/README.md')).toContain('docs/ui-modals-rules.md');
++    expect(read('docs/architecture/engine-charter.md')).toContain('docs/ui-modals-rules.md');
++    expect(read('replit.md')).toContain('docs/ui-modals-rules.md');
++  });
++
++  it('предохранитель поименован в уставе', () => {
++    const charter = read('docs/architecture/engine-charter.md');
++    expect(charter).toContain('__tests__/ui/modal-design-reuse-512.test.js');
++    expect(charter).toContain('Новая модалка переиспользует каркас ближайшей модалки');
++  });
++});
+diff --git a/components/lootTrade/KeyItemCardCell.js b/components/lootTrade/KeyItemCardCell.js
+index 43e7069..af04306 100644
+--- a/components/lootTrade/KeyItemCardCell.js
++++ b/components/lootTrade/KeyItemCardCell.js
+@@ -1,29 +1,62 @@
+ /**
+- * Патч 511: карточка ключевой записи на экране «Добыча / Торговля».
++ * Патч 512: карточка ключевой записи повторяет не только сетку, но и поведение
++ * `ContainerCardCell`: одна кнопка «⋮» в правом нижнем углу и такое же
++ * выпадающее меню (`menuBackdrop` / `actionMenu` / `actionMenuItem`).
+  *
+- * Владелец явно попросил, чтобы ключ выглядел как карточка контейнера /
+- * торговца / терминала, а не как отдельный пункт в шапке. Поэтому используется
+- * та же сетка и те же стили (styles/LootTradeScreen.styles.js).
++ * Владелец: «если создаёшь модалки, то хотя бы ориентируйся на дизайн других
++ * модалок, которые рядом или делают что-то похожее». Соседняя карточка —
++ * главный образец, поэтому все стили берутся из `LootTradeScreen.styles.js`.
+  */
+ 
+-import React from 'react';
+-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
++import React, { useRef, useState } from 'react';
++import {
++  View,
++  Text,
++  TouchableOpacity,
++  Pressable,
++  Modal,
++  Dimensions,
++  StyleSheet,
++} from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../i18n/locale';
+ import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import cardStyles from '../../styles/LootTradeScreen.styles';
+ import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
+ 
++const MENU_WIDTH = 224;
++const MENU_HEIGHT = 100;
++
+ const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
+   useLocale();
++  const menuBtnRef = useRef(null);
++  const [menuPos, setMenuPos] = useState(null);
++
++  const openMenu = (event) => {
++    event?.stopPropagation?.();
++    menuBtnRef.current?.measureInWindow((x, y, width, height) => {
++      const { width: winW, height: winH } = Dimensions.get('window');
++      const left = Math.max(8, Math.min(x + width - MENU_WIDTH, winW - MENU_WIDTH - 8));
++      const top = y + height + MENU_HEIGHT + 8 <= winH
++        ? y + height + 4
++        : Math.max(8, y - MENU_HEIGHT - 4);
++      setMenuPos({ top, left });
++    });
++  };
++
++  const runMenuAction = (fn) => {
++    setMenuPos(null);
++    fn?.();
++  };
++
+   return (
+     <TouchableOpacity
+       testID={`key-item-card-${keyItem.id}`}
+       style={cardStyles.cardCell}
+       onPress={onEdit}
+-      activeOpacity={0.8}
++      activeOpacity={0.82}
+     >
+-      <View style={[cardStyles.cardHero, styles.cardHeroKey]}>
++      <View style={[cardStyles.cardHero, localStyles.cardHeroKey]}>
+         <MaterialCommunityIcons name="key-variant" size={34} color="#f0e68c" />
+       </View>
+       <View style={cardStyles.cardBody}>
+@@ -40,32 +73,54 @@ const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
+           </Text>
+         )}
+       </View>
+-      <View style={styles.actions}>
+-        <TouchableOpacity
+-          testID={`key-item-edit-${keyItem.id}`}
+-          style={cardStyles.cardActionButton}
+-          onPress={(event) => { event?.stopPropagation?.(); onEdit?.(); }}
+-          accessibilityLabel={tLootTrade('keyItems.edit')}
+-        >
+-          <MaterialCommunityIcons name="pencil" size={18} color="#555555" />
+-        </TouchableOpacity>
+-        <TouchableOpacity
+-          testID={`key-item-issue-${keyItem.id}`}
+-          style={[cardStyles.cardActionButton, styles.issueButton]}
+-          onPress={(event) => { event?.stopPropagation?.(); onIssue?.(); }}
+-          accessibilityLabel={tLootTrade('keyItems.issue')}
+-        >
+-          <MaterialCommunityIcons name="send" size={18} color="#555555" />
+-        </TouchableOpacity>
+-      </View>
++
++      <TouchableOpacity
++        ref={menuBtnRef}
++        testID={`key-item-menu-${keyItem.id}`}
++        style={cardStyles.cardActionButton}
++        onPress={openMenu}
++        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++        accessibilityLabel={tLootTrade('card.openMenu')}
++      >
++        <MaterialCommunityIcons name="dots-vertical" size={20} color="#555555" />
++      </TouchableOpacity>
++
++      <Modal
++        visible={Boolean(menuPos)}
++        transparent
++        animationType="none"
++        onRequestClose={() => setMenuPos(null)}
++      >
++        <Pressable style={cardStyles.menuBackdrop} onPress={() => setMenuPos(null)}>
++          {menuPos && (
++            <View style={[cardStyles.actionMenu, menuPos]}>
++              <TouchableOpacity
++                testID={`key-item-edit-${keyItem.id}`}
++                style={cardStyles.actionMenuItem}
++                onPress={() => runMenuAction(onEdit)}
++              >
++                <MaterialCommunityIcons name="pencil-outline" size={19} color="#d4af37" />
++                <Text style={cardStyles.actionMenuText}>{tLootTrade('keyItems.edit')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity
++                testID={`key-item-issue-${keyItem.id}`}
++                style={cardStyles.actionMenuItem}
++                onPress={() => runMenuAction(onIssue)}
++              >
++                <MaterialCommunityIcons name="broadcast" size={19} color="#f0e68c" />
++                <Text style={cardStyles.actionMenuText}>{tLootTrade('keyItems.issue')}</Text>
++              </TouchableOpacity>
++            </View>
++          )}
++        </Pressable>
++      </Modal>
+     </TouchableOpacity>
+   );
+ };
+ 
+-const styles = StyleSheet.create({
++// Единственное отличие от соседних карточек — оттенок шапки под иконку ключа.
++const localStyles = StyleSheet.create({
+   cardHeroKey: { backgroundColor: '#2d2a1e' },
+-  actions: { position: 'absolute', left: 5, right: 5, bottom: 5, zIndex: 10 },
+-  issueButton: { left: 0, right: undefined },
+ });
+ 
+ export default KeyItemCardCell;
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 575cc1d..8c440de 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -611,7 +611,9 @@ const ContainerFormModal = ({
+   );
+ };
+ 
+-const styles = StyleSheet.create({
++// Патч 512: каркас формы переиспользуется соседними модалками, чтобы они
++// не рисовали «похожий, но другой» дизайн. Экспорт не меняет саму форму.
++export const lootTradeFormStyles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0,0,0,0.72)',
+@@ -978,4 +980,6 @@ const styles = StyleSheet.create({
+   },
+ });
+ 
++const styles = lootTradeFormStyles;
++
+ export default ContainerFormModal;
+diff --git a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
+index 57f805e..c1858a4 100644
+--- a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
++++ b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
+@@ -1,10 +1,13 @@
+ /**
+- * Патч 511: форма ключевой записи в стиле ContainerFormModal.
++ * Патч 512: форма ключевой записи буквально использует каркас
++ * `ContainerFormModal` (`lootTradeFormStyles`), а не «похожий» набор стилей.
+  *
+- * Владелец: «я полагал ключ будет, как карточка контейнера/торговца/терминала
+- * и с модалкой в стиле создания контейнера и потом сохранением в экран».
+- * Поэтому здесь те же тема ADMIN_MODAL_PALETTE, карточка, подписи полей,
+- * выбор комнаты и футер «Отмена / Сохранить», что и у формы контейнера.
++ * Владелец (патч 511): ключ должен быть «как карточка контейнера/торговца/
++ * терминала и с модалкой в стиле создания контейнера». Владелец (патч 512):
++ * «если создаёшь модалки, то хотя бы ориентируйся на дизайн других модалок,
++ * которые рядом или делают что-то похожее». Поэтому общие стили (карточка,
++ * заголовок, подписи, поля, чипсы комнат, футер) импортируются из соседней
++ * формы; локально описаны только элементы, которых там нет (теги и превью).
+  */
+ 
+ import React, { useEffect, useState } from 'react';
+@@ -19,13 +22,12 @@ import {
+   KeyboardAvoidingView,
+   Platform,
+ } from 'react-native';
+-import { MaterialCommunityIcons } from '@expo/vector-icons';
+-import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade } from '../logic/lootTradeI18n';
+ import { renderTextWithIcons } from '../../../../modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+ import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
+ import { showRawAlert } from '../../../alerts/alertService';
++import { lootTradeFormStyles as styles } from './ContainerFormModal';
+ 
+ const TAG_BUTTONS = [
+   { label: '**Ж**', insert: '**жирный**' },
+@@ -73,12 +75,9 @@ const KeyItemFormModal = ({
+     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
+         <View style={styles.card}>
+-          <View style={styles.titleRow}>
+-            <MaterialCommunityIcons name="key-variant" size={24} color={ADMIN_MODAL_PALETTE.accent} />
+-            <Text style={styles.title}>
+-              {tLootTrade(isEditing ? 'form.editKeyItemTitle' : 'form.createKeyItemTitle')}
+-            </Text>
+-          </View>
++          <Text style={styles.title}>
++            {tLootTrade(isEditing ? 'form.editKeyItemTitle' : 'form.createKeyItemTitle')}
++          </Text>
+ 
+           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+             <Text style={styles.label}>{tLootTrade('form.nameLabel')}</Text>
+@@ -95,63 +94,75 @@ const KeyItemFormModal = ({
+             {availableRooms.length === 0 ? (
+               <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
+             ) : (
+-              <View style={styles.chipsRow}>
+-                {availableRooms.map((room) => {
+-                  const active = room.code === roomCode;
+-                  return (
+-                    <TouchableOpacity
+-                      key={room.code}
+-                      testID={`key-item-room-${room.code}`}
+-                      style={[styles.chip, active && styles.chipActive]}
+-                      onPress={() => setRoomCode(active ? '' : room.code)}
+-                    >
+-                      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+-                        {room.name || formatRoomCodeForDisplay(room.code)}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  );
+-                })}
+-              </View>
++              <>
++                <View style={styles.roomChips}>
++                  {availableRooms.map((room) => {
++                    const selected = room.code === roomCode;
++                    return (
++                      <TouchableOpacity
++                        key={room.code}
++                        testID={`key-item-room-${room.code}`}
++                        style={[styles.roomChip, selected && styles.roomChipActive]}
++                        onPress={() => setRoomCode(selected ? '' : room.code)}
++                      >
++                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
++                          {room.name || formatRoomCodeForDisplay(room.code)}
++                        </Text>
++                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
++                          {formatRoomCodeForDisplay(room.code)}
++                        </Text>
++                      </TouchableOpacity>
++                    );
++                  })}
++                </View>
++                <Text style={styles.hintText}>{tLootTrade('form.roomsMultiHint')}</Text>
++              </>
+             )}
+ 
+             <Text style={styles.label}>{tLootTrade('keyItems.descriptionLabel')}</Text>
+-            <View style={styles.tagRow}>
++            <View style={extraStyles.tagRow}>
+               {TAG_BUTTONS.map((tag) => (
+                 <TouchableOpacity
+                   key={tag.label}
+-                  style={styles.tagButton}
++                  style={extraStyles.tagButton}
+                   onPress={() => setDescription((prev) => prev + tag.insert)}
+                 >
+-                  <Text style={styles.tagButtonText}>{tag.label}</Text>
++                  <Text style={extraStyles.tagButtonText}>{tag.label}</Text>
+                 </TouchableOpacity>
+               ))}
+             </View>
+             <TextInput
+               testID="key-item-form-description"
+-              style={[styles.input, styles.textArea]}
++              style={[styles.input, styles.multilineInput]}
+               value={description}
+               onChangeText={setDescription}
+               placeholder={tLootTrade('keyItems.descriptionPlaceholder')}
+               placeholderTextColor="#8c8c8c"
+               multiline
+             />
+-            <View style={styles.preview}>
++            <View style={extraStyles.preview}>
+               {renderTextWithIcons(
+                 description || tLootTrade('keyItems.previewEmpty'),
+-                styles.previewText,
++                extraStyles.previewText,
+               )}
+             </View>
+-            <Text style={styles.hint}>
+-              {tLootTrade('keyItems.hint')}
+-            </Text>
++            <Text style={styles.hintText}>{tLootTrade('keyItems.hint')}</Text>
+           </ScrollView>
+ 
+           <View style={styles.footer}>
+-            <TouchableOpacity testID="key-item-form-cancel" style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
+-              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
++            <TouchableOpacity
++              testID="key-item-form-save"
++              style={[styles.btn, styles.saveBtn]}
++              onPress={handleSave}
++            >
++              <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
+             </TouchableOpacity>
+-            <TouchableOpacity testID="key-item-form-save" style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
+-              <Text style={styles.saveBtnText}>{tLootTrade('keyItems.save')}</Text>
++            <TouchableOpacity
++              testID="key-item-form-cancel"
++              style={[styles.btn, styles.cancelBtn]}
++              onPress={onClose}
++            >
++              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
+             </TouchableOpacity>
+           </View>
+         </View>
+@@ -160,59 +171,34 @@ const KeyItemFormModal = ({
+   );
+ };
+ 
+-const styles = StyleSheet.create({
+-  overlay: {
+-    flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.72)',
+-    justifyContent: 'center',
+-    alignItems: 'center',
+-    paddingHorizontal: 28,
+-    paddingVertical: 36,
++// Только то, чего нет в форме контейнера: панель тегов и поле предпросмотра.
++const extraStyles = StyleSheet.create({
++  tagRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 5,
++    marginBottom: 6,
+   },
+-  card: {
+-    width: '90%',
+-    maxWidth: 520,
+-    maxHeight: '92%',
+-    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+-    borderWidth: 1.5,
+-    borderColor: ADMIN_MODAL_PALETTE.accent,
+-    borderRadius: 8,
+-    padding: 16,
++  tagButton: {
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    paddingHorizontal: 9,
++    paddingVertical: 4,
++    backgroundColor: '#ffffff',
+   },
+-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderColor: ADMIN_MODAL_PALETTE.accent, paddingBottom: 10, marginBottom: 8 },
+-  title: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800', flex: 1 },
+-  scroll: { flexGrow: 0 },
+-  scrollContent: { paddingBottom: 4 },
+-  label: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 10, marginBottom: 5 },
+-  input: {
++  tagButtonText: { color: '#111111', fontSize: 12, fontWeight: '700' },
++  preview: {
+     borderWidth: 1,
+-    borderColor: ADMIN_MODAL_PALETTE.border,
++    borderColor: '#5a5a5a',
+     borderRadius: 5,
+-    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+-    color: ADMIN_MODAL_PALETTE.text,
+-    paddingHorizontal: 10,
+-    paddingVertical: 9,
+-    fontSize: 14,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    marginTop: 8,
++    minHeight: 64,
++    backgroundColor: '#ffffff',
+   },
+-  textArea: { minHeight: 92, textAlignVertical: 'top' },
+-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+-  chip: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 4, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised },
+-  chipActive: { backgroundColor: ADMIN_MODAL_PALETTE.selected, borderColor: ADMIN_MODAL_PALETTE.accent },
+-  chipText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12 },
+-  chipTextActive: { color: ADMIN_MODAL_PALETTE.text, fontWeight: '700' },
+-  warnText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, fontStyle: 'italic' },
+-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 6 },
+-  tagButton: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 3, paddingHorizontal: 7, paddingVertical: 3 },
+-  tagButtonText: { color: ADMIN_MODAL_PALETTE.accent, fontSize: 10 },
+-  preview: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 5, padding: 9, marginTop: 8, minHeight: 42 },
+-  previewText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 13 },
+-  hint: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 8 },
+-  footer: { flexDirection: 'row', gap: 10, marginTop: 14 },
+-  btn: { flex: 1, paddingVertical: 12, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
+-  saveBtn: { backgroundColor: ADMIN_MODAL_PALETTE.selected, borderColor: ADMIN_MODAL_PALETTE.accent },
+-  saveBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15, fontWeight: '700' },
+-  cancelBtn: { backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised, borderColor: ADMIN_MODAL_PALETTE.border },
+-  cancelBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15 },
++  previewText: { color: '#111111', fontSize: 13 },
+ });
+ 
+ export default KeyItemFormModal;
+diff --git a/docs/agents/README.md b/docs/agents/README.md
+index 90708db..91e2d69 100644
+--- a/docs/agents/README.md
++++ b/docs/agents/README.md
+@@ -19,6 +19,9 @@
+ 4. `setting-contract.md` — контракт пакета сеттинга (`.trpg`).
+ 5. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
+    (каталог, моды оружия, робо-слоты, сейвы, выживание).
++6. `docs/ui-modals-rules.md` — обязателен перед созданием/переделкой любого
++   модального окна: брать каркас ближайшей модалки, не рисовать заново.
++   `docs/ui-alerts-rules.md` — для уведомлений и подтверждений.
+ 
+ ## Карта репозитория по слоям
+ 
+@@ -112,3 +115,6 @@ Web — ПУСТАЯ ФУНКЦИЯ: молчит; прямые вызовы в
+   но не считает правила.
+ - Установщик патчей: истина — в содержимом файлов (`./apply-patch.sh N`,
+   `--status`); правки в рабочем дереве коммитить до применения цепочки.
++- **Новая модалка = каркас ближайшей модалки** (палитра, карточка, заголовок,
++  поля, кнопки, меню `⋮`), а не новый `StyleSheet.create` с «похожими»
++  значениями. Полный чек-лист и образцы — `docs/ui-modals-rules.md`.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 7f3cac9..45db871 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -96,6 +96,7 @@
+ | 9 | migrations.js не трогать; миграции только добавляются в конец | код-ревью + тесты загрузки старых сейвов; владелец подтверждает |
+ | 10 | Каждый `.ts`/`.tsx` репозитория входит в `include` tsconfig — типизация не «забывает» файлы; протухших записей в include нет | `__tests__/typescript/tsconfig-coverage.test.js` (патч 280) |
+ | 11 | Нет дублей `foo.js` + `foo.ts`/`foo.tsx` в одной папке — резолвер Metro берёт `.js` первым, TS-файл был бы мёртвым кодом | `__tests__/typescript/no-js-ts-duplicates.test.js` (патч 280) |
++| 12 | Новая модалка переиспользует каркас ближайшей модалки, а не задаёт базовые стили заново | `docs/ui-modals-rules.md` + `__tests__/ui/modal-design-reuse-512.test.js` (патч 512) |
+ 
+ **Следствие (главный урок серии 219–249):** новое поле/действие/ключ сейва = обновление паспорта
+ В ТОМ ЖЕ ПАТЧЕ — иначе контрактный тест падает. Горячие фиксы «по времени и силам» исчезают:
+@@ -183,6 +184,9 @@
+ - Разбор структуры кода не резолвит адреса импортов — для этого отдельный предохранитель (раздел 3, п.6).
+ - Большой патч без промежуточных коммитов = риск. Коммит+пуш после каждого шага.
+ - Экраны переводить на TypeScript, когда они успокоились; кипящий код — после фичевой волны.
++- Модалку «в стиле соседней» нельзя писать по памяти: в патче 511 так получились
++  свои высота, радиус, отступы, заголовок, подписи и порядок кнопок. Стили надо
++  импортировать из образца — правило и чек-лист в `docs/ui-modals-rules.md`.
+ 
+ ---
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2a34640..e7815a0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,31 @@
+ # Changelog
+ ---
++## Modals now follow the design of nearby windows (patch 512)
++
++The owner: "If you create modal windows, at least follow the design of other
++modals nearby or doing something similar. If possible, write it down in the
++app's working rules". Patch 511 built the key form "in the style of" its
++neighbour but with its own height, radius, padding, heading, labels and button
++order — it looked out of place.
++
++- **Form.** `KeyItemFormModal` no longer defines base styles: it imports
++  `lootTradeFormStyles` from `ContainerFormModal`. Both windows now share the
++  backdrop, card, centered heading, field labels, inputs, room chips, hints and
++  footer with "Save" on the left and "Cancel" on the right. Only the tag bar
++  and text preview remain local, because the container form has neither.
++- **Card.** Instead of two separate round buttons, the key card now has one
++  `⋮` button and the same dropdown menu ("Edit", "Add to storage") as
++  container, merchant and terminal cards, using the same menu styles.
++- **Rule written down.** New `docs/ui-modals-rules.md` lists the mandatory
++  reference, nearby modals by layer, what exactly to reuse, a pre-release
++  checklist and the patch 511 lesson. Links added to `docs/agents/README.md`,
++  `docs/architecture/engine-charter.md` (a dedicated safeguard) and `replit.md`.
++- **Safeguard.** `__tests__/ui/modal-design-reuse-512.test.js` checks the actual
++  style import rather than a visual resemblance: no local `StyleSheet.create`
++  with base keys, matching button order, and the rule present in the docs.
++
++Key behaviour, shared storage and the protocol are unchanged.
++
+ ## Keys as cards on the screen (patch 511)
+ 
+ The owner clarified after 510: "I expected a key to be like a container /
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c9385f9..51c9be6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,35 @@
+ # История изменений
+ 
+ ---
++## Модалки берут дизайн у соседних окон (патч 512)
++
++Владелец: «Просьба если создаёшь модалки, то хотя бы ориентируйся на дизайн
++других модалок, которые рядом или делают что-то похожее. По возможности
++зафиксируй в правилах работы с приложением». В патче 511 форма ключа была
++написана «в стиле» соседней формы, но со своими высотой, радиусом, отступами,
++заголовком, подписями и порядком кнопок — визуально выбивалась.
++
++- **Форма.** `KeyItemFormModal` больше не описывает базовые стили: она
++  импортирует `lootTradeFormStyles` из `ContainerFormModal`. Теперь у окон
++  одинаковые подложка, карточка, центрированный заголовок, подписи полей, поля
++  ввода, чипсы комнат, подсказки и футер с «Сохранить» слева и «Отмена»
++  справа. Локально остались только панель тегов и предпросмотр текста, которых
++  у формы контейнера нет.
++- **Карточка.** Вместо двух отдельных круглых кнопок у ключа теперь одна
++  кнопка `⋮` и такое же выпадающее меню («Изменить», «Выдать на склад»), как у
++  карточек контейнеров, торговцев и терминалов — те же общие стили меню.
++- **Правило зафиксировано.** Новый документ `docs/ui-modals-rules.md`:
++  обязательный образец, таблица ближайших модалок по слоям, что именно
++  переиспользовать, чек-лист перед сдачей и урок 511. Ссылки добавлены в
++  `docs/agents/README.md`, `docs/architecture/engine-charter.md` (отдельный
++  предохранитель) и `replit.md`.
++- **Предохранитель.** Тест `__tests__/ui/modal-design-reuse-512.test.js`
++  проверяет не «похожесть на глаз», а факт импорта каркаса, отсутствие своего
++  `StyleSheet.create` с базовыми ключами, совпадение порядка кнопок и наличие
++  правила в документации.
++
++Поведение ключей, общее хранилище и протокол не менялись.
++
+ ## Ключи как карточки на экране (патч 511)
+ 
+ Владелец уточнил после 510: «Я полагал ключ будет, как карточка
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 44f2461..0e59967 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,7 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
+-- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. See `docs/patch-511-install.md`.
++- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See `docs/patch-512-install.md`.
+ - **Handover.** Snapshots sync from the GM Google Drive in both directions, so the save arrives on another device. Both the GM and players can export storage to a file and import it back: when the GM changes, the new GM fills storage on the new server in one action. Room state lives only in server memory and disappears on disconnect — the file and Drive are the recovery path. See `docs/patch-509-install.md`.
+ - **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index c382f2d..92cebda 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,7 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
+-- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Подробности — `docs/patch-511-install.md`.
++- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). Подробности — `docs/patch-512-install.md`.
+ - **Перенос хранилища.** Снимок синхронизируется из Google Drive Мастера в обе стороны, поэтому сейв приезжает на другое устройство. И Мастер, и игрок могут выгрузить хранилище в файл и импортировать его обратно: если ведущий сменился, новый Мастер наполняет хранилище нового сервера одним действием. Состояние комнаты живёт только в памяти сервера и исчезает при отключении — файл и Drive служат для восстановления. Подробности — `docs/patch-509-install.md`.
+ - **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index bb4d0b0..826fd50 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -29,6 +29,11 @@
+ - на карточке доступны «Изменить» (открывает ту же форму) и «Выдать на склад»
+   (прежний `storage.addKey`, только Мастер и только онлайн).
+ 
++**Патч 512** привёл этот интерфейс к дизайну соседних окон по просьбе
++владельца: форма ключа импортирует каркас `ContainerFormModal`, а карточка
++повторяет `⋮`-меню карточек контейнеров. Правило зафиксировано в
++`docs/ui-modals-rules.md`.
++
+ Слой данных 510 (`gm_key_items`, `kind: 'keyItem'`, запрет `withdraw`,
+ перенос в снимке) не меняется: меняется только способ создания и показа
+ записей на экране Мастера.
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index 481de20..ab762d9 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > Актуальная версия — патч **495** (собственный словарь, ИНТ/Наука/Удача,
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index d518b7f..dabcdc2 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 494** (коммит `a572b16`, ветка
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index b1a17ee..fd9883a 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 750ac4e..83830b1 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 00a24c1..f37ae58 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 0ad42fa..28bd73c 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 4cf686b..6407eae 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 094b10a..58bdb59 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index d0c7e64..b604844 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index edae213..80a6006 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 9a314bd..56ff0ed 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index ee44650..8e218b1 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 8d8044c..a6389c0 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index a6ff139..2531b87 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 9d8b5e4..40be6a6 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 6bf6e31..28d2ee3 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ > **Ключи и записки на складе (шаг 2) — см. `docs/patch-510-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 25fbd8d..9beb820 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 509** (коммит `6b16651`, ветка
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index 49c7fa0..cf42c07 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++
+ Патч подготовлен от состояния **версии 510** (коммит `0606fb8`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–511
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+new file mode 100644
+index 0000000..3d7669b
+--- /dev/null
++++ b/docs/patch-512-install.md
+@@ -0,0 +1,113 @@
++# Установка патча 512: модалки берут дизайн у соседних окон
++
++Патч подготовлен от состояния **версии 511** (коммит `860fe82`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–512
++цепочкой.
++
++## Причина
++
++> Просьба если создаёшь модалки, то хотя бы ориентируйся на дизайн других
++> модалок, которые рядом или делают что-то похожее. По возможности зафиксируй
++> в правилах работы с приложением.
++
++Патч 511 сделал форму ключа «в стиле» `ContainerFormModal`, но описал стили
++заново: высота 92 % вместо 84 %, радиус 8 вместо 5, отступы 16 вместо 24/22,
++заголовок 17 с иконкой вместо центрированных 18, подписи 11 заглавными вместо
++13 жирных, свои чипсы комнат, свой футер и обратный порядок кнопок. Карточка
++ключа получила две отдельные круглые кнопки вместо общего `⋮`-меню.
++
++## Что изменилось
++
++### 1. Общий каркас формы
++
++`ContainerFormModal` экспортирует свой `StyleSheet` как
++`lootTradeFormStyles`; внутри он остаётся `const styles = lootTradeFormStyles;`,
++то есть **внешний вид формы контейнера не изменился ни на пиксель**.
++
++`KeyItemFormModal` удалил собственный `StyleSheet.create` с базовыми ключами и
++импортирует `lootTradeFormStyles`. Теперь совпадают: подложка, карточка,
++заголовок, прокрутка, подписи, поля ввода, многострочное поле, чипсы комнат,
++тексты подсказок/предупреждений и футер с «Сохранить» слева и «Отмена»
++справа. Локальный `extraStyles` содержит только панель тегов и предпросмотр —
++этих элементов у формы контейнера нет.
++
++### 2. Карточка как у контейнера
++
++`KeyItemCardCell` заменил две круглые кнопки на одну `⋮` в правом нижнем углу и
++выпадающее меню с иконками («Изменить», «Выдать на склад»). Используются те же
++`cardActionButton`, `menuBackdrop`, `actionMenu`, `actionMenuItem`,
++`actionMenuText` из `styles/LootTradeScreen.styles.js` и тот же расчёт позиции
++через `measureInWindow`, что и в `ContainerCardCell`.
++
++Поведение не изменилось: нажатие на карточку открывает форму, «Изменить» —
++её же с текущими значениями, «Выдать на склад» — прежний `storage.addKey`.
++
++### 3. Правило зафиксировано
++
++- **`docs/ui-modals-rules.md`** — новый документ по образцу
++  `docs/ui-alerts-rules.md`: основное правило, как именно переиспользовать
++  каркас, таблица ближайших образцов по слоям, чек-лист перед сдачей,
++  причины и урок 511.
++- **`docs/agents/README.md`** — документ добавлен в обязательный порядок
++  чтения и в короткий список правил, которые нельзя нарушать.
++- **`docs/architecture/engine-charter.md`** — строка 12 в таблице
++  предохранителей (правило → тест) и запись в разделе «Уроки (не повторять)».
++- **`replit.md`** — ссылка в разделе обязательного контекста для ИИ-агентов.
++- **`__tests__/ui/modal-design-reuse-512.test.js`** — предохранитель: проверяет
++  импорт каркаса, отсутствие своего набора базовых стилей, совпадение порядка
++  кнопок, `⋮`-меню карточки и наличие правила в трёх документах.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | экспорт `lootTradeFormStyles`, внешний вид не менялся |
++| `components/screens/LootTradeScreen/modals/KeyItemFormModal.js` | импорт общего каркаса, локально только теги и превью |
++| `components/lootTrade/KeyItemCardCell.js` | `⋮`-меню вместо двух круглых кнопок |
++| `__tests__/room/key-items-cards-511.test.js` | ожидания под общий каркас |
++| `__tests__/ui/modal-design-reuse-512.test.js` | новый предохранитель (6 проверок) |
++| `docs/ui-modals-rules.md` | новые правила работы с модалками |
++| `docs/agents/README.md`, `docs/architecture/engine-charter.md`, `replit.md` | ссылки и строка предохранителя |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md`, `docs/key-items-and-gates-design.md` | RU/EN описание и фиксация решения |
++| `public/version.json`, `patchs/baseline.json` | версия 512, 78/78 заметок |
++| `patchs/512-modal-design-reuse.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 511:
++
++```bash
++./apply-patch.sh 512
++# ✓ Установлен патч: №512 (версия 511 → 512)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 512
++```
++
++`patchs/baseline.json` в источнике равен `512`. После установки
++`public/version.json` → `512`; закоммитьте изменения, **перезапустите сервис
++Node.js** и пересоберите веб-сборку.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/ui/modal-design-reuse-512.test.js
++npx vitest run __tests__/room/key-items-cards-511.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "512"'
++```
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/512-modal-design-reuse.patch
++cp /path/to/512-modal-design-reuse.patch patchs/
++```
+diff --git a/docs/ui-modals-rules.md b/docs/ui-modals-rules.md
+new file mode 100644
+index 0000000..e47feed
+--- /dev/null
++++ b/docs/ui-modals-rules.md
+@@ -0,0 +1,87 @@
++# Правила работы с модальными окнами
++
++> Зафиксировано по просьбе владельца (патч 512): «если создаёшь модалки, то
++> хотя бы ориентируйся на дизайн других модалок, которые рядом или делают
++> что-то похожее». Документ обязателен к прочтению перед созданием или
++> переделкой любого модального окна. Соседний документ про уведомления —
++> `docs/ui-alerts-rules.md`.
++
++## Основное правило
++
++**Новая модалка не рисуется с нуля.** Перед работой нужно найти одну-две
++ближайшие модалки — в той же папке/на том же экране или решающие похожую
++задачу — и **переиспользовать их каркас**: палитру, размеры карточки,
++подложку, заголовок, подписи полей, поля ввода, чипсы выбора, кнопки и их
++порядок, меню карточек. Свои стили допустимы только для элементов, которых у
++образца нет.
++
++«Похоже, но чуть иначе» — не попадание в дизайн. Разница в 8 px, другой
++радиус, другой порядок кнопок или иконка в заголовке уже делает окно чужим.
++
++## Как именно переиспользовать
++
++1. **Сначала посмотреть соседей**, а не писать `StyleSheet.create`.
++   Для экрана «Добыча / Торговля» образцы перечислены ниже.
++2. **Импортировать готовый каркас**, если он экспортируется. Например, формы
++   создания берут `lootTradeFormStyles` из `ContainerFormModal.js`; карточки
++   берут `cardCell`, `cardActionButton`, `actionMenu` из
++   `styles/LootTradeScreen.styles.js`.
++3. **Если общего каркаса ещё нет** — вынести его в отдельный модуль стилей
++   **в том же патче** и перевести на него и образец, и новую модалку. Не
++   оставлять две копии с «почти одинаковыми» значениями.
++4. **Не задавать заново** базовые ключи `overlay`, `card`, `title`, `label`,
++   `input`, `footer`, `btn`, `saveBtn`, `cancelBtn` в новой модалке. Цвета —
++   из палитры (`components/admin/adminModalTheme.js` для admin-окон),
++   а не литералами под настроение.
++5. **Порядок кнопок и подписи — как у образца.** В формах «Добыча /
++   Торговля» слева «Сохранить», справа «Отмена»; подписи берутся из общего
++   словаря экрана, а не из нового набора ключей.
++6. **Карточки с действиями** повторяют паттерн `ContainerCardCell`: одна
++   кнопка `⋮` в правом нижнем углу и выпадающее меню с иконками. Несколько
++   отдельных круглых кнопок на карточке — отступление от дизайна.
++
++## Образцы по слоям
++
++| Что делаем | Ближайший образец | Что берём |
++| --- | --- | --- |
++| Форма создания/правки на экране Мастера | `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | `lootTradeFormStyles`: подложка, карточка 90%/520, центрированный заголовок 18, подписи 13 bold, поля, чипсы комнат, футер |
++| Каталог, список с поиском | `components/screens/LootTradeScreen/modals/ContainerCatalogModal.js` | высота окна, тулбар поиска, строки списка, кнопка выбора |
++| Короткое окно с одним числом/подтверждением | `components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js` | компактная карточка 460, центрированные подписи, счётчик |
++| Выбор из списка | `components/screens/LootTradeScreen/modals/HubChildPickerModal.js` | карточка, заголовок, строки-пункты |
++| Выдача чего-то в комнату | `components/screens/LootTradeScreen/modals/IssueContainerModal.js` | переключатель адресата, подписи, футер |
++| Окно склада / чтение длинного текста | `components/lootTrade/PartyStorageModal.js` | список, карточка записи, `renderTextWithIcons` |
++| Окна игрока (добыча, торговля) | `components/lootTrade/PlayerLootTradeOverlay.js` | двухпанельная раскладка, кнопки «Взять 1 / Все» |
++| Карточка на сетке | `ContainerCardCell` в `LootTradeScreen.js` + `styles/LootTradeScreen.styles.js` | `cardCell`, `cardHero`, `cardBody`, `⋮`-меню |
++| Уведомления и подтверждения | `docs/ui-alerts-rules.md` | только `showRawAlert` / `showAlert`, не модалка |
++
++## Чек-лист перед сдачей патча
++
++- [ ] Открыты и прочитаны 1–2 соседние модалки, не только собственный код.
++- [ ] Базовые стили импортированы, а не описаны заново.
++- [ ] Совпадают: ширина/высота карточки, радиус, отступы, цвет рамки и фона,
++      размер и выравнивание заголовка, размер подписей, вид полей, порядок
++      кнопок в футере.
++- [ ] Новые ключи i18n добавлены парно RU/EN и не дублируют существующие
++      (`form.save`, `form.cancel`, `form.nameLabel` и т.п.).
++- [ ] В приёмочном тесте есть проверка, что новая модалка ссылается на каркас
++      образца, а не содержит свой `StyleSheet.create` с базовыми ключами.
++
++## Почему
++
++- **Единообразие.** Владелец видит экран целиком: окно «не как остальные»
++  читается как ошибка, даже если функционально всё верно.
++- **Кросс-платформенность.** Проверенные значения уже обкатаны в вебе и
++  нативе; самописные `maxHeight`/`overflow` ломаются то там, то тут.
++- **Меньше кода.** Один каркас правится один раз; две копии расходятся при
++  первом же следующем патче.
++
++## Урок патча 511 (не повторять)
++
++Форма ключевой записи была написана «в стиле» соседней формы, но со своими
++значениями: высота 92 % вместо 84 %, радиус 8 вместо 5, отступы 16 вместо
++24/22, заголовок 17 с иконкой вместо центрированных 18, подписи 11
++заглавными вместо 13 жирных, свои чипсы, свой футер и обратный порядок
++кнопок. Карточка ключа получила две отдельные круглые кнопки вместо `⋮`-меню.
++Патч 512 заменил всё это импортом `lootTradeFormStyles` и общими стилями
++меню карточки; правило зафиксировано здесь, в `docs/agents/README.md`,
++`docs/architecture/engine-charter.md` и `replit.md`.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 0f4faab..88e9272 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "511"
++  "baseline": "512"
+ }
+diff --git a/public/version.json b/public/version.json
+index 23efb9f..dade96b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "511",
++  "version": "512",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
+       "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
+       "Мастер может создавать ключи и записки: имя, описание с жирным текстом, курсивом и списками, предпросмотр перед сохранением.",
+       "Найденная в контейнере запись или выданная Мастером карточка доступа попадает в общее хранилище и остаётся общей для всей группы.",
+@@ -82,6 +83,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
+       "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
+       "The GM can create keys and notes: a name, a description with bold, italics and lists, and a live preview before saving.",
+       "A record found in a container or issued by the GM goes to shared storage and stays common to the whole group.",
+diff --git a/replit.md b/replit.md
+index c0d81f0..ed82ef8 100644
+--- a/replit.md
++++ b/replit.md
+@@ -11,7 +11,10 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
+ - `docs/architecture/engine-dna.md` — the authoritative engine/setting boundary,
+   source-of-truth rules, TypeScript migration strategy, and AI working protocol;
+ - `setting-contract.md` — the setting package and `.trpg` contract;
+-- the relevant document under `docs/architecture/`.
++- the relevant document under `docs/architecture/`;
++- `docs/ui-modals-rules.md` before adding or restyling ANY modal window —
++  reuse the nearest existing modal's layout and styles instead of inventing
++  a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
+ 
+ This project is evolving from a Fallout-only application into a universal
+ TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform

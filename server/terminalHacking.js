@@ -65,6 +65,10 @@ const normalizeTerminalConfig = (raw = {}) => ({
   name: String(raw.name || '').trim(),
   description: String(raw.description || '').trim(),
   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
+  // Патч 516: требование ключа доходит до сервера вместе с конфигурацией.
+  requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+  keyRequirement: String(raw.keyRequirement || 'none'),
+  linkedCheckId: String(raw.linkedCheckId || '').trim(),
 });
 
 // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.

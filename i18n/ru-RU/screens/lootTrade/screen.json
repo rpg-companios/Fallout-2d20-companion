@@ -6,7 +6,8 @@
     "createMerchant": "Создать\nторговца",
     "createHub": "Создать\nлокацию",
     "syncCloud": "Синхронизация с облаком",
-    "createTerminal": "Терминал взлома"
+    "createTerminal": "Терминал взлома",
+    "createKeyItem": "Создать ключ / записку"
   },
   "card": {
     "lootBadge": "Добыча",
@@ -27,7 +28,16 @@
     "edit": "Изменить",
     "delete": "Удалить",
     "copySuffix": "копия",
-    "terminalDifficulty": "Сложность {difficulty}"
+    "terminalDifficulty": "Сложность {difficulty}",
+    "requiresKey": "Ключ: {name}",
+    "keyRequiredBadge": "обязателен",
+    "keyOptionalBadge": "необязателен",
+    "hubKind": "локация",
+    "merchantKind": "торговец",
+    "lootKind": "контейнер",
+    "gateAfter": "После: {name}",
+    "gateOpen": "ворота пройдены",
+    "gatePending": "ворота закрыты"
   },
   "form": {
     "createLootTitle": "Новый контейнер добычи",
@@ -62,7 +72,19 @@
     "validationRoom": "Выберите комнату.",
     "createTerminalTitle": "Создать терминал взлома",
     "editTerminalTitle": "Настройки терминала",
-    "terminalDifficultyLabel": "Сложность"
+    "terminalDifficultyLabel": "Сложность",
+    "createKeyItemTitle": "Новая ключевая запись",
+    "editKeyItemTitle": "Изменить ключевую запись",
+    "keyRequirementLabel": "Требуемый ключ",
+    "keySearchPlaceholder": "Поиск ключа или записки",
+    "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
+    "keyNoDescription": "без описания",
+    "keyRequiredLabel": "Обязателен",
+    "linkedCheckLabel": "Ворота: событие другой точки",
+    "linkedCheckSearchPlaceholder": "Поиск точки",
+    "linkedCheckEmpty": "Других точек пока нет",
+    "linkedCheckTerminal": "источник события",
+    "linkedCheckHint": "Пока выбранная точка не дала событие (взлом, ключ или решение Мастера), доступ закрыт. Событие общее на всю комнату."
   },
   "detail": {
     "backToList": "← К списку контейнеров",
@@ -112,7 +134,14 @@
     "deleteHubWithChildren": "Удалить всё",
     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
-    "emptyLootKeep": "Оставить"
+    "emptyLootKeep": "Оставить",
+    "hubKeysTitle": "Ключи и записки в локации",
+    "hubKeysEmpty": "Перетащите карточку ключа на локацию",
+    "hubKeyDetach": "Вернуть на сетку",
+    "hubGatesTitle": "Ворота между точками",
+    "hubGatesEmpty": "Связей между точками пока нет",
+    "hubGatePassed": "пройдено",
+    "hubGatePending": "ожидает"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",
@@ -228,27 +257,34 @@
     "shortfallConfirmMessage": "Торговец должен вам {need} {CAP}, но в его кассе есть только {have} {CAP} (не хватает {shortfall} {CAP}).\n\nВы можете отменить и добрать разницу товаром, либо согласиться получить все доступные {have} {CAP}.",
     "shortfallAccept": "Согласиться на {have} {CAP}",
     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
-    "tradeSuccess": "Сделка успешно завершена!"
+    "tradeSuccess": "Сделка успешно завершена!",
+    "keyRequiredError": "Нужен ключ: без него точка закрыта",
+    "hubNodeKeyUnlockedBadge": "Открыт ключом"
   },
   "keyItems": {
-  "title": "Ключи и записки",
-  "nameLabel": "Название",
-  "namePlaceholder": "Ключ от склада",
-  "descriptionLabel": "Описание",
-  "descriptionPlaceholder": "Нажать левый верхний кирпич…",
-  "previewEmpty": "Здесь будет предпросмотр описания",
-  "save": "Сохранить",
-  "clear": "Очистить",
-  "catalog": "Справочник",
-  "empty": "Пока нет ни одной записи",
-  "edit": "Изменить",
-  "issue": "Выдать на склад",
-  "issued": "Ключ выдан в общее хранилище",
-  "nameRequired": "Сначала задайте название",
-  "noRoom": "Нет подключённой комнаты Мастера",
-  "failed": "Не удалось выдать ключ",
-  "hint": "Название обязательно, описание можно оставить пустым."
-},
+    "title": "Ключи и записки",
+    "nameLabel": "Название",
+    "namePlaceholder": "Ключ от склада",
+    "descriptionLabel": "Описание",
+    "descriptionPlaceholder": "Нажать левый верхний кирпич…",
+    "previewEmpty": "Здесь будет предпросмотр описания",
+    "save": "Сохранить",
+    "clear": "Очистить",
+    "catalog": "Справочник",
+    "empty": "Пока нет ни одной записи",
+    "edit": "Изменить",
+    "issue": "Выдать на склад",
+    "issued": "Ключ выдан в общее хранилище",
+    "nameRequired": "Сначала задайте название",
+    "noRoom": "Нет подключённой комнаты Мастера",
+    "failed": "Не удалось выдать ключ",
+    "hint": "Название обязательно, описание можно оставить пустым. После сохранения карточка появится на экране.",
+    "saved": "Ключ сохранён на экране «Добыча / Торговля»",
+    "attachToLabel": "Часть чего",
+    "attachToSearchPlaceholder": "Поиск локации, контейнера или торговца",
+    "attachToNone": "Никуда (на сетке)",
+    "attachToHint": "Ключ попадает к игрокам вместе с выбранной карточкой. В терминал вложить нельзя."
+  },
   "terminal": {
     "title": "Терминал",
     "hack": "Взломать",
@@ -296,6 +332,8 @@
     "accessUsed": "ДОСТУП ИСПОЛЬЗОВАН",
     "hackedTitle": "Терминал взломан",
     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
-    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера."
+    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера.",
+    "keyUnlockedBadge": "ОТКРЫТ КЛЮЧОМ",
+    "keyRequiredError": "Нужен ключ или привязанная проверка"
   }
 }

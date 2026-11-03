@@ -275,6 +275,40 @@ const styles = StyleSheet.create({
   actionMenuText: { flex: 1, color: '#e8e8e8', fontSize: 14 },
   actionMenuDeleteText: { color: '#e57373' },
 
+  // Патч 514: вложенные ключи и записки в локации.
+  hubKeysSection: {
+    marginTop: 10,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#d4af37',
+    backgroundColor: 'rgba(31,31,31,0.92)',
+  },
+  hubKeysTitle: {
+    color: '#f0e68c',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  hubKeyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#3a3a3a',
+  },
+  hubKeyRowName: { flex: 1, color: '#e8e8e8', fontSize: 12 },
+  hubKeyDetachBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+  },
+  hubKeyDetachText: { color: '#cccccc', fontSize: 10 },
+
   // Детальный экран контейнера / торговца
   detailWrapper: {
     flex: 1,

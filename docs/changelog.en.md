@@ -1,5 +1,184 @@
 # Changelog
 ---
+## Gates between points (patch 517)
+
+Plan item 9. Previously the linked check could only look at a win in the
+terminal mini-game. Now **any point** can be the source of a neutral access
+event, and that event lives **on the room**, not in a player's tab.
+
+- **Shared event journal.** Hacking a terminal, opening a point with a key or
+  a linked check, and a manual GM decision all produce the same event. It is
+  idempotent, arrives on join and is broadcast to every member on each
+  recompute.
+- **Gates without a key.** The second setup row now works even when no key is
+  required: until the chosen point produces an event, access stays closed;
+  after the event it opens. Sources are no longer limited to terminals —
+  locations, containers, merchants and terminals are all selectable.
+- **Gate chains.** If A opens B and B is the source for C, the server resolves
+  the whole chain in a few passes; cyclic links are bounded.
+- **Links visible to the GM.** The card shows "After: <point name>" with a
+  "gate passed / closed" badge; the location has a separate section listing
+  links and their state.
+- **Manual opening.** The GM can still unlock a location node by hand; gates
+  and keys do not override that decision.
+
+## Server-side key checking and staying on the card grid (patch 516)
+
+Plan item 8. Access is now decided by the **server from the room state**, not
+by the player's window (lesson 506): the client never decides whether a point
+is open.
+
+- **Key present in shared storage** — the mini-game never starts: the terminal
+  gets "access granted" with no board and no attempts, containers and
+  merchants open. The GM gets no "Terminal hacked" notice: they created the
+  record, linked it and issued it. The location list shows "Opened by key".
+- **Key missing and mandatory** — the point stays locked; taking loot, trading
+  or starting a hack returns a "Key required" refusal.
+- **Key missing and optional** — access waits for the linked check: once the
+  chosen terminal is hacked, the point opens. Until then a key is needed or
+  the GM opens it manually.
+- **Key found later** — issuing a record, finding one in loot, restoring a
+  storage snapshot and hacking the linked terminal all recompute access and
+  broadcast fresh states to the room. The requirement reaches the server both
+  for a standalone terminal and for location nodes.
+- **New error code** `KEY_REQUIRED` in both protocols with paired RU/EN labels.
+
+Also, as requested: **creating a point no longer opens its detail screen** —
+the GM stays on the card grid and sees the newly saved card there.
+
+## "Mandatory" checkbox and field order (patch 515)
+
+The owner: "When creating a container, the 'Mandatory' requirement should
+better be a checkbox. And the description fields should be last or second to
+last. That is more logical".
+
+- The two chip buttons ("Mandatory" / "Optional") in the access-point form
+  were replaced with a single **checkbox** with a checked/unchecked icon. One
+  tap switches between a mandatory and an optional key; clearing the key still
+  means no requirement.
+- The two button labels were removed from the RU/EN dictionaries; only the
+  checkbox label remains. Checkbox styles were added to the shared form
+  skeleton, so the neighbouring key form inherits them automatically
+  (rule in `docs/ui-modals-rules.md`).
+- **The description moved to the end of the form**: name, bindings and access
+  settings first, description last. The key form already had the description
+  and preview at the end — that order is kept and pinned by a test.
+- `docs/roadmap.md` updated to version 515; the outstanding items are
+  unchanged.
+
+## Requirement fields in cards (patch 514)
+
+The first half of design step 3: "we are now editing card UI and creating
+fields and requirements for them". **Server-side key checking is NOT in this
+patch** — it stays the next item on the plan.
+
+- **Access-point fields.** Locations, containers, merchants and terminals now
+  store `requiredKeyItemId`, `keyRequirement` (none / optional / mandatory),
+  `linkedCheckId` and `keyItemIds`. Normalization clears nested keys on
+  terminals: a key can be placed there neither by the form nor by dragging.
+- **Two setup rows.** The first is a name search or a list of created keys and
+  notes, with a "Is it mandatory?" toggle next to it; the second is a search
+  or list of terminals as the alternative check. The card shows which key is
+  required and whether it is mandatory.
+- **A key is part of something.** The key form has a "Part of" row: location,
+  container or merchant (no terminals in the list). The link lives on the
+  parent, so editing or deleting the template never extinguishes a found
+  record.
+- **Dragging.** The key card now has the same arrow drag handle as containers.
+  It leaves the root grid for a location, is listed there separately, and can
+  be moved back with a button. "Add to storage" in the `⋮` menu stays as the
+  backward-compatibility exception.
+- **Live roadmap.** New `docs/roadmap.md`: a status table of every item and an
+  "Outstanding after this patch" list. As requested, it is updated in every
+  patch and repeated in the reply. It also records the new storage description:
+  "Like the merchant, two panels ... just no price checks" — the current
+  storage window does not match it yet.
+
+## Key and access-point rules clarified (patch 513, docs only)
+
+The owner extended the design and chose "document it for now" — **no code,
+protocol or game behaviour was changed**. All decisions are recorded in
+`docs/key-items-and-gates-design.md` (Update 7 and section 10), in
+`docs/architecture/engine-charter.md`, in the agent start map and in `replit.md`.
+
+- **A key is never issued on its own.** Containers, merchants and terminals can
+  stand on the grid and be broadcast to players either directly or inside a
+  location. A key reaches the party only as part of a location, container or
+  merchant; it is never placed inside a terminal, although a terminal may
+  require it.
+- **Compatibility exception.** The "Add to storage" item in the key card's
+  `⋮` menu stays by the owner's explicit decision ("for backward
+  compatibility"): existing campaigns and storage snapshots keep working.
+  Removing the item or changing the snapshot format is forbidden.
+- **Dragging.** All four cards — container, merchant, terminal, key — can be
+  moved into a location, and each has the arrow drag handle. Already found
+  records are untouched by a move.
+- **Two kinds of requirement.** Containers, merchants, terminals and the future
+  "lock" may require a key as mandatory or optional. The point's card gets two
+  setup rows: a key (search or list) with an "Is it mandatory?" field next to
+  it, and a check (search or list of terminals / locks).
+- **Access.** If the key is in shared storage, the mini-game never starts and
+  the point opens immediately. A missing mandatory key means no access. A
+  missing optional key means the linked terminal, hack, lockpick or force must
+  be passed, or the GM opens access manually. The check runs on the server by
+  record id; the note's text is for players and is never parsed.
+- **Examples.** A safe "by key or by hack" and a safe "key only"; a
+  contraband merchant gated by a faction badge or an incriminating note.
+
+Step 3 implementation will start on a separate instruction.
+
+## Modals now follow the design of nearby windows (patch 512)
+
+The owner: "If you create modal windows, at least follow the design of other
+modals nearby or doing something similar. If possible, write it down in the
+app's working rules". Patch 511 built the key form "in the style of" its
+neighbour but with its own height, radius, padding, heading, labels and button
+order — it looked out of place.
+
+- **Form.** `KeyItemFormModal` no longer defines base styles: it imports
+  `lootTradeFormStyles` from `ContainerFormModal`. Both windows now share the
+  backdrop, card, centered heading, field labels, inputs, room chips, hints and
+  footer with "Save" on the left and "Cancel" on the right. Only the tag bar
+  and text preview remain local, because the container form has neither.
+- **Card.** Instead of two separate round buttons, the key card now has one
+  `⋮` button and the same dropdown menu ("Edit", "Add to storage") as
+  container, merchant and terminal cards, using the same menu styles.
+- **Rule written down.** New `docs/ui-modals-rules.md` lists the mandatory
+  reference, nearby modals by layer, what exactly to reuse, a pre-release
+  checklist and the patch 511 lesson. Links added to `docs/agents/README.md`,
+  `docs/architecture/engine-charter.md` (a dedicated safeguard) and `replit.md`.
+- **Safeguard.** `__tests__/ui/modal-design-reuse-512.test.js` checks the actual
+  style import rather than a visual resemblance: no local `StyleSheet.create`
+  with base keys, matching button order, and the rule present in the docs.
+
+Key behaviour, shared storage and the protocol are unchanged.
+
+## Keys as cards on the screen (patch 511)
+
+The owner clarified after 510: "I expected a key to be like a container /
+merchant / terminal card, with a modal in the style of creating a container,
+and then saved into the screen". A separate catalog behind a key icon in the
+header was not what was wanted.
+
+- **Creation.** The Loot / Trade grid now has a "Create key / note" tile next
+  to the location, container, merchant and terminal tiles.
+- **Form.** `KeyItemFormModal` mirrors `ContainerFormModal`: same theme, card,
+  field labels, room selector, and "Cancel / Save" footer. A name is required,
+  the description may be empty; the editor inserts the existing tags
+  (`**bold**`, `*italic*`, list, `{CD}`, `{CAP}`) and previews them through
+  `renderTextWithIcons`.
+- **Saved into the screen.** The record is written to `gm_key_items`, the card
+  list refreshes immediately, and the key stays on the grid next to containers.
+  `KeyItemCardCell` uses the same cell styles as a container, merchant or
+  terminal card.
+- **Card actions.** "Edit" opens the same form with current values; "Add to
+  storage" sends the record to shared storage — as before, GM only and online
+  only. A record found as loot still goes to shared storage, never into a
+  personal inventory.
+- **No regressions.** The data layer, the `storage.addKey` protocol, the
+  no-withdraw rule for keys and key transfer inside the storage snapshot are
+  unchanged. The header icon and `KeyItemCatalogModal` are gone.
+
 ## Keys and notes in shared storage (patch 510)
 
 Step 2 of `docs/key-items-and-gates-design.md`. The owner: "Many such items

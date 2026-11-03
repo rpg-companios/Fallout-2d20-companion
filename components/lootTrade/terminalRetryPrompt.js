@@ -62,6 +62,9 @@ export const findCompleted = (rooms, clientId = null) => {
     if (!isGmRoom(room, clientId)) continue;
     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
       if (terminal?.game?.status !== 'won') continue;
+      // Патч 516: терминал, открытый ключом, не считается «взломанным
+      // игроком» — Мастер сам создал и выдал ключ, уведомление не нужно.
+      if (terminal?.game?.hackedByKey) continue;
       if (terminal?.closed) continue;
       completed.push({
         code,

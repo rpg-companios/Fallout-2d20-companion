@@ -337,6 +337,25 @@ const attachRoomWebSocketServer = (httpServer, {
     }
   };
 
+  /**
+   * Патч 516: ключ мог появиться на складе одновременно с перезаписью
+   * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
+   * по текущему состоянию комнаты и шлём свежие состояния точек.
+   */
+  const broadcastKeyAccessState = (room, exceptClientId = null) => {
+    const fresh = registry.recomputeKeyAccess(room?.code) || room;
+    if (!fresh) return;
+    if (fresh.activeSession) {
+      broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
+    }
+    broadcastTerminalStates(fresh, exceptClientId);
+    // Патч 517: ворота — состояние событий доступа общее на всю комнату,
+    // поэтому рассылаем его ВСЕМ, включая инициатора действия.
+    broadcastToRoom(fresh, null, MESSAGE.ACCESS_STATE, {
+      events: registry.getAccessEvents(fresh.code),
+    });
+  };
+
   const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
@@ -668,6 +687,7 @@ const attachRoomWebSocketServer = (httpServer, {
           const statePayload = { terminal: result.terminal, requestId: payload.requestId || null };
           sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
           broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
+          broadcastKeyAccessState(result.room, clientId);
           break;
         }
 
@@ -702,6 +722,9 @@ const attachRoomWebSocketServer = (httpServer, {
             terminal: result.terminal,
             usedDigest: result.usedDigest || false,
           });
+          // Патч 516: взлом привязанного терминала открывает точки с
+          // необязательным ключом.
+          broadcastKeyAccessState(result.room, clientId);
           break;
         }
 
@@ -759,6 +782,7 @@ const attachRoomWebSocketServer = (httpServer, {
           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          broadcastKeyAccessState(result.room, clientId);
           break;
         }
 
@@ -777,6 +801,7 @@ const attachRoomWebSocketServer = (httpServer, {
           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          broadcastKeyAccessState(result.room, clientId);
           break;
         }
 
@@ -808,10 +833,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, {
-            session: result.session,
-          });
-          broadcastTerminalStates(result.room);
+          broadcastKeyAccessState(result.room, clientId);
           break;
         }
 
@@ -988,6 +1010,8 @@ const attachRoomWebSocketServer = (httpServer, {
             sendEnvelope(ws, MESSAGE.STORAGE_STATE, { storage }, canonical, clientId);
             broadcastToRoom(result.room, null, MESSAGE.STORAGE_STATE, { storage });
           }
+          // Патч 516: найденный ключ сразу открывает точки, которые его ждут.
+          broadcastKeyAccessState(result.room, null);
           break;
         }
 

@@ -14,7 +14,12 @@ const {
   applySessionUpdate,
   applyAtomicLootTake,
   applyAtomicTradeCommit,
+  applyKeyAccessToSession,
 } = require('./lootTradeSession');
+const {
+  KEY_ACCESS,
+  resolveKeyAccess,
+} = require('./keyAccess');
 const {
   normalizeTerminalConfig,
   publicGameState,
@@ -56,6 +61,95 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     gmOnline: isGmOnline(room),
   });
 
+  /**
+   * Патч 516: «доступ разрешён ключом» — выигранное состояние терминала без
+   * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
+   * Мастер сам создал ключ, связал его с точкой и выдал.
+   */
+  const keyWonGame = (config, at) => ({
+    status: 'won',
+    result: 'ACCESS GRANTED',
+    scrollUp: true,
+    name: String(config?.name || '').trim() || 'Терминал',
+    description: String(config?.description || '').trim(),
+    attempts: 4,
+    attemptsMax: 4,
+    guesses: [],
+    wordRanges: [],
+    bracketRanges: [],
+    hackedByKey: true,
+    revision: 1,
+    updatedAt: at,
+  });
+
+  const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
+    const id = String(containerId || '').trim();
+    if (!id || room.accessEvents.has(id)) return false;
+    room.accessEvents.set(id, { containerId: id, kind, by, at: now() });
+    return true;
+  };
+
+  const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
+    storage: room.partyStorage,
+    terminalStates: room.terminalStates,
+    accessEvents: room.accessEvents,
+  });
+
+  /** Пересчитать доступ по текущему складу, терминалам и журналу ворот. */
+  const refreshKeyAccess = (room) => {
+    if (!room) return;
+    const resolve = resolveForRoom(room);
+
+    // Патч 517: открытая точка сама становится источником события для
+    // следующих ворот. Событие идемпотентно и общее на всю комнату.
+    const recordFromSession = (session) => {
+      let added = false;
+      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
+        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
+      }
+      for (const node of session.nodes || []) {
+        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
+          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
+        }
+      }
+      return added;
+    };
+
+    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
+    // появившиеся события открывают следующую точку. Ограничение защищает
+    // от циклических ссылок, заданных Мастером.
+    for (let pass = 0; pass < 4; pass += 1) {
+      let added = false;
+      if (room.activeSession) {
+        room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+        if (recordFromSession(room.activeSession)) added = true;
+      }
+      for (const [id, entry] of room.terminalStates) {
+        const decision = resolve({
+          requiredKeyItemId: entry.config?.requiredKeyItemId,
+          keyRequirement: entry.config?.keyRequirement,
+          linkedCheckId: entry.config?.linkedCheckId,
+        });
+        entry.keyAccessState = decision.state;
+        entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+        if (entry.game?.status === 'won' || decision.state === KEY_ACCESS.OPEN_BY_KEY) {
+          if (recordAccessEvent(room, id, 'hacked', entry.game?.operatorName || 'gm')) added = true;
+        }
+        if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+          entry.game = keyWonGame(entry.config, now());
+          entry.closed = false;
+          entry.accessId = newBroadcastId();
+          entry.updatedAt = now();
+        }
+      }
+      if (!added) break;
+    }
+    // Финальный пересчёт: событие последнего прохода могло открыть ещё узел.
+    if (room.activeSession) {
+      room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+    }
+  };
+
   const touchRateLog = (log, key, windowMs, max) => {
     const cutoff = now() - windowMs;
     const list = (log.get(key) || []).filter((ts) => ts > cutoff);
@@ -74,6 +168,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+    // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+    // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+    accessEvents: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
@@ -119,6 +216,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       id,
       terminalPublic(id, entry),
     ])),
+    // Патч 517: при подключении игрок сразу видит, какие ворота уже пройдены.
+    accessEvents: Object.fromEntries(room.accessEvents || new Map()),
     // Патч 508: игрок при подключении получает текущий снапшот хранилища.
     // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
     partyStorage: storageSnapshot(room),
@@ -330,11 +429,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
+    refreshKeyAccess(room);
     // Патч 504: открытие/повторная выдача локации — это новая трансляция,
     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
     syncTerminalNodes(room, normalized, { reissue: true });
     room.lastClosedSession = null;
-    return { room, session: normalized };
+    return { room, session: room.activeSession || normalized };
   };
 
   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
@@ -364,6 +464,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
     // открыть терминал один раз за трансляцию, даже если закрыл окно.
     accessId: entry.accessId || null,
+    // Патч 516: состояние требования ключа для карточки терминала.
+    keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
+    keyUnlocked: Boolean(entry.keyUnlocked),
     game: publicGameState(entry.game),
     updatedAt: entry.updatedAt,
   });
@@ -433,6 +536,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const previous = room.terminalStates.get(config.containerId);
     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
     room.terminalStates.set(config.containerId, entry);
+    refreshKeyAccess(room);
     return { room, terminal: terminalPublic(config.containerId, entry) };
   };
 
@@ -496,6 +600,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       entry.accessId = newBroadcastId();
       entry.updatedAt = now();
       return { room, terminal: terminalPublic(id, entry) };
+    }
+    // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+    // не запускается вообще — игрок получает понятный отказ.
+    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
+      || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
+      return { error: ERROR_CODE.KEY_REQUIRED };
     }
     const member = room.members.get(clientId);
     if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
@@ -565,6 +675,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       });
     }
     entry.updatedAt = now();
+    // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+    // для которых ключ был необязательным.
+    refreshKeyAccess(room);
     return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
   };
 
@@ -935,6 +1048,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     storage.entries = [...storage.entries, entry];
     storage.revision += 1;
     room.partyStorage = storage;
+    refreshKeyAccess(room);
     return entry;
   };
 
@@ -998,6 +1112,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       return { room, storage: storageSnapshot(room), applied: false };
     }
     room.partyStorage = incoming;
+    refreshKeyAccess(room);
     return { room, storage: storageSnapshot(room), applied: true };
   };
 
@@ -1038,9 +1153,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     depositToPartyStorage,
     withdrawFromPartyStorage,
     getPartyStorage,
+    getAccessEvents: (code) => Object.fromEntries(
+      (rooms.get(code)?.accessEvents || new Map()).entries(),
+    ),
     addKeyItemToStorage,
     restorePartyStorage,
     sweep,
+    // Патч 516: явный пересчёт доступа перед рассылкой (ключ могли найти
+    // в том же самом взятии добычи, когда сессия ещё перезаписывалась).
+    recomputeKeyAccess: (code) => {
+      const room = rooms.get(code);
+      if (room) refreshKeyAccess(room);
+      return room || null;
+    },
     _rooms: rooms, // диагностика/тесты
   };
 };

@@ -55,6 +55,8 @@ export interface RoomStateEntry {
   terminalStates?: Record<string, any>;
   /** Патч 507: «Общее хранилище» комнаты (канон — сервер). */
   partyStorage?: PartyStorageState;
+  /** Патч 517: нейтральные события доступа (ворота), общие на комнату. */
+  accessEvents?: Record<string, { containerId: string; kind: string; by?: string; at: number }>;
   directives?: RoomDirectiveEntry[];
   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
   capabilities?: Record<string, boolean>;
@@ -417,6 +419,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         }
       });
     }
+    // Патч 517: ворота между точками — сервер шлёт общий журнал событий.
+    if (message.type === ROOM_MESSAGE.ACCESS_STATE) {
+      const code = message.roomCode;
+      const events = message.payload?.events;
+      const current = code ? get().rooms[code] : null;
+      if (code && current && events && typeof events === 'object') {
+        set({ rooms: {
+          ...get().rooms,
+          [code]: { ...current, accessEvents: events },
+        } });
+      }
+    }
     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
       const code = message.roomCode;
       const terminal = message.payload?.terminal;
@@ -662,6 +676,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               activeSession,
               terminalStates,
               partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
+              accessEvents: (payloadRooms.accessEvents as Record<string, any> | undefined) ?? {},
               directives,
               capabilities,
             },

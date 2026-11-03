@@ -1,0 +1,1519 @@
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index a8e5de2..91685d7 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -69,15 +69,29 @@ describe('514: две строки настройки в форме точки',
+   const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+   const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+ 
+-  it('первая строка — поиск и список ключей с полем «Обязателен?»', () => {
++  it('первая строка — поиск и список ключей с чекбоксом «Обязателен» (патч 515)', () => {
+     expect(form).toContain('availableKeyItems');
+     expect(form).toContain('testID="container-form-key-search"');
+-    expect(form).toContain('container-form-key-required');
+-    expect(form).toContain('container-form-key-optional');
+-    expect(form).toContain("tLootTrade('form.keyMandatoryLabel')");
++    expect(form).toContain('testID="container-form-key-required"');
++    expect(form).toContain("accessibilityRole=\"checkbox\"");
++    expect(form).toContain('checkbox-marked');
++    expect(form).toContain('checkbox-blank-outline');
++    expect(form).toContain("tLootTrade('form.keyRequiredLabel')");
++    expect(form).not.toContain('container-form-key-optional');
+     expect(form).toContain('styles.roomChips');
+   });
+ 
++  it('описание — последнее поле формы (патч 515)', () => {
++    expect(form).toContain('testID="container-form-description"');
++    const descAt = form.indexOf('container-form-description');
++    const checkAt = form.indexOf('container-form-check-search');
++    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
++    expect(checkAt).toBeGreaterThan(-1);
++    expect(descAt).toBeGreaterThan(checkAt);
++    expect(descAt).toBeGreaterThan(hintAt);
++    expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
++  });
++
+   it('вторая строка — поиск и список терминалов / замков', () => {
+     expect(form).toContain('availableCheckContainers');
+     expect(form).toContain('testID="container-form-check-search"');
+@@ -133,8 +147,8 @@ describe('514: словари и живой план', () => {
+     const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
+     const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
+     for (const [section, key] of [
+-      ['form', 'keyRequirementLabel'], ['form', 'keyMandatoryLabel'],
+-      ['form', 'keyRequiredLabel'], ['form', 'keyOptionalLabel'],
++      ['form', 'keyRequirementLabel'],
++      ['form', 'keyRequiredLabel'],
+       ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
+       ['card', 'requiresKey'], ['card', 'hubKind'],
+       ['keyItems', 'attachToLabel'], ['keyItems', 'attachToHint'],
+@@ -147,8 +161,8 @@ describe('514: словари и живой план', () => {
+ 
+   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
+     const plan = read('docs/roadmap.md');
+-    expect(plan).toContain('514');
+-    expect(plan).toContain('Осталось после патча 514');
++    expect(plan).toContain('515');
++    expect(plan).toContain('Осталось после патча 515');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('Ворота между контейнерами');
+     expect(plan).toContain('две панели');
+diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
+new file mode 100644
+index 0000000..d8a6888
+--- /dev/null
++++ b/__tests__/ui/form-checkbox-515.test.js
+@@ -0,0 +1,79 @@
++// Патч 515 (уточнение владельца): «При создании контейнера, требование
++// "Обязателен" лучше пусть будет чекбокс. А поля под описание пусть будут
++// последними или предпоследними. Так логичнее».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++const keyForm = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
++
++describe('515: чекбокс обязательности', () => {
++  it('это один чекбокс, а не две кнопки-чипса', () => {
++    expect(form).toContain('testID="container-form-key-required"');
++    expect(form).toContain('accessibilityRole="checkbox"');
++    expect(form).toContain('accessibilityState={{ checked:');
++    expect(form).toContain("'checkbox-marked'");
++    expect(form).toContain("'checkbox-blank-outline'");
++    expect(form).toContain("tLootTrade('form.keyRequiredLabel')");
++    expect(form).not.toContain('container-form-key-optional');
++    expect(form).not.toContain("tLootTrade('form.keyMandatoryLabel')");
++  });
++
++  it('стили чекбокса лежат в общем каркасе формы (правило 512)', () => {
++    expect(form).toContain('export const lootTradeFormStyles = StyleSheet.create({');
++    expect(form).toContain('checkboxRow: {');
++    expect(form).toContain('checkboxLabel: {');
++    expect(form).toContain('styles.checkboxRow');
++    expect(keyForm).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
++  });
++
++  it('переключение даёт обязательный / необязательный режим', () => {
++    expect(form).toContain('KEY_REQUIREMENT.REQUIRED');
++    expect(form).toContain('KEY_REQUIREMENT.OPTIONAL');
++    expect(form).toContain('setKeyRequirement(');
++  });
++});
++
++describe('515: описание в конце формы', () => {
++  it('в форме контейнера описание после всех настроек', () => {
++    const descAt = form.indexOf('testID="container-form-description"');
++    const checkAt = form.indexOf('container-form-check-search');
++    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
++    expect(descAt).toBeGreaterThan(-1);
++    expect(descAt).toBeGreaterThan(checkAt);
++    expect(descAt).toBeGreaterThan(hintAt);
++    expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
++  });
++
++  it('в форме ключа описание и предпросмотр тоже в конце', () => {
++    const descAt = keyForm.indexOf('testID="key-item-form-description"');
++    const parentAt = keyForm.indexOf('testID="key-item-form-parent-search"');
++    expect(descAt).toBeGreaterThan(parentAt);
++    expect(keyForm.indexOf('extraStyles.preview')).toBeGreaterThan(descAt);
++    expect(keyForm.lastIndexOf('</ScrollView>')).toBeGreaterThan(keyForm.indexOf('extraStyles.preview'));
++  });
++});
++
++describe('515: словари без мёртвых ключей и живой план', () => {
++  it('старые подписи двух кнопок удалены в обоих языках', () => {
++    for (const loc of ['ru-RU', 'en-EN']) {
++      const dict = JSON.parse(read(`i18n/${loc}/screens/lootTrade/screen.json`));
++      expect(dict.form.keyMandatoryLabel).toBeUndefined();
++      expect(dict.form.keyOptionalLabel).toBeUndefined();
++      expect(dict.form.keyRequiredLabel).toBeTruthy();
++    }
++  });
++
++  it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
++    const plan = read('docs/roadmap.md');
++    expect(plan).toContain('515');
++    expect(plan).toContain('Осталось после патча 515');
++    expect(plan).toContain('Серверная проверка ключа');
++    expect(plan).toContain('две панели');
++    expect(plan).toContain('Мини-игра взлома замков');
++  });
++});
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 8e8b436..2539cb0 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -518,16 +518,6 @@ const ContainerFormModal = ({
+               </>
+             )}
+ 
+-            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
+-            <TextInput
+-              style={[styles.input, styles.multilineInput]}
+-              value={description}
+-              onChangeText={setDescription}
+-              placeholder={tLootTrade('form.descriptionPlaceholder')}
+-              placeholderTextColor="#8c8c8c"
+-              multiline
+-            />
+-
+             {isTerminal && (
+               <>
+                 <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
+@@ -661,29 +651,26 @@ const ContainerFormModal = ({
+                   })}
+                 </View>
+                 {Boolean(requiredKeyItemId) && (
+-                  <>
+-                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
+-                    <View style={styles.requirementRow}>
+-                      <TouchableOpacity
+-                        testID="container-form-key-required"
+-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
+-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
+-                      >
+-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
+-                          {tLootTrade('form.keyRequiredLabel')}
+-                        </Text>
+-                      </TouchableOpacity>
+-                      <TouchableOpacity
+-                        testID="container-form-key-optional"
+-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
+-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
+-                      >
+-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
+-                          {tLootTrade('form.keyOptionalLabel')}
+-                        </Text>
+-                      </TouchableOpacity>
+-                    </View>
+-                  </>
++                  <TouchableOpacity
++                    testID="container-form-key-required"
++                    style={styles.checkboxRow}
++                    onPress={() => setKeyRequirement(
++                      keyRequirement === KEY_REQUIREMENT.REQUIRED
++                        ? KEY_REQUIREMENT.OPTIONAL
++                        : KEY_REQUIREMENT.REQUIRED,
++                    )}
++                    accessibilityRole="checkbox"
++                    accessibilityState={{ checked: keyRequirement === KEY_REQUIREMENT.REQUIRED }}
++                  >
++                    <MaterialCommunityIcons
++                      name={keyRequirement === KEY_REQUIREMENT.REQUIRED
++                        ? 'checkbox-marked'
++                        : 'checkbox-blank-outline'}
++                      size={20}
++                      color={ADMIN_MODAL_PALETTE.accent}
++                    />
++                    <Text style={styles.checkboxLabel}>{tLootTrade('form.keyRequiredLabel')}</Text>
++                  </TouchableOpacity>
+                 )}
+ 
+                 <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
+@@ -720,6 +707,18 @@ const ContainerFormModal = ({
+                 <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
+               </>
+             )}
++
++            {/* Патч 515: описание — последнее поле формы, после всех настроек. */}
++            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
++            <TextInput
++              testID="container-form-description"
++              style={[styles.input, styles.multilineInput]}
++              value={description}
++              onChangeText={setDescription}
++              placeholder={tLootTrade('form.descriptionPlaceholder')}
++              placeholderTextColor="#8c8c8c"
++              multiline
++            />
+           </ScrollView>
+ 
+           <View style={styles.footer}>
+@@ -1082,6 +1081,17 @@ export const lootTradeFormStyles = StyleSheet.create({
+     flexWrap: 'wrap',
+     gap: 8,
+   },
++  checkboxRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 9,
++    paddingVertical: 6,
++  },
++  checkboxLabel: {
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 13,
++    fontWeight: '700',
++  },
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 88e64fe..c21bbbe 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,25 @@
+ # Changelog
+ ---
++## "Mandatory" checkbox and field order (patch 515)
++
++The owner: "When creating a container, the 'Mandatory' requirement should
++better be a checkbox. And the description fields should be last or second to
++last. That is more logical".
++
++- The two chip buttons ("Mandatory" / "Optional") in the access-point form
++  were replaced with a single **checkbox** with a checked/unchecked icon. One
++  tap switches between a mandatory and an optional key; clearing the key still
++  means no requirement.
++- The two button labels were removed from the RU/EN dictionaries; only the
++  checkbox label remains. Checkbox styles were added to the shared form
++  skeleton, so the neighbouring key form inherits them automatically
++  (rule in `docs/ui-modals-rules.md`).
++- **The description moved to the end of the form**: name, bindings and access
++  settings first, description last. The key form already had the description
++  and preview at the end — that order is kept and pinned by a test.
++- `docs/roadmap.md` updated to version 515; the outstanding items are
++  unchanged.
++
+ ## Requirement fields in cards (patch 514)
+ 
+ The first half of design step 3: "we are now editing card UI and creating
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e3b2b0a..61f9a9a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,25 @@
+ # История изменений
+ 
+ ---
++## Чекбокс «Обязателен» и порядок полей (патч 515)
++
++Владелец: «При создании контейнера, требование "Обязателен" лучше пусть будет
++чекбокс. А поля под описание пусть будут последними или предпоследними. Так
++логичнее».
++
++- В форме точки доступа две кнопки-чипса («Обязателен» / «Необязателен»)
++  заменены одним **чекбоксом** с иконкой отмеченной/пустой рамки. Нажатие
++  переключает режим между обязательным и необязательным ключом; снятый ключ
++  по-прежнему даёт режим «нет требования».
++- Подписи двух кнопок удалены из RU/EN словарей; осталась одна подпись
++  чекбокса. Стили чекбокса добавлены в общий каркас формы, поэтому соседняя
++  форма ключа наследует их автоматически (правило `docs/ui-modals-rules.md`).
++- **Описание перенесено в конец формы**: сначала имя, привязки и настройки
++  доступа, затем поле описания. В форме ключа описание и предпросмотр уже были
++  в конце — порядок сохранён и закреплён тестом.
++- Живой план `docs/roadmap.md` обновлён до версии 515; список оставшихся
++  тезисов не изменился.
++
+ ## Поля и требования в карточках (патч 514)
+ 
+ Первая половина шага 3 дизайна: «сейчас правим ui карточек и создаём для них
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index ae1c3fe..0d24eec 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -140,6 +140,9 @@
+   привязку;
+ - пункт «Выдать на склад» в меню `⋮` сохранён (исключение 7.1).
+ 
++**Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
++кнопок, а поле описания перенесено в конец формы — после настроек доступа.
++
+ **Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
+ обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
+ 
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index f235a87..0f2edd4 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index b20cc52..b216aff 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index dabfffb..290d9af 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index cb0e44a..5d7b5b2 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index d126d64..21c44f6 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 33ac668..8e38cf6 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 8d00201..5a89eb0 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index e3ab331..8007e7c 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 597ea88..a28683d 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index c2b0558..46341c4 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 6c02630..5a674b6 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 2304bd9..dc224d8 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 96f4006..ad5b4f9 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 60b6678..1a0c5bc 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 251a734..ecf7069 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 5545944..2ac91ec 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index c57aefa..7967163 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index c84c9fa..76cebcd 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index ec14109..8c41ca5 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+index d5af108..da2a321 100644
+--- a/docs/patch-513-install.md
++++ b/docs/patch-513-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 513: уточнение правил ключей (только документ)
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 512** (коммит `6da0a37`, ветка
+diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
+index 9a3bace..5399c5b 100644
+--- a/docs/patch-514-install.md
++++ b/docs/patch-514-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 514: поля и требования в карточках
+ 
++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++
+ Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–514
+diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
+new file mode 100644
+index 0000000..e207054
+--- /dev/null
++++ b/docs/patch-515-install.md
+@@ -0,0 +1,87 @@
++# Установка патча 515: чекбокс «Обязателен» и порядок полей
++
++Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–515
++цепочкой.
++
++> Уточнение владельца: «При создании контейнера, требование "Обязателен" лучше
++> пусть будет чекбокс. А поля под описание пусть будут последними или
++> предпоследними. Так логичнее».
++
++## Что изменилось
++
++### 1. Чекбокс вместо двух кнопок
++
++В `ContainerFormModal` блок «Обязателен / Необязателен» заменён одним
++`TouchableOpacity` с `accessibilityRole="checkbox"`, иконкой
++`checkbox-marked` / `checkbox-blank-outline` и подписью «Обязателен».
++Одно нажатие переключает `keyRequirement` между `required` и `optional`;
++если ключ не выбран, режим остаётся `none`. Подписи двух кнопок удалены из
++RU/EN словарей.
++
++Стили `checkboxRow` и `checkboxLabel` добавлены в `lootTradeFormStyles` —
++общий каркас, который импортирует `KeyItemFormModal`. Правило
++`docs/ui-modals-rules.md` соблюдено: новый элемент не рисуется отдельным
++набором стилей.
++
++### 2. Описание в конце формы
++
++Поле «Описание» вынесено из середины формы и стоит **последним** полем
++перед футером: имя → привязки → сложность/настройки точки → две строки
++требования → описание. В форме ключа описание и предпросмотр уже были в конце;
++порядок закреплён приёмочным тестом.
++
++Поведение сохранения, поля данных и протокол не изменились.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | чекбокс, перенос описания, стили в общем каркасе |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | удалены подписи двух кнопок |
++| `__tests__/room/key-items-fields-514.test.js` | ожидания под чекбокс и порядок полей |
++| `__tests__/ui/form-checkbox-515.test.js` | новый предохранитель (7 проверок) |
++| `docs/roadmap.md` | версия 515, «Осталось после патча 515» |
++| `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 515, 81/81 заметок |
++| `patchs/515-form-checkbox-order.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 514:
++
++```bash
++./apply-patch.sh 515
++# ✓ Установлен патч: №515 (версия 514 → 515)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 515
++```
++
++`patchs/baseline.json` в источнике равен `515`. После установки
++`public/version.json` → `515`; закоммитьте изменения и пересоберите
++веб-сборку. Серверный код не менялся, перезапуск сервиса не обязателен.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/ui/form-checkbox-515.test.js
++npx vitest run __tests__/room/key-items-fields-514.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "515"'
++```
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/515-form-checkbox-order.patch
++cp /path/to/515-form-checkbox-order.patch patchs/
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 6b8e882..df74a36 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-03. Текущая версия: **514**.
++Дата ревизии: 2026-11-03. Текущая версия: **515**.
+ 
+ ## Тезисы
+ 
+@@ -17,14 +17,14 @@
+ | 4 | Общий склад: каркас, канон Мастера, сейв в Drive и перенос файлом | ✅ сделано | 507–509 |
+ | 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
+ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
+-| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + «Обязателен?» / проверка), вложенные ключи в локации | ✅ сделано | **514** |
++| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
+ | 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
+ | 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
+ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
+ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
+ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+ 
+-## Осталось после патча 514
++## Осталось после патча 515
+ 
+ 1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
+ 2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 440cf9a..810d897 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -76,9 +76,7 @@
+     "keySearchPlaceholder": "Search keys and notes",
+     "keyEmpty": "No keys yet — create a card on the grid",
+     "keyNoDescription": "no description",
+-    "keyMandatoryLabel": "Is it mandatory?",
+     "keyRequiredLabel": "Mandatory",
+-    "keyOptionalLabel": "Optional",
+     "linkedCheckLabel": "Check (terminal / lock)",
+     "linkedCheckSearchPlaceholder": "Search terminals",
+     "linkedCheckEmpty": "No terminals yet",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 590e2e8..2d49da7 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -76,9 +76,7 @@
+     "keySearchPlaceholder": "Поиск ключа или записки",
+     "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
+     "keyNoDescription": "без описания",
+-    "keyMandatoryLabel": "Обязателен?",
+     "keyRequiredLabel": "Обязателен",
+-    "keyOptionalLabel": "Необязателен",
+     "linkedCheckLabel": "Проверка (терминал / замок)",
+     "linkedCheckSearchPlaceholder": "Поиск терминала",
+     "linkedCheckEmpty": "Терминалов пока нет",
+diff --git a/patchs/515-form-checkbox-order.patch b/patchs/515-form-checkbox-order.patch
+new file mode 100644
+index 0000000..271f3e2
+--- /dev/null
++++ b/patchs/515-form-checkbox-order.patch
+@@ -0,0 +1,751 @@
++diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
++index a8e5de2..0cc6234 100644
++--- a/__tests__/room/key-items-fields-514.test.js
+++++ b/__tests__/room/key-items-fields-514.test.js
++@@ -69,15 +69,29 @@ describe('514: две строки настройки в форме точки',
++   const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++   const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++ 
++-  it('первая строка — поиск и список ключей с полем «Обязателен?»', () => {
+++  it('первая строка — поиск и список ключей с чекбоксом «Обязателен» (патч 515)', () => {
++     expect(form).toContain('availableKeyItems');
++     expect(form).toContain('testID="container-form-key-search"');
++-    expect(form).toContain('container-form-key-required');
++-    expect(form).toContain('container-form-key-optional');
++-    expect(form).toContain("tLootTrade('form.keyMandatoryLabel')");
+++    expect(form).toContain('testID="container-form-key-required"');
+++    expect(form).toContain("accessibilityRole=\"checkbox\"");
+++    expect(form).toContain('checkbox-marked');
+++    expect(form).toContain('checkbox-blank-outline');
+++    expect(form).toContain("tLootTrade('form.keyRequiredLabel')");
+++    expect(form).not.toContain('container-form-key-optional');
++     expect(form).toContain('styles.roomChips');
++   });
++ 
+++  it('описание — последнее поле формы (патч 515)', () => {
+++    expect(form).toContain('testID="container-form-description"');
+++    const descAt = form.indexOf('container-form-description');
+++    const checkAt = form.indexOf('container-form-check-search');
+++    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
+++    expect(checkAt).toBeGreaterThan(-1);
+++    expect(descAt).toBeGreaterThan(checkAt);
+++    expect(descAt).toBeGreaterThan(hintAt);
+++    expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
+++  });
+++
++   it('вторая строка — поиск и список терминалов / замков', () => {
++     expect(form).toContain('availableCheckContainers');
++     expect(form).toContain('testID="container-form-check-search"');
++@@ -133,8 +147,8 @@ describe('514: словари и живой план', () => {
++     const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++     const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++     for (const [section, key] of [
++-      ['form', 'keyRequirementLabel'], ['form', 'keyMandatoryLabel'],
++-      ['form', 'keyRequiredLabel'], ['form', 'keyOptionalLabel'],
+++      ['form', 'keyRequirementLabel'],
+++      ['form', 'keyRequiredLabel'],
++       ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
++       ['card', 'requiresKey'], ['card', 'hubKind'],
++       ['keyItems', 'attachToLabel'], ['keyItems', 'attachToHint'],
++diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
++new file mode 100644
++index 0000000..d8a6888
++--- /dev/null
+++++ b/__tests__/ui/form-checkbox-515.test.js
++@@ -0,0 +1,79 @@
+++// Патч 515 (уточнение владельца): «При создании контейнера, требование
+++// "Обязателен" лучше пусть будет чекбокс. А поля под описание пусть будут
+++// последними или предпоследними. Так логичнее».
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+++const keyForm = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
+++
+++describe('515: чекбокс обязательности', () => {
+++  it('это один чекбокс, а не две кнопки-чипса', () => {
+++    expect(form).toContain('testID="container-form-key-required"');
+++    expect(form).toContain('accessibilityRole="checkbox"');
+++    expect(form).toContain('accessibilityState={{ checked:');
+++    expect(form).toContain("'checkbox-marked'");
+++    expect(form).toContain("'checkbox-blank-outline'");
+++    expect(form).toContain("tLootTrade('form.keyRequiredLabel')");
+++    expect(form).not.toContain('container-form-key-optional');
+++    expect(form).not.toContain("tLootTrade('form.keyMandatoryLabel')");
+++  });
+++
+++  it('стили чекбокса лежат в общем каркасе формы (правило 512)', () => {
+++    expect(form).toContain('export const lootTradeFormStyles = StyleSheet.create({');
+++    expect(form).toContain('checkboxRow: {');
+++    expect(form).toContain('checkboxLabel: {');
+++    expect(form).toContain('styles.checkboxRow');
+++    expect(keyForm).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
+++  });
+++
+++  it('переключение даёт обязательный / необязательный режим', () => {
+++    expect(form).toContain('KEY_REQUIREMENT.REQUIRED');
+++    expect(form).toContain('KEY_REQUIREMENT.OPTIONAL');
+++    expect(form).toContain('setKeyRequirement(');
+++  });
+++});
+++
+++describe('515: описание в конце формы', () => {
+++  it('в форме контейнера описание после всех настроек', () => {
+++    const descAt = form.indexOf('testID="container-form-description"');
+++    const checkAt = form.indexOf('container-form-check-search');
+++    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
+++    expect(descAt).toBeGreaterThan(-1);
+++    expect(descAt).toBeGreaterThan(checkAt);
+++    expect(descAt).toBeGreaterThan(hintAt);
+++    expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
+++  });
+++
+++  it('в форме ключа описание и предпросмотр тоже в конце', () => {
+++    const descAt = keyForm.indexOf('testID="key-item-form-description"');
+++    const parentAt = keyForm.indexOf('testID="key-item-form-parent-search"');
+++    expect(descAt).toBeGreaterThan(parentAt);
+++    expect(keyForm.indexOf('extraStyles.preview')).toBeGreaterThan(descAt);
+++    expect(keyForm.lastIndexOf('</ScrollView>')).toBeGreaterThan(keyForm.indexOf('extraStyles.preview'));
+++  });
+++});
+++
+++describe('515: словари без мёртвых ключей и живой план', () => {
+++  it('старые подписи двух кнопок удалены в обоих языках', () => {
+++    for (const loc of ['ru-RU', 'en-EN']) {
+++      const dict = JSON.parse(read(`i18n/${loc}/screens/lootTrade/screen.json`));
+++      expect(dict.form.keyMandatoryLabel).toBeUndefined();
+++      expect(dict.form.keyOptionalLabel).toBeUndefined();
+++      expect(dict.form.keyRequiredLabel).toBeTruthy();
+++    }
+++  });
+++
+++  it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
+++    const plan = read('docs/roadmap.md');
+++    expect(plan).toContain('515');
+++    expect(plan).toContain('Осталось после патча 515');
+++    expect(plan).toContain('Серверная проверка ключа');
+++    expect(plan).toContain('две панели');
+++    expect(plan).toContain('Мини-игра взлома замков');
+++  });
+++});
++diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++index 8e8b436..2539cb0 100644
++--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++@@ -518,16 +518,6 @@ const ContainerFormModal = ({
++               </>
++             )}
++ 
++-            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
++-            <TextInput
++-              style={[styles.input, styles.multilineInput]}
++-              value={description}
++-              onChangeText={setDescription}
++-              placeholder={tLootTrade('form.descriptionPlaceholder')}
++-              placeholderTextColor="#8c8c8c"
++-              multiline
++-            />
++-
++             {isTerminal && (
++               <>
++                 <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
++@@ -661,29 +651,26 @@ const ContainerFormModal = ({
++                   })}
++                 </View>
++                 {Boolean(requiredKeyItemId) && (
++-                  <>
++-                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
++-                    <View style={styles.requirementRow}>
++-                      <TouchableOpacity
++-                        testID="container-form-key-required"
++-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
++-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
++-                      >
++-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
++-                          {tLootTrade('form.keyRequiredLabel')}
++-                        </Text>
++-                      </TouchableOpacity>
++-                      <TouchableOpacity
++-                        testID="container-form-key-optional"
++-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
++-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
++-                      >
++-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
++-                          {tLootTrade('form.keyOptionalLabel')}
++-                        </Text>
++-                      </TouchableOpacity>
++-                    </View>
++-                  </>
+++                  <TouchableOpacity
+++                    testID="container-form-key-required"
+++                    style={styles.checkboxRow}
+++                    onPress={() => setKeyRequirement(
+++                      keyRequirement === KEY_REQUIREMENT.REQUIRED
+++                        ? KEY_REQUIREMENT.OPTIONAL
+++                        : KEY_REQUIREMENT.REQUIRED,
+++                    )}
+++                    accessibilityRole="checkbox"
+++                    accessibilityState={{ checked: keyRequirement === KEY_REQUIREMENT.REQUIRED }}
+++                  >
+++                    <MaterialCommunityIcons
+++                      name={keyRequirement === KEY_REQUIREMENT.REQUIRED
+++                        ? 'checkbox-marked'
+++                        : 'checkbox-blank-outline'}
+++                      size={20}
+++                      color={ADMIN_MODAL_PALETTE.accent}
+++                    />
+++                    <Text style={styles.checkboxLabel}>{tLootTrade('form.keyRequiredLabel')}</Text>
+++                  </TouchableOpacity>
++                 )}
++ 
++                 <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
++@@ -720,6 +707,18 @@ const ContainerFormModal = ({
++                 <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
++               </>
++             )}
+++
+++            {/* Патч 515: описание — последнее поле формы, после всех настроек. */}
+++            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
+++            <TextInput
+++              testID="container-form-description"
+++              style={[styles.input, styles.multilineInput]}
+++              value={description}
+++              onChangeText={setDescription}
+++              placeholder={tLootTrade('form.descriptionPlaceholder')}
+++              placeholderTextColor="#8c8c8c"
+++              multiline
+++            />
++           </ScrollView>
++ 
++           <View style={styles.footer}>
++@@ -1082,6 +1081,17 @@ export const lootTradeFormStyles = StyleSheet.create({
++     flexWrap: 'wrap',
++     gap: 8,
++   },
+++  checkboxRow: {
+++    flexDirection: 'row',
+++    alignItems: 'center',
+++    gap: 9,
+++    paddingVertical: 6,
+++  },
+++  checkboxLabel: {
+++    color: ADMIN_MODAL_PALETTE.text,
+++    fontSize: 13,
+++    fontWeight: '700',
+++  },
++   footer: {
++     flexDirection: 'row',
++     gap: 10,
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 88e64fe..c21bbbe 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,25 @@
++ # Changelog
++ ---
+++## "Mandatory" checkbox and field order (patch 515)
+++
+++The owner: "When creating a container, the 'Mandatory' requirement should
+++better be a checkbox. And the description fields should be last or second to
+++last. That is more logical".
+++
+++- The two chip buttons ("Mandatory" / "Optional") in the access-point form
+++  were replaced with a single **checkbox** with a checked/unchecked icon. One
+++  tap switches between a mandatory and an optional key; clearing the key still
+++  means no requirement.
+++- The two button labels were removed from the RU/EN dictionaries; only the
+++  checkbox label remains. Checkbox styles were added to the shared form
+++  skeleton, so the neighbouring key form inherits them automatically
+++  (rule in `docs/ui-modals-rules.md`).
+++- **The description moved to the end of the form**: name, bindings and access
+++  settings first, description last. The key form already had the description
+++  and preview at the end — that order is kept and pinned by a test.
+++- `docs/roadmap.md` updated to version 515; the outstanding items are
+++  unchanged.
+++
++ ## Requirement fields in cards (patch 514)
++ 
++ The first half of design step 3: "we are now editing card UI and creating
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index e3b2b0a..61f9a9a 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,25 @@
++ # История изменений
++ 
++ ---
+++## Чекбокс «Обязателен» и порядок полей (патч 515)
+++
+++Владелец: «При создании контейнера, требование "Обязателен" лучше пусть будет
+++чекбокс. А поля под описание пусть будут последними или предпоследними. Так
+++логичнее».
+++
+++- В форме точки доступа две кнопки-чипса («Обязателен» / «Необязателен»)
+++  заменены одним **чекбоксом** с иконкой отмеченной/пустой рамки. Нажатие
+++  переключает режим между обязательным и необязательным ключом; снятый ключ
+++  по-прежнему даёт режим «нет требования».
+++- Подписи двух кнопок удалены из RU/EN словарей; осталась одна подпись
+++  чекбокса. Стили чекбокса добавлены в общий каркас формы, поэтому соседняя
+++  форма ключа наследует их автоматически (правило `docs/ui-modals-rules.md`).
+++- **Описание перенесено в конец формы**: сначала имя, привязки и настройки
+++  доступа, затем поле описания. В форме ключа описание и предпросмотр уже были
+++  в конце — порядок сохранён и закреплён тестом.
+++- Живой план `docs/roadmap.md` обновлён до версии 515; список оставшихся
+++  тезисов не изменился.
+++
++ ## Поля и требования в карточках (патч 514)
++ 
++ Первая половина шага 3 дизайна: «сейчас правим ui карточек и создаём для них
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index ae1c3fe..0d24eec 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -140,6 +140,9 @@
++   привязку;
++ - пункт «Выдать на склад» в меню `⋮` сохранён (исключение 7.1).
++ 
+++**Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
+++кнопок, а поле описания перенесено в конец формы — после настроек доступа.
+++
++ **Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
++ обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
++ 
++diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
++index f235a87..0f2edd4 100644
++--- a/docs/patch-493-install.md
+++++ b/docs/patch-493-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 493: терминал в локации открывает мини-игру
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
++index b20cc52..b216aff 100644
++--- a/docs/patch-495-install.md
+++++ b/docs/patch-495-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
++index dabfffb..290d9af 100644
++--- a/docs/patch-496-install.md
+++++ b/docs/patch-496-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 496: «Саммари v2» взлома терминалов
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
++index cb0e44a..5d7b5b2 100644
++--- a/docs/patch-497-install.md
+++++ b/docs/patch-497-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 497: канонические 4 попытки и доска «последовательности»
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
++index d126d64..21c44f6 100644
++--- a/docs/patch-498-install.md
+++++ b/docs/patch-498-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 498: чистый интерфейс терминала
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
++index 33ac668..8e38cf6 100644
++--- a/docs/patch-499-install.md
+++++ b/docs/patch-499-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 499: скобки двух сортов, число задаёт Наука
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
++index 8d00201..5a89eb0 100644
++--- a/docs/patch-500-install.md
+++++ b/docs/patch-500-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 500: доска «25 − ИНТ»
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
++index e3ab331..8007e7c 100644
++--- a/docs/patch-501-install.md
+++++ b/docs/patch-501-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 501: характеристики берутся из листа персонажа
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
++index 597ea88..a28683d 100644
++--- a/docs/patch-502-install.md
+++++ b/docs/patch-502-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 502: сейв из файла экспорта читается на любой глубине
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
++index c2b0558..46341c4 100644
++--- a/docs/patch-503-install.md
+++++ b/docs/patch-503-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 503: три группы слов, смена оператора, один полный возврат
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
++index 6c02630..5a674b6 100644
++--- a/docs/patch-504-install.md
+++++ b/docs/patch-504-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 504: решение Мастера вместо блокировки после провала
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
++index 2304bd9..dc224d8 100644
++--- a/docs/patch-505-install.md
+++++ b/docs/patch-505-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 505: успешный взлом больше не пропадает
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
++index 96f4006..ad5b4f9 100644
++--- a/docs/patch-506-install.md
+++++ b/docs/patch-506-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
++index 60b6678..1a0c5bc 100644
++--- a/docs/patch-507-install.md
+++++ b/docs/patch-507-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
++index 251a734..ecf7069 100644
++--- a/docs/patch-508-install.md
+++++ b/docs/patch-508-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 508: хранилище Мастера + снапшот игрокам
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
++index 5545944..2ac91ec 100644
++--- a/docs/patch-509-install.md
+++++ b/docs/patch-509-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
++index c57aefa..7967163 100644
++--- a/docs/patch-510-install.md
+++++ b/docs/patch-510-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 510: ключи и записки на общем складе (шаг 2)
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
++index c84c9fa..76cebcd 100644
++--- a/docs/patch-511-install.md
+++++ b/docs/patch-511-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
++index ec14109..8c41ca5 100644
++--- a/docs/patch-512-install.md
+++++ b/docs/patch-512-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 512: модалки берут дизайн у соседних окон
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
++index d5af108..da2a321 100644
++--- a/docs/patch-513-install.md
+++++ b/docs/patch-513-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 513: уточнение правил ключей (только документ)
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++ 
++ Патч подготовлен от состояния **версии 512** (коммит `6da0a37`, ветка
++diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
++index 9a3bace..5399c5b 100644
++--- a/docs/patch-514-install.md
+++++ b/docs/patch-514-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 514: поля и требования в карточках
++ 
+++> **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+++
++ Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
++ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–514
++diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
++new file mode 100644
++index 0000000..e207054
++--- /dev/null
+++++ b/docs/patch-515-install.md
++@@ -0,0 +1,87 @@
+++# Установка патча 515: чекбокс «Обязателен» и порядок полей
+++
+++Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–515
+++цепочкой.
+++
+++> Уточнение владельца: «При создании контейнера, требование "Обязателен" лучше
+++> пусть будет чекбокс. А поля под описание пусть будут последними или
+++> предпоследними. Так логичнее».
+++
+++## Что изменилось
+++
+++### 1. Чекбокс вместо двух кнопок
+++
+++В `ContainerFormModal` блок «Обязателен / Необязателен» заменён одним
+++`TouchableOpacity` с `accessibilityRole="checkbox"`, иконкой
+++`checkbox-marked` / `checkbox-blank-outline` и подписью «Обязателен».
+++Одно нажатие переключает `keyRequirement` между `required` и `optional`;
+++если ключ не выбран, режим остаётся `none`. Подписи двух кнопок удалены из
+++RU/EN словарей.
+++
+++Стили `checkboxRow` и `checkboxLabel` добавлены в `lootTradeFormStyles` —
+++общий каркас, который импортирует `KeyItemFormModal`. Правило
+++`docs/ui-modals-rules.md` соблюдено: новый элемент не рисуется отдельным
+++набором стилей.
+++
+++### 2. Описание в конце формы
+++
+++Поле «Описание» вынесено из середины формы и стоит **последним** полем
+++перед футером: имя → привязки → сложность/настройки точки → две строки
+++требования → описание. В форме ключа описание и предпросмотр уже были в конце;
+++порядок закреплён приёмочным тестом.
+++
+++Поведение сохранения, поля данных и протокол не изменились.
+++
+++## Файлы
+++
+++| Файл | Изменение |
+++| --- | --- |
+++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | чекбокс, перенос описания, стили в общем каркасе |
+++| `i18n/ru-RU/...`, `i18n/en-EN/...` | удалены подписи двух кнопок |
+++| `__tests__/room/key-items-fields-514.test.js` | ожидания под чекбокс и порядок полей |
+++| `__tests__/ui/form-checkbox-515.test.js` | новый предохранитель (7 проверок) |
+++| `docs/roadmap.md` | версия 515, «Осталось после патча 515» |
+++| `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | RU/EN описание |
+++| `public/version.json`, `patchs/baseline.json` | версия 515, 81/81 заметок |
+++| `patchs/515-form-checkbox-order.patch` | сам патч для установщика |
+++
+++## Установка
+++
+++С действующей версии 514:
+++
+++```bash
+++./apply-patch.sh 515
+++# ✓ Установлен патч: №515 (версия 514 → 515)
+++```
+++
+++С чистого `main` со старым установщиком:
+++
+++```bash
+++git fetch origin arena/054e6676-fallout-2d20-companion
+++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
+++./apply-patch.sh 515
+++```
+++
+++`patchs/baseline.json` в источнике равен `515`. После установки
+++`public/version.json` → `515`; закоммитьте изменения и пересоберите
+++веб-сборку. Серверный код не менялся, перезапуск сервиса не обязателен.
+++
+++## Проверка
+++
+++```bash
+++npm run typecheck
+++npx vitest run __tests__/ui/form-checkbox-515.test.js
+++npx vitest run __tests__/room/key-items-fields-514.test.js
+++npx vitest run
+++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
+++curl -s http://localhost:5000/version.json | grep '"version": "515"'
+++```
+++
+++### Прямой `git apply` без установщика
+++
+++```bash
+++git apply patchs/515-form-checkbox-order.patch
+++cp /path/to/515-form-checkbox-order.patch patchs/
+++```
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++index 6b8e882..df74a36 100644
++--- a/docs/roadmap.md
+++++ b/docs/roadmap.md
++@@ -5,7 +5,7 @@
++ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++ > ответе владельцу. Этот файл — источник истины для порядка шагов.
++ 
++-Дата ревизии: 2026-11-03. Текущая версия: **514**.
+++Дата ревизии: 2026-11-03. Текущая версия: **515**.
++ 
++ ## Тезисы
++ 
++@@ -17,14 +17,14 @@
++ | 4 | Общий склад: каркас, канон Мастера, сейв в Drive и перенос файлом | ✅ сделано | 507–509 |
++ | 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
++ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
++-| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + «Обязателен?» / проверка), вложенные ключи в локации | ✅ сделано | **514** |
+++| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
++ | 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
++ | 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
++ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
++ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
++ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++ 
++-## Осталось после патча 514
+++## Осталось после патча 515
++ 
++ 1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
++ 2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
++diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
++index 440cf9a..810d897 100644
++--- a/i18n/en-EN/screens/lootTrade/screen.json
+++++ b/i18n/en-EN/screens/lootTrade/screen.json
++@@ -76,9 +76,7 @@
++     "keySearchPlaceholder": "Search keys and notes",
++     "keyEmpty": "No keys yet — create a card on the grid",
++     "keyNoDescription": "no description",
++-    "keyMandatoryLabel": "Is it mandatory?",
++     "keyRequiredLabel": "Mandatory",
++-    "keyOptionalLabel": "Optional",
++     "linkedCheckLabel": "Check (terminal / lock)",
++     "linkedCheckSearchPlaceholder": "Search terminals",
++     "linkedCheckEmpty": "No terminals yet",
++diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
++index 590e2e8..2d49da7 100644
++--- a/i18n/ru-RU/screens/lootTrade/screen.json
+++++ b/i18n/ru-RU/screens/lootTrade/screen.json
++@@ -76,9 +76,7 @@
++     "keySearchPlaceholder": "Поиск ключа или записки",
++     "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
++     "keyNoDescription": "без описания",
++-    "keyMandatoryLabel": "Обязателен?",
++     "keyRequiredLabel": "Обязателен",
++-    "keyOptionalLabel": "Необязателен",
++     "linkedCheckLabel": "Проверка (терминал / замок)",
++     "linkedCheckSearchPlaceholder": "Поиск терминала",
++     "linkedCheckEmpty": "Терминалов пока нет",
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index 8581ba3..3239451 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "514"
+++  "baseline": "515"
++ }
++diff --git a/public/version.json b/public/version.json
++index efe3010..143e5c0 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "514",
+++  "version": "515",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
++       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
++       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
++       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
++@@ -85,6 +86,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
++       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
++       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
++       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 8581ba3..3239451 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "514"
++  "baseline": "515"
+ }
+diff --git a/public/version.json b/public/version.json
+index efe3010..143e5c0 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "514",
++  "version": "515",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
+       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
+       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
+       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
+@@ -85,6 +86,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
+       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
+       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
+       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",

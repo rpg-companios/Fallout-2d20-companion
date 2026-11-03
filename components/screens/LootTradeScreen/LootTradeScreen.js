@@ -31,6 +31,9 @@ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
 import {
   CONTAINER_KIND,
   CONTAINER_KIND_SORT_ORDER,
+  containerCanHoldKey,
+  containerCanRequireKey,
+  KEY_REQUIREMENT,
   addOrMergeContainerItem,
   analyzeHubDeletion,
   buildHubSessionNodes,
@@ -74,7 +77,8 @@ import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
-import KeyItemCatalogModal from '../../lootTrade/KeyItemCatalogModal';
+import KeyItemCardCell from '../../lootTrade/KeyItemCardCell';
+import KeyItemFormModal from './modals/KeyItemFormModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
 import IssueContainerModal from './modals/IssueContainerModal';
@@ -99,8 +103,8 @@ const getItemIcon = (itemType) => {
   return '📦';
 };
 
-const ActionCell = ({ iconName, label, onPress }) => (
-  <TouchableOpacity style={styles.createCell} onPress={onPress} activeOpacity={0.75}>
+const ActionCell = ({ iconName, label, onPress, testID }) => (
+  <TouchableOpacity testID={testID} style={styles.createCell} onPress={onPress} activeOpacity={0.75}>
     <MaterialCommunityIcons name={iconName} size={42} color="#5a5a5a" />
     <Text style={styles.createLabel}>{label}</Text>
   </TouchableOpacity>
@@ -119,6 +123,9 @@ const ContainerCardCell = ({
   onDuplicate,
   onEdit,
   onDelete,
+  keyItemNames = {},
+  gateSourceNames = {},
+  gateEvents = {},
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -265,6 +272,36 @@ const ContainerCardCell = ({
         )}
       </View>
 
+      {Boolean(container.linkedCheckId) && (
+        <Text
+          testID={`card-gate-${container.id}`}
+          style={styles.cardMeta}
+          numberOfLines={1}
+        >
+          {formatLootTrade(tLootTrade('card.gateAfter'), {
+            name: gateSourceNames[container.linkedCheckId] || container.linkedCheckId,
+          })}
+          {' · '}
+          {tLootTrade(gateEvents[container.linkedCheckId] ? 'card.gateOpen' : 'card.gatePending')}
+        </Text>
+      )}
+
+      {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
+        <Text
+          testID={`card-requires-key-${container.id}`}
+          style={styles.cardMeta}
+          numberOfLines={1}
+        >
+          {formatLootTrade(tLootTrade('card.requiresKey'), {
+            name: keyItemNames[container.requiredKeyItemId] || container.requiredKeyItemId,
+          })}
+          {' · '}
+          {tLootTrade(container.keyRequirement === KEY_REQUIREMENT.REQUIRED
+            ? 'card.keyRequiredBadge'
+            : 'card.keyOptionalBadge')}
+        </Text>
+      )}
+
       <TouchableOpacity
         ref={menuBtnRef}
         style={styles.cardActionButton}
@@ -357,14 +394,16 @@ export default function LootTradeScreen() {
 
   // Модалки и перетаскивание в локации
   const [formModal, setFormModal] = useState(null); // { kind, initialContainer }
-  // Патч 510: справочник ключевых записей.
-  const [keyCatalogVisible, setKeyCatalogVisible] = useState(false);
+  // Патч 511: ключевые записи — такие же карточки на сетке, как контейнеры.
+  const [keyItems, setKeyItems] = useState([]);
+  const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [hubPickerOpen, setHubPickerOpen] = useState(false);
   const [moveToHubTarget, setMoveToHubTarget] = useState(null); // container для переноса через меню ⋮
   const [movingContainerId, setMovingContainerId] = useState(null);
+  const [movingKeyItemId, setMovingKeyItemId] = useState(null); // патч 514: перетаскивание ключа в локацию
   const [drag, setDrag] = useState(null); // { container, x, y }
   const hubRefs = useRef({});
   const hubDropBounds = useRef({});
@@ -385,8 +424,9 @@ export default function LootTradeScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [savedContainers, folders, roomRows] = await Promise.all([
+      const [savedContainers, savedKeyItems, folders, roomRows] = await Promise.all([
         db.getGmContainersList(),
+        db.getGmKeyItems(),
         db.getCharacterFolders(),
         db.getFolderRooms(),
       ]);
@@ -399,6 +439,7 @@ export default function LootTradeScreen() {
       }));
       setAvailableRooms(rooms);
       setContainers(savedContainers || []);
+      setKeyItems(savedKeyItems || []);
     } catch (error) {
       debugLog('lootTrade.load:failed', { message: error?.message });
     } finally {
@@ -616,6 +657,9 @@ export default function LootTradeScreen() {
                 name: saved.name,
                 description: saved.description,
                 difficulty: saved.difficulty,
+                requiredKeyItemId: saved.requiredKeyItemId || '',
+                keyRequirement: saved.keyRequirement || 'none',
+                linkedCheckId: saved.linkedCheckId || '',
               },
             });
           } else if (terminalNode) {
@@ -752,12 +796,10 @@ export default function LootTradeScreen() {
     }
 
     setFormModal(null);
-    if (!activeContainerId && !draft.id) {
-      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
-        setReturnHubId(selectedHubIds[0]);
-      }
-      setActiveContainerId(saved.id);
-    }
+    // Патч 516: после создания точки остаёмся на экране карточек. Раньше
+    // только что сохранённая карточка сразу открывалась в детальный экран.
+    // Привязка к локациям всё равно записана выше, так что скрытого
+    // перехода в локацию не требуется.
     if (capsRollInfo?.rolled) {
       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
         dice: capsRollInfo.diceCount,
@@ -765,6 +807,88 @@ export default function LootTradeScreen() {
         total: capsRollInfo.quantity,
       }));
     }
+  };
+
+  // Патч 511: ключевая запись сохраняется в каталог Мастера и сразу появляется
+  // карточкой на сетке экрана «Добыча / Торговля» (как контейнер/торговец/терминал).
+  const handleSaveKeyItem = async (draft) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const saved = await db.saveGmKeyItem({
+      ...draft,
+      id: draft.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    });
+    // Патч 514: «ключ должен быть частью чего-либо». Привязка хранится в
+    // родителе (keyItemIds), поэтому правки шаблона не гасят добытую запись.
+    const attachedTo = String(draft.attachedTo || '').trim();
+    if (saved?.id) {
+      const currentList = await db.getGmContainersList();
+      for (const parent of currentList || []) {
+        const holds = (parent.keyItemIds || []).includes(saved.id);
+        const shouldHold = attachedTo === parent.id;
+        if (holds === shouldHold) continue;
+        await persistAndSyncContainer({
+          ...parent,
+          keyItemIds: shouldHold
+            ? [...(parent.keyItemIds || []), saved.id]
+            : (parent.keyItemIds || []).filter((id) => id !== saved.id),
+        });
+      }
+    }
+    const freshList = await db.getGmKeyItems();
+    setKeyItems(freshList || []);
+    setKeyItemForm(null);
+    if (saved?.id) {
+      showTimedBanner(tLootTrade('keyItems.saved'));
+    }
+  };
+
+  const handleIssueKeyItem = async (keyItem) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const gmEntry = Object.entries(roomRooms || {}).find(([, room]) => room?.role === 'gm');
+    const code = keyItem.roomCode || gmEntry?.[0] || '';
+    if (!code) {
+      showRawAlert({ title: tLootTrade('keyItems.noRoom') });
+      return;
+    }
+    try {
+      await useRoomStore.getState().addKeyItemToStorage({
+        code,
+        keyItemId: keyItem.id,
+        name: keyItem.name,
+        description: keyItem.description || '',
+      });
+      showRawAlert({ title: tLootTrade('keyItems.issued') });
+    } catch (error) {
+      showRawAlert({ title: tLootTrade('keyItems.failed'), message: error?.message });
+    }
+  };
+
+  const handleMoveKeyItemIntoHub = async (keyItemId, hubId) => {
+    if (!keyItemId || !hubId) return;
+    const currentList = await db.getGmContainersList();
+    for (const parent of currentList || []) {
+      const holds = (parent.keyItemIds || []).includes(keyItemId);
+      const shouldHold = parent.id === hubId;
+      if (holds === shouldHold) continue;
+      await persistAndSyncContainer({
+        ...parent,
+        keyItemIds: shouldHold
+          ? [...(parent.keyItemIds || []), keyItemId]
+          : (parent.keyItemIds || []).filter((id) => id !== keyItemId),
+      });
+    }
+    setMovingKeyItemId(null);
+    setMovingContainerId(null);
+    setDrag(null);
+    hubDropBounds.current = {};
+  };
+
+  const handleDetachKeyItem = async (keyItemId) => {
+    if (!activeContainer || !keyItemId) return;
+    await persistAndSyncContainer({
+      ...activeContainer,
+      keyItemIds: (activeContainer.keyItemIds || []).filter((id) => id !== keyItemId),
+    });
   };
 
   const handleMoveCardIntoHub = async (cardId, hubId) => {
@@ -788,6 +912,7 @@ export default function LootTradeScreen() {
       await loadData();
     }
     setMovingContainerId(null);
+    setMovingKeyItemId(null);
     setDrag(null);
     hubDropBounds.current = {};
   };
@@ -825,7 +950,9 @@ export default function LootTradeScreen() {
   const handleDragStart = async (point, card) => {
     if (!card || card.kind === CONTAINER_KIND.HUB) return;
     hubDropBounds.current = {};
-    setMovingContainerId(card.id);
+    const isKeyItem = card.type === 'keyItem';
+    setMovingKeyItemId(isKeyItem ? card.id : null);
+    setMovingContainerId(isKeyItem ? null : card.id);
     setDrag({ container: card, x: point.pageX, y: point.pageY });
     await measureHubDropTargets();
   };
@@ -843,9 +970,12 @@ export default function LootTradeScreen() {
       && point.pageY >= b.y
       && point.pageY <= b.y + b.height
     ));
-    if (hit && movingContainerId) {
+    if (hit && movingKeyItemId) {
+      await handleMoveKeyItemIntoHub(movingKeyItemId, hit[0]);
+    } else if (hit && movingContainerId) {
       await handleMoveCardIntoHub(movingContainerId, hit[0]);
     } else {
+      setMovingKeyItemId(null);
       setMovingContainerId(null);
       setDrag(null);
     }
@@ -1053,6 +1183,9 @@ export default function LootTradeScreen() {
             name: freshSource.name,
             description: freshSource.description,
             difficulty: freshSource.difficulty,
+            requiredKeyItemId: freshSource.requiredKeyItemId || '',
+            keyRequirement: freshSource.keyRequirement || 'none',
+            linkedCheckId: freshSource.linkedCheckId || '',
           },
         });
       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
@@ -1420,12 +1553,66 @@ export default function LootTradeScreen() {
     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
   }, [formatSingleRoomName]);
 
+  const gateSourceNames = useMemo(
+    () => Object.fromEntries(containers.map((c) => [c.id, c.name])),
+    [containers],
+  );
+  const gateEvents = useMemo(
+    () => roomRooms[activeLiveRoomCode]?.accessEvents || {},
+    [roomRooms, activeLiveRoomCode],
+  );
+
+  // Патч 517: ворота могут ссылаться на любую точку, а не только терминал.
+  const gateSources = useMemo(
+    () => containers
+      .filter((c) => c.id !== formModal?.initialContainer?.id)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        kindLabel: c.kind === CONTAINER_KIND.HUB
+          ? tLootTrade('card.hubKind')
+          : (c.kind === CONTAINER_KIND.TERMINAL ? tLootTrade('form.linkedCheckTerminal') : ''),
+      })),
+    [containers, formModal?.initialContainer?.id],
+  );
+
+  const keyItemNames = useMemo(
+    () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
+    [keyItems],
+  );
+
+  const availableParents = useMemo(
+    () => containers
+      .filter((c) => containerCanHoldKey(c.kind))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        kindLabel: c.kind === CONTAINER_KIND.HUB
+          ? tLootTrade('card.hubKind')
+          : (c.kind === CONTAINER_KIND.MERCHANT
+            ? tLootTrade('card.merchantKind')
+            : tLootTrade('card.lootKind')),
+      })),
+    [containers],
+  );
+
+  const attachedKeyItemIds = useMemo(
+    () => new Set(containers.flatMap((c) => c.keyItemIds || [])),
+    [containers],
+  );
+
   const gridItems = [
     { type: 'createHub', id: '__create_hub__' },
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
+    { type: 'createKeyItem', id: '__create_key_item__' },
     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
+    // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
+    // Патч 514: вложенные в локацию/контейнер/торговца уходят с корня.
+    ...keyItems
+      .filter((k) => !attachedKeyItemIds.has(k.id))
+      .map((k) => ({ type: 'keyItem', ...k })),
   ];
 
   const rows = [];
@@ -1472,15 +1659,6 @@ export default function LootTradeScreen() {
     <View style={styles.container}>
       {/* Верхняя шапка Мастера */}
       <View style={styles.topBar}>
-        {/* Патч 510: ключевые записи (карточки доступа, записки с кодами). */}
-        <TouchableOpacity
-          testID="key-catalog-button"
-          style={styles.syncIconButton}
-          onPress={() => setKeyCatalogVisible(true)}
-          accessibilityLabel={tLootTrade('keyItems.title')}
-        >
-          <MaterialCommunityIcons name="key-variant" size={20} color="#f0e68c" />
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.syncIconButton}
           onPress={handleCloudSyncPress}
@@ -1587,6 +1765,34 @@ export default function LootTradeScreen() {
                         />
                       );
                     }
+                    if (cell.type === 'createKeyItem') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="key-variant"
+                          label={tLootTrade('actions.createKeyItem')}
+                          testID="create-key-item-cell"
+                          onPress={() => setKeyItemForm({ initialKeyItem: null })}
+                        />
+                      );
+                    }
+                    if (cell.type === 'keyItem') {
+                      const roomRecord = roomByCode[cell.roomCode];
+                      const attachedTo = containers.find((c) => (c.keyItemIds || []).includes(cell.id))?.id || '';
+                      return (
+                        <KeyItemCardCell
+                          key={cell.id}
+                          keyItem={cell}
+                          roomLabel={roomRecord?.name || ''}
+                          canMoveToHub={availableHubs.length > 0}
+                          onDragStart={availableHubs.length > 0 ? (point) => handleDragStart(point, cell) : undefined}
+                          onDragMove={availableHubs.length > 0 ? handleDragMove : undefined}
+                          onDragEnd={availableHubs.length > 0 ? handleDragEnd : undefined}
+                          onEdit={() => setKeyItemForm({ initialKeyItem: { ...cell, attachedTo } })}
+                          onIssue={() => void handleIssueKeyItem(cell)}
+                        />
+                      );
+                    }
                     if (cell.type === 'empty') {
                       return <View key={cell.id} style={styles.emptyCell} />;
                     }
@@ -1597,6 +1803,9 @@ export default function LootTradeScreen() {
                         key={cell.id}
                         container={cell}
                         roomLabel={roomLabel}
+                        keyItemNames={keyItemNames}
+                        gateSourceNames={gateSourceNames}
+                        gateEvents={gateEvents}
                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
                         isDropTarget={Boolean(isHubCell && movingContainerId)}
                         canMoveToHub={!isHubCell && availableHubs.length > 0}
@@ -2013,6 +2222,55 @@ export default function LootTradeScreen() {
                 <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
               </TouchableOpacity>
 
+              <View style={styles.hubKeysSection}>
+                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubKeysTitle')}</Text>
+                {(activeContainer.keyItemIds || []).length === 0 ? (
+                  <Text style={styles.emptyListText}>{tLootTrade('detail.hubKeysEmpty')}</Text>
+                ) : (activeContainer.keyItemIds || []).map((keyId) => {
+                  const record = keyItems.find((k) => k.id === keyId);
+                  if (!record) return null;
+                  return (
+                    <View key={keyId} testID={`hub-key-${keyId}`} style={styles.hubKeyRow}>
+                      <MaterialCommunityIcons name="key-variant" size={18} color="#d4af37" />
+                      <Text style={styles.hubKeyRowName} numberOfLines={1}>{record.name}</Text>
+                      <TouchableOpacity
+                        testID={`hub-key-detach-${keyId}`}
+                        style={styles.hubKeyDetachBtn}
+                        onPress={() => void handleDetachKeyItem(keyId)}
+                      >
+                        <Text style={styles.hubKeyDetachText}>{tLootTrade('detail.hubKeyDetach')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Патч 517: видимые Мастеру связи между точками локации. */}
+              <View style={styles.hubKeysSection}>
+                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
+                {(() => {
+                  const linked = (activeContainer.links || [])
+                    .map((link) => containers.find((c) => c.id === link.containerId))
+                    .filter((child) => child?.linkedCheckId);
+                  if (linked.length === 0) {
+                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
+                  }
+                  return linked.map((child) => (
+                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
+                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
+                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
+                        {`${child.name} ← ${gateSourceNames[child.linkedCheckId] || child.linkedCheckId}`}
+                      </Text>
+                      <Text style={styles.hubKeyDetachText}>
+                        {tLootTrade(gateEvents[child.linkedCheckId]
+                          ? 'detail.hubGatePassed'
+                          : 'detail.hubGatePending')}
+                      </Text>
+                    </View>
+                  ));
+                })()}
+              </View>
+
               <ScrollView style={styles.itemsListContainer}>
                 {(activeContainer.links || []).length === 0 ? (
                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
@@ -2234,10 +2492,14 @@ export default function LootTradeScreen() {
         </View>
       )}
 
-      {/* Модалки создания/правки, каталога, правки строки, локации и выдачи */}
-      <KeyItemCatalogModal
-        visible={keyCatalogVisible}
-        onClose={() => setKeyCatalogVisible(false)}
+      {/* Модалки создания/правки, ключевых записей, локации и выдачи */}
+      <KeyItemFormModal
+        visible={Boolean(keyItemForm)}
+        initialKeyItem={keyItemForm?.initialKeyItem || null}
+        availableRooms={availableRooms}
+        availableParents={availableParents}
+        onSave={handleSaveKeyItem}
+        onClose={() => setKeyItemForm(null)}
       />
       <ContainerFormModal
         visible={Boolean(formModal)}
@@ -2245,6 +2507,8 @@ export default function LootTradeScreen() {
         initialContainer={formModal?.initialContainer || null}
         availableRooms={availableRooms}
         availableHubs={availableHubs}
+        availableKeyItems={keyItems}
+        availableCheckContainers={gateSources}
         initialLinkedHubIds={
           formModal?.initialContainer?.id
             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
