@@ -409,6 +409,24 @@ const rowToGmContainer = (row) => {
   });
 };
 
+// Патч 508: снимок «Общего хранилища» в локальной БД Мастера.
+export async function saveRoomStorage(code, storage) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+  const data = JSON.stringify(storage && typeof storage === 'object' ? storage : { revision: 0, entries: [] });
+  await runQuery(
+    'INSERT OR REPLACE INTO gm_room_storage (code, data, updated_at) VALUES (?, ?, ?)',
+    [cleanCode, data, Date.now()],
+  );
+  return { code: cleanCode, storage: JSON.parse(data) };
+}
+
+export async function getRoomStorage(code) {
+  const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
+  if (!row?.data) return null;
+  try { return JSON.parse(row.data); } catch { return null; }
+}
+
 export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
   assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
   const now = Date.now();

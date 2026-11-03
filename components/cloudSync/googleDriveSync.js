@@ -1149,6 +1149,42 @@ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
   }
 };
 
+// Патч 508: снимок «Общего хранилища» Мастера уезжает в его же Drive.
+// Это НЕ серверное хранилище: файл принадлежит аккаунту ведущего.
+export const syncRoomStorageToCloudIfEnabled = async (code) => {
+  if (!ensureWeb() || !code) return;
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return;
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmFolderId = await getGmContainersFolderId(token, moduleFolderId);
+    const storage = await db.getRoomStorage(code);
+    if (!storage) return;
+    const prefix = `storage__${code}__`;
+    const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(prefix));
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_room_storage',
+      code,
+      exportedAt: Date.now(),
+      storage,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmFolderId,
+      fileId: remote?.id,
+      filename: `${prefix}${Date.now()}.json`,
+      payload,
+    });
+    debugLog('sync.roomStorage.auto:done', { code });
+  } catch (e) {
+    debugLog('sync.roomStorage.auto:failed', { code, message: e?.message || String(e) });
+  }
+};
+
 // Удаление контейнера/торговца Мастера из Google Drive при локальном удалении.
 export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
   if (!ensureWeb() || !containerId) return { removed: false, reason: 'not-web' };

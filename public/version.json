@@ -1,8 +1,12 @@
 {
-  "version": "507",
+  "version": "508",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Общее хранилище теперь принадлежит Мастеру: его сохранение лежит в локальной базе ведущего и уезжает в его Google Drive, а игрокам рассылается текущий снимок.",
+      "Без Мастера в сети хранилище доступно только для просмотра: положить или забрать вещь нельзя, пока ведущий не подключится к комнате.",
+      "При подключении к комнате игрок сразу получает актуальное состояние хранилища, а Мастер поднимает своё сохранение в комнату.",
+      "Сервер больше не пишет файлы хранилища на диск: состояние комнаты живёт в памяти, все изменения происходят только пока Мастер и игрок в сети.",
       "В инвентаре появилось «Общее хранилище»: вещи группы лежат в одном месте, доступном каждому игроку комнаты, даже если положивший их персонаж выбыл из игры.",
       "Предмет можно положить в общее хранилище или забрать оттуда в свой инвентарь; количество меняется атомарно, поэтому двое не заберут одну и ту же вещь.",
       "Хранилище живёт на сервере и переживает перезапуск: при подключении к комнате игрок сразу получает актуальное содержимое.",
@@ -69,6 +73,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Shared storage now belongs to the Game Master: its save lives in the GM local database and syncs to their Google Drive, while players receive a current snapshot.",
+      "Without the GM online the storage is read-only: items cannot be deposited or withdrawn until the GM connects to the room.",
+      "Connecting to a room immediately delivers the current storage state, and the GM uploads their saved copy into the room.",
+      "The server no longer writes storage files to disk: room state lives in memory and all changes happen only while the GM and player are online.",
       "Inventory now has \"Shared storage\": party items live in one place available to every player in the room, even if the character who deposited them leaves the game.",
       "Items can be deposited into shared storage or withdrawn into a personal inventory; quantities change atomically so two players cannot take the same item.",
       "Storage lives on the server and survives a restart: connecting to a room immediately delivers its current contents.",

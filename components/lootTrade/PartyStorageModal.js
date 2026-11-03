@@ -50,9 +50,11 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
   }, [rooms]);
 
   const entries = room?.storage?.entries || [];
+  // Без Мастера в сети хранилище только для чтения.
+  const writable = Boolean(room?.storage?.gmOnline);
 
   const deposit = async (item) => {
-    if (!room || busy) return;
+    if (!room || busy || !writable) return;
     setBusy(true);
     try {
       await useRoomStore.getState().depositToPartyStorage({
@@ -71,7 +73,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
   };
 
   const withdraw = async (entry) => {
-    if (!room || busy) return;
+    if (!room || busy || !writable) return;
     setBusy(true);
     try {
       const result = await useRoomStore.getState().withdrawFromPartyStorage({
@@ -115,7 +117,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
                       <TouchableOpacity
                         key={item.id || `${item.name}-${index}`}
                         style={styles.row}
-                        disabled={busy}
+                        disabled={busy || !writable}
                         onPress={() => void deposit(item)}
                       >
                         <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
@@ -134,7 +136,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
                       <TouchableOpacity
                         key={entry.entryId}
                         style={styles.row}
-                        disabled={busy}
+                        disabled={busy || !writable}
                         onPress={() => void withdraw(entry)}
                       >
                         <Text style={styles.rowName} numberOfLines={1}>
@@ -148,6 +150,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
             </View>
           )}
 
+          {!writable && <Text style={styles.readOnly}>{tInventory('screen.storage.readOnly')}</Text>}
           <Text style={styles.hint}>{tInventory('screen.storage.hint')}</Text>
         </View>
       </View>
@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
   rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
   rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
   hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
+  readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
 });
 
 export default PartyStorageModal;

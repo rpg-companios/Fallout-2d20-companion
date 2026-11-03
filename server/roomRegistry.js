@@ -30,7 +30,7 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
-const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS, partyStorageStore = null } = {}) => {
+const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
   const rooms = new Map(); // code -> room
   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
@@ -40,28 +40,21 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   // Клиент использует его как «билет» одноразового доступа к мини-игре.
   let broadcastCounter = 0;
   const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
-  // Патч 507: «Общее хранилище». Канон — сервер; при старте подтягиваем
-  // сохранённые комнаты, при каждом изменении пишем весь набор обратно.
-  const savedStorages = partyStorageStore ? partyStorageStore.load() : new Map();
+  // Патч 508: хранилище Мастера + снапшот игрокам. Сервер держит только
+  // ТЕКУЩИЙ снимок в памяти комнаты (как activeSession / terminalStates) и
+  // ничего не пишет на диск. Канон — локальное хранилище Мастера; он
+  // поднимает его в комнату сообщением `storage.restore` при подключении.
   let storageEntryCounter = 0;
   const emptyStorage = () => ({ revision: 0, entries: [] });
   const cloneStorage = (storage) => ({
     revision: Number(storage?.revision) || 0,
     entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
   });
-  const persistStorages = () => {
-    if (!partyStorageStore) return;
-    const map = new Map();
-    for (const room of rooms.values()) {
-      if (room.partyStorage?.entries?.length || map.has(room.code)) {
-        map.set(room.code, cloneStorage(room.partyStorage));
-      }
-    }
-    for (const [code, stored] of savedStorages.entries()) {
-      if (!map.has(code) && stored?.entries?.length) map.set(code, cloneStorage(stored));
-    }
-    partyStorageStore.save(map);
-  };
+  const isGmOnline = (room) => Boolean(room.ownerClientId && room.members.has(room.ownerClientId));
+  const storageSnapshot = (room) => ({
+    ...cloneStorage(room.partyStorage),
+    gmOnline: isGmOnline(room),
+  });
 
   const touchRateLog = (log, key, windowMs, max) => {
     const cutoff = now() - windowMs;
@@ -81,7 +74,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
-    partyStorage: cloneStorage(savedStorages.get(code) || emptyStorage()),
+    partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
@@ -126,9 +119,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       id,
       terminalPublic(id, entry),
     ])),
-    // Патч 507: склад приходит вместе с состоянием комнаты — «подключился,
-    // получил обновления». Дополнительного запроса не требуется.
-    partyStorage: cloneStorage(room.partyStorage),
+    // Патч 508: игрок при подключении получает текущий снапшот хранилища.
+    // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
+    partyStorage: storageSnapshot(room),
     lastClosedSession: room.lastClosedSession || null,
     directives: cloneDirectives(room.directives),
     // Признак обновлённого сервера: клиент включает синхронизированную игру,
@@ -883,6 +876,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const depositToPartyStorage = ({ code, clientId, name, item, quantity }) => {
     const room = rooms.get(code);
     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    // Без Мастера в сети хранилище доступно только для просмотра.
+    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
     const qty = Math.floor(Number(quantity));
     if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
@@ -904,14 +899,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     storage.entries = [...storage.entries, entry];
     storage.revision += 1;
     room.partyStorage = storage;
-    persistStorages();
-    return { room, storage: cloneStorage(storage), entry: { ...entry } };
+    return { room, storage: storageSnapshot(room), entry: { ...entry } };
   };
 
   /** Забрать предмет из общего хранилища (только игрок, атомарно). */
   const withdrawFromPartyStorage = ({ code, clientId, entryId, quantity }) => {
     const room = rooms.get(code);
     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
     const member = room.members.get(clientId);
     if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
     const storage = room.partyStorage || emptyStorage();
@@ -928,15 +923,33 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     storage.entries = entries;
     storage.revision += 1;
     room.partyStorage = storage;
-    persistStorages();
     return {
       room,
-      storage: cloneStorage(storage),
+      storage: storageSnapshot(room),
       withdrawn: { item: { ...taken.item }, quantity: qty, name: taken.name },
     };
   };
 
-  const getPartyStorage = (code) => cloneStorage(rooms.get(code)?.partyStorage || emptyStorage());
+  const getPartyStorage = (code) => storageSnapshot(rooms.get(code) || { partyStorage: emptyStorage(), members: new Map() });
+
+  /**
+   * Патч 508: Мастер подключается и поднимает СВОЁ сохранённое хранилище в
+   * комнату. Игроки при подключении получают уже актуальный снапшот.
+   * Конфликтов нет: изменений вне сети не бывает, Мастер — канон.
+   */
+  const restorePartyStorage = ({ code, clientId, ownerToken = null, storage }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const incoming = cloneStorage(storage);
+    const current = room.partyStorage || emptyStorage();
+    if (Number(incoming.revision) < Number(current.revision)) {
+      return { room, storage: storageSnapshot(room), applied: false };
+    }
+    room.partyStorage = incoming;
+    return { room, storage: storageSnapshot(room), applied: true };
+  };
 
   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
   const sweep = () => {
@@ -975,6 +988,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     depositToPartyStorage,
     withdrawFromPartyStorage,
     getPartyStorage,
+    restorePartyStorage,
     sweep,
     _rooms: rooms, // диагностика/тесты
   };

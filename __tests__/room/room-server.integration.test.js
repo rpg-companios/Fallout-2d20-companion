@@ -562,6 +562,45 @@ describe('roomServer: create/join/presence', () => {
     });
   });
 
+  // Патч 508: канон — хранилище Мастера; игрокам снапшот. Без Мастера
+  // онлайн запись запрещена, но снимок доступен; Мастер поднимает свой сейв.
+  it('508: Master storage, player snapshot, offline = read-only', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-508');
+      const p1 = makeClient(port, 'p-508-1');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Master storage 508' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      const ownerToken = created.payload.ownerToken;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm', ownerToken });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Игрок', role: 'player' });
+      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      expect(joined.payload.partyStorage).toMatchObject({ gmOnline: true, revision: 0, entries: [] });
+
+      // Мастер поднимает сохранённое хранилище — игрок получает свежий снимок.
+      const saved = { revision: 4, entries: [{ entryId: 'st_saved', item: { name: 'Карточка' }, name: 'Карточка', itemType: 'misc', quantity: 1 }] };
+      const restoreReq = await gm.send(MESSAGE.STORAGE_RESTORE, { ownerToken, storage: saved }, code);
+      const restored = await gm.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === restoreReq);
+      expect(restored.payload.storage.entries[0].name).toBe('Карточка');
+      const snapshot = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
+      expect(snapshot.payload.storage.entries).toHaveLength(1);
+
+      // Мастер ушёл: игрок видит снимок, но не может писать.
+      // Уводим Мастера напрямую через реестр: детерминированно и без гонки
+      // с уже полученными сообщениями в inbox клиента.
+      app.registry.leaveRoom({ code, clientId: gm.clientId });
+      const offlineState = app.registry.getState(code).partyStorage;
+      expect(offlineState.gmOnline).toBe(false);
+      expect(offlineState.entries).toHaveLength(1);
+      const deniedReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item: { name: 'Пулемёт' }, quantity: 1 }, code);
+      const denied = await p1.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === deniedReq);
+      expect(denied.payload.code).toBe('STORAGE_GM_OFFLINE');
+
+      gm.close(); p1.close();
+    });
+  });
+
   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
     await withServer(async (port) => {
       const gm = makeClient(port, 'gm-1');

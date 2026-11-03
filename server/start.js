@@ -25,8 +25,6 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { createRoomServer } = require('./roomServer');
-const { createRoomRegistry } = require('./roomRegistry');
-const { createFilePartyStorageStore } = require('./partyStorageStore');
 
 const FINGERPRINT_FILE = '.build-fingerprint';
 
@@ -706,12 +704,6 @@ const createManagedAppServer = ({
     host,
     distDir: resolvedDistDir,
     beforeStatic,
-    // Патч 507: канон «Общего хранилища» лежит на сервере в .data/ и
-    // переживает рестарт; тесты создают сервер без этого параметра и
-    // работают с хранилищем в памяти.
-    registry: createRoomRegistry({
-      partyStorageStore: createFilePartyStorageStore(),
-    }),
   });
 
   const start = async () => {

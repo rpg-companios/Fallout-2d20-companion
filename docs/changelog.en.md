@@ -1,5 +1,35 @@
 # Changelog
 ---
+## GM storage and player snapshot (patch 508)
+
+The owner simplified the model and rejected the server file from 507: "Shared
+storage is the GM storage plus a snapshot for players. Without the GM online
+they cannot take items from shared storage, but can view it. When a player
+connects to the room, storage updates to the current state. All changes happen
+while the player and the GM are online."
+
+- **The server writes nothing to disk.** `server/partyStorageStore.js`,
+  `.data/`, the `partyStorageStore` parameter and the `server/start.js` wiring
+  are gone. Storage state lives in room memory next to `activeSession` and
+  `terminalStates`.
+- **The GM storage is the canon.** New `gm_room_storage` table in the local
+  database; `src/lootTrade/partyStoragePersistence.js` saves every snapshot and
+  uploads it to the GM Google Drive (`gm_room_storage`) along the same path as
+  loot containers. Players do not persist the snapshot.
+- **Restore on connect.** `storage.restore` is accepted only from the room
+  owner; the GM uploads their save and a joining player receives the current
+  state via `room.state`. An older save cannot roll the room back.
+- **Online only.** `gmOnline` in the snapshot; without the GM, `deposit` /
+  `withdraw` return `STORAGE_GM_OFFLINE` while the item list stays visible.
+  The storage modal disables its buttons and shows a "GM offline" note.
+- No offline commits, queues, `baseRevision`, conflicts or conflict alerts:
+  all changes happen while the GM and player are online.
+
+The 507 skeleton (protocol, atomicity, GM `withdraw` ban, green bar, modal,
+fixed name) is kept.
+
+Installation: `docs/patch-508-install.md`.
+
 ## Shared storage for the room (patch 507)
 
 Step one of `docs/key-items-and-gates-design.md`. The owner: "A party stash ...

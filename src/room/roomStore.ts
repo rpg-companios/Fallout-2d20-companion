@@ -40,6 +40,8 @@ export interface PartyStorageEntry {
 export interface PartyStorageState {
   revision: number;
   entries: PartyStorageEntry[];
+  /** Мастер в сети: без него хранилище только для чтения. */
+  gmOnline?: boolean;
 }
 
 export interface RoomStateEntry {
@@ -108,6 +110,7 @@ interface RoomStoreState {
   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
+  restorePartyStorage: (input: { code: string; storage: PartyStorageState }) => Promise<PartyStorageState | null>;
   openRoomSession: (input: {
     code: string;
     session: Record<string, unknown>;
@@ -218,6 +221,7 @@ const pendingRequests = new Map<string, {
 const joiningCodes = new Set<string>();
 const publishListeners = new Set<(message: RoomEnvelope) => void>();
 const sessionListeners = new Set<(message: RoomEnvelope) => void>();
+const storageListeners = new Set<(message: RoomEnvelope) => void>();
 const directiveListeners = new Set<(message: RoomEnvelope) => void>();
 
 const getWebTabSessionSuffix = (): string => {
@@ -284,6 +288,12 @@ export const onRoomCharacterPublish = (listener: (message: RoomEnvelope) => void
 export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) => {
   sessionListeners.add(listener);
   return () => { sessionListeners.delete(listener); };
+};
+
+/** Патч 508: подписка на снимки «Общего хранилища» (только для Мастера). */
+export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) => {
+  storageListeners.add(listener);
+  return () => { storageListeners.delete(listener); };
 };
 
 /** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
@@ -400,6 +410,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           [code]: { ...current, partyStorage: storage },
         } });
       }
+      storageListeners.forEach((listener) => {
+        try { listener(message); } catch (error) {
+          debugLog('room.storageListener:failed', { message: (error as Error)?.message });
+        }
+      });
     }
     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
       const code = message.roomCode;
@@ -802,6 +817,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         storage: (response.payload?.storage as PartyStorageState | null) ?? null,
         withdrawn: response.payload?.withdrawn as any,
       };
+    },
+
+    restorePartyStorage: async ({ code, storage }) => {
+      const response = await sendRequest(ROOM_MESSAGE.STORAGE_RESTORE, {
+        code, storage,
+      }, code);
+      return (response.payload?.storage as PartyStorageState | null) ?? null;
     },
 
     openRoomSession: async ({ code, session, ownerToken }) => {
