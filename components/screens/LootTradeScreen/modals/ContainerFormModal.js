@@ -518,16 +518,6 @@ const ContainerFormModal = ({
               </>
             )}
 
-            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
-            <TextInput
-              style={[styles.input, styles.multilineInput]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder={tLootTrade('form.descriptionPlaceholder')}
-              placeholderTextColor="#8c8c8c"
-              multiline
-            />
-
             {isTerminal && (
               <>
                 <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
@@ -661,29 +651,26 @@ const ContainerFormModal = ({
                   })}
                 </View>
                 {Boolean(requiredKeyItemId) && (
-                  <>
-                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
-                    <View style={styles.requirementRow}>
-                      <TouchableOpacity
-                        testID="container-form-key-required"
-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
-                      >
-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
-                          {tLootTrade('form.keyRequiredLabel')}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        testID="container-form-key-optional"
-                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
-                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
-                      >
-                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
-                          {tLootTrade('form.keyOptionalLabel')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
+                  <TouchableOpacity
+                    testID="container-form-key-required"
+                    style={styles.checkboxRow}
+                    onPress={() => setKeyRequirement(
+                      keyRequirement === KEY_REQUIREMENT.REQUIRED
+                        ? KEY_REQUIREMENT.OPTIONAL
+                        : KEY_REQUIREMENT.REQUIRED,
+                    )}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: keyRequirement === KEY_REQUIREMENT.REQUIRED }}
+                  >
+                    <MaterialCommunityIcons
+                      name={keyRequirement === KEY_REQUIREMENT.REQUIRED
+                        ? 'checkbox-marked'
+                        : 'checkbox-blank-outline'}
+                      size={20}
+                      color={ADMIN_MODAL_PALETTE.accent}
+                    />
+                    <Text style={styles.checkboxLabel}>{tLootTrade('form.keyRequiredLabel')}</Text>
+                  </TouchableOpacity>
                 )}
 
                 <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
@@ -720,6 +707,18 @@ const ContainerFormModal = ({
                 <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
               </>
             )}
+
+            {/* Патч 515: описание — последнее поле формы, после всех настроек. */}
+            <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
+            <TextInput
+              testID="container-form-description"
+              style={[styles.input, styles.multilineInput]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder={tLootTrade('form.descriptionPlaceholder')}
+              placeholderTextColor="#8c8c8c"
+              multiline
+            />
           </ScrollView>
 
           <View style={styles.footer}>
@@ -1081,6 +1080,17 @@ export const lootTradeFormStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingVertical: 6,
+  },
+  checkboxLabel: {
+    color: ADMIN_MODAL_PALETTE.text,
+    fontSize: 13,
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',

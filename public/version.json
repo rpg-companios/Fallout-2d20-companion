@@ -1,8 +1,9 @@
 {
-  "version": "514",
+  "version": "515",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
@@ -85,6 +86,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",

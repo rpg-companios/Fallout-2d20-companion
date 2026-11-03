@@ -1,5 +1,25 @@
 # Changelog
 ---
+## "Mandatory" checkbox and field order (patch 515)
+
+The owner: "When creating a container, the 'Mandatory' requirement should
+better be a checkbox. And the description fields should be last or second to
+last. That is more logical".
+
+- The two chip buttons ("Mandatory" / "Optional") in the access-point form
+  were replaced with a single **checkbox** with a checked/unchecked icon. One
+  tap switches between a mandatory and an optional key; clearing the key still
+  means no requirement.
+- The two button labels were removed from the RU/EN dictionaries; only the
+  checkbox label remains. Checkbox styles were added to the shared form
+  skeleton, so the neighbouring key form inherits them automatically
+  (rule in `docs/ui-modals-rules.md`).
+- **The description moved to the end of the form**: name, bindings and access
+  settings first, description last. The key form already had the description
+  and preview at the end — that order is kept and pinned by a test.
+- `docs/roadmap.md` updated to version 515; the outstanding items are
+  unchanged.
+
 ## Requirement fields in cards (patch 514)
 
 The first half of design step 3: "we are now editing card UI and creating

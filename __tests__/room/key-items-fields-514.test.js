@@ -69,13 +69,27 @@ describe('514: две строки настройки в форме точки',
   const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
   const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
 
-  it('первая строка — поиск и список ключей с полем «Обязателен?»', () => {
+  it('первая строка — поиск и список ключей с чекбоксом «Обязателен» (патч 515)', () => {
     expect(form).toContain('availableKeyItems');
     expect(form).toContain('testID="container-form-key-search"');
-    expect(form).toContain('container-form-key-required');
-    expect(form).toContain('container-form-key-optional');
-    expect(form).toContain("tLootTrade('form.keyMandatoryLabel')");
+    expect(form).toContain('testID="container-form-key-required"');
+    expect(form).toContain("accessibilityRole=\"checkbox\"");
+    expect(form).toContain('checkbox-marked');
+    expect(form).toContain('checkbox-blank-outline');
+    expect(form).toContain("tLootTrade('form.keyRequiredLabel')");
+    expect(form).not.toContain('container-form-key-optional');
     expect(form).toContain('styles.roomChips');
+  });
+
+  it('описание — последнее поле формы (патч 515)', () => {
+    expect(form).toContain('testID="container-form-description"');
+    const descAt = form.indexOf('container-form-description');
+    const checkAt = form.indexOf('container-form-check-search');
+    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
+    expect(checkAt).toBeGreaterThan(-1);
+    expect(descAt).toBeGreaterThan(checkAt);
+    expect(descAt).toBeGreaterThan(hintAt);
+    expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
   });
 
   it('вторая строка — поиск и список терминалов / замков', () => {
@@ -133,8 +147,8 @@ describe('514: словари и живой план', () => {
     const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
     const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
     for (const [section, key] of [
-      ['form', 'keyRequirementLabel'], ['form', 'keyMandatoryLabel'],
-      ['form', 'keyRequiredLabel'], ['form', 'keyOptionalLabel'],
+      ['form', 'keyRequirementLabel'],
+      ['form', 'keyRequiredLabel'],
       ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
       ['card', 'requiresKey'], ['card', 'hubKind'],
       ['keyItems', 'attachToLabel'], ['keyItems', 'attachToHint'],
@@ -147,8 +161,8 @@ describe('514: словари и живой план', () => {
 
   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
     const plan = read('docs/roadmap.md');
-    expect(plan).toContain('514');
-    expect(plan).toContain('Осталось после патча 514');
+    expect(plan).toContain('515');
+    expect(plan).toContain('Осталось после патча 515');
     expect(plan).toContain('Серверная проверка ключа');
     expect(plan).toContain('Ворота между контейнерами');
     expect(plan).toContain('две панели');
