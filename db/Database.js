@@ -470,6 +470,17 @@ export async function saveRoomStorage(code, storage) {
   return { code: cleanCode, storage: JSON.parse(data) };
 }
 
+export async function getAllRoomStorages() {
+  const rows = await getAll('SELECT code, data, updated_at FROM gm_room_storage');
+  return (rows || []).map((row) => {
+    try {
+      return { code: row.code, storage: JSON.parse(row.data), updatedAt: Number(row.updated_at) || 0 };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
 export async function getRoomStorage(code) {
   const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
   if (!row?.data) return null;

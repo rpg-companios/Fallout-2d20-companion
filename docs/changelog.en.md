@@ -1,5 +1,34 @@
 # Changelog
 ---
+## Cross-platform save and JSON handover (patch 509)
+
+The owner: "Yes, the save must be cross-platform. And both the GM and players
+should be able to export shared storage to JSON, so if the GM steps down, the
+group changes its GM, or one of the players becomes the GM, the snapshot can be
+imported back. Since storage contents disappear when the server disconnects,
+arriving on a new server the GM can fill storage in one action."
+
+- **Two-way save.** `syncRoomStoragesInSession` in `googleDriveSync.js` now
+  downloads `storage__...` files from the GM Drive into the local database as
+  well as uploading them. It is called from the general cloud sync;
+  `getAllRoomStorages` was added to both database adapters.
+- **JSON export / import.** The pure `domain/partyStorageTransfer.js` defines
+  the format (`type: 'party_storage'`, room code, revision, entries), validates
+  files and also accepts a bare snapshot. Files are written and read through
+  the existing cross-platform `src/utils/characterFileTransfer.js` (Web Share
+  API / browser-fs-access / anchor download on web, expo-document-picker +
+  expo-sharing on native).
+- **Both roles.** The "Shared storage" window now has "Export JSON" and
+  "Import JSON" buttons and also opens for the GM. A GM import immediately
+  sends `storage.restore` to the room — one action fills the new storage. A
+  player import saves the snapshot on the device; once they become GM,
+  `restoreMasterStorage` uploads it.
+- This matters because room state is **ephemeral**: the server keeps it in
+  memory and it disappears on disconnect or server change. The JSON file and
+  the Drive save restore it without any server-side storage.
+
+Installation: `docs/patch-509-install.md`.
+
 ## GM storage and player snapshot (patch 508)
 
 The owner simplified the model and rejected the server file from 507: "Shared

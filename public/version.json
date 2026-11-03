@@ -1,8 +1,12 @@
 {
-  "version": "508",
+  "version": "509",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Снимок общего хранилища теперь синхронизируется из Google Drive в обе стороны: сейв Мастера приезжает на другое устройство и на другой платформе.",
+      "И Мастер, и игрок могут выгрузить общее хранилище в JSON-файл и загрузить его обратно.",
+      "Если ведущий перестал водить или сменился Мастер, импорт снимка наполняет хранилище нового сервера одним действием.",
+      "Окно хранилища доступно Мастеру и игроку: экспорт и импорт работают на вебе и в нативном приложении через общий механизм файлов.",
       "Общее хранилище теперь принадлежит Мастеру: его сохранение лежит в локальной базе ведущего и уезжает в его Google Drive, а игрокам рассылается текущий снимок.",
       "Без Мастера в сети хранилище доступно только для просмотра: положить или забрать вещь нельзя, пока ведущий не подключится к комнате.",
       "При подключении к комнате игрок сразу получает актуальное состояние хранилища, а Мастер поднимает своё сохранение в комнату.",
@@ -73,6 +77,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Shared storage snapshots now sync from Google Drive in both directions, so the GM save arrives on another device and platform.",
+      "Both the Game Master and players can export shared storage to a JSON file and import it back.",
+      "If the GM steps down or the group changes its GM, importing a snapshot fills storage on the new server in one action.",
+      "The storage window is available to both GM and players; export and import work on web and native through the shared file transfer layer.",
       "Shared storage now belongs to the Game Master: its save lives in the GM local database and syncs to their Google Drive, while players receive a current snapshot.",
       "Without the GM online the storage is read-only: items cannot be deposited or withdrawn until the GM connects to the room.",
       "Connecting to a room immediately delivers the current storage state, and the GM uploads their saved copy into the room.",

@@ -18,6 +18,17 @@ vi.mock('react-native', () => {
 });
 vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
 vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
+// Патч 509: модалка теперь работает с файлами и локальной БД; в рендер-тесте
+// достаточно заглушек, реальный IO проверяют тесты формата.
+vi.mock('../../db', () => ({
+  saveRoomStorage: vi.fn(async () => null),
+  getRoomStorage: vi.fn(async () => null),
+  getAllRoomStorages: vi.fn(async () => []),
+}));
+vi.mock('../../src/utils/characterFileTransfer', () => ({
+  saveCharacter: vi.fn(async () => ({ success: true })),
+  loadCharacter: vi.fn(async () => null),
+}));
 
 import PartyStorageModal from '../../components/lootTrade/PartyStorageModal';
 import useRoomStore from '../../src/room/roomStore';

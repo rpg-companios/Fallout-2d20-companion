@@ -19,6 +19,13 @@ import {
   Platform,
 } from 'react-native';
 import useRoomStore from '../../src/room/roomStore';
+import * as db from '../../db';
+import { saveCharacter, loadCharacter } from '../../src/utils/characterFileTransfer';
+import {
+  createStorageExportPayload,
+  parseStorageImportPayload,
+  storageExportFileName,
+} from '../../domain/partyStorageTransfer';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
 import { showRawAlert } from '../alerts/alertService';
 import { useLocale } from '../../i18n/locale';
@@ -44,9 +51,16 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
   const [busy, setBusy] = useState(false);
 
   const room = useMemo(() => {
-    const entry = Object.entries(rooms || {}).find(([, value]) => value?.role === 'player');
+    // Патч 509: окно склада доступно и Мастеру, и игроку — оба должны уметь
+    // выгрузить снимок в JSON. Предпочитаем комнату игрока, если их несколько.
+    const candidates = Object.entries(rooms || {}).filter(([, value]) => value?.partyStorage);
+    const entry = candidates.find(([, value]) => value.role === 'player') || candidates[0];
     if (!entry) return null;
-    return { code: entry[0], storage: entry[1].partyStorage || { revision: 0, entries: [] } };
+    return {
+      code: entry[0],
+      role: entry[1].role,
+      storage: entry[1].partyStorage || { revision: 0, entries: [] },
+    };
   }, [rooms]);
 
   const entries = room?.storage?.entries || [];
@@ -88,6 +102,48 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
       showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const exportJson = async () => {
+    if (!room) return;
+    const payload = createStorageExportPayload({
+      code: room.code,
+      storage: room.storage,
+      exportedBy: room.role === 'gm' ? 'gm' : 'player',
+    });
+    const result = await saveCharacter(payload, storageExportFileName(room.code));
+    if (result?.success) {
+      showRawAlert({ title: tInventory('screen.storage.exportDone') });
+    }
+  };
+
+  const importJson = async () => {
+    if (!room) return;
+    const raw = await loadCharacter();
+    const parsed = parseStorageImportPayload(raw);
+    if (parsed.error || !parsed.storage) {
+      showRawAlert({ title: tInventory('screen.storage.importError') });
+      return;
+    }
+    try {
+      // Снимок сохраняется локально под кодом ТЕКУЩЕЙ комнаты: если игрок
+      // позже станет Мастером, restoreMasterStorage поднимет его.
+      await db.saveRoomStorage(room.code, parsed.storage);
+      if (room.role === 'gm') {
+        await useRoomStore.getState().restorePartyStorage({
+          code: room.code,
+          storage: parsed.storage,
+        });
+        showRawAlert({ title: tInventory('screen.storage.importDone') });
+      } else {
+        showRawAlert({
+          title: tInventory('screen.storage.importDone'),
+          message: tInventory('screen.storage.importPlayerHint'),
+        });
+      }
+    } catch (error) {
+      showRawAlert({ title: tInventory('screen.storage.importError'), message: error?.message });
     }
   };
 
@@ -150,6 +206,22 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
             </View>
           )}
 
+          <View style={styles.transferRow}>
+            <TouchableOpacity
+              testID="storage-export-button"
+              style={styles.transferButton}
+              onPress={() => { void exportJson(); }}
+            >
+              <Text style={styles.transferButtonText}>{tInventory('screen.storage.export')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="storage-import-button"
+              style={styles.transferButton}
+              onPress={() => { void importJson(); }}
+            >
+              <Text style={styles.transferButtonText}>{tInventory('screen.storage.import')}</Text>
+            </TouchableOpacity>
+          </View>
           {!writable && <Text style={styles.readOnly}>{tInventory('screen.storage.readOnly')}</Text>}
           <Text style={styles.hint}>{tInventory('screen.storage.hint')}</Text>
         </View>
@@ -173,6 +245,17 @@ const styles = StyleSheet.create({
   rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
   rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
   hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
+  transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  transferButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#58875d',
+    backgroundColor: '#213028',
+  },
+  transferButtonText: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
   readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
 });
 
