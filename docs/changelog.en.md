@@ -1,5 +1,46 @@
 # Changelog
 ---
+## GM notice, one-time terminal access and leaving a location (patch 506)
+
+The owner tested 505 in two tabs of one browser: "in the GM tab I do not see
+the terminal-hacked notice. As a player I can close the terminal and the
+terminal window remains, but it is actually the location window. And since
+it is an active location window I can hack the terminal again and again and
+again. This looks like an architectural bug. The terminal must not open again.
+Players should be able to disconnect from a location themselves with a
+'leave location' button next to 'minimize' in the modal."
+
+- **GM notice.** The global host selected events only by `role: 'gm'` in the
+  store. But the UI mode of tabs in one browser is shared (localStorage), so
+  the owner easily ended up with `role: 'player'` — both the failure question
+  and the success notice stayed silent. Ownership is now also detected from
+  the room member with `role: 'gm'` and this tab's `clientId` (the server
+  sends the member list regardless of interface mode). Loading `ownerToken`
+  can no longer block display (one-second cap), and `AlertHost` is mounted
+  above the "What's new" window so it cannot be covered.
+- **One-time access.** Whether a terminal is open no longer lives in the
+  modal's local state. The server issues a stable `accessId` per broadcast:
+  it does not change on turns or card edits, but is renewed after `reissue`,
+  re-broadcasting the location, or the GM answering "Yes". The pure
+  `terminalAccess.js` rule disables "Hack" after the first press and both
+  buttons after `won` / `awaitingRetry` / `closed`; the player sees a state
+  badge instead of another opening. The same rule applies to a standalone
+  terminal.
+- **"Leave location".** `playerCloseSession` previously refused to close a
+  `hub` for players, and the outer location window offered only "Minimize".
+  A "Leave location" button now sits next to it: the server adds the
+  `clientId` to `session.closedByClientIds`, that player's overlay stops
+  showing the scene, and the GM session stays active for everyone else.
+  Only the GM can still end the scene for all.
+- Paired RU/EN labels: "Leave location", its hint, "ACCESS USED", and an
+  updated note about ending the scene.
+
+Unchanged: all 504/505 rules, the word-count formula, three groups,
+4 attempts, Science brackets, Luck, the Hacker perk, operator takeover and
+the dictionary.
+
+Installation: `docs/patch-506-install.md`.
+
 ## A successful hack no longer disappears (patch 505)
 
 The owner tested the game in two tabs of one browser: "I found a 5/7 match,

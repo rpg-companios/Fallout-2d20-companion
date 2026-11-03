@@ -11,14 +11,29 @@ export const decisionKey = (code, containerId, game) => (
 );
 
 /**
+ * Патч 506: вкладки одного браузера делят UI-режим (localStorage), поэтому
+ * `role: 'gm'` в сторе у Мастера легко оказывается 'player' — глобальный хост
+ * тогда молчал и на провал, и на успех. Надёжный признак владельца — запись
+ * участника с role 'gm' и clientId ЭТОЙ вкладки (сервер её присылает в
+ * room.state / room.member независимо от UI-режима).
+ */
+export const isGmRoom = (room, clientId = null) => {
+  if (room?.role === 'gm') return true;
+  if (!clientId || !Array.isArray(room?.members)) return false;
+  return room.members.some(
+    (member) => member?.role === 'gm' && member?.clientId === clientId,
+  );
+};
+
+/**
  * Из состояний комнат выбирает провалившиеся партии, по которым Мастер ещё
  * не ответил. Игровые комнаты (role: 'player') и уже закрытые терминалы
  * никогда не порождают вопрос.
  */
-export const findPending = (rooms) => {
+export const findPending = (rooms, clientId = null) => {
   const pending = [];
   for (const [code, room] of Object.entries(rooms || {})) {
-    if (room?.role !== 'gm') continue;
+    if (!isGmRoom(room, clientId)) continue;
     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
       if (terminal?.game?.status !== 'awaitingRetry') continue;
       if (terminal?.closed) continue;
@@ -41,10 +56,10 @@ export const findPending = (rooms) => {
  * Мастеру как отдельное событие. Префикс в ключе исключает коллизию с
  * вопросом `findPending` по той же ревизии партии.
  */
-export const findCompleted = (rooms) => {
+export const findCompleted = (rooms, clientId = null) => {
   const completed = [];
   for (const [code, room] of Object.entries(rooms || {})) {
-    if (room?.role !== 'gm') continue;
+    if (!isGmRoom(room, clientId)) continue;
     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
       if (terminal?.game?.status !== 'won') continue;
       if (terminal?.closed) continue;

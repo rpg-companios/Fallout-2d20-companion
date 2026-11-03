@@ -460,6 +460,65 @@ describe('roomServer: create/join/presence', () => {
     });
   });
 
+  // Патч 506: выход игрока из локации персональный, а билет доступа к
+  // терминалу обновляется только после явной повторной трансляции Мастера.
+  it('506: игрок покидает локацию, остальные остаются; reissue выдаёт новый accessId', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-506');
+      const player = makeClient(port, 'player-506');
+      const other = makeClient(port, 'player-506-other');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 506' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
+      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await other.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
+      await other.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+
+      const config = { containerId: 'term-506', name: 'Терминал', difficulty: 3 };
+      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
+      const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+      const firstAccessId = issued.payload.terminal.accessId;
+      expect(firstAccessId).toMatch(/^broadcast-\d+$/);
+
+      const openReq = await gm.send(MESSAGE.SESSION_OPEN, {
+        session: {
+          kind: 'hub', name: 'Убежище', targetType: 'room',
+          nodes: [{ containerId: config.containerId, kind: 'terminal', name: 'Терминал', difficulty: 3 }],
+        },
+      }, code);
+      const opened = await gm.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === openReq);
+      const sessionId = opened.payload.session.sessionId;
+      expect(opened.payload.session.kind).toBe('hub');
+
+      // Игрок уходит сам: сессия Мастера остаётся активной.
+      const leaveReq = await player.send(MESSAGE.SESSION_PLAYER_CLOSE, { sessionId }, code);
+      const left = await player.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === leaveReq);
+      expect(left.payload.session).toBeTruthy();
+      expect(left.payload.session.kind).toBe('hub');
+      expect(left.payload.session.closedByClientIds).toContain(player.clientId);
+      expect(left.payload.session.closedByClientIds).not.toContain(other.clientId);
+      expect(app.registry.getRoom(code).activeSession).toBeTruthy();
+      const otherState = await other.waitFor((m) => (
+        m.type === MESSAGE.SESSION_STATE && m.payload.session?.closedByClientIds?.includes(player.clientId)
+      ));
+      expect(otherState.payload.session.sessionId).toBe(sessionId);
+
+      // Повторная трансляция терминала выдаёт новый билет доступа.
+      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'reissue',
+      }, code);
+      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
+      expect(reissued.payload.terminal.accessId).not.toBe(firstAccessId);
+
+      gm.close();
+      player.close();
+      other.close();
+    });
+  });
+
   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
     await withServer(async (port) => {
       const gm = makeClient(port, 'gm-1');

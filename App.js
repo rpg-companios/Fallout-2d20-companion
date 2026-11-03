@@ -346,10 +346,12 @@ function App() {
           <FusionCoreChoiceModal />
           <PlayerLootTradeOverlay />
           <PlayerDirectiveOverlay />
+          {/* Патч 506: «Что нового» рисуется ДО диалогов, иначе окно обновления
+              перекрывало уведомление Мастера о взломе терминала. */}
+          <UpdateNoticeModal />
           <AlertHost />
           {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
           <TerminalRetryPromptHost />
-          <UpdateNoticeModal />
           <SurvivalClock />
       </SafeAreaProvider>
     </PaperProvider>

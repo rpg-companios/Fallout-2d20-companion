@@ -35,6 +35,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
   const lastRng = rng; // jest/vitest подмена
+  // Патч 506: номер трансляции терминала. Не меняется на ходах и при правке
+  // карточки; обновляется только после явной повторной выдачи Мастером.
+  // Клиент использует его как «билет» одноразового доступа к мини-игре.
+  let broadcastCounter = 0;
+  const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
 
   const touchRateLog = (log, key, windowMs, max) => {
     const cutoff = now() - windowMs;
@@ -337,6 +342,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
     awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
     standaloneIssued: Boolean(entry.standaloneIssued),
+    // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
+    // открыть терминал один раз за трансляцию, даже если закрыл окно.
+    accessId: entry.accessId || null,
     game: publicGameState(entry.game),
     updatedAt: entry.updatedAt,
   });
@@ -353,6 +361,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         config,
         closed: false,
         standaloneIssued,
+        accessId: newBroadcastId(),
         game: null,
         updatedAt: now(),
       };
@@ -367,6 +376,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       config,
       closed: reissue ? false : Boolean(previous.closed),
       standaloneIssued: standaloneIssued || Boolean(previous.standaloneIssued),
+      // Повторная трансляция выдаёт новый «билет»; обычная правка карточки — нет.
+      accessId: reissue ? newBroadcastId() : (previous.accessId || newBroadcastId()),
       game,
       updatedAt: now(),
     };
@@ -452,6 +463,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         fresh.operatorName = operatorName;
         entry.game = fresh;
         entry.closed = false;
+        entry.accessId = newBroadcastId();
         if (Array.isArray(fresh.wordRanges)) {
           const words = fresh.wordRanges.map((range) => range.word);
           room.recentTerminalWords = [...words, ...(room.recentTerminalWords || [])].slice(0, 60);
@@ -462,6 +474,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       // unlock/reset/reissue — повторная трансляция терминала.
       entry.closed = false;
       entry.game = null;
+      entry.accessId = newBroadcastId();
       entry.updatedAt = now();
       return { room, terminal: terminalPublic(id, entry) };
     }
@@ -570,13 +583,23 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (sessionId && current.sessionId !== String(sessionId)) {
       return { room, session: current, closedSession: null, closedReason: null };
     }
-    // Локацию ('hub') может закрыть только Мастер; игроки закрывают лишь вложенные окна внутри неё.
-    if (current.kind === 'hub') {
-      return { room, session: current, closedSession: null, closedReason: null };
-    }
-
     const closedSet = new Set(current.closedByClientIds || []);
     closedSet.add(clientId);
+
+    // Патч 506: «Покинуть локацию». Игрок отключается от выданной локации
+    // сам, но сессия Мастера остаётся активной для остальных игроков —
+    // локацию по-прежнему закрывает только Мастер. Просто помечаем этого
+    // участника в closedByClientIds (оверлей игрока уже читает это поле).
+    if (current.kind === 'hub') {
+      const nextSession = {
+        ...current,
+        closedByClientIds: [...closedSet],
+        revision: current.revision + 1,
+        updatedAt: now(),
+      };
+      room.activeSession = nextSession;
+      return { room, session: nextSession, closedSession: null, closedReason: null };
+    }
 
     if (!hasRemainingActiveSessionViewers(room, current, closedSet)) {
       const closedSession = {

@@ -38,9 +38,15 @@ const TerminalRetryPromptHost = () => {
       if (busyRef.current) return;
       busyRef.current = true;
       try {
+        // Патч 506: БД больше не может заблокировать показ уведомления.
+        // Если локальное хранилище недоступно или транзакция зависла,
+        // продолжаем без ownerToken (он нужен только для ответа «Да/Нет»).
         let ownerTokens = {};
         try {
-          const rows = await db.getFolderRooms();
+          const rows = await Promise.race([
+            db.getFolderRooms(),
+            new Promise((resolve) => setTimeout(() => resolve([]), 1000)),
+          ]);
           ownerTokens = Object.fromEntries(
             (rows || [])
               .filter((row) => row?.code && row?.owner_token)
@@ -123,9 +129,12 @@ const TerminalRetryPromptHost = () => {
     };
 
     const collect = (state) => {
+      // Патч 506: владельца определяем и по participant'у с role 'gm' —
+      // UI-режим вкладки больше не влияет на доставку сообщений Мастеру.
+      const clientId = state?.clientId || useRoomStore.getState().clientId;
       const events = [
-        ...findPending(state?.rooms).map((item) => ({ ...item, kind: 'retry' })),
-        ...findCompleted(state?.rooms),
+        ...findPending(state?.rooms, clientId).map((item) => ({ ...item, kind: 'retry' })),
+        ...findCompleted(state?.rooms, clientId),
       ];
       for (const item of events) {
         if (handledRef.current.has(item.key)) continue;

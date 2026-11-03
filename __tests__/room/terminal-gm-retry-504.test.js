@@ -441,7 +441,10 @@ describe('504: диалог Мастера и экраны', () => {
   it('оверлей игрока показывает «Закрыт» и отключает обе кнопки; модалка сообщает о провале', () => {
     const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
     expect(overlay).toContain('terminal-closed-badge');
-    expect(overlay).toContain('disabled={terminalClosed}');
+    // Патч 506: обе кнопки блокируются единым признаком завершённого
+    // доступа (закрыт / ждёт решения / взломан / билет уже использован).
+    expect(overlay).toContain('disabled={Boolean(accessBlockedReason)}');
+    expect(overlay).toContain('disabled={!hackAllowed}');
     expect(overlay).toContain('terminalClosedBadge');
     expect(overlay).toContain('terminalAwaiting');
     const modal = read('components/lootTrade/TerminalHackingModal.js');

@@ -1,8 +1,12 @@
 {
-  "version": "505",
+  "version": "506",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Мастер теперь получает уведомление о взломанном терминале в любой вкладке браузера: владелец определяется по участнику комнаты, а не по переключателю режима интерфейса.",
+      "Терминал нельзя открыть заново после первого взлома: доступ привязан к трансляции Мастера, поэтому закрытие окна больше не возвращает кнопку «Взломать».",
+      "В окне локации рядом с «Свернуть» появилась кнопка «Покинуть локацию»: игрок отключается сам, а сцена остаётся открытой для остальных участников.",
+      "После успеха, провала или закрытия терминала обе кнопки карточки блокируются с понятной отметкой состояния; новая трансляция Мастера снова открывает доступ.",
       "Теперь после удачного взлома доска не сбрасывается: надпись «ДОСТУП РАЗРЕШЁН» и все подсказки остаются на экране, пока ведущий не транслирует терминал заново.",
       "Ведущий получает уведомление «Терминал взломан» с именем оператора, даже если в этот момент открыт другой раздел приложения.",
       "Если попытки закончились, найденные подсказки вроде «5 из 7» больше не пропадают: они видны рядом с сообщением о провале.",
@@ -61,6 +65,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The Game Master now receives the terminal-hacked notice in any browser tab: ownership is detected from the room member list rather than the interface mode switch.",
+      "A terminal can no longer be opened again after the first hack: access is tied to the Game Master broadcast, so closing the window no longer restores the \"Hack\" button.",
+      "The location window now has a \"Leave location\" button next to \"Minimize\": the player disconnects on their own while the scene stays open for everyone else.",
+      "After a success, a failure or a closed terminal both card buttons are disabled with a clear state badge; a new broadcast by the Game Master restores access.",
       "After a successful hack the board no longer resets: «ACCESS GRANTED» and every hint stay on screen until the Game Master broadcasts the terminal again.",
       "The Game Master now receives a «Terminal hacked» notice with the operator name, even while viewing a different part of the app.",
       "When all attempts are used, discovered hints such as «5 of 7» remain visible next to the failure message.",

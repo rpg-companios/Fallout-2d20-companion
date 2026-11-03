@@ -187,7 +187,9 @@
     "close": "Close",
     "backToLocation": "← Location",
     "hubEmpty": "No accessible objects in this location yet.",
-    "hubMasterClosesHint": "This location window stays open until the GM ends the scene.",
+    "hubMasterClosesHint": "The GM ends the scene for everyone; you may leave on your own.",
+    "leaveHub": "Leave location",
+    "leaveHubHint": "You will disconnect from the location; other players stay in it.",
     "hubNodeLockedBadge": "🔒 Locked",
     "hubNodeLockedDefaultHint": "Requires lockpicking or GM permission",
     "hubNodeOpenLoot": "Open",
@@ -272,6 +274,7 @@
     "stateClosed": "Closed",
     "stateWon": "Hacked",
     "retryFailed": "Could not apply the Game Master decision",
+    "accessUsed": "ACCESS USED",
     "hackedTitle": "Terminal hacked",
     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
     "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."

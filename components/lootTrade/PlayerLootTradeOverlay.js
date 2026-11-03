@@ -38,6 +38,11 @@ import {
 } from '../../src/lootTrade/grantCharacterItems';
 import { showRawAlert } from '../alerts/alertService';
 import TerminalHackingModal from './TerminalHackingModal';
+import {
+  terminalAccessKey,
+  canHackTerminal,
+  terminalBlockedReason,
+} from './terminalAccess';
 import { debugLog } from '../../src/debug/falloutDebug';
 
 const getItemIcon = (itemType) => {
@@ -83,6 +88,15 @@ export default function PlayerLootTradeOverlay() {
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
   const [terminalSelection, setTerminalSelection] = useState(null);
   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
+  // Патч 506: одноразовый доступ к терминалу в рамках ОДНОЙ трансляции.
+  // Раньше признак «терминал открыт» жил в модалке: закрыл окно — и кнопка
+  // «Взломать» снова считала терминал свободным, сколько угодно раз.
+  // Ключ содержит accessId сервера: новая трансляция Мастера выдаёт новый.
+  const [usedTerminalAccess, setUsedTerminalAccess] = useState({});
+  const markTerminalAccess = useCallback((key) => {
+    if (!key) return;
+    setUsedTerminalAccess((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  }, []);
 
   // Буферы обмена с торговцем
   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
@@ -172,6 +186,28 @@ export default function PlayerLootTradeOverlay() {
   }, [isGmMode, bindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
+  /**
+   * Патч 506: «Покинуть локацию». Игрок отключается сам, сессия Мастера
+   * остаётся активной для остальных. Сервер помечает этого участника в
+   * session.closedByClientIds, и matchedContext выше перестаёт показывать
+   * окно — источник правды не локальный useState, а состояние комнаты.
+   */
+  const leaveLocation = async () => {
+    const session = matchedContext?.session;
+    if (!session || !matchedContext) return;
+    setTerminalSelection(null);
+    setDismissedTerminalId(null);
+    try {
+      await useRoomStore.getState().playerCloseRoomSession({
+        code: matchedContext.roomCode,
+        sessionId: session.sessionId,
+      });
+    } catch (error) {
+      debugLog('playerOverlay.leaveLocation:failed', { message: error?.message });
+      markSessionClosedLocally(session.sessionId);
+    }
+  };
+
   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
 
   const selectedHubNode = useMemo(() => {
@@ -298,12 +334,26 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    if (dismissedTerminalId === config.containerId) {
+    // Патч 506: та же одноразовость для терминала, выданного напрямую.
+    // Закрыл окно — «Открыть терминал» больше не возвращает к мини-игре.
+    const directAccessKey = terminalAccessKey({
+      roomCode: directTerminalContext.roomCode,
+      containerId: config.containerId,
+      accessId: directTerminalContext.terminalState?.accessId,
+    });
+    const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
+    if (dismissedTerminalId === config.containerId || directUsed) {
       return (
         <View style={styles.floatingBar} pointerEvents="box-none">
-          <TouchableOpacity style={styles.floatingPill} onPress={() => setDismissedTerminalId(null)}>
+          <TouchableOpacity
+            style={styles.floatingPill}
+            disabled={directUsed}
+            onPress={() => setDismissedTerminalId(null)}
+          >
             <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
-            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
+            <Text style={styles.floatingPillAction}>
+              {directUsed ? tLootTrade('terminal.accessUsed') : tLootTrade('terminal.openTerminal')}
+            </Text>
           </TouchableOpacity>
         </View>
       );
@@ -313,7 +363,10 @@ export default function PlayerLootTradeOverlay() {
         visible
         terminal={config}
         roomCode={directTerminalContext.roomCode}
-        onClose={() => setDismissedTerminalId(config.containerId)}
+        onClose={() => {
+          markTerminalAccess(directAccessKey);
+          setDismissedTerminalId(config.containerId);
+        }}
       />
     );
   }
@@ -385,12 +438,21 @@ export default function PlayerLootTradeOverlay() {
                   <Text style={styles.modalTitle}>{activeSession.name}</Text>
                 </View>
                 <View style={styles.headerActionsRow}>
-                  {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
+                  {/* Патч 506: «Свернуть» и «Покинуть локацию». Закрыть сцену
+                      по-прежнему может только Мастер; игрок отключается сам. */}
                   <TouchableOpacity
                     style={styles.minimizeBtn}
                     onPress={() => setMinimizedSessionId(activeSession.sessionId)}
                   >
                     <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="leave-hub-button"
+                    accessibilityRole="button"
+                    style={styles.leaveHubBtn}
+                    onPress={() => { void leaveLocation(); }}
+                  >
+                    <Text style={styles.leaveHubBtnText}>{tLootTrade('player.leaveHub')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -431,6 +493,33 @@ export default function PlayerLootTradeOverlay() {
                     const terminalAwaiting = !terminalClosed && Boolean(
                       terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
                     );
+                    // Патч 506: доступ привязан к трансляции, а не к окну.
+                    const accessKey = terminalAccessKey({
+                      roomCode: matchedContext.roomCode,
+                      containerId: node.containerId,
+                      accessId: terminalState?.accessId,
+                    });
+                    const hackAllowed = canHackTerminal({
+                      used: usedTerminalAccess,
+                      key: accessKey,
+                      game: terminalState?.game,
+                      terminalClosed,
+                      terminalAwaiting,
+                    });
+                    const accessBlockedReason = terminalBlockedReason({
+                      used: usedTerminalAccess,
+                      key: accessKey,
+                      game: terminalState?.game,
+                      terminalClosed,
+                      terminalAwaiting,
+                    });
+                    const accessBadgeKey = {
+                      closed: 'terminal.closedBadge',
+                      awaiting: 'terminal.retryWaiting',
+                      won: 'terminal.stateWon',
+                      finished: 'terminal.accessUsed',
+                      used: 'terminal.accessUsed',
+                    }[accessBlockedReason] || null;
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -496,42 +585,36 @@ export default function PlayerLootTradeOverlay() {
                             </View>
                           ) : nodeIsTerminal ? (
                             <View style={styles.terminalButtons}>
-                              {terminalClosed && (
+                              {accessBadgeKey && (
                                 <View testID="terminal-closed-badge" style={styles.terminalClosedBadge}>
-                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade('terminal.closedBadge')}</Text>
+                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade(accessBadgeKey)}</Text>
                                 </View>
                               )}
                               <TouchableOpacity
                                 accessibilityRole="button"
-                                accessibilityState={{ disabled: terminalClosed }}
-                                disabled={terminalClosed}
+                                accessibilityState={{ disabled: Boolean(accessBlockedReason) }}
+                                disabled={Boolean(accessBlockedReason)}
                                 testID="terminal-view-button"
-                                style={[styles.terminalViewButton, terminalClosed && styles.terminalButtonDisabled]}
+                                style={[styles.terminalViewButton, accessBlockedReason && styles.terminalButtonDisabled]}
                                 onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
                               >
                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
-                              {!terminalClosed && !terminalAwaiting
-                                && !['playing', 'pendingDigest', 'won', 'awaitingRetry'].includes(terminalState?.game?.status) ? (
-                                <TouchableOpacity
-                                  accessibilityRole="button"
-                                  testID="terminal-hack-button"
-                                  style={styles.terminalHackButton}
-                                  onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
-                                >
-                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
-                                </TouchableOpacity>
-                              ) : (terminalClosed || terminalAwaiting) && (
-                                <TouchableOpacity
-                                  accessibilityRole="button"
-                                  accessibilityState={{ disabled: true }}
-                                  disabled
-                                  testID="terminal-hack-button"
-                                  style={[styles.terminalHackButton, styles.terminalButtonDisabled]}
-                                >
-                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
-                                </TouchableOpacity>
-                              )}
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityState={{ disabled: !hackAllowed }}
+                                disabled={!hackAllowed}
+                                testID="terminal-hack-button"
+                                style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
+                                onPress={() => {
+                                  // Один «Взломать» на трансляцию: даже если
+                                  // игрок закроет окно, кнопка не оживёт.
+                                  markTerminalAccess(accessKey);
+                                  setTerminalSelection({ node: terminalForSelection, autoStart: true });
+                                }}
+                              >
+                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                              </TouchableOpacity>
                             </View>
                           ) : (
                             <TouchableOpacity
@@ -561,6 +644,9 @@ export default function PlayerLootTradeOverlay() {
 
               <Text style={styles.hubMasterClosesHint}>
                 {tLootTrade('player.hubMasterClosesHint')}
+              </Text>
+              <Text style={styles.hubMasterClosesHint}>
+                {tLootTrade('player.leaveHubHint')}
               </Text>
             </View>
           </View>
@@ -1462,6 +1548,15 @@ const styles = StyleSheet.create({
     borderColor: '#777777',
     backgroundColor: '#2a2a2a',
   },
+  leaveHubBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#8a5555',
+    backgroundColor: '#2b2222',
+  },
+  leaveHubBtnText: { color: '#e2a3a3', fontSize: 11, fontWeight: '700' },
   minimizeBtnText: {
     color: '#e5e5e5',
     fontSize: 12,
