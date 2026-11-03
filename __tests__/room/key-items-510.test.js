@@ -106,11 +106,13 @@ describe('510: справочник, редактор и карточка', () =
     expect(read('db/schema.js')).toContain('gm_key_items');
     expect(read('db/Database.js')).toContain('saveGmKeyItem');
     expect(read('db/Database.web.js')).toContain('getGmKeyItems');
-    const catalog = read('components/lootTrade/KeyItemCatalogModal.js');
-    expect(catalog).toContain('renderTextWithIcons');
-    expect(catalog).toContain('key-item-description');
-    expect(catalog).toContain('addKeyItemToStorage');
-    expect(read('components/screens/LootTradeScreen/LootTradeScreen.js')).toContain('testID="key-catalog-button"');
+    const form = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
+    expect(form).toContain('renderTextWithIcons');
+    expect(form).toContain('key-item-form-description');
+    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+    expect(screen).toContain('addKeyItemToStorage');
+    expect(screen).toContain("type: 'createKeyItem'");
+    expect(screen).toContain("type: 'keyItem'");
   });
 
   it('окно склада показывает ключи отдельно и без кнопки «Забрать»', () => {

@@ -74,7 +74,8 @@ import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
-import KeyItemCatalogModal from '../../lootTrade/KeyItemCatalogModal';
+import KeyItemCardCell from '../../lootTrade/KeyItemCardCell';
+import KeyItemFormModal from './modals/KeyItemFormModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
 import IssueContainerModal from './modals/IssueContainerModal';
@@ -99,8 +100,8 @@ const getItemIcon = (itemType) => {
   return '📦';
 };
 
-const ActionCell = ({ iconName, label, onPress }) => (
-  <TouchableOpacity style={styles.createCell} onPress={onPress} activeOpacity={0.75}>
+const ActionCell = ({ iconName, label, onPress, testID }) => (
+  <TouchableOpacity testID={testID} style={styles.createCell} onPress={onPress} activeOpacity={0.75}>
     <MaterialCommunityIcons name={iconName} size={42} color="#5a5a5a" />
     <Text style={styles.createLabel}>{label}</Text>
   </TouchableOpacity>
@@ -357,8 +358,9 @@ export default function LootTradeScreen() {
 
   // Модалки и перетаскивание в локации
   const [formModal, setFormModal] = useState(null); // { kind, initialContainer }
-  // Патч 510: справочник ключевых записей.
-  const [keyCatalogVisible, setKeyCatalogVisible] = useState(false);
+  // Патч 511: ключевые записи — такие же карточки на сетке, как контейнеры.
+  const [keyItems, setKeyItems] = useState([]);
+  const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
@@ -385,8 +387,9 @@ export default function LootTradeScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [savedContainers, folders, roomRows] = await Promise.all([
+      const [savedContainers, savedKeyItems, folders, roomRows] = await Promise.all([
         db.getGmContainersList(),
+        db.getGmKeyItems(),
         db.getCharacterFolders(),
         db.getFolderRooms(),
       ]);
@@ -399,6 +402,7 @@ export default function LootTradeScreen() {
       }));
       setAvailableRooms(rooms);
       setContainers(savedContainers || []);
+      setKeyItems(savedKeyItems || []);
     } catch (error) {
       debugLog('lootTrade.load:failed', { message: error?.message });
     } finally {
@@ -764,6 +768,43 @@ export default function LootTradeScreen() {
         unit: capsRollInfo.unit === 'cd' ? '{CD}' : 'd20',
         total: capsRollInfo.quantity,
       }));
+    }
+  };
+
+  // Патч 511: ключевая запись сохраняется в каталог Мастера и сразу появляется
+  // карточкой на сетке экрана «Добыча / Торговля» (как контейнер/торговец/терминал).
+  const handleSaveKeyItem = async (draft) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const saved = await db.saveGmKeyItem({
+      ...draft,
+      id: draft.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    });
+    const freshList = await db.getGmKeyItems();
+    setKeyItems(freshList || []);
+    setKeyItemForm(null);
+    if (saved?.id) {
+      showTimedBanner(tLootTrade('keyItems.saved'));
+    }
+  };
+
+  const handleIssueKeyItem = async (keyItem) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const gmEntry = Object.entries(roomRooms || {}).find(([, room]) => room?.role === 'gm');
+    const code = keyItem.roomCode || gmEntry?.[0] || '';
+    if (!code) {
+      showRawAlert({ title: tLootTrade('keyItems.noRoom') });
+      return;
+    }
+    try {
+      await useRoomStore.getState().addKeyItemToStorage({
+        code,
+        keyItemId: keyItem.id,
+        name: keyItem.name,
+        description: keyItem.description || '',
+      });
+      showRawAlert({ title: tLootTrade('keyItems.issued') });
+    } catch (error) {
+      showRawAlert({ title: tLootTrade('keyItems.failed'), message: error?.message });
     }
   };
 
@@ -1425,7 +1466,10 @@ export default function LootTradeScreen() {
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
+    { type: 'createKeyItem', id: '__create_key_item__' },
     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
+    // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
+    ...keyItems.map((k) => ({ type: 'keyItem', ...k })),
   ];
 
   const rows = [];
@@ -1472,15 +1516,6 @@ export default function LootTradeScreen() {
     <View style={styles.container}>
       {/* Верхняя шапка Мастера */}
       <View style={styles.topBar}>
-        {/* Патч 510: ключевые записи (карточки доступа, записки с кодами). */}
-        <TouchableOpacity
-          testID="key-catalog-button"
-          style={styles.syncIconButton}
-          onPress={() => setKeyCatalogVisible(true)}
-          accessibilityLabel={tLootTrade('keyItems.title')}
-        >
-          <MaterialCommunityIcons name="key-variant" size={20} color="#f0e68c" />
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.syncIconButton}
           onPress={handleCloudSyncPress}
@@ -1584,6 +1619,29 @@ export default function LootTradeScreen() {
                           iconName="console"
                           label={tLootTrade('actions.createTerminal')}
                           onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null })}
+                        />
+                      );
+                    }
+                    if (cell.type === 'createKeyItem') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="key-variant"
+                          label={tLootTrade('actions.createKeyItem')}
+                          testID="create-key-item-cell"
+                          onPress={() => setKeyItemForm({ initialKeyItem: null })}
+                        />
+                      );
+                    }
+                    if (cell.type === 'keyItem') {
+                      const roomRecord = roomByCode[cell.roomCode];
+                      return (
+                        <KeyItemCardCell
+                          key={cell.id}
+                          keyItem={cell}
+                          roomLabel={roomRecord?.name || ''}
+                          onEdit={() => setKeyItemForm({ initialKeyItem: cell })}
+                          onIssue={() => void handleIssueKeyItem(cell)}
                         />
                       );
                     }
@@ -2234,10 +2292,13 @@ export default function LootTradeScreen() {
         </View>
       )}
 
-      {/* Модалки создания/правки, каталога, правки строки, локации и выдачи */}
-      <KeyItemCatalogModal
-        visible={keyCatalogVisible}
-        onClose={() => setKeyCatalogVisible(false)}
+      {/* Модалки создания/правки, ключевых записей, локации и выдачи */}
+      <KeyItemFormModal
+        visible={Boolean(keyItemForm)}
+        initialKeyItem={keyItemForm?.initialKeyItem || null}
+        availableRooms={availableRooms}
+        onSave={handleSaveKeyItem}
+        onClose={() => setKeyItemForm(null)}
       />
       <ContainerFormModal
         visible={Boolean(formModal)}

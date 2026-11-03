@@ -1,5 +1,31 @@
 # Changelog
 ---
+## Keys as cards on the screen (patch 511)
+
+The owner clarified after 510: "I expected a key to be like a container /
+merchant / terminal card, with a modal in the style of creating a container,
+and then saved into the screen". A separate catalog behind a key icon in the
+header was not what was wanted.
+
+- **Creation.** The Loot / Trade grid now has a "Create key / note" tile next
+  to the location, container, merchant and terminal tiles.
+- **Form.** `KeyItemFormModal` mirrors `ContainerFormModal`: same theme, card,
+  field labels, room selector, and "Cancel / Save" footer. A name is required,
+  the description may be empty; the editor inserts the existing tags
+  (`**bold**`, `*italic*`, list, `{CD}`, `{CAP}`) and previews them through
+  `renderTextWithIcons`.
+- **Saved into the screen.** The record is written to `gm_key_items`, the card
+  list refreshes immediately, and the key stays on the grid next to containers.
+  `KeyItemCardCell` uses the same cell styles as a container, merchant or
+  terminal card.
+- **Card actions.** "Edit" opens the same form with current values; "Add to
+  storage" sends the record to shared storage — as before, GM only and online
+  only. A record found as loot still goes to shared storage, never into a
+  personal inventory.
+- **No regressions.** The data layer, the `storage.addKey` protocol, the
+  no-withdraw rule for keys and key transfer inside the storage snapshot are
+  unchanged. The header icon and `KeyItemCatalogModal` are gone.
+
 ## Keys and notes in shared storage (patch 510)
 
 Step 2 of `docs/key-items-and-gates-design.md`. The owner: "Many such items

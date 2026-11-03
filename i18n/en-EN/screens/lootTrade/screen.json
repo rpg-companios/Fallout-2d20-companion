@@ -6,7 +6,8 @@
     "createMerchant": "Create\nMerchant",
     "createHub": "Create\nLocation",
     "syncCloud": "Cloud sync",
-    "createTerminal": "Hacking terminal"
+    "createTerminal": "Hacking terminal",
+    "createKeyItem": "Create key / note"
   },
   "card": {
     "lootBadge": "Loot",
@@ -62,7 +63,9 @@
     "validationRoom": "Please select a room.",
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
-    "terminalDifficultyLabel": "Difficulty"
+    "terminalDifficultyLabel": "Difficulty",
+    "createKeyItemTitle": "New key record",
+    "editKeyItemTitle": "Edit key record"
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -231,24 +234,25 @@
     "tradeSuccess": "Trade completed!"
   },
   "keyItems": {
-  "title": "Keys and notes",
-  "nameLabel": "Name",
-  "namePlaceholder": "Warehouse key",
-  "descriptionLabel": "Description",
-  "descriptionPlaceholder": "Press the top-left brick…",
-  "previewEmpty": "Description preview appears here",
-  "save": "Save",
-  "clear": "Clear",
-  "catalog": "Catalog",
-  "empty": "No records yet",
-  "edit": "Edit",
-  "issue": "Add to storage",
-  "issued": "Key added to shared storage",
-  "nameRequired": "Enter a name first",
-  "noRoom": "No connected GM room",
-  "failed": "Could not add the key",
-  "hint": "A name is required; the description may be empty."
-},
+    "title": "Keys and notes",
+    "nameLabel": "Name",
+    "namePlaceholder": "Warehouse key",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Press the top-left brick…",
+    "previewEmpty": "Description preview appears here",
+    "save": "Save",
+    "clear": "Clear",
+    "catalog": "Catalog",
+    "empty": "No records yet",
+    "edit": "Edit",
+    "issue": "Add to storage",
+    "issued": "Key added to shared storage",
+    "nameRequired": "Enter a name first",
+    "noRoom": "No connected GM room",
+    "failed": "Could not add the key",
+    "hint": "A name is required; the description may be empty. The card appears on the screen after saving.",
+    "saved": "Key saved on the Loot / Trade screen"
+  },
   "terminal": {
     "title": "Terminal",
     "hack": "Hack",
