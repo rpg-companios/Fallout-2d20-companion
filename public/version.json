@@ -1,8 +1,11 @@
 {
-  "version": "502",
+  "version": "503",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Доска взлома теперь собрана из трёх групп слов с общими окончаниями или приставками: сначала нужно понять верную группу, а затем верный вариант сочетания внутри неё. Логический разбор почти гарантирует победу, а слепой перебор остаётся ненадёжным.",
+      "Если терминал открывает другой игрок, доска, число слов и скобки считаются по его листу персонажа; одновременно взламывает только один, остальные наблюдают.",
+      "Полное восстановление попыток теперь может выпасть не более одного раза на доску. Подсказка в окне взлома показывает совпавшие буквы как «N из M».",
       "Исправлен взлом после импорта персонажа из файла: лист персонажа теперь находится в сейве любой вложенности, поэтому при Интеллекте 10 и Удаче 10 на пятой сложности будет 15 слов и 20 % шанс возврата попыток.",
       "Имя персонажа в окне взлома больше не пропадает при запуске партии напрямую.",
       "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
@@ -50,6 +53,9 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
+      "When another player opens a terminal, the board, word count and brackets are rebuilt from their character sheet; only one player hacks at a time and everyone else watches.",
+      "A full attempt restore can now appear at most once per board. The hacking window shows matching letters as N out of M.",
       "Fixed hacking after importing a character from a file: the sheet is now found at any nesting depth, so Intellect 10 and Luck 10 give 15 words and a 20% attempt-recovery chance at difficulty 5.",
       "The character name no longer disappears from the hacking window when a round is started directly.",
       "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",

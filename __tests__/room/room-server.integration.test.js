@@ -177,11 +177,28 @@ describe('roomServer: create/join/presence', () => {
 
       const observerState = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.containerId === 'term-1' && m.payload.terminal?.game?.status === 'playing');
       expect(observerState.payload.terminal.game.operatorClientId).toBe('player-terminal-1');
-      const blockedReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+      // Патч 503: «Взломать» от другого персонажа собирает доску под ЕГО лист.
+      // Партия остаётся одна на всех; прежний оператор становится зрителем.
+      const takeoverReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
         containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
       }, code);
-      const blocked = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === blockedReq);
-      expect(blocked.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+      const takeover = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === takeoverReq);
+      expect(takeover.payload.terminal.game).toMatchObject({
+        operatorClientId: 'player-terminal-2', operatorCharacterId: 'char-terminal-2', status: 'playing',
+      });
+      // Повторный start от того же оператора не сбрасывает его прогресс.
+      const repeatReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
+      }, code);
+      const repeat = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === repeatReq);
+      expect(repeat.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+      // Прежний оператор теперь только наблюдает.
+      const oldGuessReq = await operator.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'guess', characterId: 'char-terminal-1',
+        value: takeover.payload.terminal.game.wordRanges[0].id,
+      }, code);
+      const oldGuess = await operator.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === oldGuessReq);
+      expect(oldGuess.payload.code).toBe('TERMINAL_VIEW_ONLY');
 
       gm.close();
       operator.close();

@@ -1,6 +1,6 @@
 // Приёмочный тест патча 500: канонические 4 попытки, N = 15 + 2·D − ИНТ,
 // скобки двух сортов, число скобок задаёт Наука, удача 5–20 %,
-// доска «последовательности».
+// доска из трёх групп с общими сочетаниями (патч 503).
 import { describe, expect, it } from 'vitest';
 import { getWordsByLength } from '../../server/terminalWords/index.js';
 import {
@@ -11,6 +11,9 @@ import {
   MAX_LIKENESS_BY_DIFFICULTY,
   MIN_AMBIGUITY_BY_DIFFICULTY,
   MIN_SHARED_BY_DIFFICULTY,
+  WORD_GROUPS,
+  GROUP_VARIANTS,
+  buildGroupedPasswordSet,
   bracketSplitFor,
   applyGameAction,
   attemptsForDifficulty,
@@ -118,7 +121,7 @@ describe('патч 500: число слов, попытки и скобочны�
   });
 });
 
-describe('патч 500: доска «последовательности»', () => {
+describe('патч 503: доска из трёх групп', () => {
   it('MIN_SHARED = L−3, предел подсказки из 495, пол неоднозначности поднят на D4–D5', () => {
     expect(MIN_SHARED_BY_DIFFICULTY).toEqual([1, 2, 3, 4, 5, 6]);
     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
@@ -126,40 +129,81 @@ describe('патч 500: доска «последовательности»', ()
     expect(AMBIGUITY_TARGET_BY_DIFFICULTY).toEqual([2, 2, 2, 2, 8, 8]);
   });
 
-  it('на всех сложностях слова реальные, почти одинаковые и подсказка ограничена', () => {
-    for (let difficulty = 0; difficulty <= 5; difficulty += 1) {
-      const game = gameFor({ difficulty, seed: 0.37 });
-      const dictionary = new Set(getWordsByLength(game.wordLength));
-      const cap = MAX_LIKENESS_BY_DIFFICULTY[difficulty];
-      expect(game.likenessCap).toBe(cap);
-      expect(game.wordCount).toBe(passwordWordCount(difficulty, 4));
-      for (const entry of game.wordRanges) expect(dictionary.has(entry.word)).toBe(true);
-      const duds = game.wordRanges.filter((entry) => entry.word !== game.password);
-      expect(Math.max(...duds.map((entry) => positionalLikeness(entry.word, game.password)))).toBeLessThanOrEqual(cap);
-      expect(new Set(duds.map((entry) => positionalLikeness(entry.word, game.password))).size).toBeGreaterThanOrEqual(2);
-      if (difficulty > 0) {
-        // Пустышки — «родственники» опорного слова; пароль выбран внутри
-        // набора, поэтому смотрим СРЕДНЮЮ близость, а не минимум.
-        const common = duds.map((entry) => sharedLetters(entry.word, game.password));
-        const average = common.reduce((total, value) => total + value, 0) / common.length;
-        expect(average).toBeGreaterThanOrEqual(MIN_SHARED_BY_DIFFICULTY[difficulty] - 2);
-        expect(common.filter((value) => value >= MIN_SHARED_BY_DIFFICULTY[difficulty] - 1).length)
-          .toBeGreaterThanOrEqual(Math.floor(common.length / 2));
+  it('на всех сложностях слова реальные, три группы и градиент подсказок', () => {
+    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
+      for (const seed of [0.21, 0.37, 0.53, 0.71]) {
+        const selection = buildGroupedPasswordSet({
+          wordLength: difficulty + 4,
+          wordCount: passwordWordCount(difficulty, 10),
+          rng: () => seed,
+        });
+        expect(selection, `D${difficulty} seed ${seed}`).toBeTruthy();
+        expect(selection.wordCount).toBe(passwordWordCount(difficulty, 10));
+        expect(selection.groups).toHaveLength(WORD_GROUPS);
+        expect(new Set(selection.groups.map((g) => g.base)).size).toBe(WORD_GROUPS);
+        expect(selection.groups.every((g) => g.position === 'end' || g.position === 'start')).toBe(true);
+        for (const group of selection.groups) {
+          expect(group.variants).toHaveLength(GROUP_VARIANTS);
+          expect(new Set(group.variants).size).toBe(GROUP_VARIANTS);
+          for (const variant of group.variants) {
+            expect(selection.words.some((w) => group.position === 'end'
+              ? w.endsWith(variant) : w.startsWith(variant))).toBe(true);
+          }
+        }
+        const dictionary = new Set(getWordsByLength(difficulty + 4));
+        for (const word of selection.words) expect(dictionary.has(word)).toBe(true);
+        expect(selection.words.filter((w) => w === selection.password)).toHaveLength(1);
+        // Градиент: свой вариант > другой вариант своей группы > чужие группы и шум.
+        const winner = selection.groups.find((g) => g.winner);
+        const otherVariant = winner.variants.find((v) => v !== selection.winnerVariant);
+        const belongs = (word, fragment) => (winner.position === 'end'
+          ? word.endsWith(fragment) : word.startsWith(fragment));
+        const level = (word) => {
+          if (belongs(word, selection.winnerVariant)) return 2;
+          if (belongs(word, otherVariant)) return 1;
+          return 0;
+        };
+        const levels = [[], [], []];
+        for (const word of selection.words) {
+          if (word === selection.password) continue;
+          levels[level(word)].push(positionalLikeness(word, selection.password));
+        }
+        const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
+        expect(mean(levels[2]), `D${difficulty} свой вариант`).toBeGreaterThan(mean(levels[1]));
+        expect(mean(levels[1]), `D${difficulty} другой вариант`).toBeGreaterThan(mean(levels[0]));
+        // Подсказка теперь честно показывает до L−1 из L.
+        expect(selection.likenessCap).toBe(difficulty + 3);
+        expect(Math.max(...selection.words.filter((w) => w !== selection.password)
+          .map((w) => positionalLikeness(w, selection.password)))).toBeLessThanOrEqual(selection.likenessCap);
+        expect(selection.hintKinds).toBeGreaterThanOrEqual(3);
       }
     }
   });
 
-  it('на D4–D5 после любого первого хода остаётся >= 4 кандидатов и пароль не «центральный»', () => {
+  it('на D1–D5 группы, формат подсказки и число слов не зависят от сложности', () => {
+    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
+      const game = gameFor({ difficulty, int: 10, seed: 0.37 });
+      expect(game.groupCount).toBe(WORD_GROUPS);
+      expect(game.groupVariants).toBe(GROUP_VARIANTS);
+      expect(game.likenessCap).toBe(game.wordLength - 1);
+      expect(game.wordCount).toBe(passwordWordCount(difficulty, 10));
+      expect(game.wordRanges).toHaveLength(game.wordCount);
+      expect(publicGameState(game).password).toBeUndefined();
+    }
+  });
+
+  it('на D4–D5 пароль не «самый центральный」, а подсказки дают несколько уровней', () => {
     for (const difficulty of [4, 5]) {
       for (let k = 1; k <= 8; k += 1) {
         const game = gameFor({ difficulty, int: 10, seed: k / 9 });
-        expect(game.minAmbiguity).toBeGreaterThanOrEqual(MIN_AMBIGUITY_BY_DIFFICULTY[difficulty]);
         expect(game.centralityRank).toBeGreaterThan(3);
+        expect(game.hintKinds).toBeGreaterThanOrEqual(3);
+        expect(game.minAmbiguity).toBeGreaterThanOrEqual(1);
       }
     }
   });
 
-  it('ни один двухбуквенный префикс не повторяется больше двух раз', () => {
+  it('общие сочетания группы видны в словах доски (окончания или приставки)', () => {
     for (const difficulty of [3, 4, 5]) {
       const selection = buildPasswordSet({
         wordLength: difficulty + 4,
@@ -167,9 +211,14 @@ describe('патч 500: доска «последовательности»', ()
         wordCount: passwordWordCount(difficulty, 4),
         rng: () => 0.53,
       });
-      const counts = {};
-      for (const word of selection.words) counts[word.slice(0, 2)] = (counts[word.slice(0, 2)] || 0) + 1;
-      expect(Math.max(...Object.values(counts))).toBeLessThanOrEqual(2);
+      expect(selection.groups).toHaveLength(WORD_GROUPS);
+      for (const group of selection.groups) {
+        for (const variant of group.variants) {
+          const matched = selection.words.filter((word) => (group.position === 'end'
+            ? word.endsWith(variant) : word.startsWith(variant)));
+          expect(matched.length).toBeGreaterThanOrEqual(1);
+        }
+      }
     }
   });
 

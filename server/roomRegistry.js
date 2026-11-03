@@ -394,8 +394,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const published = room.lastSnapshots.get(charId);
     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
     if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
-    if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
+    // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
+    // Партия всё равно одна на всех: прежний оператор становится зрителем,
+    // а повторный start от того же оператора не сбрасывает его прогресс.
+    const activeGame = ['playing', 'pendingDigest', 'won'].includes(entry.game?.status);
+    const switchingOperator = Boolean(entry.game
+      && (entry.game.operatorCharacterId !== charId || entry.game.operatorClientId !== clientId));
+    if (action === 'start' && activeGame && !switchingOperator) {
       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+    }
+    if (action === 'start' && switchingOperator) {
+      // Доска пересобирается createGame() из конфигурации терминала, а не из
+      // чужого состояния: число слов, скобки и удача берутся из нового листа.
+      entry.game = null;
     }
     // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
     // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;

@@ -349,7 +349,199 @@ const seededRng = (rng) => {
  *
  * Матрица попарных совпадений считается только для выбранных ~26 слов.
  */
-const buildPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
+// Патч 503. Доска из ТРЁХ ГРУПП с общими сочетаниями (окончания, приставки,
+// суффиксы). Внутри каждой группы ДВА варианта последовательности — например
+// `ION`/`ON`, `TLY`/`LY`, `THE`/`THO`. Игрок сначала по подсказке понимает,
+// какая группа верная, затем внутри неё — какой вариант, и только потом
+// выбирает пароль. Высокая подсказка (вплоть до L−1 из L) здесь не делает
+// взлом перебором: лишние слова и чужие группы занижают слепой шанс, а верная
+// последовательность почти гарантирует победу при канонических 4 попытках.
+const WORD_GROUPS = 3;
+const GROUP_VARIANTS = 2;
+const MAX_GROUP_FRAGMENT = 4;
+
+const findWordFamilies = (pool, wordLength, position, fragmentLength) => {
+  const baseLength = fragmentLength - 1;
+  const byBase = new Map();
+  for (const word of pool) {
+    const fragment = position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
+    const base = position === 'end' ? fragment.slice(1) : fragment.slice(0, -1);
+    if (base.length !== baseLength) continue;
+    if (!byBase.has(base)) byBase.set(base, new Map());
+    const variants = byBase.get(base);
+    if (!variants.has(fragment)) variants.set(fragment, []);
+    variants.get(fragment).push(word);
+  }
+  const families = [];
+  for (const [base, variants] of byBase) {
+    const entries = [...variants.entries()]
+      .filter(([, words]) => words.length >= GROUP_VARIANTS)
+      .sort((a, b) => b[1].length - a[1].length);
+    if (entries.length < GROUP_VARIANTS) continue;
+    families.push({
+      position, base,
+      variants: entries.slice(0, GROUP_VARIANTS).map(([fragment, words]) => ({ fragment, words })),
+    });
+  }
+  return families;
+};
+
+const groupSetMetrics = (set, password) => {
+  let minCandidates = 99;
+  const hintKinds = new Set();
+  for (const guess of set) {
+    if (guess === password) continue;
+    const hint = positionalLikeness(guess, password);
+    hintKinds.add(hint);
+    minCandidates = Math.min(minCandidates, set.filter(
+      (word) => word !== guess && positionalLikeness(guess, word) === hint,
+    ).length);
+  }
+  const sums = set.map((x) => set.reduce(
+    (total, w) => total + (w === x ? 0 : sharedLetters(x, w)), 0,
+  ));
+  const own = sums[set.indexOf(password)];
+  return {
+    minCandidates,
+    hintKinds: hintKinds.size,
+    centralityRank: sums.filter((value) => value > own).length + 1,
+  };
+};
+
+const buildGroupedPasswordSet = ({ wordLength, wordCount, rng = Math.random, excludeWords = [] }) => {
+  const excluded = new Set((Array.isArray(excludeWords) ? excludeWords : []).map((w) => String(w).toUpperCase()));
+  const pool = [...new Set((getWordsByLength(wordLength) || []).filter(
+    (word) => word.length === wordLength && !excluded.has(word),
+  ))];
+  const internal = seededRng(rng);
+  const fragmentLength = Math.min(MAX_GROUP_FRAGMENT, wordLength - 1);
+  const families = [
+    ...findWordFamilies(pool, wordLength, 'end', fragmentLength),
+    ...findWordFamilies(pool, wordLength, 'start', fragmentLength),
+  ];
+  // Обильные семьи предпочтительнее, но порядок всё равно случаен.
+  const ranked = shuffle(families, internal).sort((a, b) => (
+    (b.variants[0].words.length + b.variants[1].words.length)
+    - (a.variants[0].words.length + a.variants[1].words.length)
+  ));
+  const groups = [];
+  const usedBases = new Set();
+  for (const family of ranked.slice(0, 60)) {
+    if (usedBases.has(family.base)) continue;
+    // Все три группы на одной позиции: подсказки чужих групп остаются низкими.
+    // Позиции могут смешиваться, если на коротких словах семей мало;
+    // градиент подсказок всё равно проверяется при отборе доски.
+    groups.push(family);
+    usedBases.add(family.base);
+    if (groups.length === WORD_GROUPS) break;
+  }
+  if (groups.length < WORD_GROUPS) return null;
+
+  const wanted = clamp(Math.floor(Number(wordCount) || BASE_WORD_COUNT), 2, 32);
+  // Четыре слова чужих групп — по одному на каждый из двух вариантов
+  // каждой из двух остальных групп. Остальное добирается «шумом»: он и
+  // занижает вероятность слепого перебора, как просил владелец.
+  const twinsCount = clamp(Math.round((wanted - 5) * 0.3), 1, 5);
+  const otherCount = clamp(Math.round((wanted - 5) * 0.15), 1, 3);
+  let best = null;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const groupIndex = randomInt(WORD_GROUPS, internal);
+    const variantIndex = randomInt(GROUP_VARIANTS, internal);
+    const family = groups[groupIndex];
+    const winners = shuffle(family.variants[variantIndex].words, internal);
+    if (winners.length < 2) continue;
+    const password = winners[0];
+    // «Близнецы» — слова того же варианта, максимально похожие на пароль.
+    const twins = winners.slice(1)
+      .sort((a, b) => positionalLikeness(b, password) - positionalLikeness(a, password))
+      .slice(0, twinsCount);
+    const siblingVariant = shuffle(family.variants[1 - variantIndex].words, internal).slice(0, otherCount);
+    const otherGroups = [];
+    for (let i = 0; i < WORD_GROUPS; i += 1) {
+      if (i === groupIndex) continue;
+      for (const variant of groups[i].variants) {
+        const word = shuffle(variant.words, internal)[0];
+        if (word) otherGroups.push(word);
+      }
+    }
+    const used = new Set([password, ...twins, ...siblingVariant, ...otherGroups]);
+    const fragments = new Set(groups.flatMap((f) => f.variants.map((v) => v.fragment)));
+    const noise = shuffle(pool.filter((word) => !used.has(word) && !groups.some((f) => {
+      const fragment = f.position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
+      return fragments.has(fragment);
+    })), internal);
+    const set = [password, ...twins, ...siblingVariant, ...otherGroups];
+    for (const word of noise) {
+      if (set.length >= wanted) break;
+      if (used.has(word)) continue;
+      set.push(word);
+      used.add(word);
+    }
+    if (set.length !== wanted) continue;
+    if (new Set(set).size !== wanted) continue;
+    const metrics = groupSetMetrics(set, password);
+    // Градиент подсказок: слова СВОЕГО варианта > другой вариант своей
+    // группы > чужие группы и шум. Без этого логика «сначала группа, потом
+    // последовательность» не работает.
+    const variantFragments = family.variants.map((v) => v.fragment);
+    const levelOf = (word) => {
+      if (variantFragments[variantIndex] === (family.position === 'end'
+        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 2;
+      if (variantFragments[1 - variantIndex] === (family.position === 'end'
+        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 1;
+      return 0;
+    };
+    const levels = [[], [], []];
+    for (const word of set) {
+      if (word === password) continue;
+      levels[levelOf(word)].push(positionalLikeness(word, password));
+    }
+    const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
+    const gradient = mean(levels[2]) > mean(levels[1]) && mean(levels[1]) > mean(levels[0]);
+    // Пароль не должен выдаваться «самым похожим на всех» словом доски.
+    const score = (gradient ? 10000 : 0) + (metrics.centralityRank > 3 ? 1000 : 0)
+      + metrics.hintKinds * 10 + metrics.minCandidates;
+    if (!best || score > best.score) {
+      best = { set, password, metrics, score, groupIndex, variantIndex, gradient };
+    }
+    if (gradient && metrics.centralityRank > 3 && metrics.hintKinds >= 3) break;
+  }
+  if (!best) return null;
+  const words = shuffle(best.set, internal);
+  const metrics = groupSetMetrics(words, best.password);
+  return {
+    words,
+    password: best.password,
+    // Патч 503: подсказка может быть L−1 из L, но выводить её надо логикой.
+    likenessCap: wordLength - 1,
+    minAmbiguity: metrics.minCandidates,
+    minShared: Math.min(...words.filter((w) => w !== best.password).map(
+      (w) => sharedLetters(w, best.password),
+    )),
+    centralityRank: metrics.centralityRank,
+    hintKinds: metrics.hintKinds,
+    wordCount: words.length,
+    groupCount: WORD_GROUPS,
+    groupVariants: GROUP_VARIANTS,
+    groups: groups.map((family, index) => ({
+      base: family.base,
+      position: family.position,
+      variants: family.variants.map((v) => v.fragment),
+      winner: index === best.groupIndex,
+    })),
+    winnerVariant: groups[best.groupIndex].variants[best.variantIndex].fragment,
+  };
+};
+
+const buildPasswordSet = (options) => {
+  const tier = clamp(Math.floor(Number(options.effectiveDifficulty) || 0), 0, 5);
+  // D0 остаётся особым случаем: анаграммные семьи и пароль-выброс.
+  if (tier === 0) return buildLegacyPasswordSet(options);
+  const grouped = buildGroupedPasswordSet(options);
+  return grouped || buildLegacyPasswordSet(options);
+};
+
+const buildLegacyPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const likenessCap = MAX_LIKENESS_BY_DIFFICULTY[tier];
   const floor = MIN_AMBIGUITY_BY_DIFFICULTY[tier];
@@ -599,9 +791,14 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
   }
   kinds = shuffle(kinds, rng);
   const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
+  let fullRestoreAvailable = true; // 503: полное восстановление не более 1 раза на доску
   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
     const kind = kinds[groupIndex] || 'word';
-    const effect = bracketEffectFor(stats.science, stats.luck, rng, kind);
+    const rolled = bracketEffectFor(stats.science, stats.luck, rng, kind);
+    const effect = rolled.full && !fullRestoreAvailable
+      ? { words: kind === 'word' ? 1 : 0, attempts: kind === 'attempt' ? 1 : 0, full: false, kind }
+      : rolled;
+    if (effect.full) fullRestoreAvailable = false;
     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
     const length = 3 + randomInt(6, rng);
     const preferredRow = randomInt(board.length / width, rng);
@@ -656,6 +853,9 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     wordLength,
     wordCount: safeWordRanges.length,
     likenessCap: selection.likenessCap,
+    groupCount: selection.groupCount || 0,
+    groupVariants: selection.groupVariants || 0,
+    hintKinds: selection.hintKinds || 0,
     minAmbiguity: selection.minAmbiguity,
     centralityRank: selection.centralityRank,
     bracketSplit: bracketSplitFor(stats.science),
@@ -713,7 +913,9 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
   if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
   if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
   if (action === 'start') {
-    if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
+    const isSameOperator = game.operatorCharacterId === characterId
+      && game.operatorClientId === clientId;
+    if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
     const fresh = createGame({
       config: game,
       operatorClientId: clientId,
@@ -762,7 +964,11 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
     if (!bracket || bracket.used) return { error: 'TERMINAL_INVALID_BRACKET' };
     let next = { ...game, bracketRanges: game.bracketRanges.map((entry) => entry.id === bracket.id ? { ...entry, used: true } : entry) };
     // Патч 497: пакет Науки + удача. Попытки НИКОГДА не выше 4.
-    const effect = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
+    // Патч 503: полное восстановление — не более одного раза на доску.
+    const rolled = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
+    const effect = rolled.full && game.resetUsed
+      ? { ...rolled, full: false, words: 0, attempts: 1 }
+      : rolled;
     for (let i = 0; i < (effect.words || 0); i += 1) {
       const duds = next.wordRanges.filter((entry) => !entry.isPassword && !entry.removed);
       if (duds.length) {
@@ -819,6 +1025,10 @@ module.exports = {
   positionalLikeness,
   sharedLetters,
   buildPasswordSet,
+  buildGroupedPasswordSet,
+  WORD_GROUPS,
+  GROUP_VARIANTS,
+  MAX_GROUP_FRAGMENT,
   characterStats,
   normalizeCharacterSnapshot,
   createGame,

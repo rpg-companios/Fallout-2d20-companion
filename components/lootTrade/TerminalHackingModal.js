@@ -56,18 +56,25 @@ const TerminalHackingModal = ({
     && game.operatorCharacterId === characterId,
   );
   const isSpectator = localMode ? false : Boolean(game && ['playing', 'pendingDigest'].includes(game.status) && !isOperator);
+  // Патч 503: доска может принадлежать другому персонажу. Нажатие «Взломать»
+  // (autoStart) тогда собирает новую доску под текущий лист, а «Смотреть» нет.
+  const boardOfAnotherOperator = Boolean(game && !isOperator && (
+    game.operatorCharacterId !== characterId || (!localMode && game.operatorClientId !== myClientId)
+  ));
   const canHack = Boolean(characterId && (localMode || roomCode) && !terminalState?.locked);
 
   useEffect(() => {
     if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
-    if (['playing', 'pendingDigest'].includes(game?.status)) return;
-    const key = `${roomCode}:${terminal.containerId}:${characterId}`;
+    if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return;
+    const key = `${roomCode}:${terminal.containerId}:${characterId}:${game?.operatorCharacterId || ''}`;
     if (lastAutoStartKey.current === key) return;
     lastAutoStartKey.current = key;
     void doAction('start');
   // State intentionally tracks the terminal's latest game revision.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status]);
+  // State intentionally tracks the terminal's latest game revision.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId]);
 
   useEffect(() => {
     if (game?.status === 'won' && game.scrollUp) {
@@ -308,7 +315,9 @@ const TerminalHackingModal = ({
                   <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
                   <View style={styles.guessesRow}>
                     {game.guesses.map((guess, index) => (
-                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>{`${guess.word}: ${guess.likeness}`}</Text>
+                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>
+                        {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
+                      </Text>
                     ))}
                   </View>
                 </View>

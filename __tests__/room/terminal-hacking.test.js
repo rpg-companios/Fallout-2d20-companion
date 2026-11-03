@@ -104,8 +104,10 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(game.bracketRanges).toHaveLength(4); // Наука 6 -> 4 скобки на ЛЮБОЙ сложности
     expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(2);
     expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(2);
+    // Патч 503: полное восстановление выпадает НЕ БОЛЕЕ одного раза на доску,
+    // даже если удача сработала бы на каждой скобке (rng=()=>0).
+    expect(game.bracketRanges.filter((b) => b.effect.full)).toHaveLength(1);
     for (const bracket of game.bracketRanges) {
-      expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
       expect(bracket.effect.words).toBe(bracket.kind === 'word' ? 1 : 0);
       expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
     }

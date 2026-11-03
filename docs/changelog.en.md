@@ -1,5 +1,41 @@
 # Changelog
 ---
+## Three word groups, operator takeover and one full restore (patch 503)
+
+The owner clarified the board design: "Let there be 3 groups of words with
+some shared combinations for the group. Say endings, on/ion, ly/tly, The/tho.
+First you work out which ending group is right, then inside that group you work
+out whether e.g. ion or on is the right sequence. These need not be endings —
+they can be prefixes or suffixes." A hint as high as `L−1 out of L` is fine as
+long as it requires deduction: extra words make blind guessing poor, while
+finding the right sequence almost guarantees a win within the canonical
+4 attempts.
+
+- `buildGroupedPasswordSet()` builds **three groups** around a shared
+  fragment (2–3 letters) at one position — word end or word start. Each group
+  has **two variants** extending the fragment by one letter (`TION`/`SION`,
+  `NESS`/`LESS`, `THE`/`THO`). The password sits in one variant of one group.
+- Boards provide a **hint gradient**: words of the winning variant score high
+  (up to `L−1/L`), the sibling variant of the same group scores medium, and
+  other groups plus noise score low. The gradient is enforced during board
+  selection and holds across all 160 "difficulty × INT × seed" combinations.
+- Remaining slots are neutral noise, lowering blind-guess odds. Measured at
+  D5 (INT 10): blind 25%, careful deduction 97% without bonuses and 100% at
+  Science 6; at D1 careful 97%, blind 56%. The password is still not the most
+  "central" member of the set.
+- **Operator takeover.** Pressing "Hack" as another character rebuilds the
+  board from their INT/Science/Luck and makes them the operator; the previous
+  operator and everyone else only watch. A repeated `start` by the same
+  operator does not reset progress, so all five players can try in turn.
+- **At most one full restore per board.** Only one bracket can carry a full
+  return to 4 attempts, with a `resetUsed` guard for boards created earlier.
+  Other brackets keep their normal effect; attempts never exceed 4.
+- The hacking window shows hints as `N/M` (matching letters out of word
+  length) instead of a bare number. D0 keeps its anagram families and outlier
+  password.
+
+Installation: `docs/patch-503-install.md`.
+
 ## Export saves are read at any nesting depth (patch 502)
 
 The owner sent a fragment of a real save (`format: rpg-companion-character`,
