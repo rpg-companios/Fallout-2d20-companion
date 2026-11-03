@@ -35,6 +35,10 @@ const MESSAGE = Object.freeze({
   TERMINAL_ISSUE: 'terminal.issue',
   TERMINAL_ACTION: 'terminal.action',
   TERMINAL_STATE: 'terminal.state',
+  // Патч 507: общее хранилище комнаты.
+  STORAGE_STATE: 'storage.state',
+  STORAGE_DEPOSIT: 'storage.deposit',
+  STORAGE_WITHDRAW: 'storage.withdraw',
   ERROR: 'error',
 });
 
@@ -66,6 +70,10 @@ const ERROR_CODE = Object.freeze({
   TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
   TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
   TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
+  // Патч 507: общее хранилище.
+  STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
+  STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
+  STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
 });
 
 const LIMITS = Object.freeze({

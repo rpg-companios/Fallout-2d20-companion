@@ -705,6 +705,45 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        // Патч 507: «Общее хранилище». Кладём/забираем атомарно на сервере и
+        // рассылаем свежий снимок всем участникам комнаты.
+        case MESSAGE.STORAGE_DEPOSIT: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.depositToPartyStorage({
+            code: canonical,
+            clientId,
+            name: payload.name || null,
+            item: payload.item,
+            quantity: payload.quantity,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
+        case MESSAGE.STORAGE_WITHDRAW: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.withdrawFromPartyStorage({
+            code: canonical,
+            clientId,
+            entryId: payload.entryId,
+            quantity: payload.quantity,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = {
+            storage: result.storage,
+            withdrawn: result.withdrawn,
+            requestId: payload.requestId || null,
+          };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
         case MESSAGE.SESSION_OPEN: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) {

@@ -1,0 +1,1904 @@
+diff --git a/.gitignore b/.gitignore
+index f6f0e8e..6e357b0 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -44,3 +44,6 @@ package-lock — копия.json
+ # архив локальных правок перед установкой (патч 431 / 458)
+ .install-backup/
+ .installbackup/
++
++# Патч 507: серверное состояние «Общего хранилища» (не в git)
++.data/
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+new file mode 100644
+index 0000000..32632dc
+--- /dev/null
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -0,0 +1,88 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++  };
++});
++vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++
++import PartyStorageModal from '../../components/lootTrade/PartyStorageModal';
++import useRoomStore from '../../src/room/roomStore';
++
++const texts = (renderer) => renderer.root.findAllByType('Text')
++  .map((node) => String(node.props.children ?? ''));
++
++describe('507: окно «Общее хранилище» в инвентаре', () => {
++  beforeEach(() => {
++    useRoomStore.setState({
++      clientId: 'p1',
++      rooms: {
++        ROOM1: {
++          code: 'ROOM1',
++          role: 'player',
++          partyStorage: {
++            revision: 1,
++            entries: [{
++              entryId: 'st_1',
++              item: { id: 'w1', name: 'Пулемёт', itemType: 'weapon' },
++              name: 'Пулемёт',
++              itemType: 'weapon',
++              quantity: 1,
++            }],
++          },
++        },
++      },
++    });
++  });
++
++  it('показывает фиксированное название и общие вещи', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <PartyStorageModal
++          visible
++          inventoryItems={[{ id: 'i1', name: 'Аптечка', itemType: 'chem' }]}
++          onClose={() => {}}
++          onDepositLocal={() => {}}
++          onWithdrawLocal={() => {}}
++        />,
++      );
++      await Promise.resolve();
++    });
++    const all = texts(renderer);
++    expect(all.some((t) => t.includes('Общее хранилище'))).toBe(true);
++    expect(all.some((t) => t.includes('Пулемёт'))).toBe(true);
++    expect(all.some((t) => t.includes('Аптечка'))).toBe(true);
++    expect(all.some((t) => t.includes('Положить'))).toBe(true);
++    expect(all.some((t) => t.includes('Забрать'))).toBe(true);
++    // Настройки имени нет.
++    expect(all.some((t) => t.toLowerCase().includes('переименовать'))).toBe(false);
++    await act(async () => renderer.unmount());
++  });
++
++  it('без подключённой комнаты честно говорит об этом', async () => {
++    useRoomStore.setState({ rooms: {} });
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <PartyStorageModal visible onClose={() => {}} />,
++      );
++      await Promise.resolve();
++    });
++    expect(texts(renderer).some((t) => t.includes('Нет подключённой комнаты'))).toBe(true);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/party-storage-507.test.js b/__tests__/room/party-storage-507.test.js
+new file mode 100644
+index 0000000..8323d57
+--- /dev/null
++++ b/__tests__/room/party-storage-507.test.js
+@@ -0,0 +1,142 @@
++// Приёмочный тест 507, шаг 1 дизайна: «Общее хранилище» комнаты.
++// Владелец: «Групповой склад ... общий контейнер куда каждый может что-то
++// положить или забрать ... игрока сегодня нет, он придёт и достанет ...
++// хранилище лучше на сервере. Подключился — получил обновления ...
++// Имя настраивать не надо. Это просто "общее хранилище"».
++import { describe, expect, it } from 'vitest';
++import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
++import path from 'node:path';
++import os from 'node:os';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { createFilePartyStorageStore } from '../../server/partyStorageStore.js';
++import { MESSAGE, ERROR_CODE } from '../../server/protocol.js';
++import { ROOM_MESSAGE, ROOM_ERROR } from '../../src/room/roomProtocol.ts';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const ITEM = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
++
++const setup = (extra = {}) => {
++  const registry = createRoomRegistry({ now: () => 1000, ...extra });
++  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
++  return { registry, room };
++};
++
++describe('507: общее хранилище на сервере', () => {
++  it('положить/забрать атомарно, ревизия растёт, снимок уходит в room.state', () => {
++    const { registry, room } = setup();
++    const dep = registry.depositToPartyStorage({
++      code: room.code, clientId: 'p1', item: ITEM, quantity: 2,
++    });
++    expect(dep.error).toBeUndefined();
++    expect(dep.entry.name).toBe('Пулемёт');
++    expect(dep.entry.quantity).toBe(2);
++    expect(dep.storage.revision).toBe(1);
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(1);
++
++    const half = registry.withdrawFromPartyStorage({
++      code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 1,
++    });
++    expect(half.withdrawn.quantity).toBe(1);
++    expect(half.storage.entries[0].quantity).toBe(1);
++    expect(half.storage.revision).toBe(2);
++
++    const rest = registry.withdrawFromPartyStorage({
++      code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 99,
++    });
++    expect(rest.withdrawn.quantity).toBe(1);
++    expect(rest.storage.entries).toHaveLength(0);
++    expect(registry.withdrawFromPartyStorage({
++      code: room.code, clientId: 'p2', entryId: dep.entry.entryId,
++    }).error).toBe(ERROR_CODE.STORAGE_ENTRY_NOT_FOUND);
++  });
++
++  it('Мастер может положить, но не может забрать чужое', () => {
++    const { registry, room } = setup();
++    const dep = registry.depositToPartyStorage({
++      code: room.code, clientId: 'gm-1', item: ITEM, quantity: 1,
++    });
++    expect(dep.error).toBeUndefined();
++    expect(registry.withdrawFromPartyStorage({
++      code: room.code, clientId: 'gm-1', entryId: dep.entry.entryId,
++    }).error).toBe(ERROR_CODE.STORAGE_FORBIDDEN);
++    expect(registry.getPartyStorage(room.code).entries).toHaveLength(1);
++  });
++
++  it('плохие данные и чужая комната отклоняются', () => {
++    const { registry, room } = setup();
++    expect(registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: null, quantity: 1 }).error)
++      .toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
++    expect(registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: -5 }).error)
++      .toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
++    expect(registry.depositToPartyStorage({ code: 'NO-ROOM', clientId: 'p1', item: ITEM, quantity: 1 }).error)
++      .toBe(ERROR_CODE.ROOM_NOT_FOUND);
++  });
++
++  it('канон переживает рестарт: новый реестр читает файл', () => {
++    const dir = mkdtempSync(path.join(os.tmpdir(), 'party-storage-507-'));
++    const file = path.join(dir, 'storage.json');
++    try {
++      const first = createRoomRegistry({ now: () => 1000, partyStorageStore: createFilePartyStorageStore({ filePath: file }) });
++      const { room } = first.createRoom({ clientId: 'gm-1', name: 'Стол' });
++      first.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++      first.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++      const dep = first.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 3 });
++      expect(dep.storage.entries).toHaveLength(1);
++
++      // «Сервер перезапустили»: новый реестр, тот же файл, комната с тем же кодом.
++      const second = createRoomRegistry({ now: () => 2000, partyStorageStore: createFilePartyStorageStore({ filePath: file }) });
++      const restored = second.createRoom({ clientId: 'gm-1', name: 'Стол', requestedCode: room.code });
++      expect(second.getState(restored.room.code).partyStorage.entries[0]).toMatchObject({
++        name: 'Пулемёт', quantity: 3,
++      });
++    } finally {
++      rmSync(dir, { recursive: true, force: true });
++    }
++  });
++});
++
++describe('507: протокол, словари и плашка', () => {
++  it('константы зеркалятся в клиенте', () => {
++    expect(ROOM_MESSAGE.STORAGE_STATE).toBe(MESSAGE.STORAGE_STATE);
++    expect(ROOM_MESSAGE.STORAGE_DEPOSIT).toBe(MESSAGE.STORAGE_DEPOSIT);
++    expect(ROOM_MESSAGE.STORAGE_WITHDRAW).toBe(MESSAGE.STORAGE_WITHDRAW);
++    expect(ROOM_ERROR.STORAGE_FORBIDDEN).toBe(ERROR_CODE.STORAGE_FORBIDDEN);
++    expect(ROOM_ERROR.STORAGE_ENTRY_NOT_FOUND).toBe(ERROR_CODE.STORAGE_ENTRY_NOT_FOUND);
++  });
++
++  it('плашка во всю ширину под «Добыча»/«Торговля», название не настраивается', () => {
++    const screen = read('components/screens/InventoryScreen/InventoryScreen.js');
++    const styles = read('styles/InventoryScreen.styles.js');
++    expect(screen).toContain('testID="shared-storage-button"');
++    expect(screen).toContain("tInventory('screen.actions.sharedStorage')");
++    expect(screen).toContain('<PartyStorageModal');
++    expect(styles).toContain('sharedStorageCell');
++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json'));
++    expect(ru.actions.sharedStorage).toBe('Общее хранилище');
++    expect(en.actions.sharedStorage).toBe('Shared storage');
++    expect(ru.storage.title).toBe('Общее хранилище');
++    expect(en.storage.title).toBe('Shared storage');
++    // Настройки имени нет ни в словарях, ни в модалке.
++    const modal = read('components/lootTrade/PartyStorageModal.js');
++    expect(modal).not.toContain('rename');
++    expect(modal).not.toContain('setName');
++  });
++
++  it('клиент обновляет состояние из STORAGE_STATE', () => {
++    const store = read('src/room/roomStore.ts');
++    expect(store).toContain('ROOM_MESSAGE.STORAGE_STATE');
++    expect(store).toContain('partyStorage: storage');
++    expect(store).toContain('depositToPartyStorage');
++    expect(store).toContain('withdrawFromPartyStorage');
++  });
++
++  it('файл состояния не попадает в git', () => {
++    expect(read('.gitignore')).toContain('.data/');
++  });
++});
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index 6b62204..21a294b 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -519,6 +519,49 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  // Патч 507: «Общее хранилище». Состояние приходит при подключении,
++  // изменения рассылаются всем; Мастер может положить, но не забрать.
++  it('507: общее хранилище синхронизируется по WS', async () => {
++    await withServer(async (port, app) => {
++      const gm = makeClient(port, 'gm-507');
++      const p1 = makeClient(port, 'p-507-1');
++      const p2 = makeClient(port, 'p-507-2');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Storage 507' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
++      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      // «Подключился — получил обновления»: склад уже в состоянии комнаты.
++      expect(joined.payload.partyStorage).toMatchObject({ revision: 0, entries: [] });
++      await p2.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
++      await p2.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++
++      const item = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
++      const depReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item, quantity: 2, name: 'Пулемёт' }, code);
++      const dep = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === depReq);
++      expect(dep.payload.storage.entries[0]).toMatchObject({ name: 'Пулемёт', quantity: 2 });
++      const broadcast = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
++      expect(broadcast.payload.storage.entries).toHaveLength(1);
++
++      const entryId = dep.payload.storage.entries[0].entryId;
++      const wReq = await p2.send(MESSAGE.STORAGE_WITHDRAW, { entryId, quantity: 1 }, code);
++      const withdrawn = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === wReq);
++      expect(withdrawn.payload.withdrawn.quantity).toBe(1);
++      expect(withdrawn.payload.storage.entries[0].quantity).toBe(1);
++      expect(app.registry.getPartyStorage(code).entries[0].quantity).toBe(1);
++
++      // Мастер не забирает чужое.
++      const gmReq = await gm.send(MESSAGE.STORAGE_WITHDRAW, { entryId }, code);
++      const denied = await gm.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === gmReq);
++      expect(denied.payload.code).toBe('STORAGE_FORBIDDEN');
++      expect(app.registry.getPartyStorage(code).entries).toHaveLength(1);
++
++      gm.close(); p1.close(); p2.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+new file mode 100644
+index 0000000..6b49363
+--- /dev/null
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -0,0 +1,175 @@
++/**
++ * Патч 507 — «Общее хранилище» комнаты (шаг 1 дизайна, без ключевых записей).
++ *
++ * Простая модалка: слева предметы текущего персонажа («Положить»), справа
++ * общий склад комнаты («Забрать»). Канон — сервер; локальный инвентарь меняют
++ * колбэки, переданные из InventoryScreen, и только ПОСЛЕ успешного ответа.
++ *
++ * Название не настраивается: это просто «Общее хранилище».
++ */
++
++import React, { useMemo, useState } from 'react';
++import {
++  Modal,
++  View,
++  Text,
++  TouchableOpacity,
++  ScrollView,
++  StyleSheet,
++  Platform,
++} from 'react-native';
++import useRoomStore from '../../src/room/roomStore';
++import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
++import { showRawAlert } from '../alerts/alertService';
++import { useLocale } from '../../i18n/locale';
++
++// В сейве/сторе предмета есть служебные поля, которые не должны уезжать на
++// сервер: уникальные id экземпляра, экипировка, ключи стаканья и т.п.
++const pickItemSnapshot = (item) => {
++  const src = item || {};
++  const { uniqueId, equipInstanceId, stackKey, equipped, locked, appliedMods, ...rest } = src;
++  return {
++    ...rest,
++    name: String(src.name || 'Предмет'),
++    itemType: String(src.itemType || 'misc'),
++    quantity: 1,
++    equipped: false,
++    locked: false,
++  };
++};
++
++const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLocal, onWithdrawLocal }) => {
++  useLocale();
++  const rooms = useRoomStore((state) => state.rooms);
++  const [busy, setBusy] = useState(false);
++
++  const room = useMemo(() => {
++    const entry = Object.entries(rooms || {}).find(([, value]) => value?.role === 'player');
++    if (!entry) return null;
++    return { code: entry[0], storage: entry[1].partyStorage || { revision: 0, entries: [] } };
++  }, [rooms]);
++
++  const entries = room?.storage?.entries || [];
++
++  const deposit = async (item) => {
++    if (!room || busy) return;
++    setBusy(true);
++    try {
++      await useRoomStore.getState().depositToPartyStorage({
++        code: room.code,
++        item: pickItemSnapshot(item),
++        quantity: 1,
++        name: item?.name,
++      });
++      // Списываем у себя только после подтверждения сервера.
++      if (item?.id) onDepositLocal?.(item.id, 1);
++    } catch (error) {
++      showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const withdraw = async (entry) => {
++    if (!room || busy) return;
++    setBusy(true);
++    try {
++      const result = await useRoomStore.getState().withdrawFromPartyStorage({
++        code: room.code,
++        entryId: entry.entryId,
++        quantity: entry.quantity,
++      });
++      if (result?.withdrawn) {
++        onWithdrawLocal?.(result.withdrawn.item, result.withdrawn.quantity);
++      }
++    } catch (error) {
++      showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  if (!visible) return null;
++
++  return (
++    <Modal visible transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={onClose}>
++      <View style={styles.backdrop}>
++        <View style={styles.window}>
++          <View style={styles.header}>
++            <Text style={styles.title}>{tInventory('screen.storage.title')}</Text>
++            <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={onClose}>
++              <Text style={styles.closeText}>×</Text>
++            </TouchableOpacity>
++          </View>
++
++          {!room ? (
++            <Text style={styles.hint}>{tInventory('screen.storage.noRoom')}</Text>
++          ) : (
++            <View style={styles.columns}>
++              <View style={styles.column}>
++                <Text style={styles.columnTitle}>{tInventory('screen.storage.yourItems')}</Text>
++                <ScrollView style={styles.list}>
++                  {(inventoryItems || []).length === 0
++                    ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
++                    : (inventoryItems || []).map((item, index) => (
++                      <TouchableOpacity
++                        key={item.id || `${item.name}-${index}`}
++                        style={styles.row}
++                        disabled={busy}
++                        onPress={() => void deposit(item)}
++                      >
++                        <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
++                        <Text style={styles.rowAction}>{tInventory('screen.storage.deposit')}</Text>
++                      </TouchableOpacity>
++                    ))}
++                </ScrollView>
++              </View>
++
++              <View style={styles.column}>
++                <Text style={styles.columnTitle}>{tInventory('screen.storage.title')}</Text>
++                <ScrollView style={styles.list}>
++                  {entries.length === 0
++                    ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
++                    : entries.map((entry) => (
++                      <TouchableOpacity
++                        key={entry.entryId}
++                        style={styles.row}
++                        disabled={busy}
++                        onPress={() => void withdraw(entry)}
++                      >
++                        <Text style={styles.rowName} numberOfLines={1}>
++                          {`${entry.name} × ${entry.quantity}`}
++                        </Text>
++                        <Text style={styles.rowAction}>{tInventory('screen.storage.withdraw')}</Text>
++                      </TouchableOpacity>
++                    ))}
++                </ScrollView>
++              </View>
++            </View>
++          )}
++
++          <Text style={styles.hint}>{tInventory('screen.storage.hint')}</Text>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 },
++  window: { width: '100%', maxWidth: 720, maxHeight: '86%', backgroundColor: '#0b140d', borderWidth: 1.5, borderColor: '#42784a', borderRadius: 6, padding: 14 },
++  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: '#29482d', paddingBottom: 9, marginBottom: 10 },
++  title: { color: '#93d17a', fontSize: 16, fontWeight: '800' },
++  closeButton: { paddingHorizontal: 10, paddingVertical: 2 },
++  closeText: { color: '#bdc8b7', fontSize: 22 },
++  columns: { flexDirection: 'row', gap: 10, minHeight: 180 },
++  column: { flex: 1, borderWidth: 1, borderColor: '#29482d', borderRadius: 5, padding: 8 },
++  columnTitle: { color: '#8da38b', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, fontFamily: 'monospace' },
++  list: { maxHeight: 320 },
++  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderColor: '#1c2d20' },
++  rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
++  rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
++  hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
++});
++
++export default PartyStorageModal;
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index e22f5db..c6bb848 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -6,6 +6,7 @@ import { selectCarryWeight } from '../../../src/store/selectors';
+ import { selectItemsByEquipped } from '../../../src/store/selectors';
+ import { useShallow } from 'zustand/react/shallow';
+ import CapsModal from './modals/CapsModal';
++import PartyStorageModal from '../../../components/lootTrade/PartyStorageModal';
+ import SellItemModal from './modals/SellItemModal';
+ import AddItemModal from './modals/AddItemModal';
+ import BuyItemModal from './modals/BuyItemModal';
+@@ -262,6 +263,8 @@ const InventoryScreen = () => {
+   const [isSellModalVisible, setIsSellModalVisible] = useState(false);
+   const [selectedItemForSale, setSelectedItemForSale] = useState(null);
+   const [isAddItemModalVisible, setAddItemModalVisible] = useState(false);
++  // Патч 507: «Общее хранилище» комнаты.
++  const [isPartyStorageVisible, setPartyStorageVisible] = useState(false);
+   const [isCraftModalVisible, setCraftModalVisible] = useState(false);
+   const [itemSelectionMode, setItemSelectionMode] = useState('loot');
+   const [isBuyItemModalVisible, setIsBuyItemModalVisible] = useState(false);
+@@ -1974,26 +1977,37 @@ const InventoryScreen = () => {
+   };
+ 
+   const renderFooter = () => (
+-  <View style={styles.footerActionsRow}>
+-    <TouchableOpacity
+-      style={styles.addActionCell}
+-      onPress={() => {
+-        setItemSelectionMode('loot');
+-        setAddItemModalVisible(true);
+-      }}
+-    >
+-      <Text style={styles.addActionIcon}>+</Text>
+-      <Text style={styles.addActionLabel}>{tInventory('screen.actions.addLoot')}</Text>
+-    </TouchableOpacity>
++  <View>
++    <View style={styles.footerActionsRow}>
++      <TouchableOpacity
++        style={styles.addActionCell}
++        onPress={() => {
++          setItemSelectionMode('loot');
++          setAddItemModalVisible(true);
++        }}
++      >
++        <Text style={styles.addActionIcon}>+</Text>
++        <Text style={styles.addActionLabel}>{tInventory('screen.actions.addLoot')}</Text>
++      </TouchableOpacity>
++      <TouchableOpacity
++        style={styles.addActionCell}
++        onPress={() => {
++          setItemSelectionMode('buy');
++          setAddItemModalVisible(true);
++        }}
++      >
++        <Text style={styles.addActionIcon}>+</Text>
++        <Text style={styles.addActionLabel}>{tInventory('screen.actions.buyItems')}</Text>
++      </TouchableOpacity>
++    </View>
++    {/* Патч 507: та же зелёная область, но во всю ширину, под двумя кнопками. */}
+     <TouchableOpacity
+-      style={styles.addActionCell}
+-      onPress={() => {
+-        setItemSelectionMode('buy');
+-        setAddItemModalVisible(true);
+-      }}
++      testID="shared-storage-button"
++      accessibilityRole="button"
++      style={styles.sharedStorageCell}
++      onPress={() => setPartyStorageVisible(true)}
+     >
+-      <Text style={styles.addActionIcon}>+</Text>
+-      <Text style={styles.addActionLabel}>{tInventory('screen.actions.buyItems')}</Text>
++      <Text style={styles.sharedStorageLabel}>{tInventory('screen.actions.sharedStorage')}</Text>
+     </TouchableOpacity>
+   </View>
+ );
+@@ -2131,6 +2145,17 @@ const InventoryScreen = () => {
+             onClose={() => setRepairTarget(null)}
+           />
+         )}
++        <PartyStorageModal
++          visible={isPartyStorageVisible}
++          inventoryItems={inventoryItems}
++          onClose={() => setPartyStorageVisible(false)}
++          onDepositLocal={(itemId, quantity) => {
++            useCharacterStore.getState().adjustItemQuantity(itemId, -quantity);
++          }}
++          onWithdrawLocal={(item, quantity) => {
++            handleAddItem(item, quantity, 'storage');
++          }}
++        />
+         <BuyItemModal
+           visible={isBuyItemModalVisible}
+           onClose={() => {
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 719dc22..b1209a0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,37 @@
+ # Changelog
+ ---
++## Shared storage for the room (patch 507)
++
++Step one of `docs/key-items-and-gates-design.md`. The owner: "A party stash ...
++a shared container where anyone can put something or take something ... the
++group found a machine gun but needs to give it to a player who is absent
++today". Later: "Storage is better on the server. Connect — receive updates",
++"The name does not need to be customizable. It is simply shared storage",
++"What belongs to the players is theirs".
++
++- **Server canon.** `server/partyStorageStore.js` persists state to
++  `.data/party-storage.json` (excluded from git). A room restores it on
++  creation; `roomSnapshot` delivers the storage with the room state, so
++  "connect — receive updates" needs no extra request. Tests run the registry
++  without the file store, in memory.
++- **Deposit / withdraw.** New messages `storage.deposit`, `storage.withdraw`
++  and `storage.state`; operations are atomic, quantities validated, revision
++  increments, and the fresh snapshot is broadcast to all members. Errors:
++  `STORAGE_BAD_MESSAGE`, `STORAGE_ENTRY_NOT_FOUND`, `STORAGE_FORBIDDEN`.
++- **Party ownership.** The GM can deposit but cannot withdraw: `withdraw` is
++  allowed only for members with the player role. No recall, no removal of
++  others' items.
++- **Interface.** A full-width green area "Shared storage" now sits below the
++  green "Add loot" / "Buy items" cells in the inventory. The modal shows
++  character items and shared items; the local inventory changes only after a
++  successful server reply.
++- Paired RU/EN labels; the name is not customizable.
++
++This is step one only: key records, `requires`, gates and the lock-picking
++mini-game stay in the design document and will ship as separate patches.
++
++Installation: `docs/patch-507-install.md`.
++
+ ## GM notice, one-time terminal access and leaving a location (patch 506)
+ 
+ The owner tested 505 in two tabs of one browser: "in the GM tab I do not see
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 33f4e1f..385f2e9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,40 @@
+ # История изменений
+ 
+ ---
++## Общее хранилище комнаты (патч 507)
++
++Первый шаг внедрения дизайна `docs/key-items-and-gates-design.md`. Владелец:
++«Групповой склад ... общий контейнер куда каждый может что-то положить или
++забрать ... Нашла группа пулемёт, а отдать надо другому игроку, которого
++сегодня нет». Позже уточнил: «Хранилище лучше на сервере. Подключился —
++получил обновления», «Имя настраивать не надо. Это просто "общее
++хранилище"», «То, что принадлежит игрокам — это их».
++
++- **Канон на сервере.** `server/partyStorageStore.js` пишет состояние в
++  служебный файл `.data/party-storage.json` (в git не попадает). Комната
++  подтягивает сохранённое при создании; `roomSnapshot` отдаёт склад вместе с
++  состоянием комнаты, поэтому «подключился — получил обновления» работает без
++  отдельного запроса. Тесты запускают реестр без файлового store и работают
++  в памяти.
++- **Положить / забрать.** Новые сообщения `storage.deposit`,
++  `storage.withdraw` и `storage.state`; операции атомарны, количество
++  проверяется, ревизия растёт, свежий снимок рассылается всем участникам.
++  Ошибки `STORAGE_BAD_MESSAGE`, `STORAGE_ENTRY_NOT_FOUND`,
++  `STORAGE_FORBIDDEN`.
++- **Собственность партии.** Мастер может положить, но не может забрать:
++  `withdraw` разрешён только участникам с ролью игрока. Отзыва и удаления
++  чужого нет.
++- **Интерфейс.** В инвентаре под зелёными кнопками «Добавить добычу» /
++  «Купить предметы» появилась такая же зелёная область во всю ширину —
++  «Общее хранилище». Модалка показывает предметы персонажа и общие вещи;
++  локальный инвентарь меняется только после успешного ответа сервера.
++- Парные RU/EN подписи, название не настраивается.
++
++Это только шаг 1: ключевые записи, `requires`, ворота и мини-игра замков
++остаются в дизайн-документе и будут внедряться отдельными патчами.
++
++Установка: `docs/patch-507-install.md`.
++
+ ## Уведомление Мастера, одноразовый доступ и выход из локации (патч 506)
+ 
+ Владелец проверил 505 в одном браузере в двух вкладках: «я во вкладке мастера
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 1f6bffc..3aa2b30 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,6 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
++- **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage lives on the server, survives a restart and arrives with the room state on connect. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 44e8a13..db52102 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,6 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
++- **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище живёт на сервере, переживает перезапуск и приходит вместе с состоянием комнаты при подключении. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+new file mode 100644
+index 0000000..be2af05
+--- /dev/null
++++ b/docs/key-items-and-gates-design.md
+@@ -0,0 +1,382 @@
++# Ключи-предметы, ворота и групповой склад
++
++**Статус: дизайн-документ, внедряется последовательно.** Патч **507**
++реализовал **шаг 1** (§8): «Общее хранилище» без ключевых записей —
++серверный канон, `deposit`/`withdraw`, выдача состояния при подключении и
++зелёная плашка в инвентаре. Название фиксированное: «Общее хранилище».
++Шаги 2–5 (ключи, `requires`, ворота, мини-игра замков) пока не реализованы.
++Все договорённости ниже сохранены как цели следующих патчей.
++
++**Обновление 1:** по решению владельца ключевой предмет перенесён из
++инвентаря персонажа **в состояние комнаты**. Причина: «если персонаж с ключом
++выбыл из игры, остальные не остались без него». Ключ — объект
++кампании/локации/движка, а не ценный личный предмет вроде модифицированного
++оружия.
++
++**Обновление 2:** владелец предложил **«Групповой склад»** — общий контейнер,
++привязанный к серверной комнате, с кнопкой рядом с «Добыча» и «Торговля».
++Ключевые предметы попадают туда же. Это снимает сразу две задачи: ключ можно
++не получить (не полезли в сейф), и обычный предмет можно передать игроку,
++которого сегодня нет. Все разделы ниже приведены к этой модели.
++
++**Обновление 3:** три решения владельца зафиксированы.
++- **Добытое игроками неприкосновенно.** «Мастер ошибся — сам виноват»:
++  отзыва ключа и изъятия вещей со склада нет. Мастер создаёт новую запись
++  или меняет `requires` контейнера под другой `id`.
++- **Канон хранилища — сервер.** «Подключился — получил обновления».
++- **Кнопка склада** — зелёная плашка во всю ширину под «Добыча»/«Торговля»
++  в пользовательском инвентаре, того же вида, что существующие ячейки.
++
++Контекст: патроны 493–506 дали терминалы, локации, общую доску взлома,
++решение Мастера после провала, фиксацию победы, одноразовый доступ и выход
++из локации. Этот документ описывает следующий слой, не отменяя ничего из
++сделанного.
++
++---
++
++## 1. Что хотим, простыми словами
++
++1. **Ключевая запись.** Мастер создаёт запись, даёт ей имя и (по желанию)
++   описание. Это может быть «Ключ от склада» без единого слова текста, а может
++   быть «Записка наёмника» с целой мини-историей вроде «нажать левый верхний
++   кирпич». Таких записей много, у каждой свой `id`.
++2. **Она привязана не к типу, а к конкретной точке.** Ключ от склада открывает
++   именно этот склад, а не «все сундуки». Одна запись может подходить к
++   нескольким локациям, терминалам, сундукам или торговцам.
++3. **Её действие — считать проверку уже пройденной.** Терминал/замок
++   считается взломанным, мини-игра **не запускается вообще**; запертый
++   сундук/торговец считается открытым. Не «дать попытку», не «подсказать»,
++   не «пропустить ход», а заменить сам факт проверки.
++4. **Ворота.** Контейнеры зависят друг от друга: сундук доступен только
++   после взлома терминала, вход в локацию — только после взлома замка.
++5. **Групповой склад.** Общий контейнер комнаты: каждый игрок может что-то
++   положить и что-то забрать. Нашла группа пулемёт, а отдать надо игроку,
++   которого сегодня нет — кладут на склад, он придёт и достанет. Сами игроки
++   объясняют это в игре как багажник машины или брамина с грузом, который
++   всегда ходит с партией.
++6. **В перспективе** — мини-игра взлома замков. Сейчас её нет, но контракт
++   под неё закладывается сразу.
++
++### Пример, который задал владелец
++
++> Ключ может лежать в сейфе со сложным электронным замком. Игроки решат не
++> связываться с сейфом и ключ не получат, а значит и использовать не смогут.
++
++Это важнее, чем кажется: **добыча ключа должна быть необязательной**. Если
++партия обошла сейф, ключ не появился на складе, `requires` не выполнен, и
++терминал за сейфом остаётся закрытым. Никакого « ключ всё равно у Мастера,
++значит дверь открыта ».
++
++---
++
++## 2. Решения владельца (зафиксировано)
++
++| Вопрос | Решение |
++| --- | --- |
++| Ключ одноразовый? | **Нет галочки «одноразовый».** Ключ не расходуется и не списывается. Требование конкретного ключа пишется **в зависимости у контейнера**. «Сколько читателей, столько и раз и срабатывания»: каждый игрок партии получает доступ; счётчика использований нет. |
++| Сколько эффектов у ключа? | **Унифицировать.** Одна функция — «считать, что терминал/замок взломан, игра не запускалась». Для сундука и торговца это тот же эффект: запертость снимается. |
++| Ворота общие или личные? | **Общие на комнату.** Взломал один — открылось для всей партии. Состояние хранится в комнате, а не во вкладке браузера. |
++| Уведомлять Мастера об автоуспехе? | **Нет.** Мастер сам создал ключ, сам связал его с контейнером, сам решил, сколько он работает, и сам выдал его игрокам (в том числе внутри другого контейнера). Дополнительное уведомление ему не нужно. Это осознанное отличие от 505/506, где уведомление о взломе было нужно, потому что результат появлялся *неожиданно* для Мастера. |
++| Где хранится ключ? | **В групповом складе комнаты, а не в инвентаре персонажа.** Ключ — предмет кампании/локации/движка. Выбытие персонажа никак не влияет на доступ партии. |
++| Где склад? | **Общий контейнер, привязанный к серверной комнате**. Кнопка — зелёная плашка во всю ширину под «Добыча»/«Торговля» в пользовательском инвентаре. Каждый игрок может положить и забрать. |
++| Можно ли отозвать ключ / забрать чужое? | **Нет.** «То, что принадлежит игрокам — это их». Мастер управляет миром (создаёт записи, правит `requires`), но не имуществом партии. При ошибке — новая запись с новым `id` или правка контейнера; старый ключ просто остаётся лежать. |
++| Где канон склада? | **На сервере.** Подключился к комнате — получил актуальное состояние. Клиент не хранит свою копию как источник истины. |
++
++### Направление связи — важно
++
++Связь идёт **от контейнера к ключу**, а не от ключа к списку контейнеров:
++
++```
++ключ:      id, название, описание              ← ничего не знает о дверях
++контейнер: requires: [ { keyItemId: 'key_42' } ] ← знает, что ему нужно
++склад:     entries: [ ключ key_42, пулемёт … ]  ← знает, что партия добыла
++```
++
++Одна запись может открывать хоть десять точек: чтобы добавить одиннадцатую,
++Мастер правит новую дверь, а не переиздаёт ключ. Переименование ключа не рвёт
++связи.
++
++---
++
++## 3. Модель данных (черновая, без реализации)
++
++### 3.1 Ключевая запись
++
++| Поле | Смысл |
++| --- | --- |
++| `id` | устойчивый идентификатор, аналог `containerId` / `makeContainerId` |
++| `name` | «Ключ от склада», «Записка наёмника» |
++| `description` | произвольный текст с уже существующими тегами; **может быть пустым** |
++| `roomCode` | комната-владелец, по образцу `gm_containers.room_code` |
++| `data` | остальные поля в JSON (как `gm_containers.data`) |
++
++Ключ **не знает**, где применяется. У него нет владельца, веса, цены,
++количества и экземпляров. Он не переходит в личный инвентарь, не продаётся и
++не выбрасывается.
++
++### 3.2 Два состояния: «существует» и «добыт партией»
++
++Если проверять только «Мастер создал запись», все связанные контейнеры
++откроются в момент создания и исчезнет момент находки. Поэтому:
++
++1. **Создан** — запись есть в справочнике комнаты, партия её не видела.
++2. **Добыт партией** — запись **лежит на групповом складе**.
++
++Способы перевести во второе состояние:
++- игроки открыли сейф и забрали ключ → он появляется на складе, а **не в
++  инвентаре забравшего**;
++- Мастер положил ключ на склад напрямую;
++- позже — событие мини-игры замков, если Мастер так настроил.
++
++Именно «добыт» проверяет `requires`. Склад сам становится реестром добытых
++ключей: отдельный `discoveredKeyItemIds` не нужен, достаточно «на складе есть
++запись с таким `id`». Повторная выдача идемпотентна, уведомлений нет.
++
++**Запись на складе самодостаточна.** Она хранит своё имя и описание в самой
++себе, а не только ссылку на справочник Мастера: раз добытое нельзя отозвать,
++удаление или правка исходной записи в админке не должна «погасить» ключ у
++партии. Справочник — это шаблон для создания; склад — уже принадлежащая
++партии копия.
++
++### 3.3 Требование у контейнера
++
++У любого контейнера (`loot`, `merchant`, `hub`, `terminal`, будущий `lock`)
++появляется список условий:
++
++```
++requires: [
++  { kind: 'keyItem', keyItemId: 'key_42' },        // ключ добыт и лежит на складе
++  { kind: 'hacked',  containerId: 'cnt_term_1' },  // другое событие
++]
++```
++
++- Условия проверяются **на сервере** по состоянию комнаты. Клиент не решает,
++  открыт контейнер или нет: иначе повторится история 506, когда признак
++  доступа жил в окне и «оживал» после закрытия.
++- Несколько условий в одном списке — «все должны выполниться». Если позже
++  понадобится «любое из», это отдельный флаг, не новая модель.
++- Для узла локации используется уже существующий `locked` и ошибка
++  `CONTAINER_LOCKED`; новую ошибку изобретать не надо.
++
++### 3.4 Событие «пройдено»
++
++Единое нейтральное событие, условно `hacked`:
++
++```
++{ containerId, kind: 'terminal' | 'lock' | 'loot' | 'merchant' | 'hub',
++  byCharacterId, at }
++```
++
++Источники: победа в мини-игре терминала (`won`), добытый ключ, явное действие
++Мастера. Позже добавится мини-игра замков — и больше ничего менять не
++потребуется. Событие идемпотентно: повторное обращение к двери не создаёт
++новую запись и не шлёт уведомление.
++
++### 3.5 Групповой склад
++
++**Суть.** Один контейнер на комнату, общий для всех игроков. Не личный
++инвентарь, не вкладка браузера, не «чей-то» сундук. Источник правды —
++состояние комнаты на сервере, рядом с `accessId`, `terminalStates`,
++`closedByClientIds`.
++
++**Два класса содержимого с разными правилами** — ключевое решение:
++
++| Класс | Пример | Положить | Забрать | Прочитать |
++| --- | --- | --- | --- | --- |
++| **Переносимый предмет** | пулемёт, броня, крышки | да | **да**, уходит в личный инвентарь забравшего | обычная карточка предмета |
++| **Ключевая запись** | «Ключ от склада», «Записка наёмника» | да (при находке / выдаче Мастером) | **нет**, остаётся общим | да, карточка с описанием |
++
++Иначе возникнет contradiction: ключ «не предмет персонажа», но его можно
++забрать — и он снова станет чьим-то личным. Поэтому ключ можно только
++прочитать. Это и есть «сколько читателей, столько и срабатываний».
++
++**Операции.**
++
++- `deposit` — положить предмет из личного инвентаря на склад;
++- `withdraw` — забрать переносимый предмет со склада в личный инвентарь;
++- `read` — открыть карточку ключевой записи, ничего не меняя.
++
++Все три идут через сервер. Количества меняются **атомарно**, чтобы два игрока
++не забрали один и тот же пулемёт: в проекте уже есть образцы
++`applyAtomicLootTake` и `applyAtomicTradeCommit` в
++`server/lootTradeSession.js`.
++
++**Собственность партии.** Мастер может **положить** на склад (выдать ключ,
++подкинуть находку), но не может **забрать, отозвать или удалить** то, что уже
++там лежит. Ошибся `id` — создаёт новую запись или меняет `requires` у
++контейнера; старый ключ спокойно остаётся на складе как «мёртвая» запись,
++ничего не ломая. Операций `withdraw` и `remove` от имени Мастера в контракте
++нет. Это и есть «у него и так все карты на руках»: он правит мир, а не чужой
++багажник.
++
++**Канон — сервер, синхронизация при подключении.** Сейчас `roomRegistry`
++держит комнаты в памяти (`new Map()`), и после перезапуска сервиса Node.js
++партии начинаются заново. Для склада это неприемлемо: «игрока сегодня нет,
++он придёт завтра» должно пережить рестарт. Решение: склад хранится **на
++сервере** (персистентно, по `roomCode`), входит в `roomSnapshot` и приходит
++клиенту вместе с состоянием комнаты при `room.join` / переподключении;
++изменения рассылаются всем участникам тем же способом, что `terminal.state`
++и `session.state`. «Подключился — получил обновления» — буквально так.
++`src/lootTrade/gmSessionPersistence.js` остаётся полезным примером фонового
++сохранения остатков, но **не источником истины**: канон не в БД Мастера и не
++в Google Drive.
++
++**Кнопка — точное место.** В пользовательском инвентаре
++`components/screens/InventoryScreen/InventoryScreen.js` функция `renderFooter()`
++рисует строку из двух зелёных ячеек `addActionCell` с надписями
++`screen.actions.addLoot` («Добыча») и `screen.actions.buyItems` («Торговля»);
++стили — `styles/InventoryScreen.styles.js`: `footerActionsRow`,
++`addActionCell` (`rgba(0, 255, 0, 0.1)`, пунктирная рамка, `flex: 1`),
++`addActionIcon`, `addActionLabel`. Новая плашка **«Групповой склад»** — того
++же зелёного вида, но отдельной строкой **во всю ширину под этими двумя**, а не
++третьей ячейкой в ряду. Нажатие открывает окно склада. На плашке уместен
++счётчик содержимого;Окончательный вид уточняется при реализации.
++
++### 3.6 Где живёт правда
++
++В состоянии комнаты на сервере (`roomRegistry` / активная сессия), затем — в
++персистентном хранилище (§3.5). Не в `useState` модалки, не в `localStorage`
++вкладки, **не в листе персонажа**. Это напрямую решает задачу владельца:
++выбытие персонажа не влияет на доступ партии, а отсутствующий игрок находит
++предмет там, где его оставили.
++
++---
++
++## 4. Где игрок видит ключ и склад
++
++Владелец спрашивал: «В инвентаре эти предметы просто лежат с названием. Как
++правильно это делать? Как в играх это делают?» — а затем уточнил, что в
++личном инвентаре их может не быть вовсе.
++
++### Что обычно делают в играх
++
++| Паттерн | Где лежит | Когда применяется |
++| --- | --- | --- |
++| **Key ring / карманный ключ** | в инвентаре персонажа | одиночная игра, один герой |
++| **Общий журнал / улика партии** (party clue, discovered note) | в состоянии сцены или партии | кооператив, настольная партия с Мастером |
++| **Party stash / общий сундук / банк гильдии** | отдельный общий контейнер | передача вещей между игроками, в том числе离线 |
++
++Наш случай объединяет второй и третий: Fallout 2d20, Мастер и несколько
++игроков за одним столом. Находка принадлежит сцене, а вещи — багажнику,
++который «всегда ходит с партией». Это не компромисс, а более точная модель,
++чем карманный ключ.
++
++### Рекомендация для этого проекта
++
++1. **Строка склада = иконка + название + количество.** Для ключевой записи —
++   иконка и название, без количества и без кнопки «Забрать».
++2. **По нажатию — карточка.** Ключевая запись показывает имя и описание
++   (если есть) с рендером уже существующих тегов `**жирный**`, `*курсив*`,
++   списков `- `, `{CD}`, `{CAP}`. Пустое описание → только название, без
++   пустого блока. Переносимый предмет показывает обычную карточку из
++   каталога и кнопку «Забрать».
++3. **Первое прочтение — сразу при находке.** Открыли сейф, достали «Записку
++   наёмника» → карточка с текстом, запись ушла на склад. Дальше её может
++   открыть любой. Текст не парсится игрой: «нажать левый верхний кирпич» —
++   подсказка человеку, а не условие для сервера.
++4. **Никакой кнопки «Использовать».** Игрок открывает терминал → сервер видит
++   ключ на складе → не запускает мини-игру, сразу `hacked`. Без алерта
++   «ключ использован» и без уведомления Мастеру.
++5. **`resolveItem` нужен, но не для ключей.** Обычные предметы склада — это
++   каталожные записи (`id`, `itemType`, `quantity`), им нужны имя, вес и цена.
++   Ключевые записи через `resolveItem` **не проходят**: у них собственный
++   справочник комнаты. Это уточнение к прошлой версии документа, где
++   `resolveItem` был вычеркнут целиком.
++6. **Метка «где пригодится» — вычисляемая.** В админке удобно показать «эту
++   запись упоминают 3 контейнера»; игроку её показывать не обязательно, чтобы
++   не выдавать спойлер.
++
++---
++
++## 5. Описания и редактор
++
++WYSIWYG-редактор с нуля не нужен: в проекте уже есть своя разметка
++(`modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js` и
++`components/lootTrade/LootTradeIconText.js`). Достаточно многострочного поля,
++кнопок «Ж», «К», «список», «иконка CD», «иконка крышек» и предпросмотра тем
++же рендерером. Второй формат разметки и HTML в сейвах не появляются.
++
++---
++
++## 6. Опора в текущем коде
++
++| Уже есть | Как используется |
++| --- | --- |
++| `gm_containers` (`id`, `kind`, `room_code`, `data`) | образец таблицы для справочника ключей и склада |
++| `containerId`, `makeContainerId` | устойчивый адрес контейнера для `requires` |
++| `CONTAINER_KIND` (`loot`, `merchant`, `hub`, `terminal`) | новый `lock` добавляется сюда позже |
++| `node.locked` + `CONTAINER_LOCKED` | готовые «ворота» для узла локации |
++| `applySessionUpdate` меняет `locked` на ходу | снятие запертости после взлома терминала |
++| `terminal.state` со статусом `won` | один из источников события `hacked` |
++| `accessId`, `closedByClientIds` в состоянии комнаты | образец «правда на сервере, а не во вкладке» |
++| `applyAtomicLootTake`, `applyAtomicTradeCommit` | образец атомарного изменения количеств для `deposit`/`withdraw` |
++| `roomSnapshot`, `ROOM_STATE`, рассылка `terminal.state` / `session.state` | образец «склад в состоянии комнаты» и доставки при подключении |
++| `InventoryScreen.renderFooter()`, `styles/InventoryScreen.styles.js` (`footerActionsRow`, `addActionCell`, `addActionIcon`, `addActionLabel`) | точное место и вид зелёной плашки «Групповой склад» |
++| `src/lootTrade/gmSessionPersistence.js` | пример фонового сохранения остатков; **не канон** склада |
++| `textUtils`, `IconText` | рендер описаний с тегами и предпросмотр |
++| `PlayerLootTradeOverlay` | окно комнаты, из которого склад тоже должен быть доступен |
++| `resolveItem`, `grantLootEntriesToCharacter` | нужны для **обычных** предметов склада, не для ключей |
++
++**Не требуется для ключей:** Item Forge / контент-паки, обогащение как
++каталожного предмета, выдача в личный инвентарь.
++
++---
++
++## 7. Задел под мини-игру взлома замков
++
++1. `kind: 'lock'` резервируется в `CONTAINER_KIND`, но **не показывается** в
++   форме создания контейнера, пока нет механики.
++2. Условие называется нейтрально — `hacked`, а не `terminalWon`. Замок позже
++   станет ещё одним источником того же события.
++3. Ключ не знает тип цели, ворота не знают, *как* именно добыт `hacked`.
++   Появление мини-игры не меняет ни модель ключа, ни `requires`, ни склад.
++
++Пример из §1 остаётся рабочим: сейф с электронным замком — это контейнер,
++который партия вправе обойти. Не обошли → не добыли → ключ не появился на
++складе → ворота за сейфом закрыты.
++
++---
++
++## 8. Порядок реализации, когда вернёмся
++
++Отдельный патч на каждый шаг:
++
++1. **Групповой склад без ключей.** ✅ **Реализовано в патче 507**
++   (`docs/patch-507-install.md`). Общий контейнер комнаты, `deposit` /
++   `withdraw`, атомарность, серверное персистентное хранилище и выдача
++   состояния при подключении, зелёная плашка во всю ширину под «Добыча» /
++   «Торговля» в инвентаре, список вещей. Уже решает задачу с пулемётом и
++   отсутствующим игроком. Операций изъятия у Мастера нет.
++2. **Справочник ключевых записей.** Имя, описание с предпросмотром, `id`,
++   появление на складе при находке или выдаче Мастером, карточка по нажатию.
++   Без кнопки «Забрать».
++3. **Серверная проверка ключа.** Контейнер объявляет `requires`, сервер
++   проверяет склад и помечает `hacked`, не запуская мини-игру. Без
++   уведомления Мастеру.
++4. **Ворота.** `requires` по событию другого контейнера, снятие `locked`,
++   общее состояние на комнату, отображение связей в админке.
++5. **Позже:** мини-игра взлома замков на том же контракте `hacked`.
++
++---
++
++## 9. Что осталось нерешённым (не блокирует документ)
++
++- **Решено и зафиксировано выше** (больше не вопросы): отзыва ключа и изъятия
++  чужого нет; канон — сервер с выдачей состояния при подключении; кнопка —
++  зелёная плашка во всю ширину под «Добыча»/«Торговля» в инвентаре; Мастер
++  может положить, но не забрать.
++- **Лимиты и стаканье:** есть ли ограничение по весу/слотам; стакаются ли
++  одинаковые патроны и крышки на складе.
++- **Счётчик на плашке:** показывать ли количество вещей прямо в зелёной
++  области (в 507 плашка без счётчика).
++- **Решено:** название не настраивается, это просто «Общее хранилище»
++  (патч 507). Метагеймовое объяснение («багажник», «брамин с грузом») в
++  механику не зашито.
++- **Лог операций:** нужен ли Мастеру и игрокам журнал «кто положил / кто
++  забрал». Склоняемся к минимальному: игрокам не показывать, Мастеру — по
++  желанию.
++- **Удаление записи-шаблона в админке:** добытая копия на складе должна
++  остаться (§3.2); надо решить, что показывать в админке для «осиротевшей»
++  записи.
++- Показывать ли игроку, *почему* мини-игра не запустилась («У партии есть
++  карточка доступа»), или оставить совсем тихим. Склоняемся к тихому.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 420f7e6..d841291 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 567d547..44e8408 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 308d875..2f8d1c7 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 26bef0d..5f4be86 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 9091dd3..59a68e3 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 7887868..33429e3 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 9436ab2..81868f0 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index c857cc1..17abbef 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 92f4c53..fef0ae4 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 15d81dc..e548ba9 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 504** (коммит `c4a3510`, ветка
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 08138f3..46eb222 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
++
+ Патч подготовлен от состояния **версии 505** (коммит `d1adc5f`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–506
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+new file mode 100644
+index 0000000..6bf1cc6
+--- /dev/null
++++ b/docs/patch-507-install.md
+@@ -0,0 +1,146 @@
++# Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++
++Патч подготовлен от состояния **версии 506** (коммит `f087e98`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–507
++цепочкой.
++
++Это **первый шаг** последовательного внедрения дизайна
++`docs/key-items-and-gates-design.md`. Ключевые записи, `requires`, ворота и
++мини-игра взлома замков в этот патч **не входят**.
++
++## Что изменилось
++
++Владелец предложил общий контейнер для группы: «Нашла группа пулемёт, а
++отдать надо другому игроку, которого сегодня нет. Они скидывают предмет в
++общее хранилище и когда человек придёт он его оттуда достанет ... игроки
++метагеймингово объясняют это как багажник машины или брамин с грузом».
++Затем уточнил: «хранилище лучше на сервере. Подключился — получил
++обновления», «то, что принадлежит игрокам — это их», «Имя настраивать не
++надо. Это просто "общее хранилище"».
++
++### 1. Канон на сервере, переживает рестарт
++
++- Новый модуль `server/partyStorageStore.js` читает и атомарно пишет
++  `.data/party-storage.json` (служебный файл, добавлен в `.gitignore`).
++- `createRoomRegistry()` принимает необязательный `partyStorageStore`: при
++  создании комнаты подтягивает сохранённое состояние, при каждом изменении
++  пишет весь набор обратно. `server/start.js` передаёт файловый store;
++  тестовый `createRoomServer()` работает без него, в памяти.
++- `roomSnapshot` теперь включает `partyStorage`, поэтому склад приходит
++  клиенту **вместе с состоянием комнаты** при `room.join` и
++  переподключении — ровно «подключился, получил обновления». Дополнительного
++  запроса нет.
++
++### 2. Положить / забрать атомарно
++
++Новые сообщения протокола (`server/protocol.js` и зеркало
++`src/room/roomProtocol.ts`): `storage.state`, `storage.deposit`,
++`storage.withdraw`. Коды ошибок: `STORAGE_BAD_MESSAGE`,
++`STORAGE_ENTRY_NOT_FOUND`, `STORAGE_FORBIDDEN`.
++
++- Запись склада: `entryId`, `item` (самодостаточный снимок предмета), `name`,
++  `itemType`, `quantity`, `depositedBy`, `depositedByName`, `at`.
++- `deposit` проверяет объект и количество (1–999), создаёт запись, увеличивает
++  `revision`, сохраняет файл и рассылает свежий снимок всем участникам.
++- `withdraw` атомарно уменьшает количество или удаляет запись; запросившему
++  возвращается `withdrawn` (что именно положить в личный инвентарь), остальным
++  — только новый снимок. Двое не могут забрать одну и ту же вещь.
++- **Собственность партии:** `withdraw` разрешён только участникам с ролью
++  `player`. Мастер может положить вещь, но не может забрать уже добытое
++  игроками. Операций отзыва и удаления чужого нет — при ошибке Мастер создаёт
++  новую запись, а не изымает старую.
++
++### 3. Интерфейс
++
++- `components/lootTrade/PartyStorageModal.js` — окно склада: слева предметы
++  персонажа («Положить»), справа общие («Забрать»). Локальный инвентарь
++  меняется **только после успешного ответа сервера**: списание через
++  `adjustItemQuantity`, добавление через `handleAddItem(..., 'storage')`
++  (без бонусов «находки»).
++- В `InventoryScreen.renderFooter()` под двумя зелёными ячейками `addActionCell`
++  («Добавить добычу» / «Купить предметы») добавлена **такая же зелёная область
++  во всю ширину** — `styles.sharedStorageCell` с надписью
++  «Общее хранилище» (`testID="shared-storage-button"`).
++- Парные RU/EN подписи в `i18n/*/screens/inventory/screen.json`. Названия не
++  настраиваются: в модалке нет переименования, в словарях нет поля имени.
++
++### 4. Клиентский стор
++
++`src/room/roomStore.ts`: поле `partyStorage` в состоянии комнаты, обработка
++`storage.state`, методы `depositToPartyStorage` и `withdrawFromPartyStorage`.
++Broadcast от других игроков обновляет ту же комнату, поэтому все вкладки видят
++один и тот же склад.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/partyStorageStore.js` | новый: файловый канон склада |
++| `server/roomRegistry.js` | состояние комнаты, `deposit`/`withdraw`, `roomSnapshot`, персистентность |
++| `server/roomServer.js` | обработчики `storage.deposit` / `storage.withdraw`, рассылка |
++| `server/start.js` | подключение файлового store |
++| `server/protocol.js`, `src/room/roomProtocol.ts` | сообщения и коды ошибок |
++| `src/room/roomStore.ts` | `partyStorage`, обработка состояния, методы |
++| `components/lootTrade/PartyStorageModal.js` | новое окно склада |
++| `components/screens/InventoryScreen/InventoryScreen.js` | зелёная плашка и модалка |
++| `styles/InventoryScreen.styles.js` | `sharedStorageCell`, `sharedStorageLabel` |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
++| `.gitignore` | `.data/` |
++| `__tests__/room/party-storage-507.test.js` | 8 проверок домена, персистентности, протокола и UI |
++| `__tests__/lootTrade/party-storage-modal-507.test.js` | 2 рендер-проверки окна |
++| `__tests__/room/room-server.integration.test.js` | WS-сценарий склада |
++| `public/version.json`, `patchs/baseline.json` | версия 507, 64/64 заметок |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `docs/key-items-and-gates-design.md` | статус: шаг 1 внедрён |
++| `patchs/507-shared-storage.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 506:
++
++```bash
++./apply-patch.sh 507
++# ✓ Установлен патч: №507 (версия 506 → 507)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 507
++```
++
++`patchs/baseline.json` в источнике равен `507`. После установки
++`public/version.json` → `507`; закоммитьте изменения, **перезапустите сервис
++Node.js** (новые обработчики и файловый канон живут на сервере) и пересоберите
++веб-сборку. Сервер создаст `.data/party-storage.json` при первом изменении
++склада; удалять его при обновлении не нужно.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/party-storage-507.test.js
++npx vitest run __tests__/lootTrade/party-storage-modal-507.test.js
++npx vitest run __tests__/room/room-server.integration.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "507"'
++```
++
++Приёмочные тесты покрывают: атомарное изменение количества и ревизию, запрет
++`withdraw` для Мастера, валидацию данных, восстановление склада после
++«рестарта» из файла, зеркало протокола, фиксированное название, зелёную
++плашку, обновление стора из `storage.state` и исключение `.data/` из git.
++WS-тест проверяет, что склад уже приходит в `room.state` при подключении,
++изменения рассылаются второму игроку, а Мастер получает
++`STORAGE_FORBIDDEN`.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/507-shared-storage.patch
++cp /path/to/507-shared-storage.patch patchs/
++```
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 694071a..77fc9f5 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -68,11 +68,22 @@
+     "apply": "Use",
+     "sell": "Sell",
+     "addLoot": "Add loot",
++    "sharedStorage": "Shared storage",
+     "buyItems": "Buy items",
+     "repair": "Repair",
+     "contents": "Contents",
+     "collapse": "Collapse"
+   },
++  "storage": {
++    "title": "Shared storage",
++    "yourItems": "Character items",
++    "deposit": "Deposit",
++    "withdraw": "Withdraw",
++    "empty": "Empty",
++    "noRoom": "No connected room",
++    "failed": "Could not update shared storage",
++    "hint": "Items are shared by the whole party. The name is not customizable."
++  },
+   "labels": {
+     "leftArm": "Left bracer",
+     "rightArm": "Right bracer",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 85caf0b..17a688a 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -68,11 +68,22 @@
+     "apply": "Применить",
+     "sell": "Продать",
+     "addLoot": "Добавить добычу",
++    "sharedStorage": "Общее хранилище",
+     "buyItems": "Купить предметы",
+     "repair": "Починить",
+     "contents": "Содержание",
+     "collapse": "Свернуть"
+   },
++  "storage": {
++    "title": "Общее хранилище",
++    "yourItems": "Предметы персонажа",
++    "deposit": "Положить",
++    "withdraw": "Забрать",
++    "empty": "Пусто",
++    "noRoom": "Нет подключённой комнаты",
++    "failed": "Не удалось изменить общее хранилище",
++    "hint": "Вещи общие для всей группы. Название не настраивается."
++  },
+   "labels": {
+     "leftArm": "Левый наруч",
+     "rightArm": "Правый наруч",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index bbea7e3..7e4601d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "506"
++  "baseline": "507"
+ }
+diff --git a/public/version.json b/public/version.json
+index d9c3b6c..52ba5c7 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "506",
++  "version": "507",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В инвентаре появилось «Общее хранилище»: вещи группы лежат в одном месте, доступном каждому игроку комнаты, даже если положивший их персонаж выбыл из игры.",
++      "Предмет можно положить в общее хранилище или забрать оттуда в свой инвентарь; количество меняется атомарно, поэтому двое не заберут одну и ту же вещь.",
++      "Хранилище живёт на сервере и переживает перезапуск: при подключении к комнате игрок сразу получает актуальное содержимое.",
++      "Ведущий может положить вещь в общее хранилище, но не может забрать уже добытое игроками; название хранилища не настраивается.",
+       "Мастер теперь получает уведомление о взломанном терминале в любой вкладке браузера: владелец определяется по участнику комнаты, а не по переключателю режима интерфейса.",
+       "Терминал нельзя открыть заново после первого взлома: доступ привязан к трансляции Мастера, поэтому закрытие окна больше не возвращает кнопку «Взломать».",
+       "В окне локации рядом с «Свернуть» появилась кнопка «Покинуть локацию»: игрок отключается сам, а сцена остаётся открытой для остальных участников.",
+@@ -65,6 +69,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Inventory now has \"Shared storage\": party items live in one place available to every player in the room, even if the character who deposited them leaves the game.",
++      "Items can be deposited into shared storage or withdrawn into a personal inventory; quantities change atomically so two players cannot take the same item.",
++      "Storage lives on the server and survives a restart: connecting to a room immediately delivers its current contents.",
++      "The Game Master may deposit into shared storage but cannot take back what the players already own; the storage name is not customizable.",
+       "The Game Master now receives the terminal-hacked notice in any browser tab: ownership is detected from the room member list rather than the interface mode switch.",
+       "A terminal can no longer be opened again after the first hack: access is tied to the Game Master broadcast, so closing the window no longer restores the \"Hack\" button.",
+       "The location window now has a \"Leave location\" button next to \"Minimize\": the player disconnects on their own while the scene stays open for everyone else.",
+diff --git a/server/partyStorageStore.js b/server/partyStorageStore.js
+new file mode 100644
+index 0000000..ea4371a
+--- /dev/null
++++ b/server/partyStorageStore.js
+@@ -0,0 +1,44 @@
++'use strict';
++
++// Патч 507 — файловое хранилище «Общего хранилища» комнат.
++//
++// Канон склада живёт НА СЕРВЕРЕ и переживает рестарт сервиса: «подключился —
++// получил обновления» работает потому, что roomSnapshot отдаёт partyStorage
++// вместе с состоянием комнаты. Файл служебный, в git не попадает (.data/).
++//
++// Формат: { "GM-XXXXXX": { revision, entries: [...] }, ... }
++
++const fs = require('node:fs');
++const path = require('node:path');
++
++const DEFAULT_FILE = path.join(__dirname, '..', '.data', 'party-storage.json');
++
++const createFilePartyStorageStore = ({ filePath = DEFAULT_FILE } = {}) => {
++  const load = () => {
++    try {
++      const raw = fs.readFileSync(filePath, 'utf8');
++      const parsed = JSON.parse(raw);
++      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return new Map();
++      return new Map(Object.entries(parsed).filter(([, value]) => value && Array.isArray(value.entries)));
++    } catch {
++      return new Map();
++    }
++  };
++
++  const save = (map) => {
++    try {
++      fs.mkdirSync(path.dirname(filePath), { recursive: true });
++      const plain = Object.fromEntries(map.entries());
++      const tmp = `${filePath}.tmp`;
++      fs.writeFileSync(tmp, JSON.stringify(plain), 'utf8');
++      fs.renameSync(tmp, filePath);
++      return true;
++    } catch {
++      return false;
++    }
++  };
++
++  return { load, save, filePath };
++};
++
++module.exports = { createFilePartyStorageStore, DEFAULT_FILE };
+diff --git a/server/protocol.js b/server/protocol.js
+index 67987b6..68f3310 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -35,6 +35,10 @@ const MESSAGE = Object.freeze({
+   TERMINAL_ISSUE: 'terminal.issue',
+   TERMINAL_ACTION: 'terminal.action',
+   TERMINAL_STATE: 'terminal.state',
++  // Патч 507: общее хранилище комнаты.
++  STORAGE_STATE: 'storage.state',
++  STORAGE_DEPOSIT: 'storage.deposit',
++  STORAGE_WITHDRAW: 'storage.withdraw',
+   ERROR: 'error',
+ });
+ 
+@@ -66,6 +70,10 @@ const ERROR_CODE = Object.freeze({
+   TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
+   TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
+   TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
++  // Патч 507: общее хранилище.
++  STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
++  STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
++  STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+ });
+ 
+ const LIMITS = Object.freeze({
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 1f25416..14b30f6 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -30,7 +30,7 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
+  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
+  */
+-const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
++const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS, partyStorageStore = null } = {}) => {
+   const rooms = new Map(); // code -> room
+   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
+   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
+@@ -40,6 +40,28 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   // Клиент использует его как «билет» одноразового доступа к мини-игре.
+   let broadcastCounter = 0;
+   const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
++  // Патч 507: «Общее хранилище». Канон — сервер; при старте подтягиваем
++  // сохранённые комнаты, при каждом изменении пишем весь набор обратно.
++  const savedStorages = partyStorageStore ? partyStorageStore.load() : new Map();
++  let storageEntryCounter = 0;
++  const emptyStorage = () => ({ revision: 0, entries: [] });
++  const cloneStorage = (storage) => ({
++    revision: Number(storage?.revision) || 0,
++    entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
++  });
++  const persistStorages = () => {
++    if (!partyStorageStore) return;
++    const map = new Map();
++    for (const room of rooms.values()) {
++      if (room.partyStorage?.entries?.length || map.has(room.code)) {
++        map.set(room.code, cloneStorage(room.partyStorage));
++      }
++    }
++    for (const [code, stored] of savedStorages.entries()) {
++      if (!map.has(code) && stored?.entries?.length) map.set(code, cloneStorage(stored));
++    }
++    partyStorageStore.save(map);
++  };
+ 
+   const touchRateLog = (log, key, windowMs, max) => {
+     const cutoff = now() - windowMs;
+@@ -59,6 +81,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
+     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
++    partyStorage: cloneStorage(savedStorages.get(code) || emptyStorage()),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+     recentTerminalWords: [],
+     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+@@ -103,6 +126,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       id,
+       terminalPublic(id, entry),
+     ])),
++    // Патч 507: склад приходит вместе с состоянием комнаты — «подключился,
++    // получил обновления». Дополнительного запроса не требуется.
++    partyStorage: cloneStorage(room.partyStorage),
+     lastClosedSession: room.lastClosedSession || null,
+     directives: cloneDirectives(room.directives),
+     // Признак обновлённого сервера: клиент включает синхронизированную игру,
+@@ -849,6 +875,69 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     };
+   };
+ 
++  /**
++   * Патч 507: положить предмет в «Общее хранилище» комнаты.
++   * Мастер и игроки могут класть; забирать — только игроки (см. дизайн:
++   * добытое принадлежит партии, Мастер управляет миром, но не чужим багажом).
++   */
++  const depositToPartyStorage = ({ code, clientId, name, item, quantity }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const qty = Math.floor(Number(quantity));
++    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
++      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++    }
++    let plain;
++    try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
++    const member = room.members.get(clientId);
++    const entry = {
++      entryId: `st_${now()}_${++storageEntryCounter}`,
++      item: plain,
++      name: String(plain.name || name || '').trim() || 'Предмет',
++      itemType: String(plain.itemType || 'misc'),
++      quantity: qty,
++      depositedBy: clientId,
++      depositedByName: String(member?.name || name || '').trim(),
++      at: now(),
++    };
++    const storage = room.partyStorage || emptyStorage();
++    storage.entries = [...storage.entries, entry];
++    storage.revision += 1;
++    room.partyStorage = storage;
++    persistStorages();
++    return { room, storage: cloneStorage(storage), entry: { ...entry } };
++  };
++
++  /** Забрать предмет из общего хранилища (только игрок, атомарно). */
++  const withdrawFromPartyStorage = ({ code, clientId, entryId, quantity }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const member = room.members.get(clientId);
++    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
++    const storage = room.partyStorage || emptyStorage();
++    const index = storage.entries.findIndex((entry) => entry.entryId === String(entryId || '').trim());
++    if (index < 0) return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
++    const requested = Math.floor(Number(quantity));
++    const qty = Number.isFinite(requested) && requested > 0
++      ? Math.min(requested, storage.entries[index].quantity)
++      : storage.entries[index].quantity;
++    const taken = storage.entries[index];
++    const entries = [...storage.entries];
++    if (qty >= taken.quantity) entries.splice(index, 1);
++    else entries[index] = { ...taken, quantity: taken.quantity - qty };
++    storage.entries = entries;
++    storage.revision += 1;
++    room.partyStorage = storage;
++    persistStorages();
++    return {
++      room,
++      storage: cloneStorage(storage),
++      withdrawn: { item: { ...taken.item }, quantity: qty, name: taken.name },
++    };
++  };
++
++  const getPartyStorage = (code) => cloneStorage(rooms.get(code)?.partyStorage || emptyStorage());
++
+   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
+   const sweep = () => {
+     const removed = [];
+@@ -883,6 +972,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     issueDirective,
+     issuePeerAssist,
+     ackDirective,
++    depositToPartyStorage,
++    withdrawFromPartyStorage,
++    getPartyStorage,
+     sweep,
+     _rooms: rooms, // диагностика/тесты
+   };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index dd61cd5..cb0083a 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -705,6 +705,45 @@ const attachRoomWebSocketServer = (httpServer, {
+           break;
+         }
+ 
++        // Патч 507: «Общее хранилище». Кладём/забираем атомарно на сервере и
++        // рассылаем свежий снимок всем участникам комнаты.
++        case MESSAGE.STORAGE_DEPOSIT: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
++          const result = registry.depositToPartyStorage({
++            code: canonical,
++            clientId,
++            name: payload.name || null,
++            item: payload.item,
++            quantity: payload.quantity,
++          });
++          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
++          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
++          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
++          break;
++        }
++
++        case MESSAGE.STORAGE_WITHDRAW: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
++          const result = registry.withdrawFromPartyStorage({
++            code: canonical,
++            clientId,
++            entryId: payload.entryId,
++            quantity: payload.quantity,
++          });
++          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
++          const statePayload = {
++            storage: result.storage,
++            withdrawn: result.withdrawn,
++            requestId: payload.requestId || null,
++          };
++          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
++          break;
++        }
++
+         case MESSAGE.SESSION_OPEN: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) {
+diff --git a/server/start.js b/server/start.js
+index 278af2a..27cbafb 100644
+--- a/server/start.js
++++ b/server/start.js
+@@ -25,6 +25,8 @@ const path = require('node:path');
+ const crypto = require('node:crypto');
+ const { spawn } = require('node:child_process');
+ const { createRoomServer } = require('./roomServer');
++const { createRoomRegistry } = require('./roomRegistry');
++const { createFilePartyStorageStore } = require('./partyStorageStore');
+ 
+ const FINGERPRINT_FILE = '.build-fingerprint';
+ 
+@@ -704,6 +706,12 @@ const createManagedAppServer = ({
+     host,
+     distDir: resolvedDistDir,
+     beforeStatic,
++    // Патч 507: канон «Общего хранилища» лежит на сервере в .data/ и
++    // переживает рестарт; тесты создают сервер без этого параметра и
++    // работают с хранилищем в памяти.
++    registry: createRoomRegistry({
++      partyStorageStore: createFilePartyStorageStore(),
++    }),
+   });
+ 
+   const start = async () => {
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 5ed87d1..bf9ae54 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -31,6 +31,9 @@ export const ROOM_MESSAGE = {
+   TERMINAL_ISSUE: 'terminal.issue',
+   TERMINAL_ACTION: 'terminal.action',
+   TERMINAL_STATE: 'terminal.state',
++  STORAGE_STATE: 'storage.state',
++  STORAGE_DEPOSIT: 'storage.deposit',
++  STORAGE_WITHDRAW: 'storage.withdraw',
+   ERROR: 'error',
+ } as const;
+ 
+@@ -62,6 +65,9 @@ export const ROOM_ERROR = {
+   TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
+   TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
+   TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
++  STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
++  STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
++  STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+ } as const;
+ 
+ export interface ActiveLootTradeItem {
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 6b9ec4e..dffe3f9 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -26,6 +26,22 @@ const CLIENT_ID_STORAGE_KEY = 'room_client_id';
+ const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
+ const REQUEST_TIMEOUT_MS = 10 * 1000;
+ 
++export interface PartyStorageEntry {
++  entryId: string;
++  item: Record<string, unknown>;
++  name: string;
++  itemType: string;
++  quantity: number;
++  depositedBy?: string;
++  depositedByName?: string;
++  at?: number;
++}
++
++export interface PartyStorageState {
++  revision: number;
++  entries: PartyStorageEntry[];
++}
++
+ export interface RoomStateEntry {
+   code: string;
+   name: string;
+@@ -35,6 +51,8 @@ export interface RoomStateEntry {
+   snapshots?: Record<string, RoomSnapshotEntry>;
+   activeSession?: ActiveLootTradeSession | null;
+   terminalStates?: Record<string, any>;
++  /** Патч 507: «Общее хранилище» комнаты (канон — сервер). */
++  partyStorage?: PartyStorageState;
+   directives?: RoomDirectiveEntry[];
+   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
+   capabilities?: Record<string, boolean>;
+@@ -88,6 +106,8 @@ interface RoomStoreState {
+   }) => Promise<void>;
+   issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
+   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
++  depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
++  withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
+   openRoomSession: (input: {
+     code: string;
+     session: Record<string, unknown>;
+@@ -368,6 +388,19 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     ) {
+       applySessionEnvelopeToStore(message);
+     }
++    // Патч 507: снимок «Общего хранилища» приходит и на действия этой
++    // вкладки, и как рассылка остальным участникам комнаты.
++    if (message.type === ROOM_MESSAGE.STORAGE_STATE) {
++      const code = message.roomCode;
++      const storage = message.payload?.storage;
++      const current = code ? get().rooms[code] : null;
++      if (code && current && storage) {
++        set({ rooms: {
++          ...get().rooms,
++          [code]: { ...current, partyStorage: storage },
++        } });
++      }
++    }
+     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
+       const code = message.roomCode;
+       const terminal = message.payload?.terminal;
+@@ -551,6 +584,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             snapshots: prev?.snapshots || {},
+             activeSession: prev?.activeSession ?? null,
+             terminalStates: prev?.terminalStates || {},
++            partyStorage: prev?.partyStorage || { revision: 0, entries: [] },
+             directives: prev?.directives || [],
+             capabilities: prev?.capabilities || {},
+           },
+@@ -611,6 +645,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               snapshots: snapshotsMap,
+               activeSession,
+               terminalStates,
++              partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
+               directives,
+               capabilities,
+             },
+@@ -752,6 +787,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       return response.payload?.terminal;
+     },
+ 
++    depositToPartyStorage: async ({ code, item, quantity, name }) => {
++      const response = await sendRequest(ROOM_MESSAGE.STORAGE_DEPOSIT, {
++        code, item, quantity, name,
++      }, code);
++      return (response.payload?.storage as PartyStorageState | null) ?? null;
++    },
++
++    withdrawFromPartyStorage: async ({ code, entryId, quantity }) => {
++      const response = await sendRequest(ROOM_MESSAGE.STORAGE_WITHDRAW, {
++        code, entryId, quantity,
++      }, code);
++      return {
++        storage: (response.payload?.storage as PartyStorageState | null) ?? null,
++        withdrawn: response.payload?.withdrawn as any,
++      };
++    },
++
+     openRoomSession: async ({ code, session, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const reqPayload: Record<string, unknown> = { code, session };
+diff --git a/styles/InventoryScreen.styles.js b/styles/InventoryScreen.styles.js
+index e5441e2..c43b53e 100644
+--- a/styles/InventoryScreen.styles.js
++++ b/styles/InventoryScreen.styles.js
+@@ -76,6 +76,20 @@ const styles = StyleSheet.create({
+   },
+   sellButton: { backgroundColor: '#DC3545' },
+   applyButton: { backgroundColor: '#28a745' },
++  // Патч 507: «Общее хранилище» — та же зелёная область, но во всю ширину.
++  sharedStorageCell: {
++    flex: 1,
++    backgroundColor: 'rgba(0, 255, 0, 0.1)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    paddingVertical: 10,
++    borderWidth: 1,
++    borderColor: '#333',
++    borderStyle: 'dashed',
++    borderRadius: 4,
++    marginTop: 10,
++  },
++  sharedStorageLabel: { color: '#0d3b16', fontSize: 13, fontWeight: '700' },
+   applyButtonDisabled: { opacity: 0.4 },
+   unequipButton: { backgroundColor: '#ffc107' },
+   actionButtonText: { color: '#fff', fontSize: 12 },

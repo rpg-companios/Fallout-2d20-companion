@@ -519,6 +519,49 @@ describe('roomServer: create/join/presence', () => {
     });
   });
 
+  // Патч 507: «Общее хранилище». Состояние приходит при подключении,
+  // изменения рассылаются всем; Мастер может положить, но не забрать.
+  it('507: общее хранилище синхронизируется по WS', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-507');
+      const p1 = makeClient(port, 'p-507-1');
+      const p2 = makeClient(port, 'p-507-2');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Storage 507' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
+      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      // «Подключился — получил обновления»: склад уже в состоянии комнаты.
+      expect(joined.payload.partyStorage).toMatchObject({ revision: 0, entries: [] });
+      await p2.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
+      await p2.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+
+      const item = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
+      const depReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item, quantity: 2, name: 'Пулемёт' }, code);
+      const dep = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === depReq);
+      expect(dep.payload.storage.entries[0]).toMatchObject({ name: 'Пулемёт', quantity: 2 });
+      const broadcast = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
+      expect(broadcast.payload.storage.entries).toHaveLength(1);
+
+      const entryId = dep.payload.storage.entries[0].entryId;
+      const wReq = await p2.send(MESSAGE.STORAGE_WITHDRAW, { entryId, quantity: 1 }, code);
+      const withdrawn = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === wReq);
+      expect(withdrawn.payload.withdrawn.quantity).toBe(1);
+      expect(withdrawn.payload.storage.entries[0].quantity).toBe(1);
+      expect(app.registry.getPartyStorage(code).entries[0].quantity).toBe(1);
+
+      // Мастер не забирает чужое.
+      const gmReq = await gm.send(MESSAGE.STORAGE_WITHDRAW, { entryId }, code);
+      const denied = await gm.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === gmReq);
+      expect(denied.payload.code).toBe('STORAGE_FORBIDDEN');
+      expect(app.registry.getPartyStorage(code).entries).toHaveLength(1);
+
+      gm.close(); p1.close(); p2.close();
+    });
+  });
+
   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
     await withServer(async (port) => {
       const gm = makeClient(port, 'gm-1');

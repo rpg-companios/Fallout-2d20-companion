@@ -31,6 +31,9 @@ export const ROOM_MESSAGE = {
   TERMINAL_ISSUE: 'terminal.issue',
   TERMINAL_ACTION: 'terminal.action',
   TERMINAL_STATE: 'terminal.state',
+  STORAGE_STATE: 'storage.state',
+  STORAGE_DEPOSIT: 'storage.deposit',
+  STORAGE_WITHDRAW: 'storage.withdraw',
   ERROR: 'error',
 } as const;
 
@@ -62,6 +65,9 @@ export const ROOM_ERROR = {
   TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
   TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
   TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
+  STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
+  STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
+  STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
 } as const;
 
 export interface ActiveLootTradeItem {

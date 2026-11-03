@@ -26,6 +26,22 @@ const CLIENT_ID_STORAGE_KEY = 'room_client_id';
 const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
 const REQUEST_TIMEOUT_MS = 10 * 1000;
 
+export interface PartyStorageEntry {
+  entryId: string;
+  item: Record<string, unknown>;
+  name: string;
+  itemType: string;
+  quantity: number;
+  depositedBy?: string;
+  depositedByName?: string;
+  at?: number;
+}
+
+export interface PartyStorageState {
+  revision: number;
+  entries: PartyStorageEntry[];
+}
+
 export interface RoomStateEntry {
   code: string;
   name: string;
@@ -35,6 +51,8 @@ export interface RoomStateEntry {
   snapshots?: Record<string, RoomSnapshotEntry>;
   activeSession?: ActiveLootTradeSession | null;
   terminalStates?: Record<string, any>;
+  /** Патч 507: «Общее хранилище» комнаты (канон — сервер). */
+  partyStorage?: PartyStorageState;
   directives?: RoomDirectiveEntry[];
   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
   capabilities?: Record<string, boolean>;
@@ -88,6 +106,8 @@ interface RoomStoreState {
   }) => Promise<void>;
   issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
+  depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
+  withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
   openRoomSession: (input: {
     code: string;
     session: Record<string, unknown>;
@@ -368,6 +388,19 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     ) {
       applySessionEnvelopeToStore(message);
     }
+    // Патч 507: снимок «Общего хранилища» приходит и на действия этой
+    // вкладки, и как рассылка остальным участникам комнаты.
+    if (message.type === ROOM_MESSAGE.STORAGE_STATE) {
+      const code = message.roomCode;
+      const storage = message.payload?.storage;
+      const current = code ? get().rooms[code] : null;
+      if (code && current && storage) {
+        set({ rooms: {
+          ...get().rooms,
+          [code]: { ...current, partyStorage: storage },
+        } });
+      }
+    }
     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
       const code = message.roomCode;
       const terminal = message.payload?.terminal;
@@ -551,6 +584,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             snapshots: prev?.snapshots || {},
             activeSession: prev?.activeSession ?? null,
             terminalStates: prev?.terminalStates || {},
+            partyStorage: prev?.partyStorage || { revision: 0, entries: [] },
             directives: prev?.directives || [],
             capabilities: prev?.capabilities || {},
           },
@@ -611,6 +645,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               snapshots: snapshotsMap,
               activeSession,
               terminalStates,
+              partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
               directives,
               capabilities,
             },
@@ -750,6 +785,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       if (ownerToken) payload.ownerToken = ownerToken;
       const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
       return response.payload?.terminal;
+    },
+
+    depositToPartyStorage: async ({ code, item, quantity, name }) => {
+      const response = await sendRequest(ROOM_MESSAGE.STORAGE_DEPOSIT, {
+        code, item, quantity, name,
+      }, code);
+      return (response.payload?.storage as PartyStorageState | null) ?? null;
+    },
+
+    withdrawFromPartyStorage: async ({ code, entryId, quantity }) => {
+      const response = await sendRequest(ROOM_MESSAGE.STORAGE_WITHDRAW, {
+        code, entryId, quantity,
+      }, code);
+      return {
+        storage: (response.payload?.storage as PartyStorageState | null) ?? null,
+        withdrawn: response.payload?.withdrawn as any,
+      };
     },
 
     openRoomSession: async ({ code, session, ownerToken }) => {

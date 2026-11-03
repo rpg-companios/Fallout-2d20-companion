@@ -1,5 +1,37 @@
 # Changelog
 ---
+## Shared storage for the room (patch 507)
+
+Step one of `docs/key-items-and-gates-design.md`. The owner: "A party stash ...
+a shared container where anyone can put something or take something ... the
+group found a machine gun but needs to give it to a player who is absent
+today". Later: "Storage is better on the server. Connect — receive updates",
+"The name does not need to be customizable. It is simply shared storage",
+"What belongs to the players is theirs".
+
+- **Server canon.** `server/partyStorageStore.js` persists state to
+  `.data/party-storage.json` (excluded from git). A room restores it on
+  creation; `roomSnapshot` delivers the storage with the room state, so
+  "connect — receive updates" needs no extra request. Tests run the registry
+  without the file store, in memory.
+- **Deposit / withdraw.** New messages `storage.deposit`, `storage.withdraw`
+  and `storage.state`; operations are atomic, quantities validated, revision
+  increments, and the fresh snapshot is broadcast to all members. Errors:
+  `STORAGE_BAD_MESSAGE`, `STORAGE_ENTRY_NOT_FOUND`, `STORAGE_FORBIDDEN`.
+- **Party ownership.** The GM can deposit but cannot withdraw: `withdraw` is
+  allowed only for members with the player role. No recall, no removal of
+  others' items.
+- **Interface.** A full-width green area "Shared storage" now sits below the
+  green "Add loot" / "Buy items" cells in the inventory. The modal shows
+  character items and shared items; the local inventory changes only after a
+  successful server reply.
+- Paired RU/EN labels; the name is not customizable.
+
+This is step one only: key records, `requires`, gates and the lock-picking
+mini-game stay in the design document and will ship as separate patches.
+
+Installation: `docs/patch-507-install.md`.
+
 ## GM notice, one-time terminal access and leaving a location (patch 506)
 
 The owner tested 505 in two tabs of one browser: "in the GM tab I do not see

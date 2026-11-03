@@ -68,10 +68,21 @@
     "apply": "Use",
     "sell": "Sell",
     "addLoot": "Add loot",
+    "sharedStorage": "Shared storage",
     "buyItems": "Buy items",
     "repair": "Repair",
     "contents": "Contents",
     "collapse": "Collapse"
+  },
+  "storage": {
+    "title": "Shared storage",
+    "yourItems": "Character items",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "empty": "Empty",
+    "noRoom": "No connected room",
+    "failed": "Could not update shared storage",
+    "hint": "Items are shared by the whole party. The name is not customizable."
   },
   "labels": {
     "leftArm": "Left bracer",

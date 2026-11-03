@@ -30,7 +30,7 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
-const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS, partyStorageStore = null } = {}) => {
   const rooms = new Map(); // code -> room
   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
@@ -40,6 +40,28 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   // Клиент использует его как «билет» одноразового доступа к мини-игре.
   let broadcastCounter = 0;
   const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
+  // Патч 507: «Общее хранилище». Канон — сервер; при старте подтягиваем
+  // сохранённые комнаты, при каждом изменении пишем весь набор обратно.
+  const savedStorages = partyStorageStore ? partyStorageStore.load() : new Map();
+  let storageEntryCounter = 0;
+  const emptyStorage = () => ({ revision: 0, entries: [] });
+  const cloneStorage = (storage) => ({
+    revision: Number(storage?.revision) || 0,
+    entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
+  });
+  const persistStorages = () => {
+    if (!partyStorageStore) return;
+    const map = new Map();
+    for (const room of rooms.values()) {
+      if (room.partyStorage?.entries?.length || map.has(room.code)) {
+        map.set(room.code, cloneStorage(room.partyStorage));
+      }
+    }
+    for (const [code, stored] of savedStorages.entries()) {
+      if (!map.has(code) && stored?.entries?.length) map.set(code, cloneStorage(stored));
+    }
+    partyStorageStore.save(map);
+  };
 
   const touchRateLog = (log, key, windowMs, max) => {
     const cutoff = now() - windowMs;
@@ -59,6 +81,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+    partyStorage: cloneStorage(savedStorages.get(code) || emptyStorage()),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
@@ -103,6 +126,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       id,
       terminalPublic(id, entry),
     ])),
+    // Патч 507: склад приходит вместе с состоянием комнаты — «подключился,
+    // получил обновления». Дополнительного запроса не требуется.
+    partyStorage: cloneStorage(room.partyStorage),
     lastClosedSession: room.lastClosedSession || null,
     directives: cloneDirectives(room.directives),
     // Признак обновлённого сервера: клиент включает синхронизированную игру,
@@ -849,6 +875,69 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     };
   };
 
+  /**
+   * Патч 507: положить предмет в «Общее хранилище» комнаты.
+   * Мастер и игроки могут класть; забирать — только игроки (см. дизайн:
+   * добытое принадлежит партии, Мастер управляет миром, но не чужим багажом).
+   */
+  const depositToPartyStorage = ({ code, clientId, name, item, quantity }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const qty = Math.floor(Number(quantity));
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    }
+    let plain;
+    try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
+    const member = room.members.get(clientId);
+    const entry = {
+      entryId: `st_${now()}_${++storageEntryCounter}`,
+      item: plain,
+      name: String(plain.name || name || '').trim() || 'Предмет',
+      itemType: String(plain.itemType || 'misc'),
+      quantity: qty,
+      depositedBy: clientId,
+      depositedByName: String(member?.name || name || '').trim(),
+      at: now(),
+    };
+    const storage = room.partyStorage || emptyStorage();
+    storage.entries = [...storage.entries, entry];
+    storage.revision += 1;
+    room.partyStorage = storage;
+    persistStorages();
+    return { room, storage: cloneStorage(storage), entry: { ...entry } };
+  };
+
+  /** Забрать предмет из общего хранилища (только игрок, атомарно). */
+  const withdrawFromPartyStorage = ({ code, clientId, entryId, quantity }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const member = room.members.get(clientId);
+    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+    const storage = room.partyStorage || emptyStorage();
+    const index = storage.entries.findIndex((entry) => entry.entryId === String(entryId || '').trim());
+    if (index < 0) return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
+    const requested = Math.floor(Number(quantity));
+    const qty = Number.isFinite(requested) && requested > 0
+      ? Math.min(requested, storage.entries[index].quantity)
+      : storage.entries[index].quantity;
+    const taken = storage.entries[index];
+    const entries = [...storage.entries];
+    if (qty >= taken.quantity) entries.splice(index, 1);
+    else entries[index] = { ...taken, quantity: taken.quantity - qty };
+    storage.entries = entries;
+    storage.revision += 1;
+    room.partyStorage = storage;
+    persistStorages();
+    return {
+      room,
+      storage: cloneStorage(storage),
+      withdrawn: { item: { ...taken.item }, quantity: qty, name: taken.name },
+    };
+  };
+
+  const getPartyStorage = (code) => cloneStorage(rooms.get(code)?.partyStorage || emptyStorage());
+
   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
   const sweep = () => {
     const removed = [];
@@ -883,6 +972,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     issueDirective,
     issuePeerAssist,
     ackDirective,
+    depositToPartyStorage,
+    withdrawFromPartyStorage,
+    getPartyStorage,
     sweep,
     _rooms: rooms, // диагностика/тесты
   };

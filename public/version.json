@@ -1,8 +1,12 @@
 {
-  "version": "506",
+  "version": "507",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "В инвентаре появилось «Общее хранилище»: вещи группы лежат в одном месте, доступном каждому игроку комнаты, даже если положивший их персонаж выбыл из игры.",
+      "Предмет можно положить в общее хранилище или забрать оттуда в свой инвентарь; количество меняется атомарно, поэтому двое не заберут одну и ту же вещь.",
+      "Хранилище живёт на сервере и переживает перезапуск: при подключении к комнате игрок сразу получает актуальное содержимое.",
+      "Ведущий может положить вещь в общее хранилище, но не может забрать уже добытое игроками; название хранилища не настраивается.",
       "Мастер теперь получает уведомление о взломанном терминале в любой вкладке браузера: владелец определяется по участнику комнаты, а не по переключателю режима интерфейса.",
       "Терминал нельзя открыть заново после первого взлома: доступ привязан к трансляции Мастера, поэтому закрытие окна больше не возвращает кнопку «Взломать».",
       "В окне локации рядом с «Свернуть» появилась кнопка «Покинуть локацию»: игрок отключается сам, а сцена остаётся открытой для остальных участников.",
@@ -65,6 +69,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Inventory now has \"Shared storage\": party items live in one place available to every player in the room, even if the character who deposited them leaves the game.",
+      "Items can be deposited into shared storage or withdrawn into a personal inventory; quantities change atomically so two players cannot take the same item.",
+      "Storage lives on the server and survives a restart: connecting to a room immediately delivers its current contents.",
+      "The Game Master may deposit into shared storage but cannot take back what the players already own; the storage name is not customizable.",
       "The Game Master now receives the terminal-hacked notice in any browser tab: ownership is detected from the room member list rather than the interface mode switch.",
       "A terminal can no longer be opened again after the first hack: access is tied to the Game Master broadcast, so closing the window no longer restores the \"Hack\" button.",
       "The location window now has a \"Leave location\" button next to \"Minimize\": the player disconnects on their own while the scene stays open for everyone else.",
