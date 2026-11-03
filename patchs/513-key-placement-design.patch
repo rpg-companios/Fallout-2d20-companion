@@ -1,0 +1,811 @@
+diff --git a/__tests__/room/key-items-placement-513.test.js b/__tests__/room/key-items-placement-513.test.js
+new file mode 100644
+index 0000000..b40e504
+--- /dev/null
++++ b/__tests__/room/key-items-placement-513.test.js
+@@ -0,0 +1,73 @@
++// Патч 513: приёмочный тест на ФИКСАЦИЮ ДИЗАЙНА (владелец выбрал «пока только
++// зафиксировать», код не трогаем). Проверяем, что дополнение попало в
++// дизайн-документ и в правила работы с приложением без противоречий.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const design = read('docs/key-items-and-gates-design.md');
++
++describe('513: вложенность ключей, перетаскивание и два вида требования', () => {
++  it('статус честно говорит, что код шага 3 ещё не начат', () => {
++    expect(design).toContain('Обновление 7 (патч 513');
++    expect(design).toContain('не реализованы');
++    expect(design).toContain('код не начат');
++    expect(design).toContain('только документы и номер версии');
++  });
++
++  it('зафиксирована таблица: кто выдаётся, кто содержит ключ, кто требует', () => {
++    expect(design).toContain('Ключ / записка');
++    expect(design).toContain('«Замок» (будущая мини-игра)');
++    expect(design).toContain('не выдаётся отдельно');
++    expect(design).toContain('В терминал ключ не');
++    expect(design).toContain('Может **содержать** ключ');
++    expect(design).toContain('Может **требовать** ключ');
++  });
++
++  it('пункт выдачи ключа сохранён как исключение обратной совместимости', () => {
++    expect(design).toContain('backward');
++    expect(design).toContain('«Выдать на склад»');
++    expect(design).toContain('остаётся');
++    expect(design).toContain('Не удалять пункт');
++    expect(design).toContain('не убирать `kind: \'keyItem\'`');
++  });
++
++  it('у всех четырёх карточек есть иконка перетаскивания', () => {
++    expect(design).toContain('Все четыре вида карточек');
++    expect(design).toContain('arrow-all');
++    expect(design).toContain('внутрь локации');
++    expect(design).toContain('не переносит уже');
++  });
++
++  it('две строки настройки и оба вида обязательности', () => {
++    expect(design).toContain('Две строки требования');
++    expect(design).toContain('Поиск по названию или выбор из списка');
++    expect(design).toContain('«Обязателен?»');
++    expect(design).toContain('терминала / замка');
++    expect(design).toContain('требование обязательное');
++    expect(design).toContain('требование необязательное');
++    expect(design).toContain('Мастер открывает доступ вручную');
++  });
++
++  it('логика доступа и примеры владельца не потеряны', () => {
++    expect(design).toContain('мини-игра **не запускается');
++    expect(design).toContain('на сервере');
++    expect(design).toContain('не разбирается');
++    expect(design).toContain('Сейф «только ключом»');
++    expect(design).toContain('Торговец контрабандой');
++    expect(design).toContain('компрометирующая записка');
++    expect(design).toContain('метка принадлежности к фракции');
++  });
++
++  it('краткие правила и ссылки в правилах приложения', () => {
++    expect(design).toContain('## 10. Краткие правила');
++    expect(design).toContain('Проверка условия — на сервере');
++    expect(read('docs/architecture/engine-charter.md')).toContain('Ключевые записи и точки доступа (патч 513');
++    expect(read('docs/agents/README.md')).toContain('docs/key-items-and-gates-design.md');
++    expect(read('replit.md')).toContain('docs/key-items-and-gates-design.md');
++    expect(read('docs/ui-modals-rules.md')).toContain('Новая модалка не рисуется с нуля');
++  });
++});
+diff --git a/docs/agents/README.md b/docs/agents/README.md
+index 91e2d69..47b0a2c 100644
+--- a/docs/agents/README.md
++++ b/docs/agents/README.md
+@@ -118,3 +118,9 @@ Web — ПУСТАЯ ФУНКЦИЯ: молчит; прямые вызовы в
+ - **Новая модалка = каркас ближайшей модалки** (палитра, карточка, заголовок,
+   поля, кнопки, меню `⋮`), а не новый `StyleSheet.create` с «похожими»
+   значениями. Полный чек-лист и образцы — `docs/ui-modals-rules.md`.
++- **Ключи и точки доступа.** Перед любой правкой `requires`, вложенности
++  карточек или выдачи прочитать разделы 7 и 10
++  `docs/key-items-and-gates-design.md`: ключ не выдаётся отдельно (пункт
++  «Выдать на склад» оставлен для совместимости), не вкладывается в терминал,
++  все четыре карточки перетаскиваются в локацию, требование бывает
++  обязательным и необязательным. Патч 513 зафиксировал контракт без кода.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 45db871..9d443dd 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -105,6 +105,21 @@
+ ---
+ 
+ ## 4. Инварианты геймплея (решения владельца, по книге)
++**Ключевые записи и точки доступа (патч 513, контракт без кода).** Полный
++дизайн — `docs/key-items-and-gates-design.md`, разделы 7 и 10. Обязательные
++инварианты, которые нельзя нарушать при реализации шага 3:
++
++- Ключ как игровой объект не выдаётся отдельно: он часть локации, контейнера
++  или торговца, но не терминала. Пункт «Выдать на склад» в меню карточки
++  ключа сохранён как исключение обратной совместимости — не удалять.
++- Все четыре карточки перетаскиваются внутрь локации и имеют иконку со
++  стрелками; добытые записи при перетаскивании не трогаются.
++- Требование ключа бывает обязательным и необязательным; настраивается двумя
++  строками (ключ + поле «Обязателен?», проверка терминалом/замком).
++- Есть ключ на общем складе — мини-игра не запускается; нет обязательного
++  ключа — доступа нет; нет необязательного — проходят привязанную проверку
++  либо Мастер открывает вручную. Проверка на сервере, не в окне игрока.
++
+ 
+ - **Усталость:** −⌊N/2⌋ текущих ОЗ за игровой час активности. Сон из правила исключён;
+   лечение — постелью. Сжигание еды/воды сном НЕ менять.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e7815a0..0354005 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,38 @@
+ # Changelog
+ ---
++## Key and access-point rules clarified (patch 513, docs only)
++
++The owner extended the design and chose "document it for now" — **no code,
++protocol or game behaviour was changed**. All decisions are recorded in
++`docs/key-items-and-gates-design.md` (Update 7 and section 10), in
++`docs/architecture/engine-charter.md`, in the agent start map and in `replit.md`.
++
++- **A key is never issued on its own.** Containers, merchants and terminals can
++  stand on the grid and be broadcast to players either directly or inside a
++  location. A key reaches the party only as part of a location, container or
++  merchant; it is never placed inside a terminal, although a terminal may
++  require it.
++- **Compatibility exception.** The "Add to storage" item in the key card's
++  `⋮` menu stays by the owner's explicit decision ("for backward
++  compatibility"): existing campaigns and storage snapshots keep working.
++  Removing the item or changing the snapshot format is forbidden.
++- **Dragging.** All four cards — container, merchant, terminal, key — can be
++  moved into a location, and each has the arrow drag handle. Already found
++  records are untouched by a move.
++- **Two kinds of requirement.** Containers, merchants, terminals and the future
++  "lock" may require a key as mandatory or optional. The point's card gets two
++  setup rows: a key (search or list) with an "Is it mandatory?" field next to
++  it, and a check (search or list of terminals / locks).
++- **Access.** If the key is in shared storage, the mini-game never starts and
++  the point opens immediately. A missing mandatory key means no access. A
++  missing optional key means the linked terminal, hack, lockpick or force must
++  be passed, or the GM opens access manually. The check runs on the server by
++  record id; the note's text is for players and is never parsed.
++- **Examples.** A safe "by key or by hack" and a safe "key only"; a
++  contraband merchant gated by a faction badge or an incriminating note.
++
++Step 3 implementation will start on a separate instruction.
++
+ ## Modals now follow the design of nearby windows (patch 512)
+ 
+ The owner: "If you create modal windows, at least follow the design of other
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 51c9be6..00ce9f4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,38 @@
+ # История изменений
+ 
+ ---
++## Уточнение правил ключей и точек доступа (патч 513, только документ)
++
++Владелец дал дополнение к дизайну и выбрал «пока только зафиксировать» —
++**код, протокол и поведение игры не менялись**. Все решения записаны в
++`docs/key-items-and-gates-design.md` (Обновление 7 и раздел 10), в устав
++`docs/architecture/engine-charter.md`, в стартовую карту агента и в `replit.md`.
++
++- **Ключ не выдаётся отдельно.** Контейнер, торговец и терминал живут на сетке
++  и выдаются игрокам как сами по себе, так и внутри локации. Ключ попадает к
++  партии только как часть локации, контейнера или торговца; в терминал его не
++  вкладывают, хотя терминал сам может его требовать.
++- **Исключение совместимости.** Пункт «Выдать на склад» в меню `⋮` карточки
++  ключа сохранён по прямому решению владельца («для backward совместимости»):
++  уже созданные кампании и снимки хранилища продолжают работать. Удалять
++  пункт и менять формат снимка запрещено.
++- **Перетаскивание.** Все четыре карточки — контейнер, торговец, терминал,
++  ключ — переносятся внутрь локации, у каждой иконка со стрелками. Уже добытые
++  записи при переносе не трогаются.
++- **Два вида требования.** Контейнер, торговец, терминал и будущий «замок»
++  могут требовать ключ как обязательный или необязательный. В карточке точки
++  две строки настройки: ключ (поиск или список) с полем «Обязателен?» рядом и
++  проверка (поиск или список терминала / замка).
++- **Доступ.** Есть ключ на общем складе — мини-игра не запускается, точка
++  открыта сразу. Нет обязательного ключа — доступа нет. Нет необязательного —
++  проходят привязанный терминал, взлом, отмычку или силу, либо Мастер открывает
++  доступ вручную. Проверка идёт на сервере по идентификатору записи, текст
++  записки для игроков не разбирается.
++- **Примеры.** Сейф «ключом или взломом» и сейф «только ключом»; торговец
++  контрабандой с меткой фракции или компрометирующей запиской.
++
++Реализация шага 3 начнётся отдельной командой.
++
+ ## Модалки берут дизайн у соседних окон (патч 512)
+ 
+ Владелец: «Просьба если создаёшь модалки, то хотя бы ориентируйся на дизайн
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 0e59967..b81d24c 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,7 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
+-- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See `docs/patch-512-install.md`.
++- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See `docs/patch-512-install.md`. Key placement, dragging and access requirements are specified in `docs/key-items-and-gates-design.md` (patch 513, no code changes).
+ - **Handover.** Snapshots sync from the GM Google Drive in both directions, so the save arrives on another device. Both the GM and players can export storage to a file and import it back: when the GM changes, the new GM fills storage on the new server in one action. Room state lives only in server memory and disappears on disconnect — the file and Drive are the recovery path. See `docs/patch-509-install.md`.
+ - **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 92cebda..650a413 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,7 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
+-- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). Подробности — `docs/patch-512-install.md`.
++- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). Подробности — `docs/patch-512-install.md`. Порядок вложения ключей, перетаскивания и требования доступа зафиксирован в `docs/key-items-and-gates-design.md` (патче 513, код не менялся).
+ - **Перенос хранилища.** Снимок синхронизируется из Google Drive Мастера в обе стороны, поэтому сейв приезжает на другое устройство. И Мастер, и игрок могут выгрузить хранилище в файл и импортировать его обратно: если ведущий сменился, новый Мастер наполняет хранилище нового сервера одним действием. Состояние комнаты живёт только в памяти сервера и исчезает при отключении — файл и Drive служат для восстановления. Подробности — `docs/patch-509-install.md`.
+ - **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 826fd50..dba328e 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -10,8 +10,11 @@
+ каркас склада, но ошибся со слоем хранения (общий файл на сервере). Патч
+ **508** заменил его финальной моделью владельца — **Обновление 5** ниже:
+ хранилище Мастера + снапшот игрокам, запись только онлайн. Протокол,
+-атомарность, плашка и модалка 507 сохранены. Шаги 3–5 (`requires`, ворота,
+-мини-игра замков) пока не реализованы.
++атомарность, плашка и модалка 507 сохранены. Патч **513** (только документ,
++без кода) зафиксировал уточнение владельца о вложенности ключей,
++перетаскивании карточек и двух строках требования — **Обновление 7** ниже.
++Шаги 3–5 (`requires`, ворота, мини-игра замков) **не реализованы**: для шага 3
++описан контракт, код начнётся отдельной командой владельца.
+ 
+ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
+ «Я полагал ключ будет, как карточка контейнера/торговца/терминала и с модалкой
+@@ -37,6 +40,97 @@
+ Слой данных 510 (`gm_key_items`, `kind: 'keyItem'`, запрет `withdraw`,
+ перенос в снимке) не меняется: меняется только способ создания и показа
+ записей на экране Мастера.
++**Обновление 7 (патч 513, фиксация дизайна без кода).** Владелец уточнил:
++«контейнер, торговца, терминал можно выдавать как самостоятельно, так и
++внутри локации. А вот ключи нельзя выдать просто так. Ключ должен быть частью
++чего-либо: локации, контейнера, торговца, но не терминала»; «карточки
++контейнера, торговца, терминала, ключа можно переместить внутрь локации ...
++должна быть иконка перетаскивания со стрелками»; «могут требовать ключевой
++предмет для открытия ... как обязательный предмет, так и необязательное».
++Ниже — согласованный контракт шага 3.
++
++### 7.1 Кто где живёт и что можно выдавать
++
++| Объект | Карточка на сетке Мастера | Выдаётся игрокам напрямую | Внутрь локации | Может **содержать** ключ | Может **требовать** ключ |
++| --- | --- | --- | --- | --- | --- |
++| Локация | да | да | — | да | да |
++| Контейнер | да | **да** | да | **да** | да |
++| Торговец | да | **да** | да | **да** | да |
++| Терминал | да | **да** | да | **нет** | да |
++| Ключ / записка | да (для создания и правки) | **нет** | да | — | — |
++| «Замок» (будущая мини-игра) | да | да | да | **нет** | да |
++
++Ключ как игровой объект **не выдаётся отдельно**: он попадает к партии только
++как содержимое выданной локации, контейнера или торговца. В терминал ключ не
++вкладывается ни при создании, ни перетаскиванием (терминал при этом сам может
++требовать ключ — это разные роли).
++
++**Исключение обратной совместимости (прямое решение владельца):** пункт
++«Выдать на склад» в меню `⋮` карточки ключа **остаётся** — «для backward
++совместимости». Уже созданные кампании и снимки хранилища 510–512 продолжают
++работать; Мастер по-прежнему может вручную положить запись на общий склад.
++Новые сценарии строятся через вложение. Не удалять пункт, не ломать
++`storage.addKey`, не убирать `kind: 'keyItem'` из снимка и не вводить запрет
++на сервере: это запрещено данным решением.
++
++### 7.2 Перетаскивание
++
++Все четыре вида карточек — контейнер, торговец, терминал, ключ — перетаскиваются
++внутрь локации. У **каждой** есть иконка со стрелками в левом верхнем углу, та
++же, что уже стоит на карточках контейнеров (`arrow-all`). Цель перетаскивания —
++только локация; ключ в терминал положить нельзя. Перетаскивание меняет
++принадлежность карточки на сетке и связи локации, но **не переносит уже
++добытые** записи на складе: добытое игроками неприкосновенно (Обновление 3).
++
++### 7.3 Две строки требования в карточке точки
++
++В форме создания/правки контейнера, торговца, терминала и будущего «замка»
++появляются две строки настройки доступа:
++
++1. **Ключ.** Поиск по названию или выбор из списка созданных ключевых записей;
++   рядом с этой строкой — поле **«Обязателен?»** (да / нет).
++2. **Проверка.** Поиск или выбор из списка терминала / замка (будущей
++   мини-игры), который служит альтернативным способом доступа.
++
++Это и есть вариативность: «только ключом», «ключом или взломом», «только
++взломом» и «ключом и взломом» собираются комбинацией этих двух строк и флага
++обязательности, без новых типов условий.
++
++### 7.4 Как решается доступ
++
++- **Ключ есть** в общем хранилище комнаты → мини-игра **не запускается
++  вообще**; замок / контейнер / торговец / терминал считаются открытыми.
++  Уведомления Мастеру нет: он сам создал запись, связал её и выдал.
++- **Ключа нет, требование обязательное** → доступа нет ни через что. Нужно
++  добыть ключ (полезть в сейф) или решение Мастера вручную открыть доступ.
++- **Ключа нет, требование необязательное** → нужно пройти привязанную
++  проверку: взломать выбранный терминал, пройти мини-игру замка, открыть
++  отмычкой или силой (набор способов — решение Мастера за столом), **либо**
++  Мастер открывает доступ вручную.
++- Условия проверяются **на сервере** по состоянию комнаты, а не в окне
++  игрока (урок 506). Клиент не решает, открыта точка или нет.
++- Текст описания записки — для игроков, он **не разбирается** как условие.
++  Проверка идёт по идентификатору ключевой записи на общем складе.
++
++### 7.5 Примеры владельца
++
++- **Сейф со сложным электронным замком:** ключ необязателен, во второй строке
++  привязан терминал. Нашли ключ — открыли сразу; не нашли — взламывают
++  терминал. Обошли сейф и не взломали — доступа нет.
++- **Сейф «только ключом»:** ключ обязателен, вторая строка пуста. Ни отмычка,
++  ни сила не помогают.
++- **Торговец контрабандой:** в первой строке «метка принадлежности к фракции»
++  или «компрометирующая записка». Без записи лавка закрыта (обязательное
++  требование) или открывается после взлома / убеждения (необязательное).
++
++### 7.6 Границы патча 513
++
++Патч меняет **только документы и номер версии**. Код, протокол, база данных,
++форма создания, серверная проверка и поведение игры не тронуты: владелец
++выбрал «пока только зафиксировать». Реализация шага 3 начинается отдельной
++командой и должна опираться на разделы 3.3, 7.3 и 7.4. `kind: 'lock'` и
++нейтральное событие `hacked` по-прежнему зарезервированы за шагом 5.
++
+ 
+ **Обновление 1:** по решению владельца ключевой предмет перенесён из
+ инвентаря персонажа **в состояние комнаты**. Причина: «если персонаж с ключом
+@@ -207,8 +301,11 @@ requires: [
+ - Условия проверяются **на сервере** по состоянию комнаты. Клиент не решает,
+   открыт контейнер или нет: иначе повторится история 506, когда признак
+   доступа жил в окне и «оживал» после закрытия.
+-- Несколько условий в одном списке — «все должны выполниться». Если позже
+-  понадобится «любое из», это отдельный флаг, не новая модель.
++- Несколько условий в одном списке — «все должны выполниться». **Обновление 7
++  (патч 513)** вводит для пары «ключ + проверка» отношение «любое из»: условие
++  ключа получает признак `optional`, а вторая строка настройки указывает
++  терминал / замок как альтернативу. Новой модели не появляется — это флаг и
++  ссылка внутри уже описанного списка условий. Подробная логика в 7.3–7.4.
+ - Для узла локации используется уже существующий `locked` и ошибка
+   `CONTAINER_LOCKED`; новую ошибку изобретать не надо.
+ 
+@@ -415,7 +512,9 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+    «Забрать». Записи едут в снимке хранилища.
+ 3. **Серверная проверка ключа.** Контейнер объявляет `requires`, сервер
+    проверяет склад и помечает `hacked`, не запуская мини-игру. Без
+-   уведомления Мастеру.
++   уведомления Мастеру. ⏳ **Контракт уточнён в 513** (вложенность ключей,
++   перетаскивание, две строки настройки, обязательный / необязательный ключ),
++   **код не начат** — ждёт отдельной команды владельца.
+ 4. **Ворота.** `requires` по событию другого контейнера, снятие `locked`,
+    общее состояние на комнату, отображение связей в админке.
+ 5. **Позже:** мини-игра взлома замков на том же контракте `hacked`.
+@@ -439,5 +538,33 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+   «предметы есть на складе или нет, игроки сами смотрят».
+ - **Осталось:** лимиты и стаканье; поведение при удалении записи-шаблона;
+   тихое срабатывание ключа.
+-- Шаги 2–5 по-прежнему в плане: ключевые записи на складе, `requires`,
+-  ворота между контейнерами и мини-игра взлома замков.
++- Шаг 2 ✅ реализован в 510–512. Шаги 3–5 в плане: `requires` и проверка
++  ключа (контракт зафиксирован в 513), ворота между контейнерами, мини-игра
++  взлома замков. Патч 513 код не менял.
++
++
++---
++
++## 10. Краткие правила (обязательные для агента и Мастера)
++
++Выжимка Обновления 7; полный контракт — в разделах 7.1–7.6.
++
++1. Ключ **не выдаётся как отдельный предмет**: он часть локации, контейнера
++   или торговца. В терминал не вкладывается.
++2. Пункт «Выдать на склад» в меню `⋮` карточки ключа **сохранён** как
++   исключение обратной совместимости; удалять его и ломать снимок хранилища
++   нельзя.
++3. У контейнера, торговца, терминала и ключа есть иконка перетаскивания со
++   стрелками; все четыре переносятся внутрь локации.
++4. Контейнер, торговец, терминал и будущий «замок» могут требовать ключ;
++   требование бывает **обязательным** и **необязательным**.
++5. Есть ключ на общем складе — мини-игра не запускается, точка открыта сразу.
++   Нет ключа и он обязателен — доступа нет. Нет ключа и он необязателен —
++   проходят привязанный терминал / взлом / отмычку / силу либо Мастер открывает
++   вручную.
++6. Настройка требования — **две строки** в карточке точки: ключ (поиск или
++   список) с полем «Обязателен?» рядом, и проверка (поиск или список
++   терминала / замка).
++7. Проверка условия — на сервере по состоянию комнаты; текст записки для
++   игроков, условие считается по идентификатору записи.
++8. Добытое игроками неприкосновенно; счётчика на плашке и журнала операций нет.
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index ab762d9..ba85828 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index dabcdc2..88cf75c 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index fd9883a..80ea702 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 83830b1..3527c9a 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index f37ae58..1bf0013 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 28bd73c..d3b022a 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 6407eae..808315c 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 58bdb59..4c6ed92 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index b604844..a867055 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 80a6006..e078a69 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 56ff0ed..9638925 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 8e218b1..44e9325 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index a6389c0..1b0137a 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 2531b87..cf2e128 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 40be6a6..6eaf797 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 28d2ee3..3a91863 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 9beb820..883bdab 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ > **Ключи как карточки на сетке (уточнение интерфейса 510) — см. `docs/patch-511-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index cf42c07..264f71d 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 510** (коммит `0606fb8`, ветка
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index 3d7669b..693e40d 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++
+ Патч подготовлен от состояния **версии 511** (коммит `860fe82`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–512
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+new file mode 100644
+index 0000000..0b69313
+--- /dev/null
++++ b/docs/patch-513-install.md
+@@ -0,0 +1,124 @@
++# Установка патча 513: уточнение правил ключей (только документ)
++
++Патч подготовлен от состояния **версии 512** (коммит `6da0a37`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–513
++цепочкой.
++
++> **Код не менялся.** Владелец на вопрос об объёме выбрал «Пока только
++> зафиксировать»: «Внести дополнение в дизайн-документ и правила, код не
++> трогать до отдельной команды». Меняются только документы, приёмочный тест на
++> них и номер версии.
++
++## Что зафиксировано
++
++Полный контракт — `docs/key-items-and-gates-design.md`, **Обновление 7**
++(разделы 7.1–7.6) и **раздел 10 «Краткие правила»**.
++
++### 1. Вложенность и выдача
++
++| Объект | Выдаётся напрямую | Внутрь локации | Содержит ключ | Требует ключ |
++| --- | --- | --- | --- | --- |
++| Локация | да | — | да | да |
++| Контейнер | да | да | да | да |
++| Торговец | да | да | да | да |
++| Терминал | да | да | **нет** | да |
++| Ключ / записка | **нет** | да | — | — |
++| «Замок» (будущий) | да | да | **нет** | да |
++
++Ключ как игровой объект попадает к партии только как содержимое выданной
++локации, контейнера или торговца. В терминал не вкладывается.
++
++**Исключение обратной совместимости:** пункт «Выдать на склад» в меню `⋮`
++карточки ключа **остаётся** — прямое решение владельца «для backward
++совместимости». Не удалять пункт, не ломать `storage.addKey`, не убирать
++`kind: 'keyItem'` из снимка хранилища.
++
++### 2. Перетаскивание
++
++Все четыре карточки — контейнер, торговец, терминал, ключ — переносятся внутрь
++локации, у каждой иконка со стрелками (`arrow-all`). Уже добытые записи при
++переносе не изменяются.
++
++### 3. Два вида требования и две строки настройки
++
++Контейнер, торговец, терминал и будущий «замок» могут требовать ключ как
++**обязательный** или **необязательный**. В карточке точки две строки:
++
++1. ключ — поиск по названию или выбор из списка; рядом поле «Обязателен?»;
++2. проверка — поиск или выбор из списка терминала / замка (будущей мини-игры).
++
++Логика доступа:
++
++- ключ есть на общем складе → мини-игра не запускается, точка открыта сразу,
++  уведомления Мастеру нет;
++- ключа нет и он обязателен → доступа нет (нужно добыть ключ или решение
++  Мастера);
++- ключа нет и он необязателен → проходят привязанный терминал / взлом /
++  отмычку / силу, либо Мастер открывает вручную;
++- проверка на сервере по идентификатору записи; текст записки для игроков не
++  разбирается.
++
++Примеры: сейф «ключом или взломом», сейф «только ключом», торговец
++контрабандой с меткой фракции или компрометирующей запиской.
++
++### 4. Где ещё записано правило
++
++- `docs/architecture/engine-charter.md` — раздел 4, блок инвариантов
++  «Ключевые записи и точки доступа (патч 513, контракт без кода)».
++- `docs/agents/README.md` — короткий список правил, которые нельзя нарушать.
++- `replit.md` — обязательный контекст для ИИ-агентов перед правкой ключей,
++  вложенности, перетаскивания или требований доступа.
++- `__tests__/room/key-items-placement-513.test.js` — 7 проверок на полноту
++  фиксации и отсутствие противоречий.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `docs/key-items-and-gates-design.md` | Обновление 7, раздел 10, правки разделов 3.3 / 8 / 9 |
++| `docs/architecture/engine-charter.md`, `docs/agents/README.md`, `replit.md` | правила приложения и ссылки |
++| `__tests__/room/key-items-placement-513.test.js` | приёмочный тест на документ |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 513, 79/79 заметок |
++| `patchs/513-key-placement-design.patch` | сам патч для установщика |
++
++Код (`components/`, `server/`, `db/`, `domain/`, `src/`, `i18n/`) **не тронут**.
++
++## Установка
++
++С действующей версии 512:
++
++```bash
++./apply-patch.sh 513
++# ✓ Установлен патч: №513 (версия 512 → 513)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 513
++```
++
++`patchs/baseline.json` в источнике равен `513`. После установки
++`public/version.json` → `513`; закоммитьте изменения и пересоберите веб-сборку
++(сервис Node.js перезапускать не обязательно — серверный код не менялся).
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/key-items-placement-513.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "513"'
++```
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/513-key-placement-design.patch
++cp /path/to/513-key-placement-design.patch patchs/
++```
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 88e9272..2ba94a6 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "512"
++  "baseline": "513"
+ }
+diff --git a/public/version.json b/public/version.json
+index dade96b..f87fd60 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "512",
++  "version": "513",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
+       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
+       "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
+       "Мастер может создавать ключи и записки: имя, описание с жирным текстом, курсивом и списками, предпросмотр перед сохранением.",
+@@ -83,6 +84,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
+       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
+       "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
+       "The GM can create keys and notes: a name, a description with bold, italics and lists, and a live preview before saving.",
+diff --git a/replit.md b/replit.md
+index ed82ef8..3da1cb8 100644
+--- a/replit.md
++++ b/replit.md
+@@ -15,6 +15,8 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
+ - `docs/ui-modals-rules.md` before adding or restyling ANY modal window —
+   reuse the nearest existing modal's layout and styles instead of inventing
+   a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
++- `docs/key-items-and-gates-design.md` (sections 7 and 10) before touching key
++  records, container/hub placement, drag handles or access requirements.
+ 
+ This project is evolving from a Fallout-only application into a universal
+ TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform

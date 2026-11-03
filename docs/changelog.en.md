@@ -1,5 +1,38 @@
 # Changelog
 ---
+## Key and access-point rules clarified (patch 513, docs only)
+
+The owner extended the design and chose "document it for now" — **no code,
+protocol or game behaviour was changed**. All decisions are recorded in
+`docs/key-items-and-gates-design.md` (Update 7 and section 10), in
+`docs/architecture/engine-charter.md`, in the agent start map and in `replit.md`.
+
+- **A key is never issued on its own.** Containers, merchants and terminals can
+  stand on the grid and be broadcast to players either directly or inside a
+  location. A key reaches the party only as part of a location, container or
+  merchant; it is never placed inside a terminal, although a terminal may
+  require it.
+- **Compatibility exception.** The "Add to storage" item in the key card's
+  `⋮` menu stays by the owner's explicit decision ("for backward
+  compatibility"): existing campaigns and storage snapshots keep working.
+  Removing the item or changing the snapshot format is forbidden.
+- **Dragging.** All four cards — container, merchant, terminal, key — can be
+  moved into a location, and each has the arrow drag handle. Already found
+  records are untouched by a move.
+- **Two kinds of requirement.** Containers, merchants, terminals and the future
+  "lock" may require a key as mandatory or optional. The point's card gets two
+  setup rows: a key (search or list) with an "Is it mandatory?" field next to
+  it, and a check (search or list of terminals / locks).
+- **Access.** If the key is in shared storage, the mini-game never starts and
+  the point opens immediately. A missing mandatory key means no access. A
+  missing optional key means the linked terminal, hack, lockpick or force must
+  be passed, or the GM opens access manually. The check runs on the server by
+  record id; the note's text is for players and is never parsed.
+- **Examples.** A safe "by key or by hack" and a safe "key only"; a
+  contraband merchant gated by a faction badge or an incriminating note.
+
+Step 3 implementation will start on a separate instruction.
+
 ## Modals now follow the design of nearby windows (patch 512)
 
 The owner: "If you create modal windows, at least follow the design of other

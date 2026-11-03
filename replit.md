@@ -15,6 +15,8 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
 - `docs/ui-modals-rules.md` before adding or restyling ANY modal window —
   reuse the nearest existing modal's layout and styles instead of inventing
   a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
+- `docs/key-items-and-gates-design.md` (sections 7 and 10) before touching key
+  records, container/hub placement, drag handles or access requirements.
 
 This project is evolving from a Fallout-only application into a universal
 TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform
