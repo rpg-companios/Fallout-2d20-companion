@@ -15,6 +15,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
+import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
 // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
 // /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
@@ -26,6 +27,7 @@ import { seedDatabase } from './db/seed';
 import { useLocale, useModuleLocale } from './i18n/locale';
 import { tApp } from './i18n/appI18n';
 import useCharacterStore from './src/store/characterStore';
+import useRoomStore from './src/room/roomStore';
 import { debugLog } from './src/debug/falloutDebug';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
@@ -37,6 +39,7 @@ import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
 import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
 import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
 import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
+import { startPartyStoragePersistence, restoreMasterStorage } from './src/lootTrade/partyStoragePersistence';
 import useUiModeStore from './src/room/uiModeStore';
 import {
   enforceAdminModeEntitlement,
@@ -171,6 +174,23 @@ function App() {
   useEffect(() => {
     if (!dbReady) return undefined;
     return startGmSessionPersistence();
+  }, [dbReady]);
+
+  // Патч 508: хранилище Мастера — канон «Общего хранилища». Сохраняем каждый
+  // снимок локально и в Drive, а при подключении Мастера поднимаем сейв в
+  // комнату, чтобы игроки получили актуальное состояние.
+  useEffect(() => {
+    if (!dbReady) return undefined;
+    const restored = new Set();
+    const unsubscribePersist = startPartyStoragePersistence();
+    const unsubscribeRooms = useRoomStore.subscribe((state) => {
+      for (const [code, room] of Object.entries(state.rooms || {})) {
+        if (room?.role !== 'gm' || room.joined === false || restored.has(code)) continue;
+        restored.add(code);
+        void restoreMasterStorage(code);
+      }
+    });
+    return () => { unsubscribePersist(); unsubscribeRooms(); };
   }, [dbReady]);
 
   // Шаг 8в (патч 243): таймер расхода блока силовой брони (§5.3/§5.4) —
@@ -345,8 +365,12 @@ function App() {
           <FusionCoreChoiceModal />
           <PlayerLootTradeOverlay />
           <PlayerDirectiveOverlay />
-          <AlertHost />
+          {/* Патч 506: «Что нового» рисуется ДО диалогов, иначе окно обновления
+              перекрывало уведомление Мастера о взломе терминала. */}
           <UpdateNoticeModal />
+          <AlertHost />
+          {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
+          <TerminalRetryPromptHost />
           <SurvivalClock />
       </SafeAreaProvider>
     </PaperProvider>

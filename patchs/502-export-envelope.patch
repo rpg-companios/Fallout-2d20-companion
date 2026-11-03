@@ -1,0 +1,623 @@
+diff --git a/__tests__/room/terminal-export-envelope-502.test.js b/__tests__/room/terminal-export-envelope-502.test.js
+new file mode 100644
+index 0000000..eaf6135
+--- /dev/null
++++ b/__tests__/room/terminal-export-envelope-502.test.js
+@@ -0,0 +1,180 @@
++// Приёмочный тест 502: владелец прислал часть реального сейва персонажа
++// (файл экспорта «rpg-companion-character») с ИНТ 10, УДЧ 10, Наукой 6 и
++// сообщил, что на терминале 5 сложности по-прежнему видит 21 слово.
++//
++// Патч 501 снимал ровно один конверт `data` (CHAR_PUBLISH). В файле экспорта
++// лист лежит глубже — в `character.data`, поэтому ИНТ не находился и снова
++// подменялся четвёркой: 25 − 4 = 21. Теперь лист ищется на любой глубине,
++// включая строковый JSON и двойные обёртки.
++import { describe, expect, it } from 'vitest';
++import {
++  characterStats,
++  createGame,
++  normalizeCharacterSnapshot,
++  passwordWordCount,
++} from '../../server/terminalHacking.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++
++// Фрагмент сейва владельца (значения и структура сохранены дословно).
++export const exportedCharacter = {
++  format: 'rpg-companion-character',
++  version: 1,
++  exportedAt: '2026-11-02T19:07:58.523Z',
++  character: {
++    id: 'char_1793455951437_wluz0q9ck',
++    name: 'ывывы',
++    level: 4,
++    originName: 'brotherhood',
++    data: {
++      characterName: 'ывывы',
++      level: 4,
++      attributes: [
++        { name: 'STR', value: 4 }, { name: 'PER', value: 4 }, { name: 'END', value: 4 },
++        { name: 'CHA', value: 4 }, { name: 'INT', value: 10 }, { name: 'AGI', value: 4 },
++        { name: 'LCK', value: 10 },
++      ],
++      skills: [
++        { name: 'ATHLETICS', value: 0 }, { name: 'BARTER', value: 0 },
++        { name: 'BIG_GUNS', value: 0 }, { name: 'ENERGY_WEAPONS', value: 0 },
++        { name: 'EXPLOSIVES', value: 3 }, { name: 'LOCKPICK', value: 3 },
++        { name: 'MEDICINE', value: 3 }, { name: 'MELEE_WEAPONS', value: 3 },
++        { name: 'PILOT', value: 3 }, { name: 'REPAIR', value: 3 },
++        { name: 'SCIENCE', value: 6 }, { name: 'SMALL_GUNS', value: 2 },
++        { name: 'SNEAK', value: 2 }, { name: 'SPEECH', value: 2 },
++        { name: 'SURVIVAL', value: 0 }, { name: 'THROWING', value: 0 },
++        { name: 'UNARMED', value: 0 },
++      ],
++      selectedSkills: ['SMALL_GUNS', 'SNEAK', 'SPEECH'],
++      extraTaggedSkills: ['SCIENCE'],
++      forcedSelectedSkills: ['SCIENCE'],
++      origin: { id: 'brotherhood' },
++      trait: {
++        ids: ['brotherhood-chain-that-binds'],
++        id: 'brotherhood-chain-that-binds',
++        name: 'Цепь, которая связывает',
++      },
++    },
++  },
++};
++
++const config = { containerId: 'term-5', name: 'Терминал', difficulty: 5 };
++const gameFor = (snapshot) => createGame({
++  config,
++  operatorClientId: 'player-1',
++  operatorCharacterId: 'char-1',
++  characterSnapshot: snapshot,
++  now: 100,
++  rng: () => 0.42,
++});
++
++describe('502: файл экспорта персонажа читается на любой глубине', () => {
++  it('весь файл экспорта: ИНТ 10, УДЧ 10, Наука 6 → 15 слов и 20 % возврата', () => {
++    expect(characterStats(exportedCharacter)).toMatchObject({
++      intelligence: 10, luck: 10, science: 6, hackerRank: 0,
++    });
++    const game = gameFor(exportedCharacter);
++    expect(game.wordCount).toBe(15);
++    expect(game.wordRanges).toHaveLength(15);
++    expect(game.wordCount).toBe(passwordWordCount(5, 10));
++    expect(game.recoveryChancePercent).toBe(20);
++    expect(game.bracketRanges).toHaveLength(4);
++    expect(game.attempts).toBe(4);
++    expect(game.operatorName).toBe('ывывы');
++  });
++
++  it('все обёртки, которыми сейв может дойти до движка, дают 15 слов', () => {
++    const sheet = exportedCharacter.character.data;
++    const publish = (data) => ({
++      characterId: exportedCharacter.character.id,
++      name: 'ывывы',
++      level: 4,
++      updatedAt: 1,
++      data,
++    });
++    const variants = {
++      'сам лист character.data': sheet,
++      'CHAR_PUBLISH { data: лист }': publish(sheet),
++      'CHAR_PUBLISH { data: файл экспорта }': publish(exportedCharacter),
++      'CHAR_PUBLISH { data: JSON-строка файла }': publish(JSON.stringify(exportedCharacter)),
++      'только узел character': exportedCharacter.character,
++      'JSON-строка всего файла экспорта': JSON.stringify(exportedCharacter),
++      'двойная обёртка CHAR_PUBLISH → export': publish(publish(exportedCharacter)),
++      'CHAR_PUBLISH { data: { characterData: лист } }': publish({ characterData: sheet }),
++    };
++    for (const [label, snapshot] of Object.entries(variants)) {
++      expect(characterStats(snapshot).intelligence, label).toBe(10);
++      expect(characterStats(snapshot).luck, label).toBe(10);
++      expect(characterStats(snapshot).science, label).toBe(6);
++      expect(gameFor(snapshot).wordCount, label).toBe(15);
++    }
++  });
++
++  it('через реестр комнаты: опубликованный файл экспорта даёт доску из 15 слов', () => {
++    const registry = createRoomRegistry();
++    const { room } = registry.createRoom({ clientId: 'gm-1' });
++    registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'player-1', name: 'ывывы', role: 'player' });
++    registry.putSnapshot({
++      code: room.code,
++      characterId: 'char_1793455951437_wluz0q9ck',
++      revision: 1,
++      fromClientId: 'player-1',
++      snapshot: exportedCharacter,
++    });
++    expect(registry.issueTerminal({ code: room.code, clientId: 'gm-1', config }).error).toBeUndefined();
++    const started = registry.terminalAction({
++      code: room.code,
++      clientId: 'player-1',
++      characterId: 'char_1793455951437_wluz0q9ck',
++      containerId: config.containerId,
++      action: 'start',
++    });
++    expect(started.error).toBeUndefined();
++    expect(started.terminal.game.intelligence).toBe(10);
++    expect(started.terminal.game.luck).toBe(10);
++    expect(started.terminal.game.science).toBe(6);
++    expect(started.terminal.game.wordCount).toBe(15);
++    expect(started.terminal.game.recoveryChancePercent).toBe(20);
++    expect(started.terminal.game.operatorName).toBe('ывывы');
++  });
++
++  it('служебные поля внешних конвертов не теряются при снятии обёрток', () => {
++    const wrapped = {
++      characterId: 'c1',
++      name: 'ывывы',
++      data: {
++        ...exportedCharacter,
++        terminalHacking: { hasProgrammersDigest: true, digestUsed: false },
++        equipment: { items: [{ id: 'mag_programmers_digest' }] },
++      },
++    };
++    const stats = characterStats(wrapped);
++    expect(stats.intelligence).toBe(10);
++    expect(stats.hasDigest).toBe(true);
++    expect(gameFor(wrapped).digestEligible).toBe(true);
++    expect(normalizeCharacterSnapshot(wrapped).characterName).toBe('ывывы');
++  });
++
++  it('формы из патча 501 и каноническая формула доски не сломаны', () => {
++    expect(characterStats({
++      attributes: { INT: { value: 10 }, LCK: { value: 4 } },
++      skills: [{ id: 'science', rank: 6 }],
++      selectedPerks: [{ id: 'hacker', rank: 1 }],
++    })).toMatchObject({ intelligence: 10, science: 6, luck: 4, hackerRank: 1 });
++    const lowInt = {
++      ...exportedCharacter,
++      character: {
++        ...exportedCharacter.character,
++        data: {
++          ...exportedCharacter.character.data,
++          attributes: exportedCharacter.character.data.attributes.map((attr) => (
++            attr.name === 'INT' ? { ...attr, value: 4 } : attr
++          )),
++        },
++      },
++    };
++    expect(characterStats(lowInt).intelligence).toBe(4);
++    expect(gameFor(lowInt).wordCount).toBe(21);
++    expect(gameFor(lowInt).wordCount).toBe(passwordWordCount(5, 4));
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2302489..d162803 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,30 @@
+ # Changelog
+ ---
++## Export saves are read at any nesting depth (patch 502)
++
++The owner sent a fragment of a real save (`format: rpg-companion-character`,
++`character.data.attributes`, INT 10, LCK 10, Science 6) and reported that a
++difficulty-5 terminal still showed 21 words.
++
++Patch 501 unwrapped exactly one `data` envelope (the `CHAR_PUBLISH` shape). An
++export file keeps the sheet one level deeper, under `character.data`, so when
++that object (or a JSON string of it) was published to the room, attributes were
++not found and fell back to 4 again: `25 − 4 = 21`.
++
++`normalizeCharacterSnapshot()` now walks the `data`, `character`,
++`characterData`, `payload`, `snapshot` and `save` envelopes up to 12 layers,
++parses JSON strings at any level, picks the deepest layer holding
++`attributes`/`skills`, and preserves service fields from outer envelopes
++(`terminalHacking`, `equipment`). The operator name is set in `createGame()`,
++not only in `applyGameAction()`.
++
++Every delivery shape was tested: the bare sheet, `CHAR_PUBLISH` with the sheet,
++`CHAR_PUBLISH` with the whole export file, a JSON string, a double envelope and
++the `character` node alone. All give INT 10 / LCK 10 / Science 6 → **15 words,
++4 brackets, 20% attempt recovery**. Board sizing is unchanged.
++
++Installation: `docs/patch-502-install.md`.
++
+ ## Character stats are read from the sheet (patch 501)
+ 
+ Owner: "Why do I see 21 words on a difficulty-5 terminal at INT 10? Isn't
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e1578a2..b686915 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,31 @@
+ # История изменений
+ 
+ ---
++## Сейв из файла экспорта читается на любой глубине (патч 502)
++
++Владелец прислал часть реального сейва (`format: rpg-companion-character`,
++`character.data.attributes`, ИНТ 10, УДЧ 10, Наука 6) и сообщил, что на
++терминале 5 сложности по-прежнему видит 21 слово.
++
++Патч 501 снимал ровно один конверт `data` (формат `CHAR_PUBLISH`). В файле
++экспорта лист лежит на уровень глубже — `character.data`, — поэтому если такой
++объект (или JSON-строка с ним) попадал в публикацию комнаты, атрибуты не
++находились и снова подменялись четвёркой: `25 − 4 = 21`.
++
++`normalizeCharacterSnapshot()` теперь обходит конверты `data`, `character`,
++`characterData`, `payload`, `snapshot`, `save` на глубину до 12 слоёв,
++понимает строковый JSON на любом уровне, находит самый глубокий слой с
++`attributes`/`skills` и сохраняет служебные поля внешних обёрток
++(`terminalHacking`, `equipment`). Имя оператора проставляется уже в
++`createGame()`, а не только в `applyGameAction()`.
++
++Проверены все варианты доставки сейва: сам лист, `CHAR_PUBLISH` с листом,
++`CHAR_PUBLISH` с целым файлом экспорта, JSON-строка, двойная обёртка и узел
++`character` без внешнего конверта. Везде ИНТ 10 / УДЧ 10 / Наука 6 дают
++**15 слов, 4 скобки, 20 % возврата попыток**. Формула доски не менялась.
++
++Установка: `docs/patch-502-install.md`.
++
+ ## Характеристики берутся из листа персонажа (патч 501)
+ 
+ Владелец: «Почему при инт 10, я вижу 21 слово на терминале 5 сложности?
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index e9a8495..2a613e5 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+ 
+ > **Патч 497 заменил этот баланс.** Актуальные правила — `docs/patch-497-install.md`.
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 21f240a..073f59f 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+ 
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 1f76d6d..747056a 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+ 
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 1a187eb..8695dd4 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+ 
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 2bf5884..2cb680d 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 499** (коммит `0840f1b`, ветка
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 206a2ba..1bed2a5 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
++
+ Патч подготовлен от состояния **версии 500** (коммит `98ab994`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+new file mode 100644
+index 0000000..1253761
+--- /dev/null
++++ b/docs/patch-502-install.md
+@@ -0,0 +1,147 @@
++# Установка патча 502: сейв из файла экспорта читается на любой глубине
++
++Патч подготовлен от состояния **версии 501** (коммит `28c861b`, ветка
++`arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
++патчи 493–502 цепочкой.
++
++## Что случилось
++
++Владелец прислал часть настоящего сейва персонажа и написал, что на
++терминале 5 сложности по-прежнему видит 21 слово:
++
++```json
++{
++  "format": "rpg-companion-character",
++  "version": 1,
++  "exportedAt": "2026-11-02T19:07:58.523Z",
++  "character": {
++    "id": "char_1793455951437_wluz0q9ck",
++    "name": "ывывы",
++    "level": 4,
++    "originName": "brotherhood",
++    "data": {
++      "characterName": "ывывы",
++      "attributes": [
++        { "name": "INT", "value": 10 },
++        { "name": "LCK", "value": 10 }
++      ],
++      "skills": [ { "name": "SCIENCE", "value": 6 } ]
++    }
++  }
++}
++```
++
++Это **файл экспорта**: лист персонажа лежит в `character.data` — на два уровня
++глубже, чем в сетевом конверте `CHAR_PUBLISH` (`{ name, data: <лист> }`), с
++которым работал патч 501. Если в комнату публикуется весь файл экспорта (или
++JSON-строка с ним), атрибуты остаются вне досягаемости, ИНТ и УДЧ снова
++подменяются четвёркой и доска собирается как `25 − 4 = 21`:
++
++| Вариант доставки сейва | 501 | 502 |
++|---|---|---|
++| сам лист `character.data` | 15 | 15 |
++| `CHAR_PUBLISH { name, data: <лист> }` | 15 | 15 |
++| **весь файл экспорта** | **21** | **15** |
++| **`CHAR_PUBLISH { data: <файл экспорта> }`** | **21** | **15** |
++| **`CHAR_PUBLISH { data: "<JSON файла>" }`** | **21** | **15** |
++| только узел `character` | 15 | 15 |
++| двойная обёртка | 21 | 15 |
++
++С присланным сейвом (ИНТ 10, УДЧ 10, Наука 6) версия 502 даёт:
++
++```
++ИНТ 10 | УДЧ 10 | Наука 6 → 15 слов, 4 скобки, 4 попытки, шанс возврата 20 %
++```
++
++## Что исправлено
++
++- `server/terminalHacking.js` — `normalizeCharacterSnapshot()` теперь обходит
++  конверты `data`, `character`, `characterData`, `payload`, `snapshot`, `save`
++  на глубину до 12 слоёв, разбирает строковый JSON на любом уровне, выбирает
++  самый глубокий слой, где есть `attributes`/`skills`/`selectedPerks`, и
++  сохраняет служебные поля внешних обёрток (`terminalHacking`, `equipment`,
++  `usedMagazineEffects`). Защита от циклических ссылок — множество `seen`.
++- Имя оператора проставляется прямо в `createGame()` (раньше только в
++  `applyGameAction('start')`), поэтому окно взлома не теряет имя персонажа.
++- Баланс и правила 496–501 **не менялись**: `N = max(4, 15 + 2·D − ИНТ)`,
++  на D5 это `25 − ИНТ`, 4 попытки, скобки по Науке, удача 5–20 %, словарь
++  12 308 слов, интерфейс без служебных строк.
++
++## Регрессионная приёмка
++
++`__tests__/room/terminal-export-envelope-502.test.js` (5 тестов) использует
++присланный фрагмент сейва дословно: весь список атрибутов, 17 навыков,
++`selectedSkills`, `extraTaggedSkills`, `forcedSelectedSkills`, происхождение и
++черту характера. Проверяются:
++
++- весь файл экспорта → 15 слов, 15 % → нет, **20 %** возврата, оператор «ывывы»;
++- восемь вариантов обёрток, включая JSON-строку и двойной конверт;
++- путь через `createRoomRegistry()` с опубликованным файлом экспорта;
++- сохранение `terminalHacking` / `equipment.items` внешнего конверта;
++- формы из версии 501 и каноническая формула (ИНТ 4 → 21 слово).
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 502
++```
++
++С чистого `main` со старым установщиком
++(`arena/c1c60b87-fallout-2d20-companion`) один раз переключите источник:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 502
++```
++
++`patchs/baseline.json` в ветке-источнике равен `502`, поэтому при установке
++точно до отсечки дерево приводится к коммиту патча целиком, а каталог
++`patchs/` синхронизируется (появится и
++`patchs/502-export-envelope.patch`). `./apply-patch.sh --status` до установки
++может написать «Всё актуально» — ориентируйтесь на `public/version.json` и
++явно указывайте номер.
++
++После установки: `public/version.json` → `502`, `patchs/baseline.json` → `502`;
++закоммитьте изменения и **перезапустите сервис Node.js** (`server/` считает
++доску). Веб-сборку пересоберите. Уже начатые партии запустите заново кнопкой
++**«Сброс»** у Мастера: доска, сгенерированная старым кодом, останется из
++21 слова, пока партию не пересоздадут.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-export-envelope-502.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "502"'
++```
++
++Проверка на вашем сейве (должно быть `15`, а не `21`) — сохраните файл
++экспорта как `/tmp/character.json`:
++
++```bash
++node -e "
++const fs = require('fs');
++const e = require('./server/terminalHacking.js');
++const save = JSON.parse(fs.readFileSync('/tmp/character.json', 'utf8'));
++const g = e.createGame({ config: { containerId: 't', name: 'T', difficulty: 5 },
++  operatorClientId: 'p', operatorCharacterId: 'c', characterSnapshot: save,
++  now: 100, rng: () => 0.42 });
++console.log('ИНТ', g.intelligence, '| УДЧ', g.luck, '| Наука', g.science,
++  '| слов', g.wordCount, '| скобок', g.bracketRanges.length,
++  '| шанс', g.recoveryChancePercent + '%');
++"
++```
++
++### Прямой `git apply` без установщика
++
++Патч-файл не может содержать сам себя, поэтому при ручном наложении его нужно
++скопировать в `patchs/` отдельно:
++
++```bash
++git apply patchs/502-export-envelope.patch
++cp /path/to/502-export-envelope.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index 32ea688..915f01c 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -3,7 +3,8 @@
+ > **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток, скобки,
+ > пакеты Науки, таблица скобок, генератор «последовательности» и приёмочные
+ > замеры — в `docs/patch-500-install.md`, чтение характеристик листа
+-> персонажа — в `docs/patch-501-install.md`. История решений 496 — в
++> персонажа — в `docs/patch-501-install.md` и `docs/patch-502-install.md`.
++> История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+ > «сначала пароль, потом пустышки» (в 497 пароль выбирается внутри набора).
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index c180089..e9af48f 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "501"
++  "baseline": "502"
+ }
+diff --git a/public/version.json b/public/version.json
+index 236f65e..d883053 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "501",
++  "version": "502",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Исправлен взлом после импорта персонажа из файла: лист персонажа теперь находится в сейве любой вложенности, поэтому при Интеллекте 10 и Удаче 10 на пятой сложности будет 15 слов и 20 % шанс возврата попыток.",
++      "Имя персонажа в окне взлома больше не пропадает при запуске партии напрямую.",
+       "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
+       "Наука, Удача и перк «Хакер» тоже берутся из листа персонажа: число скобок, шанс восстановления попыток и снижение сложности больше не сбрасываются к значениям новичка.",
+       "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
+@@ -48,6 +50,8 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Fixed hacking after importing a character from a file: the sheet is now found at any nesting depth, so Intellect 10 and Luck 10 give 15 words and a 20% attempt-recovery chance at difficulty 5.",
++      "The character name no longer disappears from the hacking window when a round is started directly.",
+       "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
+       "Science, Luck and the Hacker perk also come from the character sheet: bracket counts, attempt-recovery odds and difficulty reduction no longer fall back to beginner values.",
+       "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index 45a9933..1fd2d82 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -138,34 +138,58 @@ const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
+   return { words, attempts: full ? 0 : attempts, full, kind };
+ };
+ 
+-// Патч 501. Лист персонажа приходит во взлом в трёх обличьях:
++// Патч 501/502. Лист персонажа приходит во взлом в нескольких обличьях:
+ //   1) живой стор приложения:  attributes: { INT: { base, total } },
+ //                              skills:     { SCIENCE: { base, total } };
+-//   2)legacy-сохранение из БД: attributes: [{ name: 'INT', value: 10 }],
++//   2) сохранение из БД:       attributes: [{ name: 'INT', value: 10 }],
+ //                              skills:     [{ name: 'SCIENCE', value: 6 }];
+-//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <liст из п.2> }.
+-// Раньше readAttribute понимал только словарь и массив с полями id/key, поэтому
+-// у опубликованного персонажа ИНТ и УДЧ не находились вовсе и молча падали на 4:
+-// на сложности 5 доска собиралась как 25−4=21 слово вместо 25−10=15. Наука
+-// читалась верно (по полю name), отчего число скобок выглядело правильным, а
+-// доска — нет. Теперь все три формы приводятся к одному виду до подсчёта доски.
++//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <лист из п.2> };
++//   4) файл экспорта «rpg-companion-character»:
++//        { format, version, exportedAt, character: { id, name, data: <лист> } };
++//   5) любая комбинация этих обёрток, в том числе строковый JSON внутри `data`.
++// Патч 501 снимал ровно один конверт `data`. Если в комнату публиковался весь
++// файл экспорта, атрибуты оставались в `character.data`, ИНТ снова падал на 4
++// и доска собиралась как 25−4=21 слово. Патч 502 ищет лист на любой глубине.
++const ENVELOPE_KEYS = ['data', 'character', 'characterData', 'payload', 'snapshot', 'save'];
++const MAX_SNAPSHOT_LAYERS = 12;
+ const parseObject = (value) => {
+-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+-  return value;
++  if (!value) return null;
++  if (typeof value === 'string') {
++    try { return parseObject(JSON.parse(value)); } catch { return null; }
++  }
++  return typeof value === 'object' && !Array.isArray(value) ? value : null;
+ };
++const isCharacterSheet = (obj) => Boolean(obj && (
++  obj.attributes !== undefined || obj.skills !== undefined
++  || obj.selectedPerks !== undefined || obj.usedMagazineEffects !== undefined
++  || obj.terminalHacking !== undefined
++));
++/**
++ * Снимает любое количество конвертов (CHAR_PUBLISH, файл экспорта, строковый
++ * JSON) и возвращает плоский лист персонажа. Служебные поля внешних обёрток
++ * (`terminalHacking` из CHAR_PUBLISH, `equipment` из сохранения) сохраняются.
++ */
+ const normalizeCharacterSnapshot = (snapshot) => {
+-  const outer = parseObject(snapshot) || {};
+-  let data = outer.data;
+-  if (typeof data === 'string') {
+-    try { data = JSON.parse(data); } catch { data = null; }
++  const root = parseObject(snapshot) || {};
++  const layers = [root];
++  const seen = new Set([root]);
++  for (let i = 0; i < layers.length && layers.length < MAX_SNAPSHOT_LAYERS; i += 1) {
++    for (const key of ENVELOPE_KEYS) {
++      const child = parseObject(layers[i]?.[key]);
++      if (child && !seen.has(child)) {
++        seen.add(child);
++        layers.push(child);
++      }
++    }
+   }
+-  const inner = parseObject(data);
+-  if (!inner) return outer;
+-  return {
+-    ...outer,
+-    ...inner,
+-    characterName: inner.characterName || outer.characterName || outer.name || '',
+-  };
++  // Лист — самый глубокий слой, где реально есть характеристики или навыки.
++  const sheet = [...layers].reverse().find(isCharacterSheet) || root;
++  const merged = {};
++  for (const layer of layers) Object.assign(merged, layer);
++  Object.assign(merged, sheet); // поля листа главнее одноимённых полей конверта
++  const name = layers.map((layer) => layer.characterName).find(Boolean)
++    || layers.map((layer) => layer.name).find(Boolean) || '';
++  return { ...merged, characterName: String(name || '') };
+ };
+ 
+ const ATTRIBUTE_ALIASES = {
+@@ -622,7 +646,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+     status: 'playing',
+     operatorClientId,
+     operatorCharacterId,
+-    operatorName: '',
++    operatorName: String(normalizeCharacterSnapshot(characterSnapshot).characterName || ''),
+     intelligence: stats.intelligence,
+     science: stats.science,
+     luck: stats.luck,

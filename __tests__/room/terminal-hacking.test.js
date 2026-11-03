@@ -9,7 +9,7 @@ import {
   luckRestoreChance,
 } from '../../server/terminalHacking.js';
 
-const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true };
+const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2 };
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
@@ -35,12 +35,12 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
   });
 
-  // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
+  // Патч 500: N = 15 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
   it.each([
-    [0, 4, 16], [1, 5, 18], [2, 6, 20], [3, 7, 22], [4, 8, 24], [5, 9, 26],
+    [0, 4, 11], [1, 5, 13], [2, 6, 15], [3, 7, 17], [4, 8, 19], [5, 9, 21],
   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
-      config: { ...config, difficulty, lockOnFailure: false },
+      config: { ...config, difficulty },
       operatorClientId: 'player-1',
       operatorCharacterId: 'char-1',
       characterSnapshot: { attributes: { INT: { value: 4 } }, skills: [] },
@@ -104,8 +104,10 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(game.bracketRanges).toHaveLength(4); // Наука 6 -> 4 скобки на ЛЮБОЙ сложности
     expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(2);
     expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(2);
+    // Патч 503: полное восстановление выпадает НЕ БОЛЕЕ одного раза на доску,
+    // даже если удача сработала бы на каждой скобке (rng=()=>0).
+    expect(game.bracketRanges.filter((b) => b.effect.full)).toHaveLength(1);
     for (const bracket of game.bracketRanges) {
-      expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
       expect(bracket.effect.words).toBe(bracket.kind === 'word' ? 1 : 0);
       expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
     }
@@ -191,7 +193,7 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(nextBoard.digestEligible).toBe(false);
   });
 
-  it('sets Access Granted on success, and locks with Access Denied after the last failure', () => {
+  it('sets Access Granted on success, and asks the GM after the last failure', () => {
     const base = createGame({
       config,
       operatorClientId: 'player-1',
@@ -226,8 +228,19 @@ describe('shared Fallout terminal hacking rules', () => {
       now: 102,
       rng: noRandomness,
     }).game;
-    expect(failed.status).toBe('locked');
-    expect(failed.result).toBe('ACCESS DENIED');
+    // Патч 504: провал виден игроку и ждёт решения Мастера — автоматической
+    // блокировки по галочке больше нет.
+    expect(failed.status).toBe('awaitingRetry');
+    expect(failed.result).toBe('ATTEMPTS EXHAUSTED');
+    expect(applyGameAction({
+      game: failed,
+      action: 'start',
+      clientId: 'player-1',
+      characterId: 'char-1',
+      characterSnapshot: {},
+      now: 103,
+      rng: noRandomness,
+    }).error).toBe('TERMINAL_AWAITING_RETRY');
   });
 
   it('registers location terminals as room-wide games without replacing the active location session', () => {
@@ -247,16 +260,15 @@ describe('shared Fallout terminal hacking rules', () => {
           kind: 'terminal',
           name: 'Control terminal',
           difficulty: 4,
-          lockOnFailure: true,
           items: [],
         }],
       },
     });
     expect(opened.session.targetType).toBe('room');
-    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4, lockOnFailure: true });
+    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4 });
     expect(registry.getState(room.code).terminalStates['terminal-in-vault']).toMatchObject({
       standaloneIssued: false,
-      config: { difficulty: 4, lockOnFailure: true },
+      config: { difficulty: 4 },
       game: null,
     });
     expect(registry.getState(room.code).activeSession.kind).toBe('hub');

@@ -1,0 +1,2788 @@
+diff --git a/App.js b/App.js
+index e7b0c9c..02cdd76 100644
+--- a/App.js
++++ b/App.js
+@@ -15,6 +15,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
+ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
++import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
+ // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
+ // /version.json + описание релиза (логика — src/utils/appVersion.js).
+ import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
+@@ -346,6 +347,8 @@ function App() {
+           <PlayerLootTradeOverlay />
+           <PlayerDirectiveOverlay />
+           <AlertHost />
++          {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
++          <TerminalRetryPromptHost />
+           <UpdateNoticeModal />
+           <SurvivalClock />
+       </SafeAreaProvider>
+diff --git a/__tests__/lootTrade/local-terminal-game.test.js b/__tests__/lootTrade/local-terminal-game.test.js
+index aa7bcc8..720efd3 100644
+--- a/__tests__/lootTrade/local-terminal-game.test.js
++++ b/__tests__/lootTrade/local-terminal-game.test.js
+@@ -10,7 +10,6 @@ const terminal = {
+   name: 'Vault console',
+   description: '',
+   difficulty: 2,
+-  lockOnFailure: true,
+ };
+ const characterSnapshot = buildLocalCharacterSnapshot({
+   characterName: 'Оператор',
+diff --git a/__tests__/lootTrade/player-location-hooks-repro.test.js b/__tests__/lootTrade/player-location-hooks-repro.test.js
+index 2feb899..b66f749 100644
+--- a/__tests__/lootTrade/player-location-hooks-repro.test.js
++++ b/__tests__/lootTrade/player-location-hooks-repro.test.js
+@@ -94,7 +94,6 @@ describe('player opening a GM-issued location', () => {
+                 kind: 'terminal',
+                 name: 'Vault terminal',
+                 difficulty: 3,
+-                lockOnFailure: false,
+                 items: [],
+               }],
+             },
+@@ -126,7 +125,6 @@ describe('player opening a GM-issued location', () => {
+                   containerId: 'terminal-1',
+                   name: 'Vault terminal',
+                   difficulty: 3,
+-                  lockOnFailure: false,
+                 },
+                 locked: false,
+                 game: null,
+@@ -186,7 +184,7 @@ describe('player opening a GM-issued location', () => {
+                 name: 'Vault terminal',
+                 description: '',
+                 locked: false,
+-                lockLabel: encodeTerminalNodeMarker({ difficulty: 3, lockOnFailure: true }),
++                lockLabel: encodeTerminalNodeMarker({ difficulty: 3 }),
+                 difficulty: 0,
+                 items: [],
+               }],
+diff --git a/__tests__/lootTrade/terminal-container.test.js b/__tests__/lootTrade/terminal-container.test.js
+index bf7e2c0..530f974 100644
+--- a/__tests__/lootTrade/terminal-container.test.js
++++ b/__tests__/lootTrade/terminal-container.test.js
+@@ -18,17 +18,18 @@ describe('terminal cards in loot/trade locations', () => {
+       name: 'Vault console',
+       description: 'Power is intermittent.',
+       difficulty: 5,
+-      lockOnFailure: true,
+       items: [{ entryId: 'should-not-exist', quantity: 99 }],
+     });
+     expect(terminal).toMatchObject({
+       id: 'term-1',
+       kind: CONTAINER_KIND.TERMINAL,
+       difficulty: 5,
+-      lockOnFailure: true,
+       items: [],
+     });
+     expect(normalizeContainerEntity({ kind: 'terminal', difficulty: 99 }).difficulty).toBe(5);
++    // Патч 504: галочки «блокировать после провала» больше нет ни в карточке,
++    // ни в узлах локации — решение принимает Мастер.
++    expect(terminal).not.toHaveProperty('lockOnFailure');
+   });
+ 
+   it('mounts the hacking modal only after selection, as a sibling of the location modal', () => {
+@@ -49,7 +50,7 @@ describe('terminal cards in loot/trade locations', () => {
+ 
+   it('can be linked in a location and included in its room-wide nodes', () => {
+     const terminal = normalizeContainerEntity({
+-      id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
++      id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3,
+     });
+     const hub = normalizeContainerEntity({
+       id: 'hub-1', kind: 'hub', name: 'Vault', roomCode: 'GM-AAAAAA',
+@@ -61,7 +62,6 @@ describe('terminal cards in loot/trade locations', () => {
+       containerId: 'term-1',
+       kind: 'terminal',
+       difficulty: 3,
+-      lockOnFailure: true,
+       items: [],
+     }]);
+     expect(sortContainersForRoot([terminal, hub]).map((entry) => entry.id)).toEqual(['hub-1', 'term-1']);
+diff --git a/__tests__/lootTrade/terminal-modal-local-fallback.test.js b/__tests__/lootTrade/terminal-modal-local-fallback.test.js
+index dc9da4f..172010d 100644
+--- a/__tests__/lootTrade/terminal-modal-local-fallback.test.js
++++ b/__tests__/lootTrade/terminal-modal-local-fallback.test.js
+@@ -45,7 +45,6 @@ const terminal = {
+   name: 'Vault console',
+   description: '',
+   difficulty: 2,
+-  lockOnFailure: false,
+ };
+ 
+ describe('terminal hacking modal on a legacy room server', () => {
+diff --git a/__tests__/lootTrade/terminal-node-marker.test.js b/__tests__/lootTrade/terminal-node-marker.test.js
+index 3d03743..2475118 100644
+--- a/__tests__/lootTrade/terminal-node-marker.test.js
++++ b/__tests__/lootTrade/terminal-node-marker.test.js
+@@ -12,7 +12,7 @@ import { normalizeActiveSession, applySessionUpdate } from '../../server/lootTra
+ import { decodeTerminalNodeMarker as serverDecodeMarker } from '../../server/terminalHacking.js';
+ 
+ const terminal = normalizeContainerEntity({
+-  id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
++  id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3,
+ });
+ const hub = normalizeContainerEntity({
+   id: 'hub-1', kind: 'hub', name: 'Vault', roomCode: 'GM-AAAAAA',
+@@ -40,7 +40,6 @@ describe('terminal node marker survives a legacy room server', () => {
+     expect(node.kind).toBe(CONTAINER_KIND.TERMINAL);
+     expect(decodeTerminalNodeMarker(node.lockLabel)).toMatchObject({
+       difficulty: 3,
+-      lockOnFailure: true,
+       label: 'Доступ запрещён',
+     });
+     // CJS-копия на сервере понимает тот же формат.
+@@ -55,7 +54,6 @@ describe('terminal node marker survives a legacy room server', () => {
+     expect(resolved.node).toMatchObject({
+       kind: CONTAINER_KIND.TERMINAL,
+       difficulty: 3,
+-      lockOnFailure: true,
+       lockLabel: 'Доступ запрещён',
+     });
+     expect(resolved.node.lockLabel).not.toContain('F2D20-TERM:');
+@@ -74,7 +72,6 @@ describe('terminal node marker survives a legacy room server', () => {
+     expect(session.nodes[0]).toMatchObject({
+       kind: 'terminal',
+       difficulty: 3,
+-      lockOnFailure: true,
+     });
+     expect(serverDecodeMarker(session.nodes[0].lockLabel)).toBeTruthy();
+     expect(session.targetType).toBe('room');
+@@ -91,17 +88,24 @@ describe('terminal node marker survives a legacy room server', () => {
+       sessionId: session.sessionId,
+       nodeContainerId: terminal.id,
+       nodeDifficulty: 5,
+-      nodeLockOnFailure: false,
+     }, 2000);
+     expect(updated.session.nodes[0]).toMatchObject({
+       kind: 'terminal',
+       difficulty: 5,
+-      lockOnFailure: false,
+     });
+     expect(decodeTerminalNodeMarker(updated.session.nodes[0].lockLabel)).toMatchObject({
+       difficulty: 5,
+-      lockOnFailure: false,
+     });
++    expect(updated.session.nodes[0]).not.toHaveProperty('lockOnFailure');
++  });
++
++  it('reads markers written by older versions but never writes the removed flag', () => {
++    const legacy = `${'F2D20-TERM:'}{"v":1,"d":4,"f":1,"l":"Старый замок"}`;
++    expect(decodeTerminalNodeMarker(legacy)).toEqual({ difficulty: 4, label: 'Старый замок' });
++    expect(serverDecodeMarker(legacy)).toEqual(decodeTerminalNodeMarker(legacy));
++    const written = encodeTerminalNodeMarker({ difficulty: 4, label: 'Новый замок' });
++    expect(written).not.toContain('"f"');
++    expect(decodeTerminalNodeMarker(written)).toEqual({ difficulty: 4, label: 'Новый замок' });
+   });
+ 
+   it('ignores malformed markers on ordinary loot nodes', () => {
+diff --git a/__tests__/lootTrade/terminal-ui-cleanup-498.test.js b/__tests__/lootTrade/terminal-ui-cleanup-498.test.js
+index 8080405..33e02b2 100644
+--- a/__tests__/lootTrade/terminal-ui-cleanup-498.test.js
++++ b/__tests__/lootTrade/terminal-ui-cleanup-498.test.js
+@@ -62,11 +62,14 @@ describe('патч 498: служебные тексты и читаемый цв
+     expect(MODAL).toContain('const localMode = !roomHasTerminalProtocol');
+   });
+ 
+-  it('фразы про блокировку больше не жёлтые/кремовые', () => {
+-    expect(FORM).toContain("terminalLockText: { color: '#222222'");
+-    expect(FORM).not.toContain("terminalLockText: { color: '#e6e0c6'");
+-    expect(FORM).toContain("color={lockOnFailure ? '#222222' : '#757575'}");
+-    expect(FORM).not.toContain("color={lockOnFailure ? '#e8c04b'");
++  it('патч 504: галочка «блокировать после провала» удалена из формы', () => {
++    expect(FORM).not.toContain('lockOnFailure');
++    expect(FORM).not.toContain('terminalLockLabel');
++    expect(FORM).not.toContain('terminalLockRow');
++    expect(RU.form.terminalLockLabel).toBeUndefined();
++    expect(EN.form.terminalLockLabel).toBeUndefined();
++    // Вместо неё — диалог Мастера на любом экране.
++    expect(read('App.js')).toContain('<TerminalRetryPromptHost />');
+   });
+ });
+ 
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index c253318..d3e87c3 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -58,7 +58,7 @@ const withServer = async (fn) => {
+   const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent-dist' });
+   const address = await app.start();
+   try {
+-    await fn(address.port);
++    await fn(address.port, app);
+   } finally {
+     await app.close();
+   }
+@@ -163,7 +163,7 @@ describe('roomServer: create/join/presence', () => {
+       }, code);
+ 
+       const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
+-        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true },
++        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2 },
+       }, code);
+       const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+       expect(issued.payload.terminal).toMatchObject({ containerId: 'term-1', standaloneIssued: true, game: null });
+@@ -271,6 +271,111 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  // Патч 504: провал доходит до Мастера как awaitingGm, «Да» пересобирает
++  // доску по свежим настройкам, «Нет» закрывает терминал до новой трансляции.
++  it('504: решение Мастера о повторном взломе синхронизируется по WS', async () => {
++    await withServer(async (port, app) => {
++      const gm = makeClient(port, 'gm-504');
++      const player = makeClient(port, 'player-504');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 504' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор', role: 'player' });
++      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await player.sendRaw(MESSAGE.CHAR_PUBLISH, {
++        characterId: 'char-504', revision: 1,
++        snapshot: { characterName: 'Оператор', data: { attributes: { INT: { value: 4 } }, skills: [] } },
++      }, code);
++
++      const config = { containerId: 'term-504', name: 'Терминал', difficulty: 5 };
++      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
++      await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
++      const startReq = await player.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-504',
++      }, code);
++      const started = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
++      expect(started.payload.terminal).toMatchObject({ awaitingGm: false, closed: false });
++
++      // Скрытый пароль берём из реестра: публичное состояние его не выдаёт.
++      const hidden = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
++      const wrong = hidden.wordRanges.filter((range) => range.word !== hidden.password).slice(0, 4);
++      let last = null;
++      for (const range of wrong) {
++        const req = await player.send(MESSAGE.TERMINAL_ACTION, {
++          containerId: config.containerId, action: 'guess', characterId: 'char-504', value: range.id,
++        }, code);
++        last = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === req);
++      }
++      expect(last.payload.terminal.game).toMatchObject({ status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED' });
++      expect(last.payload.terminal.awaitingGm).toBe(true);
++      // Мастер получил то же состояние — именно по нему всплывает вопрос.
++      const gmPrompt = await gm.waitFor((m) => (
++        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.awaitingGm === true
++      ));
++      expect(gmPrompt.payload.terminal.game.status).toBe('awaitingRetry');
++
++      // Игрок не может начать заново без ответа Мастера.
++      const deniedReq = await player.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-504',
++      }, code);
++      const denied = await player.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === deniedReq);
++      expect(denied.payload.code).toBe('TERMINAL_AWAITING_RETRY');
++
++      // Мастер меняет настройки и отвечает «Да»: сразу свежая доска.
++      const editReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
++        config: { ...config, name: 'Перепрошитый', difficulty: 1 },
++      }, code);
++      const edited = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === editReq);
++      expect(edited.payload.terminal.awaitingGm).toBe(true);
++      const yesReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'retry', value: 'yes',
++      }, code);
++      const yes = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === yesReq);
++      expect(yes.payload.terminal).toMatchObject({ awaitingGm: false, closed: false });
++      expect(yes.payload.terminal.game).toMatchObject({
++        status: 'playing', difficulty: 1, wordLength: 5, name: 'Перепрошитый', attempts: 4,
++      });
++      const playerYes = await player.waitFor((m) => (
++        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.game?.status === 'playing'
++        && m.payload.terminal?.game?.difficulty === 1
++      ));
++      expect(playerYes.payload.terminal.game.attempts).toBe(4);
++
++      // Второй провал и ответ «Нет»: карточка «Закрыт», обе кнопки запрещены.
++      const hidden2 = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
++      const wrong2 = hidden2.wordRanges.filter((range) => range.word !== hidden2.password).slice(0, 4);
++      for (const range of wrong2) {
++        const req = await player.send(MESSAGE.TERMINAL_ACTION, {
++          containerId: config.containerId, action: 'guess', characterId: 'char-504', value: range.id,
++        }, code);
++        await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === req);
++      }
++      const noReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'retry', value: 'no',
++      }, code);
++      const no = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === noReq);
++      expect(no.payload.terminal).toMatchObject({ closed: true, locked: true, awaitingGm: false });
++      expect(no.payload.terminal.game.status).toBe('closed');
++      const closedReq = await player.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-504',
++      }, code);
++      const closed = await player.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === closedReq);
++      expect(closed.payload.code).toBe('TERMINAL_CLOSED');
++
++      // Новая трансляция Мастера снимает «Закрыт».
++      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'reissue',
++      }, code);
++      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
++      expect(reissued.payload.terminal).toMatchObject({ closed: false, game: null });
++
++      gm.close();
++      player.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/__tests__/room/terminal-brackets-500.test.js b/__tests__/room/terminal-brackets-500.test.js
+index 87af785..0fb1122 100644
+--- a/__tests__/room/terminal-brackets-500.test.js
++++ b/__tests__/room/terminal-brackets-500.test.js
+@@ -14,7 +14,7 @@ const snapshot = (int, sci, luck) => ({
+   skills: [{ id: 'science', rank: sci }],
+ });
+ const gameFor = (d, int, sci, luck, seed) => createGame({
+-  config: { containerId: 't', difficulty: d, lockOnFailure: false },
++  config: { containerId: 't', difficulty: d },
+   operatorClientId: 'p', operatorCharacterId: 'c',
+   characterSnapshot: snapshot(int, sci, luck), now: 100, rng: () => seed,
+ });
+diff --git a/__tests__/room/terminal-gm-retry-504.test.js b/__tests__/room/terminal-gm-retry-504.test.js
+new file mode 100644
+index 0000000..188446f
+--- /dev/null
++++ b/__tests__/room/terminal-gm-retry-504.test.js
+@@ -0,0 +1,501 @@
++// Приёмочный тест патча 504. Владелец заменил галочку «блокировать после
++// провала» на решение Мастера:
++//   «вместо "блокировать после провала" переходим на модель: мастеру всплывает
++//    сообщение "Разрешить повторный взлом? Да/нет". Если да - новый конфиг.
++//    Нет, терминал нельзя больше взломать или посмотреть, если мастер не
++//    транслирует его снова».
++// Уточнения владельца: вопрос только при провале (не после успеха); «Да» сразу
++// строит новую доску по ТЕКУЩИМ настройкам; «Нет» оставляет карточку с
++// отметкой «Закрыт» и запрещает обе кнопки до новой трансляции; поле
++// lockOnFailure удаляется из формы, движка и сохранений полностью.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  applyGameAction,
++  createGame,
++  decodeTerminalNodeMarker,
++  encodeTerminalNodeMarker,
++  normalizeTerminalConfig,
++  publicGameState,
++  syncGameConfig,
++} from '../../server/terminalHacking.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  encodeTerminalNodeMarker as domainEncodeMarker,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade.js';
++import { normalizeActiveSession, applySessionUpdate } from '../../server/lootTradeSession.js';
++import { applyLocalTerminalAction, initialLocalTerminalState } from '../../components/lootTrade/localTerminalGame.js';
++import { findPending } from '../../components/lootTrade/terminalRetryPrompt.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const SNAPSHOT = {
++  characterName: 'Оператор',
++  data: { attributes: { INT: { value: 4 }, LCK: { value: 4 } }, skills: [] },
++};
++const BASE_CONFIG = { containerId: 't1', name: 'Терминал', description: 'Убежище', difficulty: 5 };
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
++  for (const [clientId, characterId] of [['p1', 'c1'], ['p2', 'c2']]) {
++    registry.putSnapshot({
++      code: room.code,
++      characterId,
++      revision: 1,
++      fromClientId: clientId,
++      snapshot: SNAPSHOT,
++    });
++  }
++  registry.issueTerminal({ code: room.code, clientId: 'gm-1', config: BASE_CONFIG });
++  const state = () => registry.getState(room.code).terminalStates.t1;
++  const hidden = () => registry._rooms.get(room.code).terminalStates.get('t1').game;
++  const act = (clientId, characterId, action, value) => registry.terminalAction({
++    code: room.code, clientId, characterId, containerId: 't1', action, value,
++  });
++  const start = (clientId = 'p1', characterId = 'c1') => act(clientId, characterId, 'start');
++  const exhaust = (clientId = 'p1', characterId = 'c1') => {
++    const game = hidden();
++    const wrong = game.wordRanges.filter((range) => range.word !== game.password).slice(0, 4);
++    let last = null;
++    for (const range of wrong) last = act(clientId, characterId, 'guess', range.id);
++    return last;
++  };
++  return { registry, room, state, hidden, act, start, exhaust };
++};
++
++describe('504: провал виден и ждёт решения Мастера', () => {
++  it('после четырех ошибок — awaitingRetry с явным результатом, без автоблокировки', () => {
++    const { state, start, exhaust } = setup();
++    start();
++    const result = exhaust();
++    expect(result.error).toBeUndefined();
++    expect(state().game.status).toBe('awaitingRetry');
++    expect(state().game.result).toBe('ATTEMPTS EXHAUSTED');
++    expect(state().game.attempts).toBe(0);
++    expect(state().awaitingGm).toBe(true);
++    expect(state().closed).toBe(false);
++    expect(state().locked).toBe(false);
++    // Публичное состояние не выдаёт пароль, но показывает провал.
++    expect(publicGameState(state().game).password).toBeUndefined();
++    expect(publicGameState(state().game).result).toBe('ATTEMPTS EXHAUSTED');
++  });
++
++  it('после провала нельзя ни взломать заново, ни тронуть доску без ответа Мастера', () => {
++    const { act, start, exhaust } = setup();
++    start();
++    exhaust();
++    for (const action of ['start', 'guess', 'bracket', 'view', 'useDigest']) {
++      expect(act('p1', 'c1', action).error).toBe(ERROR_CODE.TERMINAL_AWAITING_RETRY);
++    }
++    // «Да/Нет» — исключительно действие Мастера.
++    expect(act('p1', 'c1', 'retry', 'yes').error).toBe(ERROR_CODE.TERMINAL_GM_ONLY);
++  });
++
++  it('после успеха вопрос не всплывает', () => {
++    const { registry, room, state, start, hidden, act } = setup();
++    start();
++    const password = hidden().password;
++    const won = act('p1', 'c1', 'guess', hidden().wordRanges.find((r) => r.word === password).id);
++    expect(won.terminal.game.status).toBe('won');
++    expect(won.terminal.awaitingGm).toBe(false);
++    expect(registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'yes',
++    }).error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(state().game.result).toBe('ACCESS GRANTED');
++  });
++
++  it('отказ от «Дайджеста программиста» тоже приводит к вопросу Мастеру', () => {
++    const { state, act, start, exhaust } = setup();
++    start();
++    const withDigest = { ...SNAPSHOT, data: { ...SNAPSHOT.data, terminalHacking: { hasProgrammersDigest: true } } };
++    // Переиздаём доску под лист с журналом.
++    const { registry, room } = setup();
++    registry.putSnapshot({
++      code: room.code, characterId: 'c1', revision: 2, fromClientId: 'p1', snapshot: withDigest,
++    });
++    registry.terminalAction({ code: room.code, clientId: 'p1', characterId: 'c1', containerId: 't1', action: 'start' });
++    const hiddenGame = registry._rooms.get(room.code).terminalStates.get('t1').game;
++    const wrong = hiddenGame.wordRanges.filter((r) => r.word !== hiddenGame.password).slice(0, 4);
++    for (const range of wrong) {
++      registry.terminalAction({ code: room.code, clientId: 'p1', characterId: 'c1', containerId: 't1', action: 'guess', value: range.id });
++    }
++    expect(registry.getState(room.code).terminalStates.t1.game.status).toBe('pendingDigest');
++    const declined = registry.terminalAction({ code: room.code, clientId: 'p1', characterId: 'c1', containerId: 't1', action: 'declineDigest' });
++    expect(declined.terminal.game.status).toBe('awaitingRetry');
++    expect(declined.terminal.awaitingGm).toBe(true);
++    // Неиспользуемые here переменные нужны только для читаемости сценария.
++    expect(state().game.status).toBe('playing');
++    expect(typeof act).toBe('function');
++    expect(typeof exhaust).toBe('function');
++  });
++});
++
++describe('504: «Да» — новая доска по текущим настройкам', () => {
++  it('сразу строит свежую доску: новые слова, 4 попытки, имя и сложность из текущей карточки', () => {
++    const { registry, room, state, start, exhaust, hidden } = setup();
++    start();
++    const oldWords = hidden().wordRanges.map((range) => range.word);
++    exhaust();
++    const failedRevision = state().game.revision;
++    expect(failedRevision).toBeGreaterThan(1);
++    // Мастер меняет настройки ПОСЛЕ провала, пока ждёт решения.
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm-1',
++      config: { ...BASE_CONFIG, name: 'Перепрошитый', description: 'Новый блок', difficulty: 1 },
++    });
++    // Запрос к Мастеру не потерялся из-за правки карточки.
++    expect(state().awaitingGm).toBe(true);
++    const yes = registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'yes',
++    });
++    expect(yes.error).toBeUndefined();
++    expect(yes.terminal.awaitingGm).toBe(false);
++    expect(yes.terminal.closed).toBe(false);
++    expect(yes.terminal.game.status).toBe('playing');
++    expect(yes.terminal.game.attempts).toBe(4);
++    expect(yes.terminal.game.maxAttempts).toBe(4);
++    expect(yes.terminal.game.difficulty).toBe(1);
++    expect(yes.terminal.game.wordLength).toBe(5);
++    expect(yes.terminal.game.name).toBe('Перепрошитый');
++    expect(yes.terminal.game.description).toBe('Новый блок');
++    // Новая партия начинает счётчик ревизий заново: это действительно свежая
++    // доска, а не продолжение проваленной.
++    expect(yes.terminal.game.revision).toBe(1);
++    expect(hidden().operatorName).toBe('Оператор');
++    // Новая доска — новые слова, а не старый набор из проваленной партии.
++    expect(hidden().wordRanges.map((range) => range.word)).not.toEqual(oldWords);
++    expect(hidden().guesses).toHaveLength(0);
++    expect(hidden().wordRanges.every((range) => !range.removed && !range.guessed)).toBe(true);
++    expect(hidden().bracketRanges.every((range) => !range.used)).toBe(true);
++  });
++
++  it('настройки, изменённые ВО ВРЕМЯ доступа, влияют на «Да», но не стирают активную доску', () => {
++    const { registry, room, state, start, exhaust } = setup();
++    start();
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm-1', config: { ...BASE_CONFIG, difficulty: 2 },
++    });
++    // Прогресс партии сохранён, а конфигурация карточки уже свежая.
++    expect(state().game.status).toBe('playing');
++    expect(state().config.difficulty).toBe(2);
++    exhaust();
++    const yes = registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'yes',
++    });
++    expect(yes.terminal.game.difficulty).toBe(2);
++    expect(yes.terminal.game.wordLength).toBe(6);
++  });
++
++  it('«Да» сохраняет лист оператора: ИНТ10 даёт 15 слов, а не дефолтные 21', () => {
++    const registry = createRoomRegistry({ now: () => 1000 });
++    const { room } = registry.createRoom({ clientId: 'gm-1' });
++    registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Умный', role: 'player' });
++    registry.putSnapshot({
++      code: room.code, characterId: 'c1', revision: 1, fromClientId: 'p1',
++      snapshot: { characterName: 'Умный', data: { attributes: { INT: { value: 10 } }, skills: [{ name: 'SCIENCE', value: 6 }] } },
++    });
++    registry.issueTerminal({ code: room.code, clientId: 'gm-1', config: BASE_CONFIG });
++    registry.terminalAction({ code: room.code, clientId: 'p1', characterId: 'c1', containerId: 't1', action: 'start' });
++    const hidden = registry._rooms.get(room.code).terminalStates.get('t1').game;
++    expect(hidden.wordCount).toBe(15);
++    const wrong = hidden.wordRanges.filter((r) => r.word !== hidden.password).slice(0, 4);
++    for (const range of wrong) {
++      registry.terminalAction({ code: room.code, clientId: 'p1', characterId: 'c1', containerId: 't1', action: 'guess', value: range.id });
++    }
++    const yes = registry.terminalAction({ code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'yes' });
++    expect(yes.terminal.game.wordCount).toBe(15);
++    expect(yes.terminal.game.bracketRanges).toHaveLength(4);
++  });
++
++  it('«Взломать» тоже собирает доску по свежему конфигу, а не по полям старой партии', () => {
++    const game = createGame({
++      config: BASE_CONFIG, operatorClientId: 'p1', operatorCharacterId: 'c1',
++      characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,
++    });
++    const fresh = applyGameAction({
++      game, config: { ...BASE_CONFIG, difficulty: 1, name: 'Свежий' },
++      action: 'start', clientId: 'p2', characterId: 'c2',
++      characterSnapshot: SNAPSHOT, now: 200, rng: () => 0.42,
++    }).game;
++    expect(fresh.difficulty).toBe(1);
++    expect(fresh.wordLength).toBe(5);
++    expect(fresh.name).toBe('Свежий');
++    expect(fresh.operatorCharacterId).toBe('c2');
++  });
++
++  it('syncGameConfig обновляет «живые» поля, но не меняет сложность собранной доски', () => {
++    const game = createGame({
++      config: BASE_CONFIG, operatorClientId: 'p1', operatorCharacterId: 'c1',
++      characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,
++    });
++    const next = syncGameConfig(game, { ...BASE_CONFIG, name: 'Новое имя', difficulty: 1 });
++    expect(next.name).toBe('Новое имя');
++    expect(next.difficulty).toBe(5);
++    expect(next.wordLength).toBe(9);
++    expect(syncGameConfig(game, game)).toBe(game);
++  });
++});
++
++describe('504: «Нет» — карточка «Закрыт» до новой трансляции', () => {
++  it('обе кнопки запрещены; повторная трансляция Мастера снова открывает терминал', () => {
++    const { registry, room, state, act, start, exhaust } = setup();
++    start();
++    exhaust();
++    const no = registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'no',
++    });
++    expect(no.error).toBeUndefined();
++    expect(state().closed).toBe(true);
++    expect(state().locked).toBe(true);
++    expect(state().awaitingGm).toBe(false);
++    expect(state().game.status).toBe('closed');
++    expect(state().game.result).toBe('TERMINAL CLOSED');
++    for (const action of ['start', 'guess', 'bracket', 'view']) {
++      expect(act('p1', 'c1', action).error).toBe(ERROR_CODE.TERMINAL_CLOSED);
++    }
++    expect(act('p2', 'c2', 'start').error).toBe(ERROR_CODE.TERMINAL_CLOSED);
++    // Правка настроек сама по себе НЕ снимает «Закрыт».
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm-1', config: { ...BASE_CONFIG, difficulty: 2 },
++    });
++    expect(state().closed).toBe(true);
++    // Явная повторная трансляция — снимает.
++    const reissued = registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'reissue',
++    });
++    expect(reissued.terminal.closed).toBe(false);
++    expect(reissued.terminal.game).toBeNull();
++    expect(act('p1', 'c1', 'start').terminal.game.difficulty).toBe(2);
++  });
++
++  it('issueTerminal с reissue и новая выдача локации снимают «Закрыт»; правка узла — нет', () => {
++    const { registry, room, state, start, exhaust } = setup();
++    start();
++    exhaust();
++    registry.terminalAction({ code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'no' });
++    expect(state().closed).toBe(true);
++    // Повторная выдача локации = новая трансляция.
++    registry.openSession({
++      code: room.code, clientId: 'gm-1',
++      session: {
++        containerId: 'hub', kind: 'hub', name: 'Убежище', targetType: 'room',
++        nodes: [{ containerId: 't1', kind: 'terminal', name: 'Терминал', difficulty: 3, items: [] }],
++      },
++    });
++    expect(state().closed).toBe(false);
++    expect(state().config.difficulty).toBe(3);
++    // Правка того же узла не переоткрывает закрытый вручную терминал.
++    registry.terminalAction({ code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'no' }).error;
++    const fresh = setup();
++    fresh.start();
++    fresh.exhaust();
++    fresh.registry.terminalAction({ code: fresh.room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'no' });
++    fresh.registry.updateSession({
++      code: fresh.room.code, clientId: 'gm-1',
++      payload: { nodeContainerId: 't1', nodeDifficulty: 4 },
++    });
++    // Узел отсутствует в hub-сессии — состояние закрытия не тронуто.
++    expect(fresh.state().closed).toBe(true);
++    const direct = fresh.registry.issueTerminal({
++      code: fresh.room.code, clientId: 'gm-1', reissue: true, config: BASE_CONFIG,
++    });
++    expect(direct.terminal.closed).toBe(false);
++  });
++
++  it('«Да» после закрытия не обходит отказ: решение принимается только в awaitingRetry', () => {
++    const { registry, room, state, start, exhaust } = setup();
++    start();
++    exhaust();
++    registry.terminalAction({ code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'no' });
++    expect(registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'yes',
++    }).error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(state().closed).toBe(true);
++    expect(registry.terminalAction({
++      code: room.code, clientId: 'gm-1', containerId: 't1', action: 'retry', value: 'maybe',
++    }).error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++  });
++});
++
++describe('504: lockOnFailure удалён полностью', () => {
++  it('движок не читает и не пишет поле; старые сохранения с ним игнорируются', () => {
++    const config = normalizeTerminalConfig({ ...BASE_CONFIG, lockOnFailure: true });
++    expect(config).not.toHaveProperty('lockOnFailure');
++    expect(Object.keys(config).sort()).toEqual(['containerId', 'description', 'difficulty', 'name']);
++    const game = createGame({
++      config, operatorClientId: 'p', operatorCharacterId: 'c',
++      characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,
++    });
++    expect(game).not.toHaveProperty('lockOnFailure');
++    expect(publicGameState(game)).not.toHaveProperty('lockOnFailure');
++  });
++
++  it('маркер узла больше не содержит f, но понимает старые маркеры', () => {
++    const legacy = `F2D20-TERM:${JSON.stringify({ v: 1, d: 4, f: 1, l: 'Замок' })}`;
++    expect(decodeTerminalNodeMarker(legacy)).toEqual({ difficulty: 4, label: 'Замок' });
++    const written = encodeTerminalNodeMarker({ difficulty: 4, label: 'Замок' });
++    expect(written).not.toContain('"f"');
++    expect(written).toBe(domainEncodeMarker({ difficulty: 4, label: 'Замок' }));
++    expect(decodeTerminalNodeMarker(written)).toEqual({ difficulty: 4, label: 'Замок' });
++  });
++
++  it('карточка, узлыhub и сессия не сохраняют поле даже если оно пришло извне', () => {
++    const container = normalizeContainerEntity({ id: 't1', kind: 'terminal', name: 'T', difficulty: 3, lockOnFailure: true });
++    expect(container).not.toHaveProperty('lockOnFailure');
++    const session = normalizeActiveSession({
++      kind: 'hub', name: 'Убежище', targetType: 'room',
++      nodes: [{ containerId: 't1', kind: 'terminal', name: 'T', difficulty: 3, lockOnFailure: true, items: [] }],
++    }, 1000);
++    expect(session.nodes[0]).not.toHaveProperty('lockOnFailure');
++    const updated = applySessionUpdate(session, {
++      sessionId: session.sessionId, nodeContainerId: 't1', nodeDifficulty: 5, nodeLockOnFailure: false,
++    }, 2000);
++    expect(updated.session.nodes[0]).not.toHaveProperty('lockOnFailure');
++    expect(updated.session.nodes[0].difficulty).toBe(5);
++    expect(decodeTerminalNodeMarker(updated.session.nodes[0].lockLabel)).toEqual({ difficulty: 5, label: '' });
++  });
++
++  it('в исходниках формы, движка, реестра и клиента нет галочки', () => {
++    for (const file of [
++      'server/terminalHacking.js',
++      'server/roomRegistry.js',
++      'server/lootTradeSession.js',
++      'domain/lootTrade.js',
++      'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
++      'components/screens/LootTradeScreen/LootTradeScreen.js',
++      'components/lootTrade/localTerminalGame.js',
++      'components/lootTrade/TerminalHackingModal.js',
++      'components/lootTrade/PlayerLootTradeOverlay.js',
++      'src/room/roomStore.ts',
++    ]) {
++      expect(read(file), file).not.toContain('lockOnFailure');
++      expect(read(file), file).not.toContain('nodeLockOnFailure');
++    }
++    expect(read('components/screens/LootTradeScreen/modals/ContainerFormModal.js')).not.toContain('terminalLockLabel');
++    expect(read('App.js')).toContain('<TerminalRetryPromptHost />');
++    for (const dict of [
++      'i18n/ru-RU/screens/lootTrade/screen.json',
++      'i18n/en-EN/screens/lootTrade/screen.json',
++    ]) {
++      expect(json(dict).form.terminalLockLabel).toBeUndefined();
++      expect(json(dict).terminal.terminalLockedHint).toBeUndefined();
++    }
++  });
++
++  it('коды ошибок новой модели есть и на сервере, и в клиенте', () => {
++    expect(ERROR_CODE.TERMINAL_CLOSED).toBe('TERMINAL_CLOSED');
++    expect(ERROR_CODE.TERMINAL_AWAITING_RETRY).toBe('TERMINAL_AWAITING_RETRY');
++    const clientProtocol = read('src/room/roomProtocol.ts');
++    expect(clientProtocol).toContain("TERMINAL_CLOSED: 'TERMINAL_CLOSED'");
++    expect(clientProtocol).toContain("TERMINAL_AWAITING_RETRY: 'TERMINAL_AWAITING_RETRY'");
++  });
++});
++
++describe('504: диалог Мастера и экраны', () => {
++  it('findPending видит только провалы в комнатах Мастера и только один раз на ревизию', () => {
++    const rooms = {
++      'GM-1': {
++        role: 'gm',
++        terminalStates: {
++          a: { closed: false, config: { name: 'A', difficulty: 3 }, game: { status: 'awaitingRetry', revision: 7 } },
++          b: { closed: false, config: { name: 'B', difficulty: 2 }, game: { status: 'won', revision: 8 } },
++          c: { closed: true, config: { name: 'C', difficulty: 1 }, game: { status: 'awaitingRetry', revision: 9 } },
++        },
++      },
++      'GM-2': { role: 'player', terminalStates: { d: { game: { status: 'awaitingRetry', revision: 3 } } } },
++    };
++    expect(findPending(rooms)).toEqual([{
++      code: 'GM-1', containerId: 'a', key: 'GM-1|a|7', name: 'A', difficulty: 3,
++    }]);
++  });
++
++  it('в словарях есть вопрос, Да/Нет, бейдж «Закрыт» и повторная трансляция', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').terminal;
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json').terminal;
++    expect(ru.retryTitle).toBe('Разрешить повторный взлом?');
++    expect(ru.retryYes).toBe('Да');
++    expect(ru.retryNo).toBe('Нет');
++    expect(ru.closedBadge).toBe('ЗАКРЫТ');
++    expect(en.retryTitle).toBe('Allow another hack?');
++    expect(en.retryYes).toBe('Yes');
++    expect(en.retryNo).toBe('No');
++    expect(en.closedBadge).toBe('CLOSED');
++    expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
++    for (const key of ['retryMessage', 'retryWaiting', 'retryWaitingHint', 'closedHint', 'reissue', 'hackFailed', 'attemptsExhausted', 'stateReady', 'stateAwaiting', 'stateClosed', 'retryFailed']) {
++      expect(ru[key], key).toBeTruthy();
++      expect(en[key], key).toBeTruthy();
++    }
++  });
++
++  it('оверлей игрока показывает «Закрыт» и отключает обе кнопки; модалка сообщает о провале', () => {
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlay).toContain('terminal-closed-badge');
++    expect(overlay).toContain('disabled={terminalClosed}');
++    expect(overlay).toContain('terminalClosedBadge');
++    expect(overlay).toContain('terminalAwaiting');
++    const modal = read('components/lootTrade/TerminalHackingModal.js');
++    expect(modal).toContain("game?.status === 'awaitingRetry'");
++    expect(modal).toContain("tLootTrade('terminal.hackFailed')");
++    expect(modal).toContain("tLootTrade('terminal.retryWaiting')");
++    expect(modal).toContain('const canHack = Boolean(characterId');
++    expect(modal).toContain('!isClosed && !awaitingGm');
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(screen).toContain("action: 'retry'");
++    expect(screen).toContain("action: 'reissue'");
++    expect(screen).toContain('reissue: true');
++    expect(screen).not.toContain('terminalLockLabel');
++  });
++});
++
++describe('504: локальный резерв без сервера повторяет ту же модель', () => {
++  const ctx = (difficulty = 5, name = 'Терминал') => ({
++    terminal: { containerId: 't1', name, difficulty },
++    characterId: 'c1',
++    characterSnapshot: { characterName: 'Оператор', attributes: { INT: { value: 4 } }, skills: [] },
++    now: 100,
++    rng: () => 0.42,
++  });
++
++  const play = () => {
++    let state = applyLocalTerminalAction(initialLocalTerminalState(), 'start', undefined, ctx());
++    const wrong = state.game.wordRanges.filter((range) => range.word !== state.game.password).slice(0, 4);
++    for (const range of wrong) {
++      state = applyLocalTerminalAction(state, 'guess', range.id, ctx());
++    }
++    return state;
++  };
++
++  it('провал → awaitingRetry, повторный start запрещён без решения Мастера', () => {
++    const failed = play();
++    expect(failed.view.status).toBe('awaitingRetry');
++    expect(failed.view.result).toBe('ATTEMPTS EXHAUSTED');
++    const again = applyLocalTerminalAction(failed, 'start', undefined, ctx());
++    expect(again.error).toBe('TERMINAL_AWAITING_RETRY');
++    expect(again.view.status).toBe('awaitingRetry');
++  });
++
++  it('«Да» строит новую доску по свежим настройкам, «Нет» закрывает терминал', () => {
++    const failed = play();
++    const yes = applyLocalTerminalAction(failed, 'retryYes', undefined, ctx(1, 'Прошитый'));
++    expect(yes.view.status).toBe('playing');
++    expect(yes.view.difficulty).toBe(1);
++    expect(yes.view.wordLength).toBe(5);
++    expect(yes.view.name).toBe('Прошитый');
++    expect(yes.view.attempts).toBe(4);
++    const no = applyLocalTerminalAction(play(), 'retryNo', undefined, ctx());
++    expect(no.view.status).toBe('closed');
++    expect(applyLocalTerminalAction(no, 'start', undefined, ctx()).error).toBe('TERMINAL_CLOSED');
++    expect(applyLocalTerminalAction(no, 'guess', 'x', ctx()).error).toBe('TERMINAL_CLOSED');
++  });
++});
+diff --git a/__tests__/room/terminal-groups-503.test.js b/__tests__/room/terminal-groups-503.test.js
+index 0ad6e13..ca6451a 100644
+--- a/__tests__/room/terminal-groups-503.test.js
++++ b/__tests__/room/terminal-groups-503.test.js
+@@ -37,7 +37,7 @@ const snapshot = (int = 4, science = 0, luck = 4, name = 'Оператор') =>
+   skills: [{ name: 'SCIENCE', value: science }],
+ });
+ const gameFor = (int, science, difficulty = 5, luck = 4, seed = 0.42) => createGame({
+-  config: { containerId: 't', name: 'T', difficulty, lockOnFailure: false },
++  config: { containerId: 't', name: 'T', difficulty },
+   operatorClientId: 'p', operatorCharacterId: 'c',
+   characterSnapshot: snapshot(int, science, luck), now: 100, rng: () => seed,
+ });
+diff --git a/__tests__/room/terminal-hacking-balance-500.test.js b/__tests__/room/terminal-hacking-balance-500.test.js
+index 568aa52..08bdac5 100644
+--- a/__tests__/room/terminal-hacking-balance-500.test.js
++++ b/__tests__/room/terminal-hacking-balance-500.test.js
+@@ -35,7 +35,7 @@ const snapshot = (int = 4, science = 0, luck = 4, extra = {}) => ({
+   ...extra,
+ });
+ const gameFor = ({ difficulty = 5, int = 4, science = 0, luck = 4, seed = 0.42, extra = {} } = {}) => createGame({
+-  config: { containerId: 't', difficulty, lockOnFailure: false },
++  config: { containerId: 't', difficulty },
+   operatorClientId: 'p',
+   operatorCharacterId: 'c',
+   characterSnapshot: snapshot(int, science, luck, extra),
+diff --git a/__tests__/room/terminal-hacking.test.js b/__tests__/room/terminal-hacking.test.js
+index 45ede9f..c824480 100644
+--- a/__tests__/room/terminal-hacking.test.js
++++ b/__tests__/room/terminal-hacking.test.js
+@@ -9,7 +9,7 @@ import {
+   luckRestoreChance,
+ } from '../../server/terminalHacking.js';
+ 
+-const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true };
++const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2 };
+ const noRandomness = () => 0;
+ 
+ describe('shared Fallout terminal hacking rules', () => {
+@@ -40,7 +40,7 @@ describe('shared Fallout terminal hacking rules', () => {
+     [0, 4, 11], [1, 5, 13], [2, 6, 15], [3, 7, 17], [4, 8, 19], [5, 9, 21],
+   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
+     const game = createGame({
+-      config: { ...config, difficulty, lockOnFailure: false },
++      config: { ...config, difficulty },
+       operatorClientId: 'player-1',
+       operatorCharacterId: 'char-1',
+       characterSnapshot: { attributes: { INT: { value: 4 } }, skills: [] },
+@@ -193,7 +193,7 @@ describe('shared Fallout terminal hacking rules', () => {
+     expect(nextBoard.digestEligible).toBe(false);
+   });
+ 
+-  it('sets Access Granted on success, and locks with Access Denied after the last failure', () => {
++  it('sets Access Granted on success, and asks the GM after the last failure', () => {
+     const base = createGame({
+       config,
+       operatorClientId: 'player-1',
+@@ -228,8 +228,19 @@ describe('shared Fallout terminal hacking rules', () => {
+       now: 102,
+       rng: noRandomness,
+     }).game;
+-    expect(failed.status).toBe('locked');
+-    expect(failed.result).toBe('ACCESS DENIED');
++    // Патч 504: провал виден игроку и ждёт решения Мастера — автоматической
++    // блокировки по галочке больше нет.
++    expect(failed.status).toBe('awaitingRetry');
++    expect(failed.result).toBe('ATTEMPTS EXHAUSTED');
++    expect(applyGameAction({
++      game: failed,
++      action: 'start',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot: {},
++      now: 103,
++      rng: noRandomness,
++    }).error).toBe('TERMINAL_AWAITING_RETRY');
+   });
+ 
+   it('registers location terminals as room-wide games without replacing the active location session', () => {
+@@ -249,16 +260,15 @@ describe('shared Fallout terminal hacking rules', () => {
+           kind: 'terminal',
+           name: 'Control terminal',
+           difficulty: 4,
+-          lockOnFailure: true,
+           items: [],
+         }],
+       },
+     });
+     expect(opened.session.targetType).toBe('room');
+-    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4, lockOnFailure: true });
++    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4 });
+     expect(registry.getState(room.code).terminalStates['terminal-in-vault']).toMatchObject({
+       standaloneIssued: false,
+-      config: { difficulty: 4, lockOnFailure: true },
++      config: { difficulty: 4 },
+       game: null,
+     });
+     expect(registry.getState(room.code).activeSession.kind).toBe('hub');
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index b86d5a7..5d90bbd 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -280,6 +280,24 @@ export default function PlayerLootTradeOverlay() {
+         </View>
+       );
+     }
++    // Патч 504: «Нет» Мастера запрещает и взлом, и просмотр до новой
++    // трансляции. Карточка остаётся на экране с отметкой «Закрыт».
++    const directClosed = Boolean(
++      directTerminalContext.terminalState.closed
++      || directTerminalContext.terminalState.locked
++      || directTerminalContext.terminalState.game?.status === 'closed',
++    );
++    if (directClosed) {
++      return (
++        <View style={styles.floatingBar} pointerEvents="box-none">
++          <View style={styles.floatingPill}>
++            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
++            <Text style={styles.floatingClosedLabel}>{tLootTrade('terminal.closedBadge')}</Text>
++            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.closedHint')}</Text>
++          </View>
++        </View>
++      );
++    }
+     if (dismissedTerminalId === config.containerId) {
+       return (
+         <View style={styles.floatingBar} pointerEvents="box-none">
+@@ -404,6 +422,15 @@ export default function PlayerLootTradeOverlay() {
+                       kind: CONTAINER_KIND.TERMINAL,
+                     };
+                     const nodeLocked = Boolean(node.locked);
++                    // Патч 504: «Нет» Мастера оставляет карточку visible, но
++                    // запрещает И взлом, И просмотр до новой трансляции.
++                    const terminalClosed = Boolean(
++                      terminalState?.closed || terminalState?.locked
++                      || terminalState?.game?.status === 'closed',
++                    );
++                    const terminalAwaiting = !terminalClosed && Boolean(
++                      terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
++                    );
+                     const piecesCount = (node.items || []).reduce(
+                       (sum, entry) => sum + (Number(entry.quantity) || 0),
+                       0,
+@@ -438,12 +465,14 @@ export default function PlayerLootTradeOverlay() {
+                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                             </Text>
+                           ) : nodeIsTerminal ? (
+-                            <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
+-                              {terminalState?.locked
+-                                ? tLootTrade('terminal.accessDenied')
+-                                : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+-                                    difficulty: terminalForSelection.difficulty || 0,
+-                                  })}
++                            <Text style={[styles.hubUnlockedMetaText, (terminalClosed || terminalAwaiting) && styles.terminalDeniedMeta]}>
++                              {terminalClosed
++                                ? tLootTrade('terminal.closedBadge')
++                                : (terminalAwaiting
++                                  ? tLootTrade('terminal.retryWaiting')
++                                  : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
++                                      difficulty: terminalForSelection.difficulty || 0,
++                                    }))}
+                             </Text>
+                           ) : nodeIsMerch ? (
+                             <IconText style={styles.hubUnlockedMetaText}>
+@@ -467,15 +496,23 @@ export default function PlayerLootTradeOverlay() {
+                             </View>
+                           ) : nodeIsTerminal ? (
+                             <View style={styles.terminalButtons}>
++                              {terminalClosed && (
++                                <View testID="terminal-closed-badge" style={styles.terminalClosedBadge}>
++                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade('terminal.closedBadge')}</Text>
++                                </View>
++                              )}
+                               <TouchableOpacity
+                                 accessibilityRole="button"
++                                accessibilityState={{ disabled: terminalClosed }}
++                                disabled={terminalClosed}
+                                 testID="terminal-view-button"
+-                                style={styles.terminalViewButton}
++                                style={[styles.terminalViewButton, terminalClosed && styles.terminalButtonDisabled]}
+                                 onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
+                               >
+                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                               </TouchableOpacity>
+-                              {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
++                              {!terminalClosed && !terminalAwaiting
++                                && !['playing', 'pendingDigest', 'won', 'awaitingRetry'].includes(terminalState?.game?.status) ? (
+                                 <TouchableOpacity
+                                   accessibilityRole="button"
+                                   testID="terminal-hack-button"
+@@ -484,6 +521,16 @@ export default function PlayerLootTradeOverlay() {
+                                 >
+                                   <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                 </TouchableOpacity>
++                              ) : (terminalClosed || terminalAwaiting) && (
++                                <TouchableOpacity
++                                  accessibilityRole="button"
++                                  accessibilityState={{ disabled: true }}
++                                  disabled
++                                  testID="terminal-hack-button"
++                                  style={[styles.terminalHackButton, styles.terminalButtonDisabled]}
++                                >
++                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                </TouchableOpacity>
+                               )}
+                             </View>
+                           ) : (
+@@ -1522,6 +1569,10 @@ const styles = StyleSheet.create({
+   terminalHackButton: { backgroundColor: '#315331', borderWidth: 1, borderColor: '#a4cb77', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
+   terminalHackButtonText: { color: '#e1f5ca', fontSize: 11, fontWeight: '800' },
+   terminalDeniedMeta: { color: '#ff6969', fontWeight: '800' },
++  terminalClosedBadge: { backgroundColor: '#2b2222', borderWidth: 1, borderColor: '#8a5555', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center' },
++  terminalClosedBadgeText: { color: '#e2a3a3', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
++  terminalButtonDisabled: { opacity: 0.38 },
++  floatingClosedLabel: { color: '#e2a3a3', fontSize: 12, fontWeight: '900', letterSpacing: 1, marginTop: 3 },
+   lootFooter: {
+     marginTop: 18,
+     paddingTop: 4,
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index 5373736..9db6244 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -45,7 +45,7 @@ const TerminalHackingModal = ({
+   const scrollAnim = useRef(new Animated.Value(0)).current;
+ 
+   const terminalState = rooms?.[roomCode]?.terminalStates?.[terminal?.containerId]
+-    || (terminal?.containerId ? { containerId: terminal.containerId, game: null, locked: false } : null);
++    || (terminal?.containerId ? { containerId: terminal.containerId, game: null, closed: false } : null);
+   // Обновлённый сервер присылает capabilities.terminalHacking. Старый сервер
+   // (или офлайн-комната) не поддерживает протокол терминалов — играем локально.
+   const localMode = !roomHasTerminalProtocol(rooms?.[roomCode]);
+@@ -61,10 +61,41 @@ const TerminalHackingModal = ({
+   const boardOfAnotherOperator = Boolean(game && !isOperator && (
+     game.operatorCharacterId !== characterId || (!localMode && game.operatorClientId !== myClientId)
+   ));
+-  const canHack = Boolean(characterId && (localMode || roomCode) && !terminalState?.locked);
++  // Патч 504: после исчерпания попыток доска НЕ перезапускается сама —
++  // сначала Мастер отвечает на «Разрешить повторный взлом? Да/Нет».
++  const isClosed = Boolean(terminalState?.closed || terminalState?.locked || game?.status === 'closed');
++  const awaitingGm = !isClosed && (game?.status === 'awaitingRetry' || Boolean(terminalState?.awaitingGm));
++  const canHack = Boolean(characterId && (localMode || roomCode) && !isClosed && !awaitingGm);
++
++  // В локальной партии (сервер комнат недоступен) Мастер сидит за этим же
++  // устройством: показываем тот же вопрос «Да/Нет» здесь. В сетевой партии
++  // решение принимает глобальный TerminalRetryPromptHost на устройстве Мастера.
++  const localPromptKey = useRef('');
++  useEffect(() => {
++    if (!visible || !localMode || !awaitingGm) return;
++    const key = `${terminal?.containerId || ''}:${game?.revision ?? 'none'}`;
++    if (localPromptKey.current === key) return;
++    localPromptKey.current = key;
++    void showRawAlert({
++      title: tLootTrade('terminal.retryTitle'),
++      message: `${tLootTrade('terminal.attemptsExhausted')}
++${tLootTrade('terminal.retryMessage')}`,
++      kind: 'info',
++      buttons: [
++        { text: tLootTrade('terminal.retryYes') },
++        { text: tLootTrade('terminal.retryNo'), style: 'cancel' },
++      ],
++    }).then((index) => {
++      if (index === 0) doAction('retryYes');
++      else if (index === 1) doAction('retryNo');
++      else localPromptKey.current = '';
++    });
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [visible, localMode, awaitingGm, game?.revision, terminal?.containerId]);
+ 
+   useEffect(() => {
+     if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
++    if (isClosed || awaitingGm) return;
+     if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return;
+     const key = `${roomCode}:${terminal.containerId}:${characterId}:${game?.operatorCharacterId || ''}`;
+     if (lastAutoStartKey.current === key) return;
+@@ -72,9 +103,7 @@ const TerminalHackingModal = ({
+     void doAction('start');
+   // State intentionally tracks the terminal's latest game revision.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  // State intentionally tracks the terminal's latest game revision.
+-  // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId]);
++  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
+ 
+   useEffect(() => {
+     if (game?.status === 'won' && game.scrollUp) {
+@@ -94,6 +123,9 @@ const TerminalHackingModal = ({
+       showRawAlert({ title: tLootTrade('terminal.selectCharacter') });
+       return;
+     }
++    // Повторный взлом без разрешения Мастера запрещён и в локальном резерве.
++    if (isClosed && !['retryYes', 'retryNo'].includes(action)) return;
++    if (awaitingGm && !localMode && !['retryYes', 'retryNo'].includes(action)) return;
+     if (localMode) {
+       const snapshot = buildLocalCharacterSnapshot(useCharacterStore.getState());
+       const next = applyLocalTerminalAction(localState, action, value, {
+@@ -129,8 +161,9 @@ const TerminalHackingModal = ({
+     } catch (error) {
+       const code = error?.code || error?.message;
+       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
+-      else if (code === 'TERMINAL_LOCKED') showRawAlert({ title: tLootTrade('terminal.accessDenied') });
+-      else if (code !== 'ROOM_TIMEOUT') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++      else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
++      else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
++      else if (code !== 'ROOM_TIMEOUT' && code !== 'TERMINAL_NOT_ACTIVE') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+     } finally {
+       setBusy(false);
+     }
+@@ -206,13 +239,14 @@ const TerminalHackingModal = ({
+     </View>
+   );
+ 
+-  const statusLabel = game?.status === 'locked'
+-    ? tLootTrade('terminal.accessDenied')
+-    : (game?.status === 'won' ? tLootTrade('terminal.accessGranted') : null);
++  const statusLabel = game?.status === 'won'
++    ? tLootTrade('terminal.accessGranted')
++    : (game?.status === 'awaitingRetry' ? tLootTrade('terminal.hackFailed') : null);
+   // Патч 496: эффект скобки игрок узнаёт только после нажатия.
+   const resultLabel = game?.result === 'DUD REMOVED' ? tLootTrade('terminal.dudRemoved')
+     : game?.result === 'ATTEMPT RESTORED' ? tLootTrade('terminal.attemptRestored')
+-      : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset') : null;
++      : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset')
++        : game?.result === 'ATTEMPTS EXHAUSTED' ? tLootTrade('terminal.attemptsExhausted') : null;
+   const shownAttempts = Math.max(game?.attempts || 0, game?.maxAttempts || ATTEMPTS_MAX);
+ 
+   return (
+@@ -233,10 +267,17 @@ const TerminalHackingModal = ({
+             <Text style={styles.description}>{terminal?.description || terminalState?.config?.description}</Text>
+           ) : null}
+ 
+-          {terminalState?.locked || game?.status === 'locked' ? (
++          {isClosed ? (
++            <View style={styles.accessPanel}>
++              <Text accessibilityRole="alert" style={styles.closedBadge}>{tLootTrade('terminal.closedBadge')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
++            </View>
++          ) : awaitingGm ? (
+             <View style={styles.accessPanel}>
+-              <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.accessDenied')}</Text>
+-              <Text style={styles.statusHint}>{tLootTrade('terminal.terminalLockedHint')}</Text>
++              <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.hackFailed')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.attemptsExhausted')}</Text>
++              <Text style={styles.retryWaiting}>{tLootTrade('terminal.retryWaiting')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.retryWaitingHint')}</Text>
+             </View>
+           ) : game?.status === 'won' ? (
+             <View style={styles.successPanel}>
+@@ -248,9 +289,9 @@ const TerminalHackingModal = ({
+               </Animated.View>
+               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
+             </View>
+-          ) : !game || game.status === 'failed' ? (
++          ) : !game ? (
+             <View style={styles.idlePanel}>
+-              <Text style={styles.idleText}>{game?.status === 'failed' ? tLootTrade('terminal.failed') : tLootTrade('terminal.ready')}</Text>
++              <Text style={styles.idleText}>{tLootTrade('terminal.ready')}</Text>
+               <Text style={styles.statusHint}>
+                 {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                   difficulty: terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0,
+@@ -367,6 +408,8 @@ const styles = StyleSheet.create({
+   successPanel: { minHeight: 250, alignItems: 'center', overflow: 'hidden', marginTop: 8 },
+   wonBoard: { width: '100%' },
+   accessDenied: { color: '#ff4b4b', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#f00', textShadowRadius: 12 },
++  closedBadge: { color: '#b9c2b4', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 4, textAlign: 'center' },
++  retryWaiting: { color: '#f0d68d', fontFamily: 'monospace', fontSize: 14, fontWeight: '800', marginTop: 14, textAlign: 'center' },
+   accessGranted: { color: '#a9f07d', fontFamily: 'monospace', fontSize: 25, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#5dff43', textShadowRadius: 12 },
+   statusHint: { color: '#97a392', fontSize: 12, textAlign: 'center', marginTop: 8 },
+   hackerHint: { color: '#a5dc88', fontSize: 11, marginTop: 5, fontFamily: 'monospace' },
+diff --git a/components/lootTrade/TerminalRetryPromptHost.js b/components/lootTrade/TerminalRetryPromptHost.js
+new file mode 100644
+index 0000000..fc5b0d4
+--- /dev/null
++++ b/components/lootTrade/TerminalRetryPromptHost.js
+@@ -0,0 +1,124 @@
++/**
++ * Патч 504 — вопрос Мастеру «Разрешить повторный взлом? Да/Нет».
++ *
++ * Монтируется один раз в App.js поверх ЛЮБОГО экрана: Мастер может в этот
++ * момент править лист, смотреть карту или быть в админке, а вопрос всё равно
++ * всплывёт. Источник правды — terminalStates комнат из roomStore: сервер
++ * выставляет `awaitingGm`, когда у партии закончились все попытки. Решение
++ * уходит на сервер действием `retry` со значением `yes` / `no`.
++ *
++ * Диалоги показываются по очереди: AlertHost держит один запрос, поэтому
++ * несколько провалившихся терминалов обрабатываются последовательной очередью.
++ */
++
++import React, { useEffect, useRef } from 'react';
++import * as db from '../../db';
++import useRoomStore from '../../src/room/roomStore';
++import { showRawAlert } from '../alerts/alertService';
++import { useLocale } from '../../i18n/locale';
++import {
++  tLootTrade,
++  formatLootTrade,
++} from '../screens/LootTradeScreen/logic/lootTradeI18n';
++import { debugLog } from '../../src/debug/falloutDebug';
++import { findPending } from './terminalRetryPrompt';
++
++const TerminalRetryPromptHost = () => {
++  useLocale();
++  const handledRef = useRef(new Set());
++  const queueRef = useRef([]);
++  const busyRef = useRef(false);
++  const timerRef = useRef(null);
++
++  useEffect(() => {
++    const drain = async () => {
++      if (busyRef.current) return;
++      busyRef.current = true;
++      try {
++        let ownerTokens = {};
++        try {
++          const rows = await db.getFolderRooms();
++          ownerTokens = Object.fromEntries(
++            (rows || [])
++              .filter((row) => row?.code && row?.owner_token)
++              .map((row) => [String(row.code), String(row.owner_token)]),
++          );
++        } catch {
++          ownerTokens = {};
++        }
++        while (queueRef.current.length > 0) {
++          const item = queueRef.current.shift();
++          const message = [
++            tLootTrade('terminal.attemptsExhausted'),
++            `${item.name} · ${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty })}`,
++            tLootTrade('terminal.retryMessage'),
++          ].join('\n');
++          // eslint-disable-next-line no-await-in-loop
++          const index = await showRawAlert({
++            title: tLootTrade('terminal.retryTitle'),
++            message,
++            kind: 'info',
++            buttons: [
++              { text: tLootTrade('terminal.retryYes') },
++              { text: tLootTrade('terminal.retryNo'), style: 'cancel' },
++            ],
++          });
++          if (index !== 0 && index !== 1) {
++            // Диалог закрыли без ответа — вопрос остаётся обязательным.
++            handledRef.current.delete(item.key);
++            timerRef.current = setTimeout(() => {
++              queueRef.current.push(item);
++              busyRef.current = false;
++              void drain();
++            }, 1500);
++            return;
++          }
++          const value = index === 0 ? 'yes' : 'no';
++          try {
++            // eslint-disable-next-line no-await-in-loop
++            await useRoomStore.getState().actOnTerminal({
++              code: item.code,
++              containerId: item.containerId,
++              action: 'retry',
++              value,
++              ownerToken: ownerTokens[item.code],
++            });
++          } catch (error) {
++            debugLog('terminal.retry:failed', { message: error?.message });
++            handledRef.current.delete(item.key);
++            // eslint-disable-next-line no-await-in-loop
++            await showRawAlert({ title: tLootTrade('terminal.retryFailed') });
++            timerRef.current = setTimeout(() => {
++              queueRef.current.push(item);
++              busyRef.current = false;
++              void drain();
++            }, 1500);
++            return;
++          }
++        }
++      } finally {
++        busyRef.current = false;
++      }
++    };
++
++    const collect = (state) => {
++      for (const item of findPending(state?.rooms)) {
++        if (handledRef.current.has(item.key)) continue;
++        handledRef.current.add(item.key);
++        queueRef.current.push(item);
++      }
++      if (queueRef.current.length > 0) void drain();
++    };
++
++    const unsubscribe = useRoomStore.subscribe(collect);
++    collect(useRoomStore.getState());
++    return () => {
++      unsubscribe();
++      if (timerRef.current) clearTimeout(timerRef.current);
++    };
++  }, []);
++
++  return null;
++};
++
++export default TerminalRetryPromptHost;
+diff --git a/components/lootTrade/localTerminalGame.js b/components/lootTrade/localTerminalGame.js
+index df82907..c2315ff 100644
+--- a/components/lootTrade/localTerminalGame.js
++++ b/components/lootTrade/localTerminalGame.js
+@@ -8,6 +8,11 @@ import engine from '../../server/terminalHacking';
+  * Это нужно, когда сервер ещё не обновлён: он не знает terminal.issue/action,
+  * поэтому клиент ведёт партию сам, но терминал всё равно открывается модалкой,
+  * а не превращается в сундук с добычей.
++ *
++ * Патч 504: галочки «блокировать после провала» больше нет. Когда попытки
++ * кончились, партия переходит в `awaitingRetry`; Мастер (на этом же устройстве)
++ * отвечает «Да» — fresh-доска по текущим настройкам, или «Нет» — терминал
++ * закрыт до новой трансляции.
+  */
+ export const LOCAL_TERMINAL_OPERATOR = 'local-terminal-player';
+ 
+@@ -41,14 +46,40 @@ export const applyLocalTerminalAction = (state, action, value, ctx = {}) => {
+     rng = Math.random,
+   } = ctx;
+   let game = state?.game || null;
++  // Патч 504: настройки читаются на каждом действии, а не «запекаются» в
++  // доску при первом «Взломать». Так «Да» строит доску по свежей сложности.
+   const config = engine.normalizeTerminalConfig({
+     containerId: terminal?.containerId || terminal?.id,
+     name: terminal?.name,
+     description: terminal?.description,
+     difficulty: terminal?.difficulty,
+-    lockOnFailure: terminal?.lockOnFailure,
+   });
+ 
++  if (game) game = engine.syncGameConfig(game, config);
++
++  // Решение Мастера в локальной партии (сервер комнат недоступен).
++  if (action === 'retryYes' || action === 'retryNo') {
++    if (!game || game.status !== 'awaitingRetry') {
++      return pack(game, { error: 'TERMINAL_NOT_ACTIVE' });
++    }
++    if (action === 'retryNo') {
++      return pack(engine.closeGame(game, { now }));
++    }
++    const fresh = engine.createGame({
++      config,
++      operatorClientId: LOCAL_TERMINAL_OPERATOR,
++      operatorCharacterId: characterId || 'local',
++      characterSnapshot,
++      now,
++      rng,
++    });
++    fresh.operatorName = characterSnapshot?.characterName || game.operatorName || '';
++    return pack(fresh);
++  }
++
++  if (game?.status === 'closed') return pack(game, { error: 'TERMINAL_CLOSED' });
++  if (game?.status === 'awaitingRetry') return pack(game, { error: 'TERMINAL_AWAITING_RETRY' });
++
+   if (action === 'start' || (!game && ['guess', 'bracket'].includes(action))) {
+     game = engine.createGame({
+       config,
+@@ -65,6 +96,7 @@ export const applyLocalTerminalAction = (state, action, value, ctx = {}) => {
+ 
+   const result = engine.applyGameAction({
+     game,
++    config,
+     action,
+     clientId: LOCAL_TERMINAL_OPERATOR,
+     characterId: characterId || 'local',
+diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
+new file mode 100644
+index 0000000..1ef70e0
+--- /dev/null
++++ b/components/lootTrade/terminalRetryPrompt.js
+@@ -0,0 +1,33 @@
++/**
++ * Чистая логика поиска терминалов, которые ждут решения Мастера (патч 504).
++ * Вынесена отдельно, чтобы её можно было проверять без React Native и чтобы
++ * глобальный хост не содержал доменной логики.
++ */
++
++export const decisionKey = (code, containerId, game) => (
++  `${code}|${containerId}|${game?.revision ?? 'none'}`
++);
++
++/**
++ * Из состояний комнат выбирает провалившиеся партии, по которым Мастер ещё
++ * не ответил. Игровые комнаты (role: 'player') и уже закрытые терминалы
++ * никогда не порождают вопрос.
++ */
++export const findPending = (rooms) => {
++  const pending = [];
++  for (const [code, room] of Object.entries(rooms || {})) {
++    if (room?.role !== 'gm') continue;
++    for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
++      if (terminal?.game?.status !== 'awaitingRetry') continue;
++      if (terminal?.closed) continue;
++      pending.push({
++        code,
++        containerId,
++        key: decisionKey(code, containerId, terminal.game),
++        name: terminal?.config?.name || containerId,
++        difficulty: terminal?.config?.difficulty ?? 0,
++      });
++    }
++  }
++  return pending;
++};
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 6bc0e43..56e1af4 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -613,7 +613,6 @@ export default function LootTradeScreen() {
+                 name: saved.name,
+                 description: saved.description,
+                 difficulty: saved.difficulty,
+-                lockOnFailure: saved.lockOnFailure,
+               },
+             });
+           } else if (terminalNode) {
+@@ -686,7 +685,6 @@ export default function LootTradeScreen() {
+               nodeItems: saved.items,
+               ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
+                 nodeDifficulty: saved.difficulty,
+-                nodeLockOnFailure: saved.lockOnFailure,
+               } : {}),
+               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
+                 caps: saved.caps,
+@@ -1045,13 +1043,13 @@ export default function LootTradeScreen() {
+       if (freshSource.kind === CONTAINER_KIND.TERMINAL && terminalProtocol) {
+         await useRoomStore.getState().issueTerminal({
+           code: effectiveRoomCode,
++          reissue: true,
+           ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+           config: {
+             containerId: freshSource.id,
+             name: freshSource.name,
+             description: freshSource.description,
+             difficulty: freshSource.difficulty,
+-            lockOnFailure: freshSource.lockOnFailure,
+           },
+         });
+       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+@@ -1728,28 +1726,51 @@ export default function LootTradeScreen() {
+                   {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                     difficulty: activeContainer.difficulty,
+                   })}
+-                  {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
+                 </Text>
+-                {activeTerminalStates.map(({ code, terminal }) => (
+-                  <View key={code} style={styles.terminalAdminStateRow}>
+-                    <Text style={styles.terminalAdminText}>
+-                      {`${formatSingleRoomName(code)} · ${terminal.locked ? tLootTrade('terminal.locked') : tLootTrade('terminal.available')}`}
+-                    </Text>
+-                    {terminal.locked && (
+-                      <TouchableOpacity
+-                        style={styles.terminalUnlockButton}
+-                        onPress={() => useRoomStore.getState().actOnTerminal({
+-                          code,
+-                          containerId: activeContainer.id,
+-                          action: 'unlock',
+-                          ownerToken: roomByCode[code]?.ownerToken,
+-                        }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }))}
+-                      >
+-                        <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.unlock')}</Text>
+-                      </TouchableOpacity>
+-                    )}
+-                  </View>
+-                ))}
++                {activeTerminalStates.map(({ code, terminal }) => {
++                  const closed = Boolean(terminal.closed || terminal.locked);
++                  const awaiting = !closed && Boolean(
++                    terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
++                  );
++                  const stateLabel = closed
++                    ? tLootTrade('terminal.stateClosed')
++                    : (awaiting ? tLootTrade('terminal.stateAwaiting') : tLootTrade('terminal.stateReady'));
++                  const decide = (value) => useRoomStore.getState().actOnTerminal({
++                    code,
++                    containerId: activeContainer.id,
++                    action: 'retry',
++                    value,
++                    ownerToken: roomByCode[code]?.ownerToken,
++                  }).catch(() => showRawAlert({ title: tLootTrade('terminal.retryFailed') }));
++                  const reissue = () => useRoomStore.getState().actOnTerminal({
++                    code,
++                    containerId: activeContainer.id,
++                    action: 'reissue',
++                    ownerToken: roomByCode[code]?.ownerToken,
++                  }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }));
++                  return (
++                    <View key={code} style={styles.terminalAdminStateRow}>
++                      <Text style={styles.terminalAdminText}>
++                        {`${formatSingleRoomName(code)} · ${stateLabel}`}
++                      </Text>
++                      {awaiting && (
++                        <View style={styles.terminalAdminActions}>
++                          <TouchableOpacity style={styles.terminalUnlockButton} onPress={() => decide('yes')}>
++                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.retryYes')}</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity style={styles.terminalUnlockButton} onPress={() => decide('no')}>
++                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.retryNo')}</Text>
++                          </TouchableOpacity>
++                        </View>
++                      )}
++                      {closed && (
++                        <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
++                          <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
++                        </TouchableOpacity>
++                      )}
++                    </View>
++                  );
++                })}
+               </View>
+             )}
+ 
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 33540d4..575cc1d 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -65,7 +65,6 @@ const ContainerFormModal = ({
+   // Сложность 0 вручную не создаётся: она возникает только у игрока с «Хакером»,
+   // когда тот снижает сложность 1 до 0. Минимум в форме — 1.
+   const [difficulty, setDifficulty] = useState(1);
+-  const [lockOnFailure, setLockOnFailure] = useState(false);
+   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
+@@ -94,7 +93,6 @@ const ContainerFormModal = ({
+     }
+     setDescription(initialContainer?.description || '');
+     setDifficulty(Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1)));
+-    setLockOnFailure(Boolean(initialContainer?.lockOnFailure));
+     setCapsCount(String(
+       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
+     ));
+@@ -257,7 +255,6 @@ const ContainerFormModal = ({
+         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
+         description: description.trim(),
+         difficulty: isTerminal ? Math.max(1, difficulty) : 0,
+-        lockOnFailure: isTerminal && lockOnFailure,
+         caps: resolvedCaps,
+         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+@@ -517,19 +514,6 @@ const ContainerFormModal = ({
+                     </TouchableOpacity>
+                   ))}
+                 </View>
+-                <TouchableOpacity
+-                  accessibilityRole="checkbox"
+-                  accessibilityState={{ checked: lockOnFailure }}
+-                  style={styles.terminalLockRow}
+-                  onPress={() => setLockOnFailure((value) => !value)}
+-                >
+-                  <MaterialCommunityIcons
+-                    name={lockOnFailure ? 'checkbox-marked' : 'checkbox-blank-outline'}
+-                    size={21}
+-                    color={lockOnFailure ? '#222222' : '#757575'}
+-                  />
+-                  <Text style={styles.terminalLockText}>{tLootTrade('form.terminalLockLabel')}</Text>
+-                </TouchableOpacity>
+               </>
+             )}
+ 
+@@ -681,8 +665,6 @@ const styles = StyleSheet.create({
+   terminalDifficultyChipActive: { borderColor: '#e8c04b', backgroundColor: '#443a17' },
+   terminalDifficultyChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
+   terminalDifficultyChipTextActive: { color: '#f4d76a' },
+-  terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
+-  terminalLockText: { color: '#222222', flex: 1, fontSize: 14 },
+   input: {
+     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d54ee1f..2506cc0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,46 @@
+ # Changelog
+ ---
++## Game Master decision instead of lockout after failure (patch 504)
++
++The owner replaced the "lock after failure" checkbox with an explicit decision:
++"the Game Master gets a prompt 'Allow another hack? Yes/No'. If yes — a new
++config. If no, the terminal can no longer be hacked or viewed unless the GM
++broadcasts it again".
++
++- **Failure is visible and no longer ends the run silently.** After the fourth
++  wrong guess the board enters "awaiting the Game Master" with "HACK FAILED"
++  and "All attempts used". Previously, without the checkbox, a player could
++  just press "Hack" again and the board was rebuilt from stale settings.
++- **The GM prompt** "Allow another hack?" with "Yes" / "No" appears over
++  *any* screen, not only the Loot/Trade tab. It never appears after a success,
++  and it cannot be dismissed without an answer. The same buttons are available
++  in the terminal admin panel.
++- **"Yes" immediately builds a fresh board from the current settings:** new
++  name, description and difficulty (even if the GM edited them during access),
++  fresh words, hints and brackets, exactly 4 attempts. The operator sheet is
++  preserved — INT 10 / Science 6 still give 15 words and 4 brackets, not the
++  default 21. Editing the card during an active run no longer wipes the board.
++- **"No" leaves the card visible with a "CLOSED" badge** and disables both
++  buttons — "Hack" and "View" — until the GM broadcasts it again. The server
++  rejects every player action (including viewing) with `TERMINAL_CLOSED`. Only
++  "Broadcast again", re-issuing the terminal, or re-issuing the location
++  reopens it; an ordinary settings edit does not clear the ban.
++- Hacking again without GM approval is impossible: while awaiting a decision
++  the server replies `TERMINAL_AWAITING_RETRY`. Deciding is GM-only.
++- **The checkbox is removed completely** from the form, engine, room registry,
++  location nodes and saved data. The `F2D20-TERM:` marker no longer writes the
++  `f` field but still reads old markers, so earlier saves keep working. Related
++  dictionary strings are gone; paired RU/EN strings for the prompt, "CLOSED",
++  the waiting state and re-broadcast were added.
++- The local fallback (older room server) follows the same model: the Yes/No
++  prompt is shown in the hacking window on the GM device.
++
++Unchanged: the board-size formula, three groups with two variants, 4 attempts,
++Science brackets, Luck, the Hacker perk, operator takeover via "Hack", the
++dictionary, and terminals inside locations opening the hacking window.
++
++Installation: `docs/patch-504-install.md`.
++
+ ## Three word groups, operator takeover and one full restore (patch 503)
+ 
+ The owner clarified the board design: "Let there be 3 groups of words with
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 63b5053..23f0621 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,48 @@
+ # История изменений
+ 
+ ---
++## Решение Мастера вместо блокировки после провала (патч 504)
++
++Владелец заменил галочку «блокировать после провала» на явное решение: «мастеру
++всплывает сообщение "Разрешить повторный взлом? Да/нет". Если да — новый
++конфиг. Нет, терминал нельзя больше взломать или посмотреть, если мастер не
++транслирует его снова».
++
++- **Провал виден и не завершает партию молча.** После четвёртой ошибки доска
++  переходит в состояние «ожидает решения Мастера» с надписью «ВЗЛОМ ПРОВАЛЕН»
++  и «Все попытки исчерпаны». Раньше без галочки игрок просто нажимал
++  «Взломать» ещё раз, и доска собиралась заново из старых настроек.
++- **Вопрос Мастеру** «Разрешить повторный взлом?» с кнопками «Да» и «Нет»
++  всплывает поверх любого экрана, а не только на вкладке «Добыча/Торговля».
++  После успеха вопрос не задаётся. Закрыть его без ответа нельзя. Те же кнопки
++  есть в админ-панели карточки терминала.
++- **«Да» сразу строит новую доску по текущим настройкам:** свежие имя,
++  описание и сложность (даже если Мастер поменял их во время доступа), новые
++  слова, подсказки и скобки, ровно 4 попытки. Лист оператора сохраняется —
++  ИНТ 10 / Наука 6 дают 15 слов и 4 скобки, а не дефолтные 21 слово.
++  Правка карточки во время активной партии больше не стирает доску.
++- **«Нет» оставляет карточку видимой с отметкой «ЗАКРЫТ»** и запрещает обе
++  кнопки — и «Взломать», и «Смотреть» — до новой трансляции Мастера. Сервер
++  отклоняет любые действия игрока (включая просмотр) с `TERMINAL_CLOSED`.
++  Открыть терминал снова можно кнопкой «Транслировать заново», повторной
++  выдачей терминала или повторной выдачей локации; обычная правка настроек
++  запрет не снимает.
++- Повторный взлом без одобрения Мастера невозможен: в состоянии ожидания
++  сервер отвечает `TERMINAL_AWAITING_RETRY`. Решение — действие только Мастера.
++- **Галочка удалена полностью** из формы, движка, реестра комнаты, узлов
++  локации и сохранений. Маркер `F2D20-TERM:` больше не пишет поле `f`, но
++  читает старые маркеры; сохранения прежних версий не ломаются. Удалены
++  соответствующие тексты словарей, добавлены парные RU/EN подписи вопроса,
++  «ЗАКРЫТ», ожидания и повторной трансляции.
++- Локальный резерв (старый сервер комнат) повторяет ту же модель: вопрос
++  «Да/Нет» показывается в окне взлома на устройстве Мастера.
++
++Не изменились: формула числа слов, три группы с двумя вариантами, 4 попытки,
++скобки по Науке, удача, перк «Хакер», смена оператора по «Взломать», словарь
++и открытие терминала внутри локации окном взлома.
++
++Установка: `docs/patch-504-install.md`.
++
+ ## Три группы слов, смена оператора и один полный возврат (патч 503)
+ 
+ Владелец уточнил устройство доски: «Пусть будет 3 группы слов у которых есть
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 141d693..2b16261 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -132,9 +132,10 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - The Game Master can put a **Lock (`🔒`)** on any chest or shop in a location and write a note (such as *«Lockpick — Difficulty 2»* or *«Requires Overseer's Key»*). Players see the locked entry and its requirement in the list, but cannot peek inside until they overcome the obstacle in play and the Game Master flips the lock to **«Unlocked» (`🔓`)**.
+ 
+ #### Terminals & the Hacking Mini-Game
+-- Tap **«Create terminal»** to set a name and description, choose a difficulty of `1–5` and optionally lock the terminal after a failed hack. Difficulty `0` cannot be set manually: it only appears for a player with the **Hacker** perk lowering a level-1 terminal.
++- Tap **«Create terminal»** to set a name and description and choose a difficulty of `1–5`. Difficulty `0` cannot be set manually: it only appears for a player with the **Hacker** perk lowering a level-1 terminal. There is no "lock after failure" checkbox anymore: the Game Master decides what happens to a failed run.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+-- In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
++- In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. A *Programmer’s Digest* magazine grants one more attempt before the GM decides.
++- **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index dd0f039..9a8f3a8 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -132,9 +132,10 @@
+ - Любой сундук или лавку в локации ведущий может пометить **замком (`🔒`)** и подписать условие (например: *«Взлом — сложность 2»* или *«Нужен ключ смотрителя»*). Запертая строка видна игрокам в списке локации с подписью, но заглянуть внутрь нельзя, пока персонаж не справится с замком в игре и ведущий не переключит замок в положение **«Открыто» (`🔓`)**.
+ 
+ #### Терминал и мини-игра взлома
+-- Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `1–5` и при желании включите блокировку терминала после провала. Сложность `0` вручную задать нельзя: она возникает только у игрока с перком **Хакер**, когда тот снижает сложность `1`.
++- Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `1–5`. Сложность `0` вручную задать нельзя: она возникает только у игрока с перком **Хакер**, когда тот снижает сложность `1`. Галочки «блокировать после провала» больше нет: судьбу проваленной попытки решает Мастер в диалоге.
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+-- В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
++- В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. *Programmer’s Digest* даёт ещё одну попытку до решения Мастера.
++- **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 0734d84..96270ed 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 3197e92..85c9d8b 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 80ab5f1..1c44e24 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index e843e1a..ab0fa41 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index f733218..3fe0ee3 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 35bfa08..fe88d54 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index e839080..2d39f4f 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 501** (коммит `28c861b`, ветка
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 9c428cc..35c3849 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
++
+ Патч подготовлен от состояния **версии 502** (коммит `2f89930`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–503 цепочкой.
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+new file mode 100644
+index 0000000..858e8d6
+--- /dev/null
++++ b/docs/patch-504-install.md
+@@ -0,0 +1,177 @@
++# Установка патча 504: решение Мастера вместо блокировки после провала
++
++Патч подготовлен от состояния **версии 503** (коммит `13f2ff6`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–504
++цепочкой.
++
++## Что изменилось
++
++Владелец заменил прежнюю модель: «вместо "блокировать после провала"
++переходим на модель: мастеру всплывает сообщение "Разрешить повторный взлом?
++Да/нет". Если да — новый конфиг. Нет, терминал нельзя больше взломать или
++посмотреть, если мастер не транслирует его снова».
++
++Уточнения: вопрос задаётся **только когда попытки исчерпаны** (после успеха —
++нет); «Да» **сразу** строит новую доску по **текущим настройкам** карточки;
++«Нет» оставляет карточку видимой с отметкой **«Закрыт»**, запрещая и
++«Взломать», и «Смотреть» до новой трансляции; галочка `lockOnFailure`
++удаляется из формы, движка и сохранений **полностью**.
++
++### 1. Провал больше не тихий и не автоматический
++
++Раньше без галочки партия переходила в `failed` с пустым `result`, а игрок
++мог просто нажать «Взломать» ещё раз — доска пересобиралась из старых полей,
++без всякого решения Мастера. С галочкой терминал блокировался сам, без
++вопроса.
++
++Теперь в `server/terminalHacking.js`:
++
++- `failGame()` всегда возвращает `status: 'awaitingRetry'` и
++  `result: 'ATTEMPTS EXHAUSTED'`. В окне взлома видно «ВЗЛОМ ПРОВАЛЕН»,
++  «Все попытки исчерпаны», «Ожидание решения Мастера».
++- «Дайджест программиста» по-прежнему предлагает последнюю попытку **до**
++  вопроса Мастеру; отказ от журнала тоже приводит к `awaitingRetry`.
++- Любое действие игрока (`start`, `guess`, `bracket`, `view`, `useDigest`)
++  в этом состоянии отклоняется с `TERMINAL_AWAITING_RETRY`. Повторный взлом
++  без одобрения Мастера невозможен.
++- `applyGameAction()` принимает свежий `config` на каждом ходу
++  (`syncGameConfig`): имя и описание карточки обновляются без пересборки
++  доски, а новая партия всегда собирается по текущим настройкам, а не по
++  полям предыдущей доски.
++
++### 2. Вопрос Мастеру поверх любого экрана
++
++`components/lootTrade/TerminalRetryPromptHost.js` смонтирован один раз в
++`App.js` рядом с `AlertHost` и следит за `terminalStates` всех комнат Мастера.
++Когда сервер выставляет `awaitingGm: true`, всплывает диалог
++**«Разрешить повторный взлом?»** с кнопками **«Да»** и **«Нет»**:
++
++- имя терминала и сложность приходят из текущей карточки;
++- несколько провалившихся терминалов обрабатываются по очереди;
++- решение уходит действием `terminal.action` → `retry` со значением
++  `yes` / `no`;
++- закрыть диалог без ответа нельзя — вопрос повторится, пока Мастер не
++  решит.
++
++Чистая логика отбора (`findPending`) вынесена в
++`components/lootTrade/terminalRetryPrompt.js` и покрыта тестами. Дубликаты
++на одну и ту же ревизию партии не задаются повторно.
++
++На экране «Добыча/Торговля» в админ-панели терминала те же **«Да» / «Нет»**
++доступны и вручную, а состояние показывается как «Доступен» /
++«Ожидает решения» / «Закрыт».
++
++### 3. «Да» = новая доска по текущим настройкам
++
++`retry: yes` — действие только Мастера (`TERMINAL_GM_ONLY` для игрока).
++Сервер **сразу** вызывает `createGame()` с `entry.config`:
++
++- новая сложность, имя и описание, если Мастер успел их поменять **во время
++  доступа или уже после провала**;
++- новые слова, подсказки и скобки, `revision` сброшен, догадки пустые;
++- ровно **4 попытки**, ни одна скобка не использована;
++- лист оператора сохранён: ИНТ 10 / Наука 6 дают 15 слов и 4 скобки, а не
++  дефолтные 21 слово. Другой игрок может нажать «Взломать» затем и собрать
++  доску уже под свой лист (механика передачи хода из патча 503 сохранена).
++
++Правка настроек во время активной партии больше **не стирает** доску: игрок
++не теряет прогресс, а новая сложность вступит в силу при следующей новой
++партии.
++
++### 4. «Нет» = «Закрыт» до новой трансляции
++
++`retry: no` переводит партию в `status: 'closed'` и выставляет
++`terminal.closed` (плюс `locked` как алиас для клиентов прежних версий):
++
++- карточка терминала **остаётся на экране** с отметкой **«ЗАКРЫТ»**;
++- обе кнопки — «Взломать» и «Смотреть» — отключены; прямой выданый
++  терминал показывает плашку «ЗАКРЫТ» вместо окна взлома;
++- сервер отвечает `TERMINAL_CLOSED` на любые действия игрока, включая
++  попытку «посмотреть»;
++- «Да» после отказа не обходит запрет: решение принимается только в
++  состоянии `awaitingRetry`.
++
++Снова открыть терминал можно **только новой трансляцией Мастера**: кнопка
++«Транслировать заново» в админ-панели (`reissue`), повторная выдача
++терминала («Выдать», `issueTerminal` с `reissue: true`) или повторная выдача
++локации. Обычная правка карточки или узла локации «Закрыт» не снимает.
++
++### 5. Галочка удалена полностью
++
++- `ContainerFormModal`: нет ни состояния, ни чекбокса, ни строк стилей; в
++  форме терминала осталась только сложность 1–5.
++- `server/terminalHacking.js`, `server/roomRegistry.js`,
++  `server/lootTradeSession.js`, `domain/lootTrade.js`: `lockOnFailure` и
++  `nodeLockOnFailure` не читаются и не пишутся.
++- Маркер `F2D20-TERM:` больше не содержит поле `f` (только `v`, `d`, `l`);
++  старые маркеры с `f` читаются, но поле игнорируется — сохранения прежних
++  версий не ломаются.
++- Словари RU/EN: удалены `form.terminalLockLabel`,
++  `terminal.terminalLockedHint`, `terminal.locked`, `terminal.available`,
++  `terminal.unlock`; добавлены парные тексты вопроса, «Да»/«Нет»,
++  «ЗАКРЫТ», ожидания и повторной трансляции.
++- `src/room/roomStore.ts` больше не знает о `nodeLockOnFailure`; в протокол
++  (`server/protocol.js`, `src/room/roomProtocol.ts`) добавлены парные коды
++  `TERMINAL_CLOSED` и `TERMINAL_AWAITING_RETRY`.
++
++### Локальный резерв
++
++Если сервер комнат старой версии, партия идёт на устройстве игрока.
++`localTerminalGame.js` повторяет ту же модель: провал → `awaitingRetry`,
++в модалке всплывает тот же вопрос «Да/Нет» (Мастер за этим же устройством),
++«Да» собирает свежую доску по текущим настройкам, «Нет» закрывает терминал.
++
++## Что не менялось
++
++Формула `N = max(4, 15 + 2·D − ИНТ)` (на D5 «25 − ИНТ»), `L = 4 + D`,
++4 попытки, число и состав скобок по Науке, удача 5–20 % и не более одного
++полного восстановления на доску, три группы слов с двумя вариантами, перк
++«Хакер», чтение листа из сетевого сейва/экспорта/локального стора, смена
++оператора по «Взломать», 12 308 слов словаря, терминал внутри локации
++открывает окно взлома, а не сундук.
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 504
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 504
++```
++
++`patchs/baseline.json` в источнике равен `504`. После установки:
++`public/version.json` → `504`; закоммитьте изменения и **перезапустите
++сервис Node.js** (состояние партий и решение Мастера считаются на сервере),
++пересоберите веб-сборку. Партии, начатые до обновления, запустите заново:
++после установки сервер уже будет требовать ответа Мастера.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-gm-retry-504.test.js
++npx vitest run __tests__/room/room-server.integration.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "504"'
++```
++
++Приёмочный тест `__tests__/room/terminal-gm-retry-504.test.js` (22 проверки)
++и WS-интеграция покрывают: явный провал и запрет повторного взлома, отсутствие
++вопроса после успеха, отказ от «Дайджеста», «Да» с правкой настроек во время
++доступа и сохранением листа оператора, «Нет» с закрытием обеих кнопок,
++повторную трансляцию, полное удаление галочки, парность словарей и кодов
++ошибок, локальный резерв.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/504-gm-retry.patch
++cp /path/to/504-gm-retry.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index ceaf611..b2042d4 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -5,6 +5,8 @@
+ > замеры — в `docs/patch-500-install.md`, чтение характеристик листа
+ > персонажа — в `docs/patch-501-install.md`, `docs/patch-502-install.md` и
+ > `docs/patch-503-install.md` (три группы слов, градиент подсказок).
++> Патч 504 заменил галочку «блокировать после провала» на решение Мастера
++> «Разрешить повторный взлом? Да/Нет» — см. `docs/patch-504-install.md`.
+ > История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index de76601..0e6fab1 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -34,7 +34,7 @@ export const CONTAINER_KIND = Object.freeze({
+  *
+  * `normalizeHubSessionNode()` на сервере (особенно на ещё не обновлённом)
+  * собирает узел заново и выбрасывает все неизвестные поля: `kind: 'terminal'`
+- * превращается в `'loot'`, а `difficulty`/`lockOnFailure` теряются. Из-за этого
++ * превращается в `'loot'`, а `difficulty` теряется. Из-за этого
+  * игрок видел терминал как обычный сундук. `lockLabel` — единственное поле,
+  * которое сервер сохраняет как есть и которое не показывается для незапертых
+  * узлов, поэтому конфигурация терминала едет в нём. Клиент и обновлённый
+@@ -43,11 +43,13 @@ export const CONTAINER_KIND = Object.freeze({
+  */
+ export const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
+ 
+-export const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
++// Патч 504: поле `f` («блокировать после провала») больше не пишется —
++// решение о повторном взломе принимает Мастер. Старые маркеры с `f`
++// читаются как прежде, но это поле игнорируется.
++export const encodeTerminalNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
+   `${TERMINAL_NODE_MARKER}${JSON.stringify({
+     v: 1,
+     d: Math.max(0, Math.min(5, Math.floor(Number(difficulty) || 0))),
+-    f: lockOnFailure ? 1 : 0,
+     l: String(label || ''),
+   })}`
+ );
+@@ -60,7 +62,6 @@ export const decodeTerminalNodeMarker = (value) => {
+     if (!parsed || parsed.v !== 1) return null;
+     return {
+       difficulty: Math.max(0, Math.min(5, Math.floor(Number(parsed.d) || 0))),
+-      lockOnFailure: Boolean(parsed.f),
+       label: String(parsed.l || ''),
+     };
+   } catch {
+@@ -72,7 +73,6 @@ export const withTerminalNodeMarker = (node) => ({
+   ...node,
+   lockLabel: encodeTerminalNodeMarker({
+     difficulty: node?.difficulty,
+-    lockOnFailure: node?.lockOnFailure,
+     label: node?.lockLabel,
+   }),
+ });
+@@ -94,7 +94,6 @@ export const resolveTerminalSessionNode = (node) => {
+       ...node,
+       kind: CONTAINER_KIND.TERMINAL,
+       difficulty: marker.difficulty,
+-      lockOnFailure: marker.lockOnFailure,
+       lockLabel: marker.label,
+     },
+     isTerminal: true,
+@@ -111,7 +110,6 @@ export const buildStandaloneTerminalSessionNode = (container, { locked = false,
+   locked,
+   lockLabel,
+   difficulty: container?.difficulty || 0,
+-  lockOnFailure: Boolean(container?.lockOnFailure),
+   items: [],
+ });
+ 
+@@ -485,7 +483,6 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+       difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+-      lockOnFailure: child.kind === CONTAINER_KIND.TERMINAL ? Boolean(child.lockOnFailure) : false,
+       characterOverrides: {},
+       items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
+         ? child.items.map((entry) => ({
+@@ -550,7 +547,6 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+     difficulty: kind === CONTAINER_KIND.TERMINAL
+       ? clampNumber(raw.difficulty, 0, 5, 0)
+       : 0,
+-    lockOnFailure: kind === CONTAINER_KIND.TERMINAL && Boolean(raw.lockOnFailure),
+     caps: kind === CONTAINER_KIND.MERCHANT
+       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
+       : 0,
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 0fa7ff9..f79eef3 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -62,8 +62,7 @@
+     "validationRoom": "Please select a room.",
+     "createTerminalTitle": "Create hacking terminal",
+     "editTerminalTitle": "Terminal settings",
+-    "terminalDifficultyLabel": "Difficulty",
+-    "terminalLockLabel": "Lock the terminal after all attempts are failed"
++    "terminalDifficultyLabel": "Difficulty"
+   },
+   "detail": {
+     "backToList": "← Back to containers",
+@@ -236,7 +235,6 @@
+     "failed": "ATTEMPTS EXHAUSTED",
+     "accessDenied": "ACCESS DENIED",
+     "accessGranted": "ACCESS GRANTED",
+-    "terminalLockedHint": "This terminal is locked for the whole room. The GM can unlock it in the card settings.",
+     "selectCharacter": "Select a character and connect it to the room first.",
+     "viewOnly": "Another player is already hacking. You can only watch.",
+     "actionFailed": "The terminal action could not be completed.",
+@@ -253,13 +251,25 @@
+     "waitingOperator": "The terminal operator must choose.",
+     "likeness": "Letters in the same position (out of the word length)",
+     "view": "View",
+-    "locked": "LOCKED",
+-    "available": "AVAILABLE",
+-    "unlock": "Unlock",
+     "openTerminal": "Open terminal",
+     "hackerReduced": "Hacker: difficulty {difficulty} → {effective}",
+     "dudRemoved": "Dud removed",
+     "attemptRestored": "Restored +1 attempt",
+-    "attemptsReset": "All attempts restored"
++    "attemptsReset": "All attempts restored",
++    "retryTitle": "Allow another hack?",
++    "retryMessage": "All attempts are used. Build a fresh board from the current terminal settings?",
++    "retryYes": "Yes",
++    "retryNo": "No",
++    "retryWaiting": "Waiting for the Game Master",
++    "retryWaitingHint": "Hacking again is unavailable until the Game Master approves it.",
++    "closedBadge": "CLOSED",
++    "closedHint": "The Game Master closed this terminal. Access returns when it is broadcast again.",
++    "reissue": "Broadcast again",
++    "hackFailed": "HACK FAILED",
++    "attemptsExhausted": "All attempts used",
++    "stateReady": "Available",
++    "stateAwaiting": "Awaiting decision",
++    "stateClosed": "Closed",
++    "retryFailed": "Could not apply the Game Master decision"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index cc7d282..725ccec 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -62,8 +62,7 @@
+     "validationRoom": "Выберите комнату.",
+     "createTerminalTitle": "Создать терминал взлома",
+     "editTerminalTitle": "Настройки терминала",
+-    "terminalDifficultyLabel": "Сложность",
+-    "terminalLockLabel": "Заблокировать терминал после провала всех попыток"
++    "terminalDifficultyLabel": "Сложность"
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
+@@ -236,7 +235,6 @@
+     "failed": "ПОПЫТКИ ИСЧЕРПАНЫ",
+     "accessDenied": "ДОСТУП ЗАПРЕЩЁН",
+     "accessGranted": "ДОСТУП РАЗРЕШЁН",
+-    "terminalLockedHint": "Терминал заблокирован для всей комнаты. Мастер может разблокировать его в настройках карточки.",
+     "selectCharacter": "Сначала выберите персонажа и подключите его к комнате.",
+     "viewOnly": "Взлом уже выполняет другой игрок. Вы можете только смотреть.",
+     "actionFailed": "Не удалось выполнить действие терминала.",
+@@ -253,13 +251,25 @@
+     "waitingOperator": "Решение принимает оператор терминала.",
+     "likeness": "Совпавшие буквы на своих местах (из длины слова)",
+     "view": "Смотреть",
+-    "locked": "ЗАБЛОКИРОВАН",
+-    "available": "ДОСТУПЕН",
+-    "unlock": "Разблокировать",
+     "openTerminal": "Открыть терминал",
+     "hackerReduced": "Хакер: сложность {difficulty} → {effective}",
+     "dudRemoved": "Пустышка удалена",
+     "attemptRestored": "Восстановлена +1 попытка",
+-    "attemptsReset": "Попытки восстановлены полностью"
++    "attemptsReset": "Попытки восстановлены полностью",
++    "retryTitle": "Разрешить повторный взлом?",
++    "retryMessage": "Все попытки исчерпаны. Собрать новую доску по текущим настройкам терминала?",
++    "retryYes": "Да",
++    "retryNo": "Нет",
++    "retryWaiting": "Ожидание решения Мастера",
++    "retryWaitingHint": "Повторный взлом без разрешения Мастера недоступен.",
++    "closedBadge": "ЗАКРЫТ",
++    "closedHint": "Терминал закрыт Мастером. Доступ появится после новой трансляции.",
++    "reissue": "Транслировать заново",
++    "hackFailed": "ВЗЛОМ ПРОВАЛЕН",
++    "attemptsExhausted": "Все попытки исчерпаны",
++    "stateReady": "Доступен",
++    "stateAwaiting": "Ожидает решения",
++    "stateClosed": "Закрыт",
++    "retryFailed": "Не удалось применить решение Мастера"
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 7a288bf..c0e9780 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "503"
++  "baseline": "504"
+ }
+diff --git a/public/version.json b/public/version.json
+index 8888ddf..0fce8c0 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "503",
++  "version": "504",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+@@ -18,7 +18,7 @@
+       "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
+       "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
+       "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
+-      "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
++      "Когда на терминале заканчиваются все попытки, ведущему сразу приходит вопрос «Разрешить повторный взлом?» с кнопками «Да» и «Нет» — он появляется поверх любого экрана, а после удачного взлома не задаётся.",
+       "Четыре попытки на терминале снова канонические на всех шести сложностях. Скобки возвращают попытки, но никогда не поднимают их выше четырёх.",
+       "Доска стала больше: число слов считается как 20 + 2·сложность − ИНТ. На пятой сложности это 26 слов при ИНТ 4 и 20 при ИНТ 10 — бонусы скобок больше не съедают доску.",
+       "Слова на доске теперь почти одинаковые: те же буквы в другом порядке, отличаются парой букв. Пароль выбирается внутри набора, поэтому его нельзя найти простым «похоже на все остальные».",
+@@ -50,7 +50,11 @@
+       "Подключение к комнате через пункт «Сервер» в меню персонажа: привязанный персонаж переподключается к своей комнате автоматически без повторного ввода кода, а перенос по личным папкам не сбрасывает привязку.",
+       "Значок сети на карточке привязанного персонажа показывает статус связи (зелёный — мастер в сети и комната доступна, бледный — не в сети); личные персонажи и комнаты мастера строго разделены между режимами «Пользователь» и «Админ».",
+       "Быстрый запуск веб-приложения: готовая сжатая сборка открывается за секунды, а во время обновления на экране сразу отображается живой индикатор запуска вместо пустого тёмного окна.",
+-      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
++      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша.",
++      "Ответ «Да» мгновенно собирает новую доску по текущим настройкам терминала: новые слова, подсказки и скобки, снова четыре попытки, а характеристики выбравшего персонажа сохраняются.",
++      "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
++      "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
++      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
+       "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
+@@ -68,7 +72,7 @@
+       "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
+       "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
+       "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
+-      "The terminal lockout label is now dark grey and readable on the light form background.",
++      "When all attempts on a terminal are used, the Game Master immediately gets an «Allow another hack?» prompt with «Yes» and «No» buttons — it appears over any screen and never shows after a successful hack.",
+       "Four attempts are canonical again at every difficulty. Brackets restore attempts but never raise them above four.",
+       "Boards are larger: word count is 20 + 2·difficulty − INT. At difficulty 5 that is 26 words at INT 4 and 20 at INT 10, so bracket bonuses no longer eat the board.",
+       "Board words are now near-identical: the same letters in a different order, differing by a couple of letters. The password is picked inside the set, so it cannot be found by simply looking for the word similar to all others.",
+@@ -100,7 +104,11 @@
+       "Connecting to a room via «Server» in the character menu: a bound character reconnects to its room automatically without re-entering the code, and moving it between personal folders keeps the binding intact.",
+       "A network badge on a bound character card shows connection status (green when the GM is online and the room is active, dim when offline); personal characters and GM rooms stay strictly separated between «User» and «Admin» modes.",
+       "Fast web app startup: the compressed build opens in seconds, and during an update a live startup indicator appears right away instead of a blank dark screen.",
+-      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing."
++      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing.",
++      "Answering «Yes» instantly builds a fresh board from the current terminal settings: new words, hints and brackets, four attempts again, and the chosen character stats are preserved.",
++      "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
++      "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
++      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away."
+     ]
+   }
+ }
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 827d104..f820f16 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -155,9 +155,6 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+           ? marker.difficulty
+           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+       : 0,
+-    lockOnFailure: kind === 'terminal' && (marker && !explicitTerminal
+-      ? marker.lockOnFailure
+-      : Boolean(raw.lockOnFailure)),
+     items,
+   };
+ };
+@@ -240,7 +237,6 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+       : 50,
+     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+     difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
+-    lockOnFailure: kind === 'terminal' && Boolean(raw.lockOnFailure),
+     items,
+     nodes,
+     closedByClientIds,
+@@ -426,9 +422,6 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+           if (payload.nodeDifficulty !== undefined) {
+             targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
+           }
+-          if (payload.nodeLockOnFailure !== undefined) {
+-            targetNode.lockOnFailure = Boolean(payload.nodeLockOnFailure);
+-          }
+         }
+         if (payload.locked !== undefined) {
+           targetNode.locked = Boolean(payload.locked);
+@@ -440,7 +433,6 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+           const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
+           targetNode.lockLabel = encodeTerminalNodeMarker({
+             difficulty: targetNode.difficulty,
+-            lockOnFailure: targetNode.lockOnFailure,
+             label: previousMarker ? previousMarker.label : targetNode.lockLabel,
+           });
+         }
+diff --git a/server/protocol.js b/server/protocol.js
+index 7048fe8..67987b6 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -55,6 +55,9 @@ const ERROR_CODE = Object.freeze({
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+   TERMINAL_NOT_ISSUED: 'TERMINAL_NOT_ISSUED',
+   TERMINAL_LOCKED: 'TERMINAL_LOCKED',
++  // Патч 504: решение Мастера вместо автоматической блокировки.
++  TERMINAL_CLOSED: 'TERMINAL_CLOSED',
++  TERMINAL_AWAITING_RETRY: 'TERMINAL_AWAITING_RETRY',
+   TERMINAL_VIEW_ONLY: 'TERMINAL_VIEW_ONLY',
+   TERMINAL_ALREADY_ACTIVE: 'TERMINAL_ALREADY_ACTIVE',
+   TERMINAL_NOT_ACTIVE: 'TERMINAL_NOT_ACTIVE',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 5ef2459..5be3464 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -18,6 +18,9 @@ const {
+ const {
+   normalizeTerminalConfig,
+   publicGameState,
++  syncGameConfig,
++  closeGame,
++  createGame,
+   applyGameAction,
+ } = require('./terminalHacking');
+ 
+@@ -91,14 +94,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       fromName: entry.fromName,
+     })),
+     activeSession: room.activeSession || null,
+-    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [id, {
+-      containerId: id,
+-      config: entry.config,
+-      locked: Boolean(entry.locked),
+-      standaloneIssued: Boolean(entry.standaloneIssued),
+-      game: publicGameState(entry.game),
+-      updatedAt: entry.updatedAt,
+-    }])),
++    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
++      id,
++      terminalPublic(id, entry),
++    ])),
+     lastClosedSession: room.lastClosedSession || null,
+     directives: cloneDirectives(room.directives),
+     // Признак обновлённого сервера: клиент включает синхронизированную игру,
+@@ -307,7 +306,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = normalized;
+-    syncTerminalNodes(room, normalized);
++    // Патч 504: открытие/повторная выдача локации — это новая трансляция,
++    // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
++    syncTerminalNodes(room, normalized, { reissue: true });
+     room.lastClosedSession = null;
+     return { room, session: normalized };
+   };
+@@ -326,7 +327,52 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, session: result.session };
+   };
+ 
+-  const syncTerminalNodes = (room, session) => {
++  const terminalPublic = (terminalId, entry) => ({
++    containerId: terminalId,
++    config: entry.config,
++    // Патч 504: «Закрыт» — решение Мастера «Нет». Поле `locked` оставлено как
++    // алиас для клиентов предыдущих версий: они просто не дают нажать кнопки.
++    closed: Boolean(entry.closed),
++    locked: Boolean(entry.closed),
++    // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
++    awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
++    standaloneIssued: Boolean(entry.standaloneIssued),
++    game: publicGameState(entry.game),
++    updatedAt: entry.updatedAt,
++  });
++
++  /**
++   * Патч 504: правка карточки во время доступа больше не стирает состояние
++   * партии и не «запекает» старые настройки в доску. `config` всегда свежий,
++   * «Да» Мастера собирает по нему новую доску. `reissue` — явная повторная
++   * трансляция терминала/локации, она снимает «Закрыт».
++   */
++  const mergeTerminalConfig = (previous, config, { reissue = false, standaloneIssued = false } = {}) => {
++    if (!previous) {
++      return {
++        config,
++        closed: false,
++        standaloneIssued,
++        game: null,
++        updatedAt: now(),
++      };
++    }
++    // Активную доску не пересобираем на ходу: игрок не теряет прогресс из-за
++    // того, что Мастер поправил карточку. Новая сложность вступит в силу при
++    // следующей новой партии — «Да» Мастера или «Взломать» другого игрока.
++    let game = previous.game ? syncGameConfig(previous.game, config) : null;
++    if (reissue && game?.status === 'closed') game = null;
++    return {
++      ...previous,
++      config,
++      closed: reissue ? false : Boolean(previous.closed),
++      standaloneIssued: standaloneIssued || Boolean(previous.standaloneIssued),
++      game,
++      updatedAt: now(),
++    };
++  };
++
++  const syncTerminalNodes = (room, session, options = {}) => {
+     if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
+     for (const node of session.nodes) {
+       if (node?.kind !== 'terminal') continue;
+@@ -335,28 +381,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         name: node.name,
+         description: node.description,
+         difficulty: node.difficulty,
+-        lockOnFailure: node.lockOnFailure,
+       });
+       if (!config.containerId || !config.name) continue;
+       const previous = room.terminalStates.get(config.containerId);
+-      const changed = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
+-      room.terminalStates.set(config.containerId, previous
+-        ? { ...previous, config, game: changed ? null : previous.game, updatedAt: now() }
+-        : { config, locked: false, standaloneIssued: false, game: null, updatedAt: now() });
++      room.terminalStates.set(
++        config.containerId,
++        mergeTerminalConfig(previous, config, options),
++      );
+     }
+   };
+ 
+-  const terminalPublic = (terminalId, entry) => ({
+-    containerId: terminalId,
+-    config: entry.config,
+-    locked: Boolean(entry.locked),
+-    standaloneIssued: Boolean(entry.standaloneIssued),
+-    game: publicGameState(entry.game),
+-    updatedAt: entry.updatedAt,
+-  });
+-
+   /** Зарегистрировать доступный терминал в комнате (только владелец комнаты). */
+-  const issueTerminal = ({ code, clientId, config: rawConfig, ownerToken = null, ws = null }) => {
++  const issueTerminal = ({ code, clientId, config: rawConfig, reissue = false, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+@@ -365,10 +401,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!config.containerId || !config.name) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     const previous = room.terminalStates.get(config.containerId);
+-    const configChanged = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
+-    const entry = previous
+-      ? { ...previous, config, standaloneIssued: true, game: configChanged ? null : previous.game, updatedAt: now() }
+-      : { config, locked: false, standaloneIssued: true, game: null, updatedAt: now() };
++    const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
+     room.terminalStates.set(config.containerId, entry);
+     return { room, terminal: terminalPublic(config.containerId, entry) };
+   };
+@@ -380,10 +413,54 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const id = String(containerId || '').trim();
+     const entry = room.terminalStates.get(id);
+     if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
+-    if (action === 'unlock' || action === 'reset') {
++    // Патч 504: решение о повторном взломе и повторная трансляция — действия
++    // Мастера. Игрок не может ни обойти отказ, ни сам «открыть» терминал.
++    if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) {
+       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
+-      entry.locked = false;
++      if (action === 'retry') {
++        if (entry.game?.status !== 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
++        const decision = value === 'yes' || value === true ? 'yes'
++          : (value === 'no' || value === false ? 'no' : null);
++        if (!decision) return { error: ERROR_CODE.BAD_MESSAGE };
++        if (decision === 'no') {
++          // «Нет» — карточка остаётся visible, но ни взломать, ни посмотреть
++          // её нельзя до новой трансляции Мастером.
++          entry.game = closeGame(entry.game, { now: now() });
++          entry.closed = true;
++          entry.updatedAt = now();
++          return { room, terminal: terminalPublic(id, entry) };
++        }
++        // «Да» — СРАЗУ новая доска по ТЕКУЩИМ настройкам карточки. Оператор
++        // сохраняется, но другой игрок может нажать «Взломать» и собрать
++        // доску уже под свой лист (механика передачи хода из патча 503).
++        const operatorCharacterId = entry.game.operatorCharacterId || null;
++        const operatorClientId = entry.game.operatorClientId || null;
++        const operatorName = entry.game.operatorName || '';
++        const published = operatorCharacterId ? room.lastSnapshots.get(operatorCharacterId) : null;
++        // Сохраняем лист оператора: иначе новая доска собралась бы под
++        // дефолтные ИНТ/Науку/Удачу и «Да» незаметно поменяло бы условия.
++        const operatorSnapshot = entry.operatorSnapshot || published?.snapshot || {};
++        const fresh = createGame({
++          config: entry.config,
++          operatorClientId,
++          operatorCharacterId,
++          characterSnapshot: operatorSnapshot,
++          now: now(),
++          excludeWords: room.recentTerminalWords || [],
++        });
++        fresh.operatorName = operatorName;
++        entry.game = fresh;
++        entry.closed = false;
++        if (Array.isArray(fresh.wordRanges)) {
++          const words = fresh.wordRanges.map((range) => range.word);
++          room.recentTerminalWords = [...words, ...(room.recentTerminalWords || [])].slice(0, 60);
++        }
++        entry.updatedAt = now();
++        return { room, terminal: terminalPublic(id, entry) };
++      }
++      // unlock/reset/reissue — повторная трансляция терминала.
++      entry.closed = false;
+       entry.game = null;
+       entry.updatedAt = now();
+       return { room, terminal: terminalPublic(id, entry) };
+@@ -393,7 +470,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const charId = String(characterId || '').trim();
+     const published = room.lastSnapshots.get(charId);
+     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+-    if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
++    if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
++    if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
+     // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
+     // Партия всё равно одна на всех: прежний оператор становится зрителем,
+     // а повторный start от того же оператора не сбрасывает его прогресс.
+@@ -414,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const snapshot = published.snapshot || {};
+     const result = applyGameAction({
+       game: entry.game || entry.config,
++      config: entry.config,
+       action,
+       clientId,
+       characterId: charId,
+@@ -423,13 +502,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       excludeWords: room.recentTerminalWords || [],
+     });
+     if (result.error) return { error: ERROR_CODE[result.error] || result.error };
++    if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
+     entry.game = result.game;
+     if (action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+       // Держим слова последних трёх досок (по 12–20 слов каждая).
+       const fresh = entry.game.wordRanges.map((range) => range.word);
+       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
+     }
+-    if (entry.game?.status === 'locked') entry.locked = true;
+     if (result.usedDigest) {
+       const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
+       const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
+diff --git a/server/roomServer.js b/server/roomServer.js
+index a950659..dd61cd5 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -656,6 +656,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             code: canonical,
+             clientId,
+             config: payload.config,
++            reissue: Boolean(payload.reissue),
+             ownerToken: payload.ownerToken || null,
+             ws,
+           });
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index b53e59e..f0ba601 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -65,20 +65,19 @@ const normalizeTerminalConfig = (raw = {}) => ({
+   name: String(raw.name || '').trim(),
+   description: String(raw.description || '').trim(),
+   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
+-  lockOnFailure: Boolean(raw.lockOnFailure),
+ });
+ 
+ // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
+ // Старые серверы комнат понижали `kind: 'terminal'` узла локации до 'loot' и
+-// теряли difficulty/lockOnFailure; lockLabel при этом сохранялся. Обновлённый
+-// сервер восстанавливает терминал из маркера, а клиент — даже если сервер
+-// вообще не обновлялся (локальная мини-игра).
++// теряли difficulty; lockLabel при этом сохранялся. Обновлённый сервер
++// восстанавливает терминал из маркера, а клиент — даже если сервер вообще
++// не обновлялся (локальная мини-игра). Патч 504: поле `f` («блокировать после
++// провала») убрано из записи; при чтении старых маркеров оно игнорируется.
+ const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
+-const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
++const encodeTerminalNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
+   `${TERMINAL_NODE_MARKER}${JSON.stringify({
+     v: 1,
+     d: clamp(Math.floor(Number(difficulty) || 0), 0, 5),
+-    f: lockOnFailure ? 1 : 0,
+     l: String(label || ''),
+   })}`
+ );
+@@ -90,7 +89,6 @@ const decodeTerminalNodeMarker = (value) => {
+     if (!parsed || parsed.v !== 1) return null;
+     return {
+       difficulty: clamp(Math.floor(Number(parsed.d) || 0), 0, 5),
+-      lockOnFailure: Boolean(parsed.f),
+       label: String(parsed.l || ''),
+     };
+   } catch {
+@@ -839,7 +837,8 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+     name: config.name,
+     description: config.description,
+     difficulty,
+-    lockOnFailure: config.lockOnFailure,
++    // Патч 504: блокировки по галочке больше нет. Исход партии решает Мастер
++    // в диалоге «Разрешить повторный взлом?», когда попытки исчерпаны.
+     status: 'playing',
+     operatorClientId,
+     operatorCharacterId,
+@@ -897,27 +896,58 @@ const publicGameState = (game) => {
+   };
+ };
+ 
++// Патч 504: «живые» поля карточки применяются к уже открытой доске без
++// пересборки. Сложность меняется только при следующей новой партии: доска
++// собрана под конкретную длину слова и не может поменяться на ходу.
++const syncGameConfig = (game, config) => {
++  if (!game || !config) return game;
++  let next = game;
++  for (const field of ['name', 'description']) {
++    if (config[field] === undefined || next[field] === config[field]) continue;
++    if (next === game) next = { ...game };
++    next[field] = config[field];
++  }
++  return next;
++};
++
+ const failGame = (game, { now }) => {
+   if (game.attempts > 0) return game;
+-  if (game.lockOnFailure && game.digestEligible && !game.digestUsed) {
++  // «Дайджест программиста» по-прежнему даёт последнюю попытку до решения
++  // Мастера, но теперь предлагается на любом терминале.
++  if (game.digestEligible && !game.digestUsed) {
+     return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+   }
+-  if (game.lockOnFailure) {
+-    return { ...game, status: 'locked', result: 'ACCESS DENIED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+-  }
+-  return { ...game, status: 'failed', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
++  // Патч 504: попытки исчерпаны — партия НЕ завершается молча и НЕ
++  // блокируется автоматически. Сервер ждёт ответа Мастера на вопрос
++  // «Разрешить повторный взлом?», а игрок видит явное сообщение о провале.
++  return { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+ };
+ 
+-const applyGameAction = ({ game, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
++const closeGame = (game, { now }) => ({
++  ...game,
++  status: 'closed',
++  result: 'TERMINAL CLOSED',
++  scrollUp: false,
++  updatedAt: now,
++  revision: game.revision + 1,
++});
++
++const applyGameAction = ({ game, config = null, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
+   if (!game) return { error: 'TERMINAL_NOT_ISSUED' };
+-  if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
+-  if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
++  // Патч 504: настройки карточки читаются на каждом ходу, а не «запекаются»
++  // в доску при первом «Взломать».
++  game = syncGameConfig(game, config);
++  if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) return { error: 'TERMINAL_GM_ONLY' };
++  if (game.status === 'closed') return { error: 'TERMINAL_CLOSED' };
++  if (game.status === 'awaitingRetry') return { error: 'TERMINAL_AWAITING_RETRY' };
+   if (action === 'start') {
+     const isSameOperator = game.operatorCharacterId === characterId
+       && game.operatorClientId === clientId;
+     if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
++    // Новая партия всегда собирается по ТЕКУЩИМ настройкам карточки, а не
++    // по полям предыдущей доски.
+     const fresh = createGame({
+-      config: game,
++      config: config || game,
+       operatorClientId: clientId,
+       operatorCharacterId: characterId,
+       characterSnapshot,
+@@ -935,8 +965,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
+       return { game: { ...game, status: 'playing', attempts: 1, digestEligible: false, digestUsed: true, result: 'DIGEST USED', updatedAt: now, revision: game.revision + 1 }, usedDigest: true };
+     }
+     if (action === 'declineDigest') {
+-      const status = game.lockOnFailure ? 'locked' : 'failed';
+-      return { game: { ...game, status, digestEligible: false, result: status === 'locked' ? 'ACCESS DENIED' : '', updatedAt: now, revision: game.revision + 1 } };
++      return { game: { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', digestEligible: false, scrollUp: false, updatedAt: now, revision: game.revision + 1 } };
+     }
+     return { error: 'TERMINAL_DIGEST_DECISION_REQUIRED' };
+   }
+@@ -1033,5 +1062,7 @@ module.exports = {
+   normalizeCharacterSnapshot,
+   createGame,
+   publicGameState,
++  syncGameConfig,
++  closeGame,
+   applyGameAction,
+ };
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 893bd00..5ed87d1 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -51,6 +51,9 @@ export const ROOM_ERROR = {
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+   TERMINAL_NOT_ISSUED: 'TERMINAL_NOT_ISSUED',
+   TERMINAL_LOCKED: 'TERMINAL_LOCKED',
++  // Патч 504: решение Мастера вместо автоматической блокировки.
++  TERMINAL_CLOSED: 'TERMINAL_CLOSED',
++  TERMINAL_AWAITING_RETRY: 'TERMINAL_AWAITING_RETRY',
+   TERMINAL_VIEW_ONLY: 'TERMINAL_VIEW_ONLY',
+   TERMINAL_ALREADY_ACTIVE: 'TERMINAL_ALREADY_ACTIVE',
+   TERMINAL_NOT_ACTIVE: 'TERMINAL_NOT_ACTIVE',
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index b6e7eef..6b9ec4e 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -86,7 +86,7 @@ interface RoomStoreState {
+     code: string;
+     characterId: string;
+   }) => Promise<void>;
+-  issueTerminal: (input: { code: string; config: Record<string, unknown>; ownerToken?: string }) => Promise<any>;
++  issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
+   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
+   openRoomSession: (input: {
+     code: string;
+@@ -112,7 +112,6 @@ interface RoomStoreState {
+     nodeDescription?: string;
+     nodeItems?: unknown[];
+     nodeDifficulty?: number;
+-    nodeLockOnFailure?: boolean;
+     locked?: boolean;
+     lockLabel?: string;
+   }) => Promise<ActiveLootTradeSession>;
+@@ -735,9 +734,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       }
+     },
+ 
+-    issueTerminal: async ({ code, config, ownerToken }) => {
++    issueTerminal: async ({ code, config, reissue, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const payload: Record<string, unknown> = { code, config };
++      if (reissue) payload.reissue = true;
+       if (ownerToken) payload.ownerToken = ownerToken;
+       const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ISSUE, payload, code);
+       return response.payload?.terminal;
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index c691522..0f782b7 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -749,6 +749,7 @@ const styles = StyleSheet.create({
+   },
+   terminalAdminText: { color: '#d8d2b8', fontSize: 13 },
+   terminalAdminStateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
++  terminalAdminActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+   terminalUnlockButton: { borderWidth: 1, borderColor: '#e8c04b', borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6 },
+   terminalUnlockButtonText: { color: '#f4d76a', fontSize: 12, fontWeight: '700' },
+   movePickerCancelText: {

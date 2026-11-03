@@ -65,7 +65,6 @@ const ContainerFormModal = ({
   // Сложность 0 вручную не создаётся: она возникает только у игрока с «Хакером»,
   // когда тот снижает сложность 1 до 0. Минимум в форме — 1.
   const [difficulty, setDifficulty] = useState(1);
-  const [lockOnFailure, setLockOnFailure] = useState(false);
   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
@@ -94,7 +93,6 @@ const ContainerFormModal = ({
     }
     setDescription(initialContainer?.description || '');
     setDifficulty(Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1)));
-    setLockOnFailure(Boolean(initialContainer?.lockOnFailure));
     setCapsCount(String(
       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
     ));
@@ -257,7 +255,6 @@ const ContainerFormModal = ({
         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
         description: description.trim(),
         difficulty: isTerminal ? Math.max(1, difficulty) : 0,
-        lockOnFailure: isTerminal && lockOnFailure,
         caps: resolvedCaps,
         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
@@ -517,19 +514,6 @@ const ContainerFormModal = ({
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: lockOnFailure }}
-                  style={styles.terminalLockRow}
-                  onPress={() => setLockOnFailure((value) => !value)}
-                >
-                  <MaterialCommunityIcons
-                    name={lockOnFailure ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                    size={21}
-                    color={lockOnFailure ? '#222222' : '#757575'}
-                  />
-                  <Text style={styles.terminalLockText}>{tLootTrade('form.terminalLockLabel')}</Text>
-                </TouchableOpacity>
               </>
             )}
 
@@ -681,8 +665,6 @@ const styles = StyleSheet.create({
   terminalDifficultyChipActive: { borderColor: '#e8c04b', backgroundColor: '#443a17' },
   terminalDifficultyChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
   terminalDifficultyChipTextActive: { color: '#f4d76a' },
-  terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
-  terminalLockText: { color: '#222222', flex: 1, fontSize: 14 },
   input: {
     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,

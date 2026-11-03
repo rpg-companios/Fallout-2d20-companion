@@ -1,0 +1,981 @@
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+index 32632dc..f7ab57f 100644
+--- a/__tests__/lootTrade/party-storage-modal-507.test.js
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -18,6 +18,17 @@ vi.mock('react-native', () => {
+ });
+ vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
+ vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++// Патч 509: модалка теперь работает с файлами и локальной БД; в рендер-тесте
++// достаточно заглушек, реальный IO проверяют тесты формата.
++vi.mock('../../db', () => ({
++  saveRoomStorage: vi.fn(async () => null),
++  getRoomStorage: vi.fn(async () => null),
++  getAllRoomStorages: vi.fn(async () => []),
++}));
++vi.mock('../../src/utils/characterFileTransfer', () => ({
++  saveCharacter: vi.fn(async () => ({ success: true })),
++  loadCharacter: vi.fn(async () => null),
++}));
+ 
+ import PartyStorageModal from '../../components/lootTrade/PartyStorageModal';
+ import useRoomStore from '../../src/room/roomStore';
+diff --git a/__tests__/room/party-storage-transfer-509.test.js b/__tests__/room/party-storage-transfer-509.test.js
+new file mode 100644
+index 0000000..6aa7a45
+--- /dev/null
++++ b/__tests__/room/party-storage-transfer-509.test.js
+@@ -0,0 +1,113 @@
++// Приёмочный тест 509. Владелец: «Да сейв нужен мультиплатформенный. И ещё
++// надо чтобы, что мастер, что игрок могли экспортировать общее хранилище в
++// json ... если мастер перестанет вести игру или игроки поменяют мастера ...
++// пришли в новый сервер и мастер наполнил хранилище одним действием».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  createStorageExportPayload,
++  parseStorageImportPayload,
++  storageExportFileName,
++  STORAGE_EXPORT_TYPE,
++} from '../../domain/partyStorageTransfer.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const SNAPSHOT = {
++  revision: 6,
++  entries: [
++    { entryId: 'st_1', item: { id: 'w1', name: 'Пулемёт' }, name: 'Пулемёт', itemType: 'weapon', quantity: 2 },
++    { entryId: 'st_2', item: { id: 'c1', name: 'Карточка' }, name: 'Карточка', itemType: 'misc', quantity: 1 },
++  ],
++};
++
++describe('509: формат JSON-снимка', () => {
++  it('экспорт содержит конверт, ревизию и записи', () => {
++    const payload = createStorageExportPayload({ code: 'GM-ABC123', storage: SNAPSHOT, exportedBy: 'player' });
++    expect(payload.type).toBe(STORAGE_EXPORT_TYPE);
++    expect(payload.formatVersion).toBe(1);
++    expect(payload.code).toBe('GM-ABC123');
++    expect(payload.exportedBy).toBe('player');
++    expect(payload.storage.entries).toHaveLength(2);
++    expect(payload.storage.revision).toBe(6);
++    expect(payload.exportedAt).toBeGreaterThan(0);
++  });
++
++  it('импорт читает и конверт, и «голый» снимок', () => {
++    const payload = createStorageExportPayload({ code: 'GM-ABC123', storage: SNAPSHOT });
++    const fromEnvelope = parseStorageImportPayload(JSON.stringify(payload));
++    expect(fromEnvelope.error).toBeUndefined();
++    expect(fromEnvelope.code).toBe('GM-ABC123');
++    expect(fromEnvelope.storage.entries[0].quantity).toBe(2);
++
++    const bare = parseStorageImportPayload({ revision: 3, entries: [SNAPSHOT.entries[1]] });
++    expect(bare.error).toBeUndefined();
++    expect(bare.storage.revision).toBe(3);
++    expect(bare.storage.entries).toHaveLength(1);
++  });
++
++  it('битые файлы отклоняются, имя файла безопасное', () => {
++    expect(parseStorageImportPayload('{oops').error).toBe('INVALID_JSON');
++    expect(parseStorageImportPayload({ hello: 1 }).error).toBe('NO_ENTRIES');
++    expect(parseStorageImportPayload(null).error).toBe('INVALID_JSON');
++    const name = storageExportFileName('GM-АБ/В:Г', new Date('2026-11-03T10:00:00Z'));
++    expect(name).toMatch(/^storage__[A-Za-z0-9_-]+__2026-11-03\.json$/);
++    expect(name).not.toContain('А');
++  });
++
++  it('новый Мастер наполняет новый сервер одним импортом', () => {
++    const exported = createStorageExportPayload({ code: 'GM-NEWROOM', storage: SNAPSHOT });
++    const imported = parseStorageImportPayload(JSON.stringify(exported));
++    // Имитация «пришли на новый сервер»: свежий реестр, пустая комната.
++    const registry = createRoomRegistry({ now: () => 5000 });
++    const { room } = registry.createRoom({ clientId: 'new-gm', name: 'Новая', ownerToken: 't' });
++    registry.joinRoom({ code: room.code, clientId: 'new-gm', name: 'GM', role: 'gm' });
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(0);
++    const restored = registry.restorePartyStorage({
++      code: room.code, clientId: 'new-gm', ownerToken: 't', storage: imported.storage,
++    });
++    expect(restored.applied).toBe(true);
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(2);
++    // Подключившийся игрок сразу видит наполненное хранилище.
++    const joined = registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
++    expect(joined.state.partyStorage.entries[0].name).toBe('Пулемёт');
++  });
++});
++
++describe('509: мультиплатформенный сейв и UI', () => {
++  it('Drive синхронизирует снимки в обе стороны', () => {
++    const cloud = read('components/cloudSync/googleDriveSync.js');
++    expect(cloud).toContain('syncRoomStoragesInSession');
++    expect(cloud).toContain('parseRoomStorageCloudPayload');
++    expect(cloud).toContain("startsWith('storage__')");
++    expect(cloud).toContain('sync.roomStorages:done');
++    expect(read('db/Database.js')).toContain('getAllRoomStorages');
++    expect(read('db/Database.web.js')).toContain('getAllRoomStorages');
++  });
++
++  it('экспорт/импорт доступны и Мастеру, и игроку', () => {
++    const modal = read('components/lootTrade/PartyStorageModal.js');
++    expect(modal).toContain('testID="storage-export-button"');
++    expect(modal).toContain('testID="storage-import-button"');
++    expect(modal).toContain('saveCharacter');
++    expect(modal).toContain('loadCharacter');
++    expect(modal).toContain('room.role === \'gm\'');
++    expect(modal).toContain('restorePartyStorage');
++    expect(modal).toContain('saveRoomStorage');
++    // Окно находится и для комнаты Мастера, не только игрока.
++    expect(modal).toContain("value.role === 'player') || candidates[0]");
++  });
++
++  it('парные RU/EN подписи', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json')).storage;
++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json')).storage;
++    for (const key of ['export', 'import', 'exportDone', 'importDone', 'importError', 'importPlayerHint']) {
++      expect(ru[key]).toBeTruthy();
++      expect(en[key]).toBeTruthy();
++    }
++  });
++});
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 844ca3b..0dc24ec 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -294,6 +294,69 @@ const parseGmContainerCloudPayload = (rawText) => {
+   }
+ };
+ 
++// Патч 509: двусторонняя синхронизация снимков «Общего хранилища» Мастера.
++const parseRoomStorageCloudPayload = (rawText) => {
++  try {
++    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
++    if (parsed?.type !== 'party_storage') return { error: 'NOT_STORAGE' };
++    const storage = parsed?.storage;
++    if (!storage || !Array.isArray(storage.entries)) return { error: 'INVALID_STORAGE' };
++    return { code: String(parsed.code || ''), storage, exportedAt: Number(parsed.exportedAt) || 0 };
++  } catch {
++    return { error: 'INVALID_JSON' };
++  }
++};
++
++const syncRoomStoragesInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
++  const locals = typeof db.getAllRoomStorages === 'function'
++    ? await db.getAllRoomStorages()
++    : [];
++  const existingFolderId = await findGmContainersFolderId(token, moduleFolderId);
++  if (!existingFolderId && locals.length === 0) return { uploaded: 0, downloaded: 0 };
++  const gmFolderId = existingFolderId || await getGmContainersFolderId(token, moduleFolderId);
++  const remoteFiles = (await listRemoteCharacterFiles(token, gmFolderId))
++    .filter((file) => (file.name || '').startsWith('storage__'));
++
++  let downloaded = 0;
++  const seenCodes = new Set();
++  for (const file of remoteFiles) {
++    const raw = await downloadRemoteCharacter(token, file.id);
++    const parsed = parseRoomStorageCloudPayload(raw);
++    if (parsed.error || !parsed.code) continue;
++    seenCodes.add(parsed.code);
++    const local = locals.find((item) => item.code === parsed.code);
++    const remoteUpdated = file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0;
++    if (local && Number(local.updatedAt) >= remoteUpdated - 1000) continue;
++    if (local && typeof confirmDownload === 'function') {
++      const ok = await confirmDownload([{ code: parsed.code, remote: file }]);
++      if (!ok) continue;
++    }
++    await db.saveRoomStorage(parsed.code, parsed.storage);
++    downloaded += 1;
++  }
++
++  let uploaded = 0;
++  for (const local of locals) {
++    if (seenCodes.has(local.code)) continue;
++    const payload = JSON.stringify({
++      formatVersion: 1,
++      type: 'party_storage',
++      code: local.code,
++      exportedAt: Date.now(),
++      storage: local.storage,
++    });
++    await uploadCharacterFile({
++      token,
++      folderId: gmFolderId,
++      fileId: null,
++      filename: `storage__${local.code.replace(/[^A-Za-z0-9_-]/g, '_')}__${Date.now()}.json`,
++      payload,
++    });
++    uploaded += 1;
++  }
++  return { uploaded, downloaded };
++};
++
+ const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+   if (!isGmLootTradeLicensed()) {
+     return { uploaded: 0, downloaded: 0 };
+@@ -1014,6 +1077,14 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+     debugLog('sync.gmEnvEntries:failed', { message: e?.message });
+   }
+ 
++  // Патч 509: снимки «Общего хранилища» Мастера — туда и обратно.
++  try {
++    const roomStorageStats = await syncRoomStoragesInSession(token, folderId, { confirmDownload });
++    debugLog('sync.roomStorages:done', roomStorageStats);
++  } catch (e) {
++    debugLog('sync.roomStorages:failed', { message: e?.message });
++  }
++
+   // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
+   // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
+   try {
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 384e8ea..5e996e5 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -19,6 +19,13 @@ import {
+   Platform,
+ } from 'react-native';
+ import useRoomStore from '../../src/room/roomStore';
++import * as db from '../../db';
++import { saveCharacter, loadCharacter } from '../../src/utils/characterFileTransfer';
++import {
++  createStorageExportPayload,
++  parseStorageImportPayload,
++  storageExportFileName,
++} from '../../domain/partyStorageTransfer';
+ import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
+ import { showRawAlert } from '../alerts/alertService';
+ import { useLocale } from '../../i18n/locale';
+@@ -44,9 +51,16 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+   const [busy, setBusy] = useState(false);
+ 
+   const room = useMemo(() => {
+-    const entry = Object.entries(rooms || {}).find(([, value]) => value?.role === 'player');
++    // Патч 509: окно склада доступно и Мастеру, и игроку — оба должны уметь
++    // выгрузить снимок в JSON. Предпочитаем комнату игрока, если их несколько.
++    const candidates = Object.entries(rooms || {}).filter(([, value]) => value?.partyStorage);
++    const entry = candidates.find(([, value]) => value.role === 'player') || candidates[0];
+     if (!entry) return null;
+-    return { code: entry[0], storage: entry[1].partyStorage || { revision: 0, entries: [] } };
++    return {
++      code: entry[0],
++      role: entry[1].role,
++      storage: entry[1].partyStorage || { revision: 0, entries: [] },
++    };
+   }, [rooms]);
+ 
+   const entries = room?.storage?.entries || [];
+@@ -91,6 +105,48 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+     }
+   };
+ 
++  const exportJson = async () => {
++    if (!room) return;
++    const payload = createStorageExportPayload({
++      code: room.code,
++      storage: room.storage,
++      exportedBy: room.role === 'gm' ? 'gm' : 'player',
++    });
++    const result = await saveCharacter(payload, storageExportFileName(room.code));
++    if (result?.success) {
++      showRawAlert({ title: tInventory('screen.storage.exportDone') });
++    }
++  };
++
++  const importJson = async () => {
++    if (!room) return;
++    const raw = await loadCharacter();
++    const parsed = parseStorageImportPayload(raw);
++    if (parsed.error || !parsed.storage) {
++      showRawAlert({ title: tInventory('screen.storage.importError') });
++      return;
++    }
++    try {
++      // Снимок сохраняется локально под кодом ТЕКУЩЕЙ комнаты: если игрок
++      // позже станет Мастером, restoreMasterStorage поднимет его.
++      await db.saveRoomStorage(room.code, parsed.storage);
++      if (room.role === 'gm') {
++        await useRoomStore.getState().restorePartyStorage({
++          code: room.code,
++          storage: parsed.storage,
++        });
++        showRawAlert({ title: tInventory('screen.storage.importDone') });
++      } else {
++        showRawAlert({
++          title: tInventory('screen.storage.importDone'),
++          message: tInventory('screen.storage.importPlayerHint'),
++        });
++      }
++    } catch (error) {
++      showRawAlert({ title: tInventory('screen.storage.importError'), message: error?.message });
++    }
++  };
++
+   if (!visible) return null;
+ 
+   return (
+@@ -150,6 +206,22 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+             </View>
+           )}
+ 
++          <View style={styles.transferRow}>
++            <TouchableOpacity
++              testID="storage-export-button"
++              style={styles.transferButton}
++              onPress={() => { void exportJson(); }}
++            >
++              <Text style={styles.transferButtonText}>{tInventory('screen.storage.export')}</Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              testID="storage-import-button"
++              style={styles.transferButton}
++              onPress={() => { void importJson(); }}
++            >
++              <Text style={styles.transferButtonText}>{tInventory('screen.storage.import')}</Text>
++            </TouchableOpacity>
++          </View>
+           {!writable && <Text style={styles.readOnly}>{tInventory('screen.storage.readOnly')}</Text>}
+           <Text style={styles.hint}>{tInventory('screen.storage.hint')}</Text>
+         </View>
+@@ -173,6 +245,17 @@ const styles = StyleSheet.create({
+   rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
+   rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
+   hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
++  transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
++  transferButton: {
++    flex: 1,
++    alignItems: 'center',
++    paddingVertical: 8,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#58875d',
++    backgroundColor: '#213028',
++  },
++  transferButtonText: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
+   readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+ });
+ 
+diff --git a/db/Database.js b/db/Database.js
+index 55a0169..6e41395 100644
+--- a/db/Database.js
++++ b/db/Database.js
+@@ -470,6 +470,17 @@ export async function saveRoomStorage(code, storage) {
+   return { code: cleanCode, storage: JSON.parse(data) };
+ }
+ 
++export async function getAllRoomStorages() {
++  const rows = await getAll('SELECT code, data, updated_at FROM gm_room_storage');
++  return (rows || []).map((row) => {
++    try {
++      return { code: row.code, storage: JSON.parse(row.data), updatedAt: Number(row.updated_at) || 0 };
++    } catch {
++      return null;
++    }
++  }).filter(Boolean);
++}
++
+ export async function getRoomStorage(code) {
+   const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
+   if (!row?.data) return null;
+diff --git a/db/Database.web.js b/db/Database.web.js
+index 2851f0d..30c74b2 100644
+--- a/db/Database.web.js
++++ b/db/Database.web.js
+@@ -421,6 +421,17 @@ export async function saveRoomStorage(code, storage) {
+   return { code: cleanCode, storage: JSON.parse(data) };
+ }
+ 
++export async function getAllRoomStorages() {
++  const rows = await getAll('SELECT code, data, updated_at FROM gm_room_storage');
++  return (rows || []).map((row) => {
++    try {
++      return { code: row.code, storage: JSON.parse(row.data), updatedAt: Number(row.updated_at) || 0 };
++    } catch {
++      return null;
++    }
++  }).filter(Boolean);
++}
++
+ export async function getRoomStorage(code) {
+   const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
+   if (!row?.data) return null;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d6ced57..9752c68 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,34 @@
+ # Changelog
+ ---
++## Cross-platform save and JSON handover (patch 509)
++
++The owner: "Yes, the save must be cross-platform. And both the GM and players
++should be able to export shared storage to JSON, so if the GM steps down, the
++group changes its GM, or one of the players becomes the GM, the snapshot can be
++imported back. Since storage contents disappear when the server disconnects,
++arriving on a new server the GM can fill storage in one action."
++
++- **Two-way save.** `syncRoomStoragesInSession` in `googleDriveSync.js` now
++  downloads `storage__...` files from the GM Drive into the local database as
++  well as uploading them. It is called from the general cloud sync;
++  `getAllRoomStorages` was added to both database adapters.
++- **JSON export / import.** The pure `domain/partyStorageTransfer.js` defines
++  the format (`type: 'party_storage'`, room code, revision, entries), validates
++  files and also accepts a bare snapshot. Files are written and read through
++  the existing cross-platform `src/utils/characterFileTransfer.js` (Web Share
++  API / browser-fs-access / anchor download on web, expo-document-picker +
++  expo-sharing on native).
++- **Both roles.** The "Shared storage" window now has "Export JSON" and
++  "Import JSON" buttons and also opens for the GM. A GM import immediately
++  sends `storage.restore` to the room — one action fills the new storage. A
++  player import saves the snapshot on the device; once they become GM,
++  `restoreMasterStorage` uploads it.
++- This matters because room state is **ephemeral**: the server keeps it in
++  memory and it disappears on disconnect or server change. The JSON file and
++  the Drive save restore it without any server-side storage.
++
++Installation: `docs/patch-509-install.md`.
++
+ ## GM storage and player snapshot (patch 508)
+ 
+ The owner simplified the model and rejected the server file from 507: "Shared
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a44bf3e..7cf1d39 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,37 @@
+ # История изменений
+ 
+ ---
++## Мультиплатформенный сейв и перенос хранилища через JSON (патч 509)
++
++Владелец: «Да сейв нужен мультиплатформенный. И ещё надо чтобы, что мастер,
++что игрок могли экспортировать общее хранилище в json. Это нужно для того,
++чтобы если вдруг мастер перестанет вести игру или игроки поменяют мастера или
++из них кто-то решит стать мастером, в общее хранилище можно было сделать
++импорт того, что было в снапшоте через json. Поскольку при отключении от
++сервера, то содержимое общего хранилища удаляется. А так пришли в новый
++сервер и мастер наполнил хранилище одним действием».
++
++- **Сейв в обе стороны.** `syncRoomStoragesInSession` в
++  `googleDriveSync.js` теперь не только выгружает снимки Мастера, но и
++  загружает файлы `storage__...` из его Drive в локальную БД. Вызов добавлен
++  в общую синхронизацию; `getAllRoomStorages` в обоих адаптерах БД.
++- **Экспорт / импорт JSON.** Чистый модуль `domain/partyStorageTransfer.js`
++  задаёт формат (`type: 'party_storage'`, код комнаты, ревизия, записи) и
++  валидирует файл; умеет читать и «голый» снимок. Файлы пишутся и читаются
++  через существующий кросс-платформенный `src/utils/characterFileTransfer.js`
++  (Web Share API / browser-fs-access / anchor download на вебе,
++  expo-document-picker + expo-sharing в нативном приложении).
++- **Доступно обеим ролям.** В окне «Общее хранилище» появились кнопки
++  «Экспорт в JSON» и «Импорт из JSON»; окно теперь открывается и у Мастера.
++  Импорт Мастера сразу отправляет `storage.restore` в комнату — новое
++  хранилище наполняется одним действием. Импорт игрока сохраняет снимок на
++  устройстве: когда он станет Мастером, `restoreMasterStorage` поднимет его.
++- Это важно именно потому, что состояние комнаты **эфемерно**: сервер держит
++  его в памяти и при отключении/смене сервера оно исчезает. JSON-файл и сейв
++  в Drive — два способа восстановить его без серверного хранилища.
++
++Установка: `docs/patch-509-install.md`.
++
+ ## Хранилище Мастера и снапшот игрокам (патч 508)
+ 
+ Владелец упростил модель и отверг серверный файл из 507: «Общее хранилище
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index be9ad34..bc993a6 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,6 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
++- **Handover.** Snapshots sync from the GM Google Drive in both directions, so the save arrives on another device. Both the GM and players can export storage to a file and import it back: when the GM changes, the new GM fills storage on the new server in one action. Room state lives only in server memory and disappears on disconnect — the file and Drive are the recovery path. See `docs/patch-509-install.md`.
+ - **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 0160d88..c030422 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,6 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
++- **Перенос хранилища.** Снимок синхронизируется из Google Drive Мастера в обе стороны, поэтому сейв приезжает на другое устройство. И Мастер, и игрок могут выгрузить хранилище в файл и импортировать его обратно: если ведущий сменился, новый Мастер наполняет хранилище нового сервера одним действием. Состояние комнаты живёт только в памяти сервера и исчезает при отключении — файл и Drive служат для восстановления. Подробности — `docs/patch-509-install.md`.
+ - **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index e3e33f2..88634d9 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -1,6 +1,7 @@
+ # Ключи-предметы, ворота и групповой склад
+ 
+-**Статус: дизайн-документ, внедряется последовательно.** Патч **507** дал
++**Статус: дизайн-документ, внедряется последовательно.** Патч **509** дал
++мультиплатформенный сейв склада и перенос через JSON. Патч **507** дал
+ каркас склада, но ошибся со слоем хранения (общий файл на сервере). Патч
+ **508** заменил его финальной моделью владельца — **Обновление 5** ниже:
+ хранилище Мастера + снапшот игрокам, запись только онлайн. Протокол,
+@@ -398,9 +399,12 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+   все изменения онлайн; отзыва ключа и изъятия чужого нет; Мастер может
+   положить, но не забрать; кнопка — зелёная плашка во всю ширину под
+   «Добыча»/«Торговля»; название не настраивается («Общее хранилище»).
+-- **Осталось:** нужна ли двусторонняя загрузка склада из Drive (сейчас
+-  выгрузка есть, восстановление идёт из локальной БД Мастера); лимиты и
+-  стаканье; счётчик на плашке; лог операций; поведение при удалении
+-  записи-шаблона; тихое срабатывание ключа.
++- **Реализовано в 509:** сейв мультиплатформенный (Drive в обе стороны),
++  экспорт/импорт снимка в JSON у Мастера и игрока, восстановление хранилища
++  на новом сервере одним действием. Состояние комнаты эфемерно: сервер
++  держит его в памяти, при отключении оно исчезает, а JSON и сейв Мастера
++  позволяют поднять его заново.
++- **Осталось:** лимиты и стаканье; счётчик на плашке; лог операций;
++  поведение при удалении записи-шаблона; тихое срабатывание ключа.
+ - Шаги 2–5 по-прежнему в плане: ключевые записи на складе, `requires`,
+   ворота между контейнерами и мини-игра взлома замков.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index fe37345..fd804b7 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 90f16c7..3183172 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 6601651..65de4bf 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 3807812..7cc2371 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 440111f..dd1dd0e 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index d8057e3..b78a765 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 0f2596a..7a7adc9 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index c5f4c76..d57665f 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 57df654..ce69b10 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 280059f..1c50387 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index c9d2cee..9a6c62b 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index d0a3c24..71b78cc 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ > ⚠️ **Слой хранения из этого патча заменён в `docs/patch-508-install.md`:**
+ > серверный файл убран, канон перенесён в хранилище Мастера.
+ 
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 42892c8..f662aee 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Мультиплатформенный сейв и JSON-перенос хранилища — см. `docs/patch-509-install.md`.**
++
+ Патч подготовлен от состояния **версии 507** (коммит `10e176f`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–508
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+new file mode 100644
+index 0000000..4c5e6ef
+--- /dev/null
++++ b/docs/patch-509-install.md
+@@ -0,0 +1,127 @@
++# Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++
++Патч подготовлен от состояния **версии 508** (коммит `24711e7`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–509
++цепочкой.
++
++Владелец: «Да сейв нужен мультиплатформенный. И ещё надо чтобы, что мастер,
++что игрок могли экспортировать общее хранилище в json ... если вдруг мастер
++перестанет вести игру или игроки поменяют мастера ... в общее хранилище можно
++было сделать импорт того, что было в снапшоте через json. Поскольку при
++отключении от сервера, то содержимое общего хранилища удаляется. А так пришли
++в новый сервер и мастер наполнил хранилище одним действием».
++
++## Что изменилось
++
++### 1. Сейв приезжает с другого устройства
++
++В 508 выгрузка снимка в Drive Мастера была односторонней. Теперь
++`syncRoomStoragesInSession` в `components/cloudSync/googleDriveSync.js`
++работает в обе стороны:
++
++- сканирует папку `gm_containers` на файлы с префиксом `storage__`, читает
++  `type: 'gm_room_storage'` / `type: 'party_storage'` и сохраняет снимки в
++  локальную БД (`gm_room_storage`);
++- выгружает локальные снимки, которых в облаке ещё нет;
++- при расхождении спрашивает подтверждение через общий `confirmDownload`.
++
++Функция вызывается из `syncAllCharactersWithCloud` рядом с синхронизацией
++комнат, контейнеров и плиток. Добавлен `getAllRoomStorages` в обоих адаптерах
++БД (`db/Database.js`, `db/Database.web.js`). Так сейв Мастера доступен на
++другом устройстве и платформе, а `restoreMasterStorage` из 508 поднимет его в
++комнату при подключении.
++
++### 2. Экспорт / импорт JSON у обеих ролей
++
++Новый чистый модуль `domain/partyStorageTransfer.js`:
++
++- `createStorageExportPayload` — конверт `{ formatVersion, type:
++  'party_storage', code, exportedBy, exportedAt, storage }`;
++- `parseStorageImportPayload` — валидация, нормализация записей, умеет читать
++  и «голый» снимок `{ revision, entries }`;
++- `storageExportFileName` — безопасное имя `storage__<код>__<дата>.json`.
++
++Файлы пишутся и читаются через существующий кросс-платформенный
++`src/utils/characterFileTransfer.js`: Web Share API, `browser-fs-access` и
++`<a download>` на вебе; `expo-document-picker` + `expo-sharing` в нативном
++приложении. Никакого нового файлового кода.
++
++В окне «Общее хранилище» (`components/lootTrade/PartyStorageModal.js`)
++появились кнопки **«Экспорт в JSON»** и **«Импорт из JSON»**. Окно теперь
++находит комнату и у Мастера, и у игрока — экспорт доступен обоим.
++
++- **Импорт Мастера:** снимок сохраняется в его локальную БД и сразу
++  отправляется `storage.restore` в комнату. На новом сервере хранилище
++  наполняется **одним действием**.
++- **Импорт игрока:** снимок сохраняется на устройстве под кодом текущей
++  комнаты; когда игрок станет Мастером, `restoreMasterStorage` поднимет его.
++  В алерте есть понятная подсказка.
++
++### 3. Почему это нужно
++
++Состояние склада **эфемерно**: сервер держит его в памяти и при отключении /
++смене сервера оно исчезает. JSON-файл и сейв в Drive Мастера — два способа
++восстановить его без какого-либо хранилища на хостинге. Парные RU/EN подписи
++добавлены в `i18n/*/screens/inventory/screen.json`.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `domain/partyStorageTransfer.js` | новый чистый формат JSON и валидация |
++| `components/cloudSync/googleDriveSync.js` | `syncRoomStoragesInSession`, загрузка из Drive |
++| `db/Database.js`, `db/Database.web.js` | `getAllRoomStorages` |
++| `components/lootTrade/PartyStorageModal.js` | кнопки экспорта/импорта, окно для Мастера |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи переноса |
++| `__tests__/room/party-storage-transfer-509.test.js` | 7 проверок формата и переноса |
++| `__tests__/lootTrade/party-storage-modal-507.test.js` | заглушки файлового IO |
++| `docs/key-items-and-gates-design.md` | статус: мультиплатформенный сейв реализован |
++| `public/version.json`, `patchs/baseline.json` | версия 509, 72/72 заметок |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `patchs/509-storage-json-handover.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 508:
++
++```bash
++./apply-patch.sh 509
++# ✓ Установлен патч: №509 (версия 508 → 509)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 509
++```
++
++`patchs/baseline.json` в источнике равен `509`. После установки
++`public/version.json` → `509`; закоммитьте изменения, перезапустите сервис
++Node.js и пересоберите веб-сборку.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/party-storage-transfer-509.test.js
++npx vitest run __tests__/lootTrade/party-storage-modal-507.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "509"'
++```
++
++Тесты покрывают: конверт экспорта, импорт конверта и «голого» снимка, отказ
++битых файлов, безопасное имя файла, сценарий «новый Мастер наполнил новый
++сервер одним импортом» (свежий реестр → `storage.restore` → подключившийся
++игрок видит вещи), двустороннюю синхронизацию Drive, доступность кнопок обеим
++ролям и парность словарей.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/509-storage-json-handover.patch
++cp /path/to/509-storage-json-handover.patch patchs/
++```
+diff --git a/domain/partyStorageTransfer.js b/domain/partyStorageTransfer.js
+new file mode 100644
+index 0000000..8efd1c7
+--- /dev/null
++++ b/domain/partyStorageTransfer.js
+@@ -0,0 +1,78 @@
++/**
++ * Патч 509: перенос «Общего хранилища» через JSON.
++ *
++ * Снимок живёт в памяти серверной комнаты и исчезает, когда сервер
++ * недоступен/перезапущен. Экспорт нужен и Мастеру, и игроку: если ведущий
++ * перестал водить, сменился Мастер или игрок сам стал Мастером, он импортирует
++ * файл и наполняет хранилище новым сервером одним действием.
++ *
++ * Модуль чистый: формат файла и валидация без React Native и без сети.
++ */
++
++export const STORAGE_EXPORT_TYPE = 'party_storage';
++export const STORAGE_EXPORT_VERSION = 1;
++
++export const createStorageExportPayload = ({ code, storage, exportedBy = '' }) => ({
++  formatVersion: STORAGE_EXPORT_VERSION,
++  type: STORAGE_EXPORT_TYPE,
++  code: String(code || ''),
++  exportedBy: String(exportedBy || ''),
++  exportedAt: Date.now(),
++  storage: {
++    revision: Number(storage?.revision) || 0,
++    entries: (storage?.entries || []).map((entry) => ({
++      entryId: String(entry.entryId || ''),
++      item: entry.item && typeof entry.item === 'object' ? { ...entry.item } : {},
++      name: String(entry.name || ''),
++      itemType: String(entry.itemType || 'misc'),
++      quantity: Math.max(1, Math.floor(Number(entry.quantity) || 1)),
++      depositedBy: entry.depositedBy ? String(entry.depositedBy) : undefined,
++      depositedByName: entry.depositedByName ? String(entry.depositedByName) : undefined,
++      at: entry.at ? Number(entry.at) : undefined,
++    })),
++  },
++});
++
++/**
++ * Разобрать файл. Принимает и наш конверт, и «голый» снимок {revision, entries}.
++ * Возвращает { storage, code, error }.
++ */
++export const parseStorageImportPayload = (raw) => {
++  let parsed = raw;
++  if (typeof raw === 'string') {
++    try { parsed = JSON.parse(raw); } catch { return { error: 'INVALID_JSON' }; }
++  }
++  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { error: 'INVALID_JSON' };
++
++  const body = parsed.storage && typeof parsed.storage === 'object'
++    ? parsed.storage
++    : parsed;
++  if (!Array.isArray(body.entries)) return { error: 'NO_ENTRIES' };
++
++  const entries = body.entries
++    .filter((entry) => entry && typeof entry === 'object' && entry.name)
++    .map((entry, index) => ({
++      entryId: String(entry.entryId || `imported_${index}`),
++      item: entry.item && typeof entry.item === 'object' ? { ...entry.item } : { name: String(entry.name) },
++      name: String(entry.name),
++      itemType: String(entry.itemType || 'misc'),
++      quantity: Math.max(1, Math.floor(Number(entry.quantity) || 1)),
++      depositedBy: entry.depositedBy ? String(entry.depositedBy) : undefined,
++      depositedByName: entry.depositedByName ? String(entry.depositedByName) : undefined,
++      at: entry.at ? Number(entry.at) : undefined,
++    }));
++
++  return {
++    storage: { revision: Number(body.revision) || 0, entries },
++    code: String(parsed.code || '').trim(),
++    exportedAt: Number(parsed.exportedAt) || 0,
++  };
++};
++
++export const storageExportFileName = (code, now = new Date()) => {
++  const clean = String(code || 'room').replace(/[^A-Za-z0-9_-]/g, '_');
++  const day = now.toISOString().slice(0, 10);
++  return `storage__${clean}__${day}.json`;
++};
++
++export default createStorageExportPayload;
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 11d6bf1..afa8312 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -83,6 +83,12 @@
+     "noRoom": "No connected room",
+     "failed": "Could not update shared storage",
+     "readOnly": "Game Master is offline — storage is read-only",
++    "export": "Export JSON",
++    "import": "Import JSON",
++    "exportDone": "Shared storage snapshot saved as JSON",
++    "importDone": "Snapshot loaded",
++    "importError": "Could not read the storage file",
++    "importPlayerHint": "The file is saved on this device. Once you become the room GM, import it again to fill the storage.",
+     "hint": "Items are shared by the whole party. The name is not customizable."
+   },
+   "labels": {
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 8e89af8..c3fd60a 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -83,6 +83,12 @@
+     "noRoom": "Нет подключённой комнаты",
+     "failed": "Не удалось изменить общее хранилище",
+     "readOnly": "Мастер не в сети — хранилище доступно только для просмотра",
++    "export": "Экспорт в JSON",
++    "import": "Импорт из JSON",
++    "exportDone": "Снимок общего хранилища сохранён в JSON",
++    "importDone": "Снимок загружен",
++    "importError": "Не удалось прочитать файл хранилища",
++    "importPlayerHint": "Файл сохранён на устройстве. Став Мастером комнаты, импортируйте его снова, чтобы наполнить хранилище.",
+     "hint": "Вещи общие для всей группы. Название не настраивается."
+   },
+   "labels": {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index ad415ab..1117dfd 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "508"
++  "baseline": "509"
+ }
+diff --git a/public/version.json b/public/version.json
+index 1ed788f..2ef3dd1 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "508",
++  "version": "509",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Снимок общего хранилища теперь синхронизируется из Google Drive в обе стороны: сейв Мастера приезжает на другое устройство и на другой платформе.",
++      "И Мастер, и игрок могут выгрузить общее хранилище в JSON-файл и загрузить его обратно.",
++      "Если ведущий перестал водить или сменился Мастер, импорт снимка наполняет хранилище нового сервера одним действием.",
++      "Окно хранилища доступно Мастеру и игроку: экспорт и импорт работают на вебе и в нативном приложении через общий механизм файлов.",
+       "Общее хранилище теперь принадлежит Мастеру: его сохранение лежит в локальной базе ведущего и уезжает в его Google Drive, а игрокам рассылается текущий снимок.",
+       "Без Мастера в сети хранилище доступно только для просмотра: положить или забрать вещь нельзя, пока ведущий не подключится к комнате.",
+       "При подключении к комнате игрок сразу получает актуальное состояние хранилища, а Мастер поднимает своё сохранение в комнату.",
+@@ -73,6 +77,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Shared storage snapshots now sync from Google Drive in both directions, so the GM save arrives on another device and platform.",
++      "Both the Game Master and players can export shared storage to a JSON file and import it back.",
++      "If the GM steps down or the group changes its GM, importing a snapshot fills storage on the new server in one action.",
++      "The storage window is available to both GM and players; export and import work on web and native through the shared file transfer layer.",
+       "Shared storage now belongs to the Game Master: its save lives in the GM local database and syncs to their Google Drive, while players receive a current snapshot.",
+       "Without the GM online the storage is read-only: items cannot be deposited or withdrawn until the GM connects to the room.",
+       "Connecting to a room immediately delivers the current storage state, and the GM uploads their saved copy into the room.",

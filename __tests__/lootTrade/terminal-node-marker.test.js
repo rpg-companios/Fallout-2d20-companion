@@ -12,7 +12,7 @@ import { normalizeActiveSession, applySessionUpdate } from '../../server/lootTra
 import { decodeTerminalNodeMarker as serverDecodeMarker } from '../../server/terminalHacking.js';
 
 const terminal = normalizeContainerEntity({
-  id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
+  id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3,
 });
 const hub = normalizeContainerEntity({
   id: 'hub-1', kind: 'hub', name: 'Vault', roomCode: 'GM-AAAAAA',
@@ -40,7 +40,6 @@ describe('terminal node marker survives a legacy room server', () => {
     expect(node.kind).toBe(CONTAINER_KIND.TERMINAL);
     expect(decodeTerminalNodeMarker(node.lockLabel)).toMatchObject({
       difficulty: 3,
-      lockOnFailure: true,
       label: 'Доступ запрещён',
     });
     // CJS-копия на сервере понимает тот же формат.
@@ -55,7 +54,6 @@ describe('terminal node marker survives a legacy room server', () => {
     expect(resolved.node).toMatchObject({
       kind: CONTAINER_KIND.TERMINAL,
       difficulty: 3,
-      lockOnFailure: true,
       lockLabel: 'Доступ запрещён',
     });
     expect(resolved.node.lockLabel).not.toContain('F2D20-TERM:');
@@ -74,7 +72,6 @@ describe('terminal node marker survives a legacy room server', () => {
     expect(session.nodes[0]).toMatchObject({
       kind: 'terminal',
       difficulty: 3,
-      lockOnFailure: true,
     });
     expect(serverDecodeMarker(session.nodes[0].lockLabel)).toBeTruthy();
     expect(session.targetType).toBe('room');
@@ -91,17 +88,24 @@ describe('terminal node marker survives a legacy room server', () => {
       sessionId: session.sessionId,
       nodeContainerId: terminal.id,
       nodeDifficulty: 5,
-      nodeLockOnFailure: false,
     }, 2000);
     expect(updated.session.nodes[0]).toMatchObject({
       kind: 'terminal',
       difficulty: 5,
-      lockOnFailure: false,
     });
     expect(decodeTerminalNodeMarker(updated.session.nodes[0].lockLabel)).toMatchObject({
       difficulty: 5,
-      lockOnFailure: false,
     });
+    expect(updated.session.nodes[0]).not.toHaveProperty('lockOnFailure');
+  });
+
+  it('reads markers written by older versions but never writes the removed flag', () => {
+    const legacy = `${'F2D20-TERM:'}{"v":1,"d":4,"f":1,"l":"Старый замок"}`;
+    expect(decodeTerminalNodeMarker(legacy)).toEqual({ difficulty: 4, label: 'Старый замок' });
+    expect(serverDecodeMarker(legacy)).toEqual(decodeTerminalNodeMarker(legacy));
+    const written = encodeTerminalNodeMarker({ difficulty: 4, label: 'Новый замок' });
+    expect(written).not.toContain('"f"');
+    expect(decodeTerminalNodeMarker(written)).toEqual({ difficulty: 4, label: 'Новый замок' });
   });
 
   it('ignores malformed markers on ordinary loot nodes', () => {

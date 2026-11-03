@@ -1,0 +1,1582 @@
+diff --git a/.gitignore b/.gitignore
+index 6e357b0..f6f0e8e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -44,6 +44,3 @@ package-lock — копия.json
+ # архив локальных правок перед установкой (патч 431 / 458)
+ .install-backup/
+ .installbackup/
+-
+-# Патч 507: серверное состояние «Общего хранилища» (не в git)
+-.data/
+diff --git a/App.js b/App.js
+index 7d18dbc..4228785 100644
+--- a/App.js
++++ b/App.js
+@@ -27,6 +27,7 @@ import { seedDatabase } from './db/seed';
+ import { useLocale, useModuleLocale } from './i18n/locale';
+ import { tApp } from './i18n/appI18n';
+ import useCharacterStore from './src/store/characterStore';
++import useRoomStore from './src/room/roomStore';
+ import { debugLog } from './src/debug/falloutDebug';
+ 
+ import HomeScreen from './components/screens/HomeScreen/HomeScreen';
+@@ -38,6 +39,7 @@ import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
+ import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
+ import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
+ import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
++import { startPartyStoragePersistence, restoreMasterStorage } from './src/lootTrade/partyStoragePersistence';
+ import useUiModeStore from './src/room/uiModeStore';
+ import {
+   enforceAdminModeEntitlement,
+@@ -174,6 +176,23 @@ function App() {
+     return startGmSessionPersistence();
+   }, [dbReady]);
+ 
++  // Патч 508: хранилище Мастера — канон «Общего хранилища». Сохраняем каждый
++  // снимок локально и в Drive, а при подключении Мастера поднимаем сейв в
++  // комнату, чтобы игроки получили актуальное состояние.
++  useEffect(() => {
++    if (!dbReady) return undefined;
++    const restored = new Set();
++    const unsubscribePersist = startPartyStoragePersistence();
++    const unsubscribeRooms = useRoomStore.subscribe((state) => {
++      for (const [code, room] of Object.entries(state.rooms || {})) {
++        if (room?.role !== 'gm' || room.joined === false || restored.has(code)) continue;
++        restored.add(code);
++        void restoreMasterStorage(code);
++      }
++    });
++    return () => { unsubscribePersist(); unsubscribeRooms(); };
++  }, [dbReady]);
++
+   // Шаг 8в (патч 243): таймер расхода блока силовой брони (§5.3/§5.4) —
+   // бывший эффект CharacterProvider. Тикает только пока приложение открыто
+   // («приложение закрыто — отсчёт на паузе»); состояние — в powerArmorSlice.
+diff --git a/__tests__/room/party-storage-507.test.js b/__tests__/room/party-storage-507.test.js
+index 8323d57..6e56843 100644
+--- a/__tests__/room/party-storage-507.test.js
++++ b/__tests__/room/party-storage-507.test.js
+@@ -1,15 +1,14 @@
+-// Приёмочный тест 507, шаг 1 дизайна: «Общее хранилище» комнаты.
+-// Владелец: «Групповой склад ... общий контейнер куда каждый может что-то
+-// положить или забрать ... игрока сегодня нет, он придёт и достанет ...
+-// хранилище лучше на сервере. Подключился — получил обновления ...
+-// Имя настраивать не надо. Это просто "общее хранилище"».
++// Приёмочный тест склада (патч 507 — каркас, патч 508 — слой хранения).
++// Финальная модель владельца: «Общее хранилище это хранилище мастера +
++// снапшот игрокам. Без мастера онлайн они не могут взять предметы ... но
++// могут смотреть. Когда игрок подключается к комнате, происходит обновление
++// хранилища на текущее состояние. Все изменения происходят пока игрок и
++// мастер в сети».
+ import { describe, expect, it } from 'vitest';
+-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
++import { readFileSync, existsSync } from 'node:fs';
+ import path from 'node:path';
+-import os from 'node:os';
+ import { fileURLToPath } from 'node:url';
+ import { createRoomRegistry } from '../../server/roomRegistry.js';
+-import { createFilePartyStorageStore } from '../../server/partyStorageStore.js';
+ import { MESSAGE, ERROR_CODE } from '../../server/protocol.js';
+ import { ROOM_MESSAGE, ROOM_ERROR } from '../../src/room/roomProtocol.ts';
+ 
+@@ -17,126 +16,116 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+ const ITEM = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
+ 
+-const setup = (extra = {}) => {
+-  const registry = createRoomRegistry({ now: () => 1000, ...extra });
+-  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол' });
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол', ownerToken: 'token-1' });
+   registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
+   registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
+   registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
+   return { registry, room };
+ };
+ 
+-describe('507: общее хранилище на сервере', () => {
+-  it('положить/забрать атомарно, ревизия растёт, снимок уходит в room.state', () => {
++describe('508: хранилище Мастера + снапшот игрокам', () => {
++  it('положить/забрать атомарно, ревизия растёт, снимок в room.state', () => {
+     const { registry, room } = setup();
+-    const dep = registry.depositToPartyStorage({
+-      code: room.code, clientId: 'p1', item: ITEM, quantity: 2,
+-    });
++    const dep = registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 2 });
+     expect(dep.error).toBeUndefined();
+-    expect(dep.entry.name).toBe('Пулемёт');
+-    expect(dep.entry.quantity).toBe(2);
++    expect(dep.storage.gmOnline).toBe(true);
+     expect(dep.storage.revision).toBe(1);
+     expect(registry.getState(room.code).partyStorage.entries).toHaveLength(1);
+-
+-    const half = registry.withdrawFromPartyStorage({
+-      code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 1,
+-    });
++    const half = registry.withdrawFromPartyStorage({ code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 1 });
+     expect(half.withdrawn.quantity).toBe(1);
+     expect(half.storage.entries[0].quantity).toBe(1);
+-    expect(half.storage.revision).toBe(2);
+-
+-    const rest = registry.withdrawFromPartyStorage({
+-      code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 99,
+-    });
++    const rest = registry.withdrawFromPartyStorage({ code: room.code, clientId: 'p2', entryId: dep.entry.entryId, quantity: 99 });
+     expect(rest.withdrawn.quantity).toBe(1);
+     expect(rest.storage.entries).toHaveLength(0);
+-    expect(registry.withdrawFromPartyStorage({
+-      code: room.code, clientId: 'p2', entryId: dep.entry.entryId,
+-    }).error).toBe(ERROR_CODE.STORAGE_ENTRY_NOT_FOUND);
++    expect(registry.withdrawFromPartyStorage({ code: room.code, clientId: 'p2', entryId: dep.entry.entryId }).error)
++      .toBe(ERROR_CODE.STORAGE_ENTRY_NOT_FOUND);
+   });
+ 
+-  it('Мастер может положить, но не может забрать чужое', () => {
++  it('без Мастера в сети — только чтение: снимок виден, запись запрещена', () => {
+     const { registry, room } = setup();
+-    const dep = registry.depositToPartyStorage({
+-      code: room.code, clientId: 'gm-1', item: ITEM, quantity: 1,
+-    });
+-    expect(dep.error).toBeUndefined();
+-    expect(registry.withdrawFromPartyStorage({
+-      code: room.code, clientId: 'gm-1', entryId: dep.entry.entryId,
+-    }).error).toBe(ERROR_CODE.STORAGE_FORBIDDEN);
+-    expect(registry.getPartyStorage(room.code).entries).toHaveLength(1);
++    const dep = registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 1 });
++    registry.leaveRoom({ code: room.code, clientId: 'gm-1' });
++    const snapshot = registry.getState(room.code).partyStorage;
++    expect(snapshot.gmOnline).toBe(false);
++    expect(snapshot.entries).toHaveLength(1); // смотреть можно
++    expect(registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 1 }).error)
++      .toBe(ERROR_CODE.STORAGE_GM_OFFLINE);
++    expect(registry.withdrawFromPartyStorage({ code: room.code, clientId: 'p1', entryId: dep.entry.entryId }).error)
++      .toBe(ERROR_CODE.STORAGE_GM_OFFLINE);
++  });
++
++  it('Мастер поднимает своё сохранённое хранилище в комнату; игрок не может', () => {
++    const { registry, room } = setup();
++    const saved = { revision: 7, entries: [{ entryId: 'st_saved', item: ITEM, name: 'Пулемёт', itemType: 'weapon', quantity: 3 }] };
++    expect(registry.restorePartyStorage({ code: room.code, clientId: 'p1', storage: saved }).error)
++      .toBe(ERROR_CODE.NOT_ROOM_OWNER);
++    const restored = registry.restorePartyStorage({ code: room.code, clientId: 'gm-1', storage: saved });
++    expect(restored.applied).toBe(true);
++    expect(registry.getState(room.code).partyStorage.entries[0].quantity).toBe(3);
++    // Подключившийся игрок получает актуальный снимок вместе с room.state.
++    const joined = registry.joinRoom({ code: room.code, clientId: 'p3', name: 'Третий', role: 'player' });
++    expect(joined.state.partyStorage.entries[0].quantity).toBe(3);
++    // Более старый сейв не откатывает комнату.
++    expect(registry.restorePartyStorage({ code: room.code, clientId: 'gm-1', storage: { revision: 2, entries: [] } }).applied)
++      .toBe(false);
+   });
+ 
+-  it('плохие данные и чужая комната отклоняются', () => {
++  it('Мастер может положить, но не забрать чужое; плохие данные отклоняются', () => {
+     const { registry, room } = setup();
++    const dep = registry.depositToPartyStorage({ code: room.code, clientId: 'gm-1', item: ITEM, quantity: 1 });
++    expect(dep.error).toBeUndefined();
++    expect(registry.withdrawFromPartyStorage({ code: room.code, clientId: 'gm-1', entryId: dep.entry.entryId }).error)
++      .toBe(ERROR_CODE.STORAGE_FORBIDDEN);
+     expect(registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: null, quantity: 1 }).error)
+       .toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
+-    expect(registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: -5 }).error)
+-      .toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
+-    expect(registry.depositToPartyStorage({ code: 'NO-ROOM', clientId: 'p1', item: ITEM, quantity: 1 }).error)
+-      .toBe(ERROR_CODE.ROOM_NOT_FOUND);
+   });
+ 
+-  it('канон переживает рестарт: новый реестр читает файл', () => {
+-    const dir = mkdtempSync(path.join(os.tmpdir(), 'party-storage-507-'));
+-    const file = path.join(dir, 'storage.json');
+-    try {
+-      const first = createRoomRegistry({ now: () => 1000, partyStorageStore: createFilePartyStorageStore({ filePath: file }) });
+-      const { room } = first.createRoom({ clientId: 'gm-1', name: 'Стол' });
+-      first.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
+-      first.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
+-      const dep = first.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 3 });
+-      expect(dep.storage.entries).toHaveLength(1);
++  it('сервер не пишет файлы: файлового store и .data/ больше нет', () => {
++    expect(existsSync(path.join(ROOT, 'server/partyStorageStore.js'))).toBe(false);
++    expect(read('.gitignore')).not.toContain('.data/');
++    expect(read('server/start.js')).not.toContain('partyStorageStore');
++    expect(read('server/roomRegistry.js')).not.toContain('persistStorages');
++  });
+ 
+-      // «Сервер перезапустили»: новый реестр, тот же файл, комната с тем же кодом.
+-      const second = createRoomRegistry({ now: () => 2000, partyStorageStore: createFilePartyStorageStore({ filePath: file }) });
+-      const restored = second.createRoom({ clientId: 'gm-1', name: 'Стол', requestedCode: room.code });
+-      expect(second.getState(restored.room.code).partyStorage.entries[0]).toMatchObject({
+-        name: 'Пулемёт', quantity: 3,
+-      });
+-    } finally {
+-      rmSync(dir, { recursive: true, force: true });
+-    }
++  it('канон — локальная БД Мастера и его Drive', () => {
++    expect(read('db/schema.js')).toContain('gm_room_storage');
++    expect(read('src/lootTrade/partyStoragePersistence.js')).toContain('saveRoomStorage');
++    expect(read('components/cloudSync/googleDriveSync.js')).toContain("type: 'gm_room_storage'");
++    expect(read('App.js')).toContain('startPartyStoragePersistence');
++    expect(read('App.js')).toContain('restoreMasterStorage');
+   });
+ });
+ 
+-describe('507: протокол, словари и плашка', () => {
++describe('508: протокол, словари и плашка', () => {
+   it('константы зеркалятся в клиенте', () => {
+     expect(ROOM_MESSAGE.STORAGE_STATE).toBe(MESSAGE.STORAGE_STATE);
+     expect(ROOM_MESSAGE.STORAGE_DEPOSIT).toBe(MESSAGE.STORAGE_DEPOSIT);
+     expect(ROOM_MESSAGE.STORAGE_WITHDRAW).toBe(MESSAGE.STORAGE_WITHDRAW);
+-    expect(ROOM_ERROR.STORAGE_FORBIDDEN).toBe(ERROR_CODE.STORAGE_FORBIDDEN);
+-    expect(ROOM_ERROR.STORAGE_ENTRY_NOT_FOUND).toBe(ERROR_CODE.STORAGE_ENTRY_NOT_FOUND);
++    expect(ROOM_MESSAGE.STORAGE_RESTORE).toBe(MESSAGE.STORAGE_RESTORE);
++    expect(ROOM_ERROR.STORAGE_GM_OFFLINE).toBe(ERROR_CODE.STORAGE_GM_OFFLINE);
+   });
+ 
+-  it('плашка во всю ширину под «Добыча»/«Торговля», название не настраивается', () => {
+-    const screen = read('components/screens/InventoryScreen/InventoryScreen.js');
+-    const styles = read('styles/InventoryScreen.styles.js');
+-    expect(screen).toContain('testID="shared-storage-button"');
+-    expect(screen).toContain("tInventory('screen.actions.sharedStorage')");
+-    expect(screen).toContain('<PartyStorageModal');
+-    expect(styles).toContain('sharedStorageCell');
++  it('плашка во всю ширину, название не настраивается, есть режим только чтения', () => {
++    expect(read('components/screens/InventoryScreen/InventoryScreen.js')).toContain('testID="shared-storage-button"');
++    expect(read('styles/InventoryScreen.styles.js')).toContain('sharedStorageCell');
++    const modal = read('components/lootTrade/PartyStorageModal.js');
++    expect(modal).toContain('gmOnline');
++    expect(modal).toContain('screen.storage.readOnly');
++    expect(modal).not.toContain('rename');
+     const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json'));
+     const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json'));
+     expect(ru.actions.sharedStorage).toBe('Общее хранилище');
+     expect(en.actions.sharedStorage).toBe('Shared storage');
+-    expect(ru.storage.title).toBe('Общее хранилище');
+-    expect(en.storage.title).toBe('Shared storage');
+-    // Настройки имени нет ни в словарях, ни в модалке.
+-    const modal = read('components/lootTrade/PartyStorageModal.js');
+-    expect(modal).not.toContain('rename');
+-    expect(modal).not.toContain('setName');
++    expect(ru.storage.readOnly).toBeTruthy();
++    expect(en.storage.readOnly).toBeTruthy();
+   });
+ 
+-  it('клиент обновляет состояние из STORAGE_STATE', () => {
++  it('клиент сохраняет и восстанавливает снимок Мастера', () => {
+     const store = read('src/room/roomStore.ts');
+-    expect(store).toContain('ROOM_MESSAGE.STORAGE_STATE');
+-    expect(store).toContain('partyStorage: storage');
+-    expect(store).toContain('depositToPartyStorage');
+-    expect(store).toContain('withdrawFromPartyStorage');
+-  });
+-
+-  it('файл состояния не попадает в git', () => {
+-    expect(read('.gitignore')).toContain('.data/');
++    expect(store).toContain('onRoomStorageState');
++    expect(store).toContain('restorePartyStorage');
++    expect(read('src/lootTrade/partyStoragePersistence.js')).toContain('restoreMasterStorage');
+   });
+ });
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index 21a294b..bb7a55c 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -562,6 +562,45 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  // Патч 508: канон — хранилище Мастера; игрокам снапшот. Без Мастера
++  // онлайн запись запрещена, но снимок доступен; Мастер поднимает свой сейв.
++  it('508: Master storage, player snapshot, offline = read-only', async () => {
++    await withServer(async (port, app) => {
++      const gm = makeClient(port, 'gm-508');
++      const p1 = makeClient(port, 'p-508-1');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Master storage 508' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      const ownerToken = created.payload.ownerToken;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm', ownerToken });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Игрок', role: 'player' });
++      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      expect(joined.payload.partyStorage).toMatchObject({ gmOnline: true, revision: 0, entries: [] });
++
++      // Мастер поднимает сохранённое хранилище — игрок получает свежий снимок.
++      const saved = { revision: 4, entries: [{ entryId: 'st_saved', item: { name: 'Карточка' }, name: 'Карточка', itemType: 'misc', quantity: 1 }] };
++      const restoreReq = await gm.send(MESSAGE.STORAGE_RESTORE, { ownerToken, storage: saved }, code);
++      const restored = await gm.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === restoreReq);
++      expect(restored.payload.storage.entries[0].name).toBe('Карточка');
++      const snapshot = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
++      expect(snapshot.payload.storage.entries).toHaveLength(1);
++
++      // Мастер ушёл: игрок видит снимок, но не может писать.
++      // Уводим Мастера напрямую через реестр: детерминированно и без гонки
++      // с уже полученными сообщениями в inbox клиента.
++      app.registry.leaveRoom({ code, clientId: gm.clientId });
++      const offlineState = app.registry.getState(code).partyStorage;
++      expect(offlineState.gmOnline).toBe(false);
++      expect(offlineState.entries).toHaveLength(1);
++      const deniedReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item: { name: 'Пулемёт' }, quantity: 1 }, code);
++      const denied = await p1.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === deniedReq);
++      expect(denied.payload.code).toBe('STORAGE_GM_OFFLINE');
++
++      gm.close(); p1.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 05144e2..844ca3b 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -1149,6 +1149,42 @@ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
+   }
+ };
+ 
++// Патч 508: снимок «Общего хранилища» Мастера уезжает в его же Drive.
++// Это НЕ серверное хранилище: файл принадлежит аккаунту ведущего.
++export const syncRoomStorageToCloudIfEnabled = async (code) => {
++  if (!ensureWeb() || !code) return;
++  try {
++    const configured = await isCloudSyncConfigured();
++    if (!configured) return;
++    await loadGoogleIdentityScript();
++    const token = await requestAccessToken();
++    const moduleFolderId = await getModuleFolderId(token);
++    const gmFolderId = await getGmContainersFolderId(token, moduleFolderId);
++    const storage = await db.getRoomStorage(code);
++    if (!storage) return;
++    const prefix = `storage__${code}__`;
++    const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
++    const remote = remoteFiles.find((file) => (file.name || '').startsWith(prefix));
++    const payload = JSON.stringify({
++      formatVersion: 1,
++      type: 'gm_room_storage',
++      code,
++      exportedAt: Date.now(),
++      storage,
++    });
++    await uploadCharacterFile({
++      token,
++      folderId: gmFolderId,
++      fileId: remote?.id,
++      filename: `${prefix}${Date.now()}.json`,
++      payload,
++    });
++    debugLog('sync.roomStorage.auto:done', { code });
++  } catch (e) {
++    debugLog('sync.roomStorage.auto:failed', { code, message: e?.message || String(e) });
++  }
++};
++
+ // Удаление контейнера/торговца Мастера из Google Drive при локальном удалении.
+ export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
+   if (!ensureWeb() || !containerId) return { removed: false, reason: 'not-web' };
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 6b49363..384e8ea 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -50,9 +50,11 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+   }, [rooms]);
+ 
+   const entries = room?.storage?.entries || [];
++  // Без Мастера в сети хранилище только для чтения.
++  const writable = Boolean(room?.storage?.gmOnline);
+ 
+   const deposit = async (item) => {
+-    if (!room || busy) return;
++    if (!room || busy || !writable) return;
+     setBusy(true);
+     try {
+       await useRoomStore.getState().depositToPartyStorage({
+@@ -71,7 +73,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+   };
+ 
+   const withdraw = async (entry) => {
+-    if (!room || busy) return;
++    if (!room || busy || !writable) return;
+     setBusy(true);
+     try {
+       const result = await useRoomStore.getState().withdrawFromPartyStorage({
+@@ -115,7 +117,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+                       <TouchableOpacity
+                         key={item.id || `${item.name}-${index}`}
+                         style={styles.row}
+-                        disabled={busy}
++                        disabled={busy || !writable}
+                         onPress={() => void deposit(item)}
+                       >
+                         <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
+@@ -134,7 +136,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+                       <TouchableOpacity
+                         key={entry.entryId}
+                         style={styles.row}
+-                        disabled={busy}
++                        disabled={busy || !writable}
+                         onPress={() => void withdraw(entry)}
+                       >
+                         <Text style={styles.rowName} numberOfLines={1}>
+@@ -148,6 +150,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
+             </View>
+           )}
+ 
++          {!writable && <Text style={styles.readOnly}>{tInventory('screen.storage.readOnly')}</Text>}
+           <Text style={styles.hint}>{tInventory('screen.storage.hint')}</Text>
+         </View>
+       </View>
+@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
+   rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
+   rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
+   hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
++  readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+ });
+ 
+ export default PartyStorageModal;
+diff --git a/db/Database.js b/db/Database.js
+index 1f620d3..55a0169 100644
+--- a/db/Database.js
++++ b/db/Database.js
+@@ -458,6 +458,24 @@ const rowToGmContainer = (row) => {
+   });
+ };
+ 
++// Патч 508: снимок «Общего хранилища» в локальной БД Мастера.
++export async function saveRoomStorage(code, storage) {
++  const cleanCode = String(code || '').trim();
++  if (!cleanCode) return null;
++  const data = JSON.stringify(storage && typeof storage === 'object' ? storage : { revision: 0, entries: [] });
++  await runQuery(
++    'INSERT OR REPLACE INTO gm_room_storage (code, data, updated_at) VALUES (?, ?, ?)',
++    [cleanCode, data, Date.now()],
++  );
++  return { code: cleanCode, storage: JSON.parse(data) };
++}
++
++export async function getRoomStorage(code) {
++  const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
++  if (!row?.data) return null;
++  try { return JSON.parse(row.data); } catch { return null; }
++}
++
+ export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
+   assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const now = Date.now();
+diff --git a/db/Database.web.js b/db/Database.web.js
+index 9d74709..2851f0d 100644
+--- a/db/Database.web.js
++++ b/db/Database.web.js
+@@ -409,6 +409,24 @@ const rowToGmContainer = (row) => {
+   });
+ };
+ 
++// Патч 508: снимок «Общего хранилища» в локальной БД Мастера.
++export async function saveRoomStorage(code, storage) {
++  const cleanCode = String(code || '').trim();
++  if (!cleanCode) return null;
++  const data = JSON.stringify(storage && typeof storage === 'object' ? storage : { revision: 0, entries: [] });
++  await runQuery(
++    'INSERT OR REPLACE INTO gm_room_storage (code, data, updated_at) VALUES (?, ?, ?)',
++    [cleanCode, data, Date.now()],
++  );
++  return { code: cleanCode, storage: JSON.parse(data) };
++}
++
++export async function getRoomStorage(code) {
++  const row = await getFirst('SELECT data FROM gm_room_storage WHERE code = ?', [String(code || '').trim()]);
++  if (!row?.data) return null;
++  try { return JSON.parse(row.data); } catch { return null; }
++}
++
+ export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
+   assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const now = Date.now();
+diff --git a/db/schema.js b/db/schema.js
+index 75c2e71..3e68729 100644
+--- a/db/schema.js
++++ b/db/schema.js
+@@ -83,6 +83,14 @@ export const CREATE_TABLES = [
+   )`,
+ 
+   // Сохранённые состояния (плитки) и папки экрана «Окружающая среда/бой» (патч 482).
++  // Патч 508: локальное хранилище Мастера для «Общего хранилища» комнаты.
++  // Сервер ничего не пишет на диск; канон лежит здесь и уезжает в Drive.
++  `CREATE TABLE IF NOT EXISTS gm_room_storage (
++    code TEXT PRIMARY KEY,
++    data TEXT NOT NULL,
++    updated_at INTEGER NOT NULL
++  )`,
++
+   `CREATE TABLE IF NOT EXISTS gm_env_entries (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b1209a0..d6ced57 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,35 @@
+ # Changelog
+ ---
++## GM storage and player snapshot (patch 508)
++
++The owner simplified the model and rejected the server file from 507: "Shared
++storage is the GM storage plus a snapshot for players. Without the GM online
++they cannot take items from shared storage, but can view it. When a player
++connects to the room, storage updates to the current state. All changes happen
++while the player and the GM are online."
++
++- **The server writes nothing to disk.** `server/partyStorageStore.js`,
++  `.data/`, the `partyStorageStore` parameter and the `server/start.js` wiring
++  are gone. Storage state lives in room memory next to `activeSession` and
++  `terminalStates`.
++- **The GM storage is the canon.** New `gm_room_storage` table in the local
++  database; `src/lootTrade/partyStoragePersistence.js` saves every snapshot and
++  uploads it to the GM Google Drive (`gm_room_storage`) along the same path as
++  loot containers. Players do not persist the snapshot.
++- **Restore on connect.** `storage.restore` is accepted only from the room
++  owner; the GM uploads their save and a joining player receives the current
++  state via `room.state`. An older save cannot roll the room back.
++- **Online only.** `gmOnline` in the snapshot; without the GM, `deposit` /
++  `withdraw` return `STORAGE_GM_OFFLINE` while the item list stays visible.
++  The storage modal disables its buttons and shows a "GM offline" note.
++- No offline commits, queues, `baseRevision`, conflicts or conflict alerts:
++  all changes happen while the GM and player are online.
++
++The 507 skeleton (protocol, atomicity, GM `withdraw` ban, green bar, modal,
++fixed name) is kept.
++
++Installation: `docs/patch-508-install.md`.
++
+ ## Shared storage for the room (patch 507)
+ 
+ Step one of `docs/key-items-and-gates-design.md`. The owner: "A party stash ...
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 385f2e9..a44bf3e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,37 @@
+ # История изменений
+ 
+ ---
++## Хранилище Мастера и снапшот игрокам (патч 508)
++
++Владелец упростил модель и отверг серверный файл из 507: «Общее хранилище
++это хранилище мастера + снапшот игрокам. Без мастера онлайн они не могут
++взять предметы из общего хранилища, но могут смотреть. Когда игрок
++подключается к комнате, то происходит обновление хранилища на текущее
++состояние. Все изменения происходят пока игрок и мастер в сети».
++
++- **Сервер ничего не пишет на диск.** Удалён `server/partyStorageStore.js`,
++  убраны `.data/`, параметр `partyStorageStore` и правки `server/start.js`.
++  Состояние склада живёт в памяти комнаты рядом с `activeSession` и
++  `terminalStates`.
++- **Канон — хранилище Мастера.** Новая таблица `gm_room_storage` в локальной
++  БД; `src/lootTrade/partyStoragePersistence.js` сохраняет каждый снимок и
++  фоном выгружает его в Google Drive ведущего (`gm_room_storage`) тем же
++  путём, что контейнеры добычи. Игроки снимок не сохраняют.
++- **Восстановление при подключении.** `storage.restore` принимается только от
++  владельца комнаты; Мастер поднимает свой сейв, а подключившийся игрок
++  получает уже актуальное состояние через `room.state`. Более старый сейв не
++  откатывает комнату.
++- **Только онлайн.** `gmOnline` в снимке; без Мастера `deposit`/`withdraw`
++  отклоняются с `STORAGE_GM_OFFLINE`, а список вещей остаётся виден. В окне
++  склада кнопки блокируются и показывается подпись «Мастер не в сети».
++- Никаких офлайн-коммитов, очередей, `baseRevision`, конфликтов и алертов о
++  расхождении: все изменения происходят, пока Мастер и игрок в сети.
++
++Каркас 507 (протокол, атомарность, запрет `withdraw` Мастеру, зелёная
++плашка, модалка, фиксированное имя) сохранён.
++
++Установка: `docs/patch-508-install.md`.
++
+ ## Общее хранилище комнаты (патч 507)
+ 
+ Первый шаг внедрения дизайна `docs/key-items-and-gates-design.md`. Владелец:
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 3aa2b30..be9ad34 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,7 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
+-- **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage lives on the server, survives a restart and arrives with the room state on connect. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
++- **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index db52102..0160d88 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,7 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
+-- **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище живёт на сервере, переживает перезапуск и приходит вместе с состоянием комнаты при подключении. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
++- **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index be2af05..e3e33f2 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -1,11 +1,11 @@
+ # Ключи-предметы, ворота и групповой склад
+ 
+-**Статус: дизайн-документ, внедряется последовательно.** Патч **507**
+-реализовал **шаг 1** (§8): «Общее хранилище» без ключевых записей —
+-серверный канон, `deposit`/`withdraw`, выдача состояния при подключении и
+-зелёная плашка в инвентаре. Название фиксированное: «Общее хранилище».
+-Шаги 2–5 (ключи, `requires`, ворота, мини-игра замков) пока не реализованы.
+-Все договорённости ниже сохранены как цели следующих патчей.
++**Статус: дизайн-документ, внедряется последовательно.** Патч **507** дал
++каркас склада, но ошибся со слоем хранения (общий файл на сервере). Патч
++**508** заменил его финальной моделью владельца — **Обновление 5** ниже:
++хранилище Мастера + снапшот игрокам, запись только онлайн. Протокол,
++атомарность, плашка и модалка 507 сохранены. Шаги 2–5 (ключи, `requires`,
++ворота, мини-игра замков) пока не реализованы.
+ 
+ **Обновление 1:** по решению владельца ключевой предмет перенесён из
+ инвентаря персонажа **в состояние комнаты**. Причина: «если персонаж с ключом
+@@ -19,11 +19,32 @@
+ не получить (не полезли в сейф), и обычный предмет можно передать игроку,
+ которого сегодня нет. Все разделы ниже приведены к этой модели.
+ 
++**Обновление 5 (финальное, отменяет Обновление 4):**
++«Пожалуй упростим. Общее хранилище это хранилище мастера + снапшот игрокам.
++Без мастера онлайн они не могут взять предметы из общего хранилища, но могут
++смотреть. Когда игрок подключается к комнате, то происходит обновление
++хранилища на текущее состояние. Все изменения происходят пока игрок и мастер
++в сети». Никаких git-коммитов, офлайн-очередей и конфликтов: канон — сейв
++Мастера (локальная БД + его Google Drive), сервер держит снимок в памяти,
++игроки получают его при подключении и видят в режиме «только чтение», когда
++Мастера нет.
++
++**Обновление 4 (промежуточное, заменено Обновлением 5; сохранено как история
++обсуждения):**
++«Общее хранилище это как буфер обмена или git. Все кто в этой комнате могут
++туда читать/писать, но только если все онлайн в комнате. Один игрок обновил
++сведения, они ждут часа, чтобы отправить коммит в комнату. Если игроки
++пришли на игру, подключился мастер и сервер стал доступен — данные
++хранилища обновились. Конфликты объявлять алертом, а решение конфликта
++задача игроков за столом». То есть: локальные копии у участников, коммиты
++при подключении, **никакого автоматического разрешения конфликтов**.
++Серверный файл из 507 и «канон = Drive-сейв Мастера» — неверны.
++
+ **Обновление 3:** три решения владельца зафиксированы.
+ - **Добытое игроками неприкосновенно.** «Мастер ошибся — сам виноват»:
+   отзыва ключа и изъятия вещей со склада нет. Мастер создаёт новую запись
+   или меняет `requires` контейнера под другой `id`.
+-- **Канон хранилища — сервер.** «Подключился — получил обновления».
++- **Канон хранилища — Мастер** (локальная БД + Drive); сервер держит снимок в памяти. «Подключился — получил обновления».
+ - **Кнопка склада** — зелёная плашка во всю ширину под «Добыча»/«Торговля»
+   в пользовательском инвентаре, того же вида, что существующие ячейки.
+ 
+@@ -80,7 +101,9 @@
+ | Где хранится ключ? | **В групповом складе комнаты, а не в инвентаре персонажа.** Ключ — предмет кампании/локации/движка. Выбытие персонажа никак не влияет на доступ партии. |
+ | Где склад? | **Общий контейнер, привязанный к серверной комнате**. Кнопка — зелёная плашка во всю ширину под «Добыча»/«Торговля» в пользовательском инвентаре. Каждый игрок может положить и забрать. |
+ | Можно ли отозвать ключ / забрать чужое? | **Нет.** «То, что принадлежит игрокам — это их». Мастер управляет миром (создаёт записи, правит `requires`), но не имуществом партии. При ошибке — новая запись с новым `id` или правка контейнера; старый ключ просто остаётся лежать. |
+-| Где канон склада? | **На сервере.** Подключился к комнате — получил актуальное состояние. Клиент не хранит свою копию как источник истины. |
++| Где канон склада? | **Хранилище Мастера**: локальная БД (`gm_room_storage`) + его Google Drive. Сервер держит только текущий снимок в памяти комнаты, ничего не пишет на диск. Игрокам — снапшот. |
++| Можно ли менять без Мастера? | **Нет.** Без Мастера онлайн хранилище только для чтения: смотреть можно, положить/забрать — нет (`STORAGE_GM_OFFLINE`). Все изменения — пока Мастер и игрок в сети. |
++| Конфликты копий? | **Не возникают.** Офлайн-правок, очередей коммитов и `baseRevision` нет; при подключении игрок просто получает текущее состояние. |
+ 
+ ### Направление связи — важно
+ 
+@@ -209,17 +232,25 @@ requires: [
+ нет. Это и есть «у него и так все карты на руках»: он правит мир, а не чужой
+ багажник.
+ 
+-**Канон — сервер, синхронизация при подключении.** Сейчас `roomRegistry`
+-держит комнаты в памяти (`new Map()`), и после перезапуска сервиса Node.js
+-партии начинаются заново. Для склада это неприемлемо: «игрока сегодня нет,
+-он придёт завтра» должно пережить рестарт. Решение: склад хранится **на
+-сервере** (персистентно, по `roomCode`), входит в `roomSnapshot` и приходит
+-клиенту вместе с состоянием комнаты при `room.join` / переподключении;
+-изменения рассылаются всем участникам тем же способом, что `terminal.state`
+-и `session.state`. «Подключился — получил обновления» — буквально так.
+-`src/lootTrade/gmSessionPersistence.js` остаётся полезным примером фонового
+-сохранения остатков, но **не источником истины**: канон не в БД Мастера и не
+-в Google Drive.
++**Хранилище Мастера + снапшот игрокам.** Серверная комната держит текущий
++снимок склада **в памяти** (как `activeSession` и `terminalStates`) с полем
++`gmOnline`. На диск сервер ничего не пишет: на хостинге работает много людей,
++и общее файловое хранилище им не принадлежит.
++
++- **Канон** — локальная БД Мастера (`gm_room_storage`) и его Google Drive
++  (`type: 'gm_room_storage'`). Каждый `storage.state` сохраняется на устройстве
++  ведущего и фоном выгружается в его облако, тем же путём, что контейнеры
++  добычи. Игроки снимок не сохраняют.
++- **Подключение.** Мастер поднимает свой сейв в комнату сообщением
++  `storage.restore` (только владелец, по `ownerToken`; более старая ревизия не
++  откатывает комнату). Игрок при подключении получает уже актуальный
++  `partyStorage` вместе с `room.state` — «обновление на текущее состояние».
++- **Только онлайн.** Запись (`deposit` / `withdraw`) разрешена, только когда
++  Мастер присутствует в комнате. Без него сервер отдаёт снимок с
++  `gmOnline: false`, а операции отклоняет `STORAGE_GM_OFFLINE`; окно склада
++  показывает «Мастер не в сети» и блокирует кнопки. Все изменения происходят
++  пока и Мастер, и игрок в сети — офлайн-правок не бывает, поэтому конфликтов
++  и алертов о расхождении нет.
+ 
+ **Кнопка — точное место.** В пользовательском инвентаре
+ `components/screens/InventoryScreen/InventoryScreen.js` функция `renderFooter()`
+@@ -230,15 +261,15 @@ requires: [
+ `addActionIcon`, `addActionLabel`. Новая плашка **«Групповой склад»** — того
+ же зелёного вида, но отдельной строкой **во всю ширину под этими двумя**, а не
+ третьей ячейкой в ряду. Нажатие открывает окно склада. На плашке уместен
+-счётчик содержимого;Окончательный вид уточняется при реализации.
++счётчик содержимого; окончательный вид уточняется при реализации.
+ 
+ ### 3.6 Где живёт правда
+ 
+-В состоянии комнаты на сервере (`roomRegistry` / активная сессия), затем — в
+-персистентном хранилище (§3.5). Не в `useState` модалки, не в `localStorage`
+-вкладки, **не в листе персонажа**. Это напрямую решает задачу владельца:
+-выбытие персонажа не влияет на доступ партии, а отсутствующий игрок находит
+-предмет там, где его оставили.
++Канон — **в локальной БД Мастера и его Drive**; текущий снимок — **в памяти
++серверной комнаты**; у игроков — копия для чтения. Не в файле на хостинге, не
++в `useState` модалки, не в листе персонажа. Выбытие персонажа не стирает
++общие вещи: они уже в хранилище Мастера. Конфликтов нет, потому что запись
++возможна только онлайн, когда Мастер в комнате.
+ 
+ ---
+ 
+@@ -310,9 +341,10 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+ | `terminal.state` со статусом `won` | один из источников события `hacked` |
+ | `accessId`, `closedByClientIds` в состоянии комнаты | образец «правда на сервере, а не во вкладке» |
+ | `applyAtomicLootTake`, `applyAtomicTradeCommit` | образец атомарного изменения количеств для `deposit`/`withdraw` |
+-| `roomSnapshot`, `ROOM_STATE`, рассылка `terminal.state` / `session.state` | образец «склад в состоянии комнаты» и доставки при подключении |
++| `roomSnapshot`, `ROOM_STATE`, рассылка `terminal.state` / `session.state` | образец «текущий снимок в памяти комнаты» и доставки при подключении |
+ | `InventoryScreen.renderFooter()`, `styles/InventoryScreen.styles.js` (`footerActionsRow`, `addActionCell`, `addActionIcon`, `addActionLabel`) | точное место и вид зелёной плашки «Групповой склад» |
+-| `src/lootTrade/gmSessionPersistence.js` | пример фонового сохранения остатков; **не канон** склада |
++| `src/lootTrade/gmSessionPersistence.js`, `src/lootTrade/partyStoragePersistence.js` | образец и реализация фонового сохранения снимков Мастера |
++| `gm_room_storage`, `syncRoomStorageToCloudIfEnabled` | локальная БД Мастера и его Drive — канон склада |
+ | `textUtils`, `IconText` | рендер описаний с тегами и предпросмотр |
+ | `PlayerLootTradeOverlay` | окно комнаты, из которого склад тоже должен быть доступен |
+ | `resolveItem`, `grantLootEntriesToCharacter` | нужны для **обычных** предметов склада, не для ключей |
+@@ -341,12 +373,11 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+ 
+ Отдельный патч на каждый шаг:
+ 
+-1. **Групповой склад без ключей.** ✅ **Реализовано в патче 507**
+-   (`docs/patch-507-install.md`). Общий контейнер комнаты, `deposit` /
+-   `withdraw`, атомарность, серверное персистентное хранилище и выдача
+-   состояния при подключении, зелёная плашка во всю ширину под «Добыча» /
+-   «Торговля» в инвентаре, список вещей. Уже решает задачу с пулемётом и
+-   отсутствующим игроком. Операций изъятия у Мастера нет.
++1. **Групповой склад без ключей.** ✅ **Реализовано в 507 (каркас) и 508
++   (слой хранения).** Протокол, атомарные `deposit`/`withdraw`, зелёная
++   плашка и модалка из 507; в 508 — канон Мастера (`gm_room_storage` + Drive),
++   `storage.restore` при подключении, `gmOnline` и режим «только чтение» без
++   Мастера. Серверный файл удалён.
+ 2. **Справочник ключевых записей.** Имя, описание с предпросмотром, `id`,
+    появление на складе при находке или выдаче Мастером, карточка по нажатию.
+    Без кнопки «Забрать».
+@@ -361,22 +392,15 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+ 
+ ## 9. Что осталось нерешённым (не блокирует документ)
+ 
+-- **Решено и зафиксировано выше** (больше не вопросы): отзыва ключа и изъятия
+-  чужого нет; канон — сервер с выдачей состояния при подключении; кнопка —
+-  зелёная плашка во всю ширину под «Добыча»/«Торговля» в инвентаре; Мастер
+-  может положить, но не забрать.
+-- **Лимиты и стаканье:** есть ли ограничение по весу/слотам; стакаются ли
+-  одинаковые патроны и крышки на складе.
+-- **Счётчик на плашке:** показывать ли количество вещей прямо в зелёной
+-  области (в 507 плашка без счётчика).
+-- **Решено:** название не настраивается, это просто «Общее хранилище»
+-  (патч 507). Метагеймовое объяснение («багажник», «брамин с грузом») в
+-  механику не зашито.
+-- **Лог операций:** нужен ли Мастеру и игрокам журнал «кто положил / кто
+-  забрал». Склоняемся к минимальному: игрокам не показывать, Мастеру — по
+-  желанию.
+-- **Удаление записи-шаблона в админке:** добытая копия на складе должна
+-  остаться (§3.2); надо решить, что показывать в админке для «осиротевшей»
+-  записи.
+-- Показывать ли игроку, *почему* мини-игра не запустилась («У партии есть
+-  карточка доступа»), или оставить совсем тихим. Склоняемся к тихому.
++- **Решено и реализовано в 507/508:** канон — хранилище Мастера (локальная БД
++  + его Drive); сервер держит снимок в памяти и не пишет файлы; при
++  подключении игрок получает текущее состояние; без Мастера — только чтение;
++  все изменения онлайн; отзыва ключа и изъятия чужого нет; Мастер может
++  положить, но не забрать; кнопка — зелёная плашка во всю ширину под
++  «Добыча»/«Торговля»; название не настраивается («Общее хранилище»).
++- **Осталось:** нужна ли двусторонняя загрузка склада из Drive (сейчас
++  выгрузка есть, восстановление идёт из локальной БД Мастера); лимиты и
++  стаканье; счётчик на плашке; лог операций; поведение при удалении
++  записи-шаблона; тихое срабатывание ключа.
++- Шаги 2–5 по-прежнему в плане: ключевые записи на складе, `requires`,
++  ворота между контейнерами и мини-игра взлома замков.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index d841291..fe37345 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 44e8408..90f16c7 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 2f8d1c7..6601651 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 5f4be86..3807812 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 59a68e3..440111f 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 33429e3..d8057e3 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 81868f0..0f2596a 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 17abbef..c5f4c76 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index fef0ae4..57df654 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index e548ba9..280059f 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ > **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 46eb222..c9d2cee 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Патч 508 заменяет слой хранения склада — см. `docs/patch-508-install.md`.**
+ > **«Общее хранилище» комнаты — шаг 1 внедрения, см. `docs/patch-507-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 505** (коммит `d1adc5f`, ветка
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 6bf1cc6..d0a3c24 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,8 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> ⚠️ **Слой хранения из этого патча заменён в `docs/patch-508-install.md`:**
++> серверный файл убран, канон перенесён в хранилище Мастера.
++
+ Патч подготовлен от состояния **версии 506** (коммит `f087e98`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–507
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+new file mode 100644
+index 0000000..42892c8
+--- /dev/null
++++ b/docs/patch-508-install.md
+@@ -0,0 +1,144 @@
++# Установка патча 508: хранилище Мастера + снапшот игрокам
++
++Патч подготовлен от состояния **версии 507** (коммит `10e176f`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–508
++цепочкой.
++
++Это **исправление слоя хранения** «Общего хранилища» из 507. Протокол,
++атомарные операции, запрет `withdraw` Мастеру, зелёная плашка и модалка из
++507 сохраняются.
++
++## Что было не так
++
++В 507 сервер писал общий файл `.data/party-storage.json` на хостинге. При
++множестве пользователей приложения это один файл на процесс со складами всех
++комнат всех людей; при нескольких инстансах состояние рассогласуется, при
++переносе сервера — пропадёт, а приватности у такой схемы нет. Владелец
++отверг её и упростил модель:
++
++> «Общее хранилище это хранилище мастера + снапшот игрокам. Без мастера
++> онлайн они не могут взять предметы из общего хранилища, но могут смотреть.
++> Когда игрок подключается к комнате, то происходит обновление хранилища на
++> текущее состояние. Все изменения происходят пока игрок и мастер в сети».
++
++Никаких офлайн-коммитов, очередей, `baseRevision`, конфликтов и алертов о
++расхождении.
++
++## Что изменилось
++
++### 1. Сервер ничего не пишет на диск
++
++- Удалён `server/partyStorageStore.js`, убраны `.data/` из `.gitignore`,
++  параметр `partyStorageStore` из `createRoomRegistry()` и wiring в
++  `server/start.js`.
++- `room.partyStorage` живёт **в памяти комнаты** рядом с `activeSession` и
++  `terminalStates`. `roomSnapshot` отдаёт его вместе с `room.state`, поэтому
++  подключившийся игрок сразу получает актуальный снимок.
++- В снимок добавлено поле `gmOnline`: есть ли владелец комнаты в сети.
++
++### 2. Канон — хранилище Мастера
++
++- Новая таблица `gm_room_storage (code, data, updated_at)` в `db/schema.js`;
++  `saveRoomStorage` / `getRoomStorage` в обоих адаптерах БД.
++- `src/lootTrade/partyStoragePersistence.js` слушает `storage.state`, и
++  **только на устройстве Мастера** сохраняет снимок в локальную БД и фоном
++  выгружает в его Google Drive (`type: 'gm_room_storage'`) через новый
++  `syncRoomStorageToCloudIfEnabled` — тем же путём, что контейнеры добычи.
++- `onRoomStorageState` добавлен в `src/room/roomStore.ts`; подписка
++  запускается в `App.js` рядом с `startGmSessionPersistence()`.
++- Двусторонняя загрузка склада из Drive пока не делается: восстановление идёт
++  из локальной БД Мастера, выгрузка в облако уже работает.
++
++### 3. Восстановление при подключении
++
++- Новое сообщение `storage.restore` и код `STORAGE_GM_OFFLINE` в обоих
++  протоколах.
++- `restorePartyStorage` в реестре принимает снимок **только от владельца**
++  (по `ownerToken`), не откатывает комнату более старой ревизией и рассылает
++  свежий `storage.state` всем.
++- При подключении Мастера `App.js` вызывает `restoreMasterStorage(code)`;
++  игрок при подключении получает уже восстановленное состояние обычным
++  `room.state`.
++
++### 4. Только онлайн
++
++- `deposit` / `withdraw` отклоняются с `STORAGE_GM_OFFLINE`, если Мастер не в
++  комнате. Список вещей при этом **виден** — снимок с `gmOnline: false`.
++- `PartyStorageModal` блокирует кнопки «Положить» / «Забрать» и показывает
++  «Мастер не в сети — хранилище доступно только для просмотра» (парные
++  RU/EN подписи `screen.storage.readOnly`).
++- Все изменения происходят, пока и Мастер, и игрок в сети; офлайн-правок нет,
++  поэтому конфликтовать нечему.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/partyStorageStore.js` | **удалён** |
++| `server/roomRegistry.js` | снимок в памяти, `gmOnline`, `storageSnapshot`, `restorePartyStorage` |
++| `server/start.js` | убран файловый store |
++| `server/roomServer.js` | обработчик `storage.restore` |
++| `server/protocol.js`, `src/room/roomProtocol.ts` | `STORAGE_RESTORE`, `STORAGE_GM_OFFLINE` |
++| `src/room/roomStore.ts` | `onRoomStorageState`, `restorePartyStorage`, `gmOnline` в типе |
++| `db/schema.js`, `db/Database.js`, `db/Database.web.js` | `gm_room_storage`, save/get |
++| `src/lootTrade/partyStoragePersistence.js` | новый: сейв Мастера + Drive |
++| `components/cloudSync/googleDriveSync.js` | `syncRoomStorageToCloudIfEnabled` |
++| `components/lootTrade/PartyStorageModal.js` | режим только чтения без Мастера |
++| `App.js` | запуск сохранения и восстановления |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | `screen.storage.readOnly` |
++| `.gitignore` | убрана `.data/` |
++| `__tests__/room/party-storage-507.test.js` | тесты новой модели |
++| `__tests__/room/room-server.integration.test.js` | WS: restore, снимок, offline |
++| `docs/key-items-and-gates-design.md` | финальная модель (Обновление 5) |
++| `public/version.json`, `patchs/baseline.json` | версия 508, 68/68 заметок |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `patchs/508-master-storage.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 507:
++
++```bash
++./apply-patch.sh 508
++# ✓ Установлен патч: №508 (версия 507 → 508)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 508
++```
++
++`patchs/baseline.json` в источнике равен `508`. После установки
++`public/version.json` → `508`; закоммитьте изменения и **перезапустите сервис
++Node.js**. Файл `.data/party-storage.json`, если он успел появиться от 507,
++можно удалить — он больше не используется и не хранится в git.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/party-storage-507.test.js
++npx vitest run __tests__/lootTrade/party-storage-modal-507.test.js
++npx vitest run __tests__/room/room-server.integration.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "508"'
++```
++
++Тесты покрывают: атомарность и ревизию, «только чтение» без Мастера,
++`storage.restore` только от владельца и без отката, получение снимка при
++подключении, отсутствие серверного файла и `.data/`, локальную БД и Drive
++Мастера, зеркало протокола и подпись «Мастер не в сети». WS-тест проверяет
++поднятие сейва Мастера, рассылку снимка игроку и `STORAGE_GM_OFFLINE` после
++ухода ведущего.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/508-master-storage.patch
++cp /path/to/508-master-storage.patch patchs/
++```
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 77fc9f5..11d6bf1 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -82,6 +82,7 @@
+     "empty": "Empty",
+     "noRoom": "No connected room",
+     "failed": "Could not update shared storage",
++    "readOnly": "Game Master is offline — storage is read-only",
+     "hint": "Items are shared by the whole party. The name is not customizable."
+   },
+   "labels": {
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 17a688a..8e89af8 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -82,6 +82,7 @@
+     "empty": "Пусто",
+     "noRoom": "Нет подключённой комнаты",
+     "failed": "Не удалось изменить общее хранилище",
++    "readOnly": "Мастер не в сети — хранилище доступно только для просмотра",
+     "hint": "Вещи общие для всей группы. Название не настраивается."
+   },
+   "labels": {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 7e4601d..ad415ab 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "507"
++  "baseline": "508"
+ }
+diff --git a/public/version.json b/public/version.json
+index 52ba5c7..1ed788f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "507",
++  "version": "508",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Общее хранилище теперь принадлежит Мастеру: его сохранение лежит в локальной базе ведущего и уезжает в его Google Drive, а игрокам рассылается текущий снимок.",
++      "Без Мастера в сети хранилище доступно только для просмотра: положить или забрать вещь нельзя, пока ведущий не подключится к комнате.",
++      "При подключении к комнате игрок сразу получает актуальное состояние хранилища, а Мастер поднимает своё сохранение в комнату.",
++      "Сервер больше не пишет файлы хранилища на диск: состояние комнаты живёт в памяти, все изменения происходят только пока Мастер и игрок в сети.",
+       "В инвентаре появилось «Общее хранилище»: вещи группы лежат в одном месте, доступном каждому игроку комнаты, даже если положивший их персонаж выбыл из игры.",
+       "Предмет можно положить в общее хранилище или забрать оттуда в свой инвентарь; количество меняется атомарно, поэтому двое не заберут одну и ту же вещь.",
+       "Хранилище живёт на сервере и переживает перезапуск: при подключении к комнате игрок сразу получает актуальное содержимое.",
+@@ -69,6 +73,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Shared storage now belongs to the Game Master: its save lives in the GM local database and syncs to their Google Drive, while players receive a current snapshot.",
++      "Without the GM online the storage is read-only: items cannot be deposited or withdrawn until the GM connects to the room.",
++      "Connecting to a room immediately delivers the current storage state, and the GM uploads their saved copy into the room.",
++      "The server no longer writes storage files to disk: room state lives in memory and all changes happen only while the GM and player are online.",
+       "Inventory now has \"Shared storage\": party items live in one place available to every player in the room, even if the character who deposited them leaves the game.",
+       "Items can be deposited into shared storage or withdrawn into a personal inventory; quantities change atomically so two players cannot take the same item.",
+       "Storage lives on the server and survives a restart: connecting to a room immediately delivers its current contents.",
+diff --git a/server/partyStorageStore.js b/server/partyStorageStore.js
+deleted file mode 100644
+index ea4371a..0000000
+--- a/server/partyStorageStore.js
++++ /dev/null
+@@ -1,44 +0,0 @@
+-'use strict';
+-
+-// Патч 507 — файловое хранилище «Общего хранилища» комнат.
+-//
+-// Канон склада живёт НА СЕРВЕРЕ и переживает рестарт сервиса: «подключился —
+-// получил обновления» работает потому, что roomSnapshot отдаёт partyStorage
+-// вместе с состоянием комнаты. Файл служебный, в git не попадает (.data/).
+-//
+-// Формат: { "GM-XXXXXX": { revision, entries: [...] }, ... }
+-
+-const fs = require('node:fs');
+-const path = require('node:path');
+-
+-const DEFAULT_FILE = path.join(__dirname, '..', '.data', 'party-storage.json');
+-
+-const createFilePartyStorageStore = ({ filePath = DEFAULT_FILE } = {}) => {
+-  const load = () => {
+-    try {
+-      const raw = fs.readFileSync(filePath, 'utf8');
+-      const parsed = JSON.parse(raw);
+-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return new Map();
+-      return new Map(Object.entries(parsed).filter(([, value]) => value && Array.isArray(value.entries)));
+-    } catch {
+-      return new Map();
+-    }
+-  };
+-
+-  const save = (map) => {
+-    try {
+-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+-      const plain = Object.fromEntries(map.entries());
+-      const tmp = `${filePath}.tmp`;
+-      fs.writeFileSync(tmp, JSON.stringify(plain), 'utf8');
+-      fs.renameSync(tmp, filePath);
+-      return true;
+-    } catch {
+-      return false;
+-    }
+-  };
+-
+-  return { load, save, filePath };
+-};
+-
+-module.exports = { createFilePartyStorageStore, DEFAULT_FILE };
+diff --git a/server/protocol.js b/server/protocol.js
+index 68f3310..fb61bbd 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -39,6 +39,7 @@ const MESSAGE = Object.freeze({
+   STORAGE_STATE: 'storage.state',
+   STORAGE_DEPOSIT: 'storage.deposit',
+   STORAGE_WITHDRAW: 'storage.withdraw',
++  STORAGE_RESTORE: 'storage.restore',
+   ERROR: 'error',
+ });
+ 
+@@ -74,6 +75,7 @@ const ERROR_CODE = Object.freeze({
+   STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
+   STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
++  STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+ });
+ 
+ const LIMITS = Object.freeze({
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 14b30f6..3b026e4 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -30,7 +30,7 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
+  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
+  */
+-const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS, partyStorageStore = null } = {}) => {
++const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+   const rooms = new Map(); // code -> room
+   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
+   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
+@@ -40,28 +40,21 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   // Клиент использует его как «билет» одноразового доступа к мини-игре.
+   let broadcastCounter = 0;
+   const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
+-  // Патч 507: «Общее хранилище». Канон — сервер; при старте подтягиваем
+-  // сохранённые комнаты, при каждом изменении пишем весь набор обратно.
+-  const savedStorages = partyStorageStore ? partyStorageStore.load() : new Map();
++  // Патч 508: хранилище Мастера + снапшот игрокам. Сервер держит только
++  // ТЕКУЩИЙ снимок в памяти комнаты (как activeSession / terminalStates) и
++  // ничего не пишет на диск. Канон — локальное хранилище Мастера; он
++  // поднимает его в комнату сообщением `storage.restore` при подключении.
+   let storageEntryCounter = 0;
+   const emptyStorage = () => ({ revision: 0, entries: [] });
+   const cloneStorage = (storage) => ({
+     revision: Number(storage?.revision) || 0,
+     entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
+   });
+-  const persistStorages = () => {
+-    if (!partyStorageStore) return;
+-    const map = new Map();
+-    for (const room of rooms.values()) {
+-      if (room.partyStorage?.entries?.length || map.has(room.code)) {
+-        map.set(room.code, cloneStorage(room.partyStorage));
+-      }
+-    }
+-    for (const [code, stored] of savedStorages.entries()) {
+-      if (!map.has(code) && stored?.entries?.length) map.set(code, cloneStorage(stored));
+-    }
+-    partyStorageStore.save(map);
+-  };
++  const isGmOnline = (room) => Boolean(room.ownerClientId && room.members.has(room.ownerClientId));
++  const storageSnapshot = (room) => ({
++    ...cloneStorage(room.partyStorage),
++    gmOnline: isGmOnline(room),
++  });
+ 
+   const touchRateLog = (log, key, windowMs, max) => {
+     const cutoff = now() - windowMs;
+@@ -81,7 +74,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
+     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+-    partyStorage: cloneStorage(savedStorages.get(code) || emptyStorage()),
++    partyStorage: emptyStorage(),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+     recentTerminalWords: [],
+     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+@@ -126,9 +119,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       id,
+       terminalPublic(id, entry),
+     ])),
+-    // Патч 507: склад приходит вместе с состоянием комнаты — «подключился,
+-    // получил обновления». Дополнительного запроса не требуется.
+-    partyStorage: cloneStorage(room.partyStorage),
++    // Патч 508: игрок при подключении получает текущий снапшот хранилища.
++    // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
++    partyStorage: storageSnapshot(room),
+     lastClosedSession: room.lastClosedSession || null,
+     directives: cloneDirectives(room.directives),
+     // Признак обновлённого сервера: клиент включает синхронизированную игру,
+@@ -883,6 +876,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   const depositToPartyStorage = ({ code, clientId, name, item, quantity }) => {
+     const room = rooms.get(code);
+     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    // Без Мастера в сети хранилище доступно только для просмотра.
++    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+     const qty = Math.floor(Number(quantity));
+     if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+@@ -904,14 +899,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     storage.entries = [...storage.entries, entry];
+     storage.revision += 1;
+     room.partyStorage = storage;
+-    persistStorages();
+-    return { room, storage: cloneStorage(storage), entry: { ...entry } };
++    return { room, storage: storageSnapshot(room), entry: { ...entry } };
+   };
+ 
+   /** Забрать предмет из общего хранилища (только игрок, атомарно). */
+   const withdrawFromPartyStorage = ({ code, clientId, entryId, quantity }) => {
+     const room = rooms.get(code);
+     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+     const member = room.members.get(clientId);
+     if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+     const storage = room.partyStorage || emptyStorage();
+@@ -928,15 +923,33 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     storage.entries = entries;
+     storage.revision += 1;
+     room.partyStorage = storage;
+-    persistStorages();
+     return {
+       room,
+-      storage: cloneStorage(storage),
++      storage: storageSnapshot(room),
+       withdrawn: { item: { ...taken.item }, quantity: qty, name: taken.name },
+     };
+   };
+ 
+-  const getPartyStorage = (code) => cloneStorage(rooms.get(code)?.partyStorage || emptyStorage());
++  const getPartyStorage = (code) => storageSnapshot(rooms.get(code) || { partyStorage: emptyStorage(), members: new Map() });
++
++  /**
++   * Патч 508: Мастер подключается и поднимает СВОЁ сохранённое хранилище в
++   * комнату. Игроки при подключении получают уже актуальный снапшот.
++   * Конфликтов нет: изменений вне сети не бывает, Мастер — канон.
++   */
++  const restorePartyStorage = ({ code, clientId, ownerToken = null, storage }) => {
++    const room = rooms.get(code);
++    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
++    const incoming = cloneStorage(storage);
++    const current = room.partyStorage || emptyStorage();
++    if (Number(incoming.revision) < Number(current.revision)) {
++      return { room, storage: storageSnapshot(room), applied: false };
++    }
++    room.partyStorage = incoming;
++    return { room, storage: storageSnapshot(room), applied: true };
++  };
+ 
+   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
+   const sweep = () => {
+@@ -975,6 +988,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     depositToPartyStorage,
+     withdrawFromPartyStorage,
+     getPartyStorage,
++    restorePartyStorage,
+     sweep,
+     _rooms: rooms, // диагностика/тесты
+   };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index cb0083a..c3903f2 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -744,6 +744,24 @@ const attachRoomWebSocketServer = (httpServer, {
+           break;
+         }
+ 
++        // Патч 508: Мастер поднимает своё сохранённое хранилище в комнату.
++        // После этого все подключившиеся игроки получают актуальный снапшот.
++        case MESSAGE.STORAGE_RESTORE: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
++          const result = registry.restorePartyStorage({
++            code: canonical,
++            clientId,
++            ownerToken: payload.ownerToken || null,
++            storage: payload.storage,
++          });
++          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
++          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
++          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
++          break;
++        }
++
+         case MESSAGE.SESSION_OPEN: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) {
+diff --git a/server/start.js b/server/start.js
+index 27cbafb..278af2a 100644
+--- a/server/start.js
++++ b/server/start.js
+@@ -25,8 +25,6 @@ const path = require('node:path');
+ const crypto = require('node:crypto');
+ const { spawn } = require('node:child_process');
+ const { createRoomServer } = require('./roomServer');
+-const { createRoomRegistry } = require('./roomRegistry');
+-const { createFilePartyStorageStore } = require('./partyStorageStore');
+ 
+ const FINGERPRINT_FILE = '.build-fingerprint';
+ 
+@@ -706,12 +704,6 @@ const createManagedAppServer = ({
+     host,
+     distDir: resolvedDistDir,
+     beforeStatic,
+-    // Патч 507: канон «Общего хранилища» лежит на сервере в .data/ и
+-    // переживает рестарт; тесты создают сервер без этого параметра и
+-    // работают с хранилищем в памяти.
+-    registry: createRoomRegistry({
+-      partyStorageStore: createFilePartyStorageStore(),
+-    }),
+   });
+ 
+   const start = async () => {
+diff --git a/src/lootTrade/partyStoragePersistence.js b/src/lootTrade/partyStoragePersistence.js
+new file mode 100644
+index 0000000..d77737b
+--- /dev/null
++++ b/src/lootTrade/partyStoragePersistence.js
+@@ -0,0 +1,60 @@
++/**
++ * Патч 508: «Общее хранилище» = хранилище Мастера + снапшот игрокам.
++ *
++ * Сервер держит только текущий снимок в памяти комнаты и ничего не пишет на
++ * диск. Здесь, на устройстве Мастера, каждый `storage.state` сохраняется в
++ * локальную БД и фоном выгружается в его Google Drive — тем же путём, что
++ * контейнеры добычи. Игроки снимок не сохраняют: у них только копия для
++ * чтения, а запись возможна лишь пока Мастер в сети.
++ *
++ * Конфликтов и офлайн-коммитов нет: все изменения происходят онлайн.
++ */
++
++import * as db from '../../db';
++import useRoomStore, { onRoomStorageState } from '../room/roomStore';
++import { syncRoomStorageToCloudIfEnabled } from '../../components/cloudSync/googleDriveSync';
++import { debugLog } from '../debug/falloutDebug';
++
++let persistenceChain = Promise.resolve();
++
++const isMasterRoom = async (code) => {
++  const room = useRoomStore.getState().rooms?.[code];
++  if (room?.role === 'gm') return true;
++  try {
++    const rows = await db.getFolderRooms();
++    return Boolean((rows || []).find((row) => row?.code === code && row?.owner_token));
++  } catch {
++    return false;
++  }
++};
++
++/** Восстановить сохранённое хранилище Мастера в комнату при подключении. */
++export const restoreMasterStorage = async (code) => {
++  try {
++    const saved = await db.getRoomStorage(code);
++    if (!saved) return false;
++    await useRoomStore.getState().restorePartyStorage({ code, storage: saved });
++    return true;
++  } catch (error) {
++    debugLog('roomStorage.restore:failed', { message: error?.message || String(error) });
++    return false;
++  }
++};
++
++export const startPartyStoragePersistence = () => onRoomStorageState((envelope) => {
++  persistenceChain = persistenceChain
++    .then(async () => {
++      const code = envelope?.roomCode;
++      const storage = envelope?.payload?.storage;
++      if (!code || !storage) return;
++      if (!await isMasterRoom(code)) return;
++      await db.saveRoomStorage(code, storage);
++      void syncRoomStorageToCloudIfEnabled(code);
++    })
++    .catch((error) => {
++      debugLog('roomStorage.persistence:failed', { message: error?.message || String(error) });
++    });
++  return persistenceChain;
++});
++
++export default startPartyStoragePersistence;
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index bf9ae54..7c5c4f9 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -34,6 +34,7 @@ export const ROOM_MESSAGE = {
+   STORAGE_STATE: 'storage.state',
+   STORAGE_DEPOSIT: 'storage.deposit',
+   STORAGE_WITHDRAW: 'storage.withdraw',
++  STORAGE_RESTORE: 'storage.restore',
+   ERROR: 'error',
+ } as const;
+ 
+@@ -68,6 +69,7 @@ export const ROOM_ERROR = {
+   STORAGE_BAD_MESSAGE: 'STORAGE_BAD_MESSAGE',
+   STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
++  STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+ } as const;
+ 
+ export interface ActiveLootTradeItem {
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index dffe3f9..db958d0 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -40,6 +40,8 @@ export interface PartyStorageEntry {
+ export interface PartyStorageState {
+   revision: number;
+   entries: PartyStorageEntry[];
++  /** Мастер в сети: без него хранилище только для чтения. */
++  gmOnline?: boolean;
+ }
+ 
+ export interface RoomStateEntry {
+@@ -108,6 +110,7 @@ interface RoomStoreState {
+   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
+   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
+   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
++  restorePartyStorage: (input: { code: string; storage: PartyStorageState }) => Promise<PartyStorageState | null>;
+   openRoomSession: (input: {
+     code: string;
+     session: Record<string, unknown>;
+@@ -218,6 +221,7 @@ const pendingRequests = new Map<string, {
+ const joiningCodes = new Set<string>();
+ const publishListeners = new Set<(message: RoomEnvelope) => void>();
+ const sessionListeners = new Set<(message: RoomEnvelope) => void>();
++const storageListeners = new Set<(message: RoomEnvelope) => void>();
+ const directiveListeners = new Set<(message: RoomEnvelope) => void>();
+ 
+ const getWebTabSessionSuffix = (): string => {
+@@ -286,6 +290,12 @@ export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) =>
+   return () => { sessionListeners.delete(listener); };
+ };
+ 
++/** Патч 508: подписка на снимки «Общего хранилища» (только для Мастера). */
++export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) => {
++  storageListeners.add(listener);
++  return () => { storageListeners.delete(listener); };
++};
++
+ /** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
+ export const onRoomDirective = (listener: (message: RoomEnvelope) => void) => {
+   directiveListeners.add(listener);
+@@ -400,6 +410,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           [code]: { ...current, partyStorage: storage },
+         } });
+       }
++      storageListeners.forEach((listener) => {
++        try { listener(message); } catch (error) {
++          debugLog('room.storageListener:failed', { message: (error as Error)?.message });
++        }
++      });
+     }
+     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
+       const code = message.roomCode;
+@@ -804,6 +819,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       };
+     },
+ 
++    restorePartyStorage: async ({ code, storage }) => {
++      const response = await sendRequest(ROOM_MESSAGE.STORAGE_RESTORE, {
++        code, storage,
++      }, code);
++      return (response.payload?.storage as PartyStorageState | null) ?? null;
++    },
++
+     openRoomSession: async ({ code, session, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const reqPayload: Record<string, unknown> = { code, session };

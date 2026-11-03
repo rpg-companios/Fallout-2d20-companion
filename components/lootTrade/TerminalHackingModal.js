@@ -21,6 +21,7 @@ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacter
 import { useLocale } from '../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { showRawAlert } from '../alerts/alertService';
+import { shouldAutoStart, autoStartKey } from './terminalAutoStart';
 
 const COLUMN_WIDTH = 12;
 const ATTEMPTS_MAX = 4;
@@ -45,7 +46,7 @@ const TerminalHackingModal = ({
   const scrollAnim = useRef(new Animated.Value(0)).current;
 
   const terminalState = rooms?.[roomCode]?.terminalStates?.[terminal?.containerId]
-    || (terminal?.containerId ? { containerId: terminal.containerId, game: null, locked: false } : null);
+    || (terminal?.containerId ? { containerId: terminal.containerId, game: null, closed: false } : null);
   // Обновлённый сервер присылает capabilities.terminalHacking. Старый сервер
   // (или офлайн-комната) не поддерживает протокол терминалов — играем локально.
   const localMode = !roomHasTerminalProtocol(rooms?.[roomCode]);
@@ -56,18 +57,73 @@ const TerminalHackingModal = ({
     && game.operatorCharacterId === characterId,
   );
   const isSpectator = localMode ? false : Boolean(game && ['playing', 'pendingDigest'].includes(game.status) && !isOperator);
-  const canHack = Boolean(characterId && (localMode || roomCode) && !terminalState?.locked);
+  // Патч 503: доска может принадлежать другому персонажу. Нажатие «Взломать»
+  // (autoStart) тогда собирает новую доску под текущий лист, а «Смотреть» нет.
+  const boardOfAnotherOperator = Boolean(game && !isOperator && (
+    game.operatorCharacterId !== characterId || (!localMode && game.operatorClientId !== myClientId)
+  ));
+  // Патч 504: после исчерпания попыток доска НЕ перезапускается сама —
+  // сначала Мастер отвечает на «Разрешить повторный взлом? Да/Нет».
+  const isClosed = Boolean(terminalState?.closed || terminalState?.locked || game?.status === 'closed');
+  const awaitingGm = !isClosed && (game?.status === 'awaitingRetry' || Boolean(terminalState?.awaitingGm));
+  const canHack = Boolean(characterId && (localMode || roomCode) && !isClosed && !awaitingGm);
 
+  // В локальной партии (сервер комнат недоступен) Мастер сидит за этим же
+  // устройством: показываем тот же вопрос «Да/Нет» здесь. В сетевой партии
+  // решение принимает глобальный TerminalRetryPromptHost на устройстве Мастера.
+  const localPromptKey = useRef('');
   useEffect(() => {
-    if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
-    if (['playing', 'pendingDigest'].includes(game?.status)) return;
-    const key = `${roomCode}:${terminal.containerId}:${characterId}`;
+    if (!visible || !localMode || !awaitingGm) return;
+    const key = `${terminal?.containerId || ''}:${game?.revision ?? 'none'}`;
+    if (localPromptKey.current === key) return;
+    localPromptKey.current = key;
+    void showRawAlert({
+      title: tLootTrade('terminal.retryTitle'),
+      message: `${tLootTrade('terminal.attemptsExhausted')}
+${tLootTrade('terminal.retryMessage')}`,
+      kind: 'info',
+      buttons: [
+        { text: tLootTrade('terminal.retryYes') },
+        { text: tLootTrade('terminal.retryNo'), style: 'cancel' },
+      ],
+    }).then((index) => {
+      if (index === 0) doAction('retryYes');
+      else if (index === 1) doAction('retryNo');
+      else localPromptKey.current = '';
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, localMode, awaitingGm, game?.revision, terminal?.containerId]);
+
+  // Патч 505: после ACCESS GRANTED окно больше не шлёт лишний `start`.
+  // Раньше статус `won` не входил в guard, и доска пересобиралась заново,
+  // стоило clientId вкладки разойтись с оператором (две вкладки одного
+  // браузера, переподключение). Правило вынесено в чистый модуль и покрыто
+  // тестами отдельно от React Native.
+  useEffect(() => {
+    const allowed = shouldAutoStart({
+      visible,
+      autoStart,
+      hasTerminal: Boolean(terminal?.containerId),
+      hasRoom: Boolean(roomCode || localMode),
+      characterId,
+      isClosed,
+      awaitingGm,
+      game,
+      boardOfAnotherOperator,
+    });
+    if (!allowed) return;
+    const key = autoStartKey({
+      roomCode,
+      containerId: terminal.containerId,
+      characterId,
+      game,
+    });
     if (lastAutoStartKey.current === key) return;
     lastAutoStartKey.current = key;
     void doAction('start');
-  // State intentionally tracks the terminal's latest game revision.
+  // State intentionally tracks the terminal's latest game status.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status]);
+  }, [visible, autoStart, terminal?.containerId, roomCode, localMode, characterId, game?.status, game?.operatorCharacterId, boardOfAnotherOperator, isClosed, awaitingGm]);
 
   useEffect(() => {
     if (game?.status === 'won' && game.scrollUp) {
@@ -87,6 +143,9 @@ const TerminalHackingModal = ({
       showRawAlert({ title: tLootTrade('terminal.selectCharacter') });
       return;
     }
+    // Повторный взлом без разрешения Мастера запрещён и в локальном резерве.
+    if (isClosed && !['retryYes', 'retryNo'].includes(action)) return;
+    if (awaitingGm && !localMode && !['retryYes', 'retryNo'].includes(action)) return;
     if (localMode) {
       const snapshot = buildLocalCharacterSnapshot(useCharacterStore.getState());
       const next = applyLocalTerminalAction(localState, action, value, {
@@ -122,8 +181,11 @@ const TerminalHackingModal = ({
     } catch (error) {
       const code = error?.code || error?.message;
       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
-      else if (code === 'TERMINAL_LOCKED') showRawAlert({ title: tLootTrade('terminal.accessDenied') });
-      else if (code !== 'ROOM_TIMEOUT') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+      else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
+      else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
+      else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
+        showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+      }
     } finally {
       setBusy(false);
     }
@@ -199,14 +261,30 @@ const TerminalHackingModal = ({
     </View>
   );
 
-  const statusLabel = game?.status === 'locked'
-    ? tLootTrade('terminal.accessDenied')
-    : (game?.status === 'won' ? tLootTrade('terminal.accessGranted') : null);
+  const statusLabel = game?.status === 'won'
+    ? tLootTrade('terminal.accessGranted')
+    : (game?.status === 'awaitingRetry' ? tLootTrade('terminal.hackFailed') : null);
   // Патч 496: эффект скобки игрок узнаёт только после нажатия.
   const resultLabel = game?.result === 'DUD REMOVED' ? tLootTrade('terminal.dudRemoved')
     : game?.result === 'ATTEMPT RESTORED' ? tLootTrade('terminal.attemptRestored')
-      : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset') : null;
+      : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset')
+        : game?.result === 'ATTEMPTS EXHAUSTED' ? tLootTrade('terminal.attemptsExhausted') : null;
   const shownAttempts = Math.max(game?.attempts || 0, game?.maxAttempts || ATTEMPTS_MAX);
+  // Патч 505: история подсказок остаётся на экране и при провале, и при
+  // успехе. Раньше панель «ВЗЛОМ ПРОВАЛЕН» полностью заменяла доску, и
+  // игрок терял только что найденную комбинацию вроде «5 из 7».
+  const guessesPanel = game?.guesses?.length > 0 ? (
+    <View style={styles.guessesPanel}>
+      <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
+      <View style={styles.guessesRow}>
+        {game.guesses.map((guess, index) => (
+          <Text key={`${guess.word}-${index}`} style={styles.guessText}>
+            {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
+          </Text>
+        ))}
+      </View>
+    </View>
+  ) : null;
 
   return (
     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
@@ -226,10 +304,18 @@ const TerminalHackingModal = ({
             <Text style={styles.description}>{terminal?.description || terminalState?.config?.description}</Text>
           ) : null}
 
-          {terminalState?.locked || game?.status === 'locked' ? (
+          {isClosed ? (
             <View style={styles.accessPanel}>
-              <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.accessDenied')}</Text>
-              <Text style={styles.statusHint}>{tLootTrade('terminal.terminalLockedHint')}</Text>
+              <Text accessibilityRole="alert" style={styles.closedBadge}>{tLootTrade('terminal.closedBadge')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
+            </View>
+          ) : awaitingGm ? (
+            <View style={styles.accessPanel}>
+              <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.hackFailed')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.attemptsExhausted')}</Text>
+              <Text style={styles.retryWaiting}>{tLootTrade('terminal.retryWaiting')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.retryWaitingHint')}</Text>
+              {guessesPanel}
             </View>
           ) : game?.status === 'won' ? (
             <View style={styles.successPanel}>
@@ -240,10 +326,12 @@ const TerminalHackingModal = ({
                 </View>
               </Animated.View>
               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.wonHint')}</Text>
+              {guessesPanel}
             </View>
-          ) : !game || game.status === 'failed' ? (
+          ) : !game ? (
             <View style={styles.idlePanel}>
-              <Text style={styles.idleText}>{game?.status === 'failed' ? tLootTrade('terminal.failed') : tLootTrade('terminal.ready')}</Text>
+              <Text style={styles.idleText}>{tLootTrade('terminal.ready')}</Text>
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
                   difficulty: terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0,
@@ -303,16 +391,7 @@ const TerminalHackingModal = ({
                 {renderColumn(1)}
               </ScrollView>
 
-              {game.guesses?.length > 0 && (
-                <View style={styles.guessesPanel}>
-                  <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
-                  <View style={styles.guessesRow}>
-                    {game.guesses.map((guess, index) => (
-                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>{`${guess.word}: ${guess.likeness}`}</Text>
-                    ))}
-                  </View>
-                </View>
-              )}
+              {guessesPanel}
               {statusLabel ? <Text style={styles.statusLabel}>{statusLabel}</Text> : null}
               {resultLabel ? <Text style={styles.resultLabel}>{resultLabel}</Text> : null}
             </>
@@ -358,6 +437,8 @@ const styles = StyleSheet.create({
   successPanel: { minHeight: 250, alignItems: 'center', overflow: 'hidden', marginTop: 8 },
   wonBoard: { width: '100%' },
   accessDenied: { color: '#ff4b4b', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#f00', textShadowRadius: 12 },
+  closedBadge: { color: '#b9c2b4', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 4, textAlign: 'center' },
+  retryWaiting: { color: '#f0d68d', fontFamily: 'monospace', fontSize: 14, fontWeight: '800', marginTop: 14, textAlign: 'center' },
   accessGranted: { color: '#a9f07d', fontFamily: 'monospace', fontSize: 25, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#5dff43', textShadowRadius: 12 },
   statusHint: { color: '#97a392', fontSize: 12, textAlign: 'center', marginTop: 8 },
   hackerHint: { color: '#a5dc88', fontSize: 11, marginTop: 5, fontFamily: 'monospace' },

@@ -749,6 +749,7 @@ const styles = StyleSheet.create({
   },
   terminalAdminText: { color: '#d8d2b8', fontSize: 13 },
   terminalAdminStateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  terminalAdminActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   terminalUnlockButton: { borderWidth: 1, borderColor: '#e8c04b', borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6 },
   terminalUnlockButtonText: { color: '#f4d76a', fontSize: 12, fontWeight: '700' },
   movePickerCancelText: {

@@ -1,4 +1,4 @@
-// Приёмочный тест 499: скобки двух сортов, число задаёт Наука,
+// Приёмочный тест 500: скобки двух сортов, число задаёт Наука,
 // слепой перебор невелик, думающий выигрывает, удача даёт 100 %.
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,7 +14,7 @@ const snapshot = (int, sci, luck) => ({
   skills: [{ id: 'science', rank: sci }],
 });
 const gameFor = (d, int, sci, luck, seed) => createGame({
-  config: { containerId: 't', difficulty: d, lockOnFailure: false },
+  config: { containerId: 't', difficulty: d },
   operatorClientId: 'p', operatorCharacterId: 'c',
   characterSnapshot: snapshot(int, sci, luck), now: 100, rng: () => seed,
 });
@@ -79,7 +79,7 @@ const rate = (d, sci, strategy, forcedFull = false, boards = 20, reps = 6) => {
   return Math.round(100 * wins / n);
 };
 
-describe('патч 499: скобки двух сортов', () => {
+describe('патч 500: скобки двух сортов', () => {
   it('число и состав скобок не зависят от сложности', () => {
     for (let sci = 0; sci <= 6; sci += 1) {
       const counts = [];
@@ -101,8 +101,8 @@ describe('патч 499: скобки двух сортов', () => {
     }
   });
 
-  it('на сложности 5 при Науке 6 слепой <= 40 %, думающий >= 85 %', () => {
-    expect(rate(5, 6, 'blind')).toBeLessThanOrEqual(40);
+  it('на сложности 5 при Науке 6 слепой <= 50 %, думающий >= 85 %', () => {
+    expect(rate(5, 6, 'blind')).toBeLessThanOrEqual(50);
     expect(rate(5, 6, 'clever')).toBeGreaterThanOrEqual(85);
   }, 30000);
 

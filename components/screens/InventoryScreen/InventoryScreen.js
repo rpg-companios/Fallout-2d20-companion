@@ -6,6 +6,7 @@ import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import CapsModal from './modals/CapsModal';
+import PartyStorageModal from '../../../components/lootTrade/PartyStorageModal';
 import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
@@ -262,6 +263,8 @@ const InventoryScreen = () => {
   const [isSellModalVisible, setIsSellModalVisible] = useState(false);
   const [selectedItemForSale, setSelectedItemForSale] = useState(null);
   const [isAddItemModalVisible, setAddItemModalVisible] = useState(false);
+  // Патч 507: «Общее хранилище» комнаты.
+  const [isPartyStorageVisible, setPartyStorageVisible] = useState(false);
   const [isCraftModalVisible, setCraftModalVisible] = useState(false);
   const [itemSelectionMode, setItemSelectionMode] = useState('loot');
   const [isBuyItemModalVisible, setIsBuyItemModalVisible] = useState(false);
@@ -1974,26 +1977,37 @@ const InventoryScreen = () => {
   };
 
   const renderFooter = () => (
-  <View style={styles.footerActionsRow}>
+  <View>
+    <View style={styles.footerActionsRow}>
+      <TouchableOpacity
+        style={styles.addActionCell}
+        onPress={() => {
+          setItemSelectionMode('loot');
+          setAddItemModalVisible(true);
+        }}
+      >
+        <Text style={styles.addActionIcon}>+</Text>
+        <Text style={styles.addActionLabel}>{tInventory('screen.actions.addLoot')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.addActionCell}
+        onPress={() => {
+          setItemSelectionMode('buy');
+          setAddItemModalVisible(true);
+        }}
+      >
+        <Text style={styles.addActionIcon}>+</Text>
+        <Text style={styles.addActionLabel}>{tInventory('screen.actions.buyItems')}</Text>
+      </TouchableOpacity>
+    </View>
+    {/* Патч 507: та же зелёная область, но во всю ширину, под двумя кнопками. */}
     <TouchableOpacity
-      style={styles.addActionCell}
-      onPress={() => {
-        setItemSelectionMode('loot');
-        setAddItemModalVisible(true);
-      }}
+      testID="shared-storage-button"
+      accessibilityRole="button"
+      style={styles.sharedStorageCell}
+      onPress={() => setPartyStorageVisible(true)}
     >
-      <Text style={styles.addActionIcon}>+</Text>
-      <Text style={styles.addActionLabel}>{tInventory('screen.actions.addLoot')}</Text>
-    </TouchableOpacity>
-    <TouchableOpacity
-      style={styles.addActionCell}
-      onPress={() => {
-        setItemSelectionMode('buy');
-        setAddItemModalVisible(true);
-      }}
-    >
-      <Text style={styles.addActionIcon}>+</Text>
-      <Text style={styles.addActionLabel}>{tInventory('screen.actions.buyItems')}</Text>
+      <Text style={styles.sharedStorageLabel}>{tInventory('screen.actions.sharedStorage')}</Text>
     </TouchableOpacity>
   </View>
 );
@@ -2131,6 +2145,17 @@ const InventoryScreen = () => {
             onClose={() => setRepairTarget(null)}
           />
         )}
+        <PartyStorageModal
+          visible={isPartyStorageVisible}
+          inventoryItems={inventoryItems}
+          onClose={() => setPartyStorageVisible(false)}
+          onDepositLocal={(itemId, quantity) => {
+            useCharacterStore.getState().adjustItemQuantity(itemId, -quantity);
+          }}
+          onWithdrawLocal={(item, quantity) => {
+            handleAddItem(item, quantity, 'storage');
+          }}
+        />
         <BuyItemModal
           visible={isBuyItemModalVisible}
           onClose={() => {

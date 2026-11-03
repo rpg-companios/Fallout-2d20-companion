@@ -1,0 +1,1183 @@
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index d3e87c3..b8942ac 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -376,6 +376,90 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  // Патч 505: ACCESS GRANTED больше не стирается лишним `start` окна взлома.
++  // Воспроизводим две вкладки одного браузера: второе соединение с тем же
++  // листом персонажа раньше расценивалось как передача хода и собирало новую
++  // доску, а Мастер не получал уведомления об успехе.
++  it('505: победа не пересобирает доску и приходит Мастеру', async () => {
++    await withServer(async (port, app) => {
++      const gm = makeClient(port, 'gm-505');
++      const player = makeClient(port, 'player-505');
++      const secondTab = makeClient(port, 'player-505-tab2');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 505' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор', role: 'player' });
++      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await secondTab.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор (вкладка 2)', role: 'player' });
++      await secondTab.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      const sheet = {
++        characterName: 'Оператор',
++        data: { attributes: { INT: { value: 8 }, LCK: { value: 6 } }, skills: [] },
++      };
++      await player.sendRaw(MESSAGE.CHAR_PUBLISH, {
++        characterId: 'char-505', revision: 1, snapshot: sheet,
++      }, code);
++
++      const config = { containerId: 'term-505', name: 'Терминал', difficulty: 3 };
++      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
++      await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
++      const startReq = await player.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-505',
++      }, code);
++      const started = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
++      expect(started.payload.terminal.game.wordLength).toBe(7);
++
++      // Угадываем пароль: его знает только сервер, публичное состояние — нет.
++      const hidden = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
++      const passwordRange = hidden.wordRanges.find((range) => range.word === hidden.password);
++      const winReq = await player.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'guess', characterId: 'char-505', value: passwordRange.id,
++      }, code);
++      const won = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === winReq);
++      expect(won.payload.terminal.game).toMatchObject({ status: 'won', result: 'ACCESS GRANTED' });
++      expect(won.payload.terminal.awaitingGm).toBe(false);
++      expect(won.payload.terminal.game.password).toBeUndefined();
++      // Именно по этому состоянию Мастеру всплывает «Терминал взломан».
++      const gmWon = await gm.waitFor((m) => (
++        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.game?.status === 'won'
++      ));
++      expect(gmWon.payload.terminal.game.result).toBe('ACCESS GRANTED');
++
++      // Вторая вкладка публикует тот же лист от своего clientId и шлёт start.
++      await secondTab.sendRaw(MESSAGE.CHAR_PUBLISH, {
++        characterId: 'char-505', revision: 2, snapshot: sheet,
++      }, code);
++      // Дожидаемся, что сервер обработал публикацию на этом соединении.
++      await secondTab.send(MESSAGE.PRESENCE_PING, {});
++      await secondTab.waitFor((m) => m.type === MESSAGE.PRESENCE_PONG);
++      const againReq = await secondTab.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-505',
++      }, code);
++      const again = await secondTab.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === againReq);
++      expect(again.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
++      expect(app.registry._rooms.get(code).terminalStates.get(config.containerId).game.status).toBe('won');
++
++      // Новая партия — только по явной повторной трансляции Мастера.
++      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'reissue',
++      }, code);
++      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
++      expect(reissued.payload.terminal.game).toBeNull();
++      // Лист теперь опубликован со второй вкладки, она и начинает новую партию.
++      const freshReq = await secondTab.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'start', characterId: 'char-505',
++      }, code);
++      const fresh = await secondTab.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === freshReq);
++      expect(fresh.payload.terminal.game).toMatchObject({ status: 'playing', attempts: 4 });
++
++      gm.close();
++      player.close();
++      secondTab.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/__tests__/room/terminal-win-505.test.js b/__tests__/room/terminal-win-505.test.js
+new file mode 100644
+index 0000000..013c37e
+--- /dev/null
++++ b/__tests__/room/terminal-win-505.test.js
+@@ -0,0 +1,222 @@
++// Приёмочный тест 505. Воспроизведение жалобы владельца: Мастер создал
++// терминал сложности 3, раздал его, игрок нашёл комбинацию 5/7 и выбрал
++// следующее слово. Доска сбросилась и «всё надо заново», Мастер не получил
++// уведомлений. Причина: после ACCESS GRANTED окно взлома слало лишний `start`
++// (guard пропускал только playing/pendingDigest), а другой clientId (вторая
++// вкладка браузера) включал передачу хода из 503 и собирал свежую доску.
++// 505 фиксирует победу и добавляет уведомление Мастеру об успехе.
++import { describe, expect, it } from 'vitest';
++import {
++  applyGameAction,
++  createGame,
++  normalizeTerminalConfig,
++  publicGameState,
++} from '../../server/terminalHacking.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { shouldAutoStart, autoStartKey, TERMINAL_FINISHED_STATUSES } from '../../components/lootTrade/terminalAutoStart.js';
++import { findPending, findCompleted, decisionKey } from '../../components/lootTrade/terminalRetryPrompt.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++
++const CONFIG = { containerId: 't1', name: 'Терминал', description: 'Убежище', difficulty: 3 };
++const SNAPSHOT = {
++  characterName: 'Оператор',
++  data: { attributes: { INT: { value: 8 }, LCK: { value: 6 } }, skills: [] },
++};
++
++const baseAutoStart = (overrides = {}) => ({
++  visible: true,
++  autoStart: true,
++  hasTerminal: true,
++  hasRoom: true,
++  characterId: 'c1',
++  isClosed: false,
++  awaitingGm: false,
++  game: null,
++  boardOfAnotherOperator: false,
++  ...overrides,
++});
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
++  for (const [clientId, characterId] of [['p1', 'c1'], ['p2', 'c2']]) {
++    registry.putSnapshot({
++      code: room.code, characterId, revision: 1, fromClientId: clientId, snapshot: SNAPSHOT,
++    });
++  }
++  registry.issueTerminal({ code: room.code, clientId: 'gm-1', config: CONFIG });
++  const hidden = () => registry._rooms.get(room.code).terminalStates.get('t1').game;
++  const state = () => registry.getState(room.code).terminalStates.t1;
++  const act = (clientId, characterId, action, value) => registry.terminalAction({
++    code: room.code, clientId, characterId, containerId: 't1', action, value,
++  });
++  const win = () => {
++    act('p1', 'c1', 'start');
++    const passwordRange = hidden().wordRanges.find((range) => range.word === hidden().password);
++    return act('p1', 'c1', 'guess', passwordRange.id);
++  };
++  return { registry, room, hidden, state, act, win };
++};
++
++describe('505: автозапуск не стирает победу', () => {
++  it('чистое правило: start только на открытие, не после won/awaitingRetry/closed', () => {
++    expect(shouldAutoStart(baseAutoStart())).toBe(true);
++    expect(shouldAutoStart(baseAutoStart({ autoStart: false }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ visible: false }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ hasTerminal: false }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ hasRoom: false }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ characterId: null }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ isClosed: true }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ awaitingGm: true }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ game: { status: 'playing' } }))).toBe(false);
++    expect(shouldAutoStart(baseAutoStart({ game: { status: 'pendingDigest' } }))).toBe(false);
++    for (const status of TERMINAL_FINISHED_STATUSES) {
++      expect(shouldAutoStart(baseAutoStart({ game: { status } }))).toBe(false);
++    }
++    // Передача хода по-прежнему работает, но только в активной партии.
++    expect(shouldAutoStart(baseAutoStart({
++      game: { status: 'playing' }, boardOfAnotherOperator: true,
++    }))).toBe(true);
++  });
++
++  it('ключ автозапуска различает статусы доски и оператора', () => {
++    const common = { roomCode: 'R', containerId: 't1', characterId: 'c1' };
++    expect(autoStartKey({ ...common, game: null })).not.toBe(
++      autoStartKey({ ...common, game: { status: 'won', operatorCharacterId: 'c1' } }),
++    );
++    expect(autoStartKey({ ...common, game: { status: 'playing', operatorCharacterId: 'c1' } })).not.toBe(
++      autoStartKey({ ...common, game: { status: 'playing', operatorCharacterId: 'c2' } }),
++    );
++  });
++
++  it('движок: start после ACCESS GRANTED отклоняется у ЛЮБОГО оператора', () => {
++    const game = createGame({
++      config: normalizeTerminalConfig(CONFIG),
++      operatorClientId: 'p1',
++      operatorCharacterId: 'c1',
++      characterSnapshot: SNAPSHOT,
++      now: 1000,
++      rng: () => 0.42,
++    });
++    const passwordRange = game.wordRanges.find((range) => range.word === game.password);
++    const won = applyGameAction({
++      game,
++      config: normalizeTerminalConfig(CONFIG),
++      action: 'guess',
++      clientId: 'p1',
++      characterId: 'c1',
++      characterSnapshot: SNAPSHOT,
++      value: passwordRange.id,
++      now: 1001,
++    }).game;
++    expect(won.status).toBe('won');
++    expect(won.result).toBe('ACCESS GRANTED');
++
++    for (const [clientId, characterId] of [['p1', 'c1'], ['p2', 'c2'], ['p3', 'c1']]) {
++      const result = applyGameAction({
++        game: won,
++        config: normalizeTerminalConfig(CONFIG),
++        action: 'start',
++        clientId,
++        characterId,
++        characterSnapshot: SNAPSHOT,
++        now: 1002,
++        rng: () => 0.13,
++      });
++      expect(result.error).toBe('TERMINAL_ALREADY_ACTIVE');
++      expect(result.game).toBeUndefined();
++    }
++  });
++});
++
++describe('505: сервер хранит победу до явной трансляции Мастера', () => {
++  it('угаданный пароль даёт won, а start другой вкладки доску не пересобирает', () => {
++    const { hidden, state, act, win } = setup();
++    const result = win();
++    expect(result.error).toBeUndefined();
++    expect(hidden().status).toBe('won');
++    expect(hidden().result).toBe('ACCESS GRANTED');
++    expect(state().game.status).toBe('won');
++    expect(state().awaitingGm).toBe(false);
++    // Публичное состояние по-прежнему не выдаёт пароль.
++    expect(publicGameState(hidden()).password).toBeUndefined();
++
++    const revision = hidden().revision;
++    // Тот же оператор: штатный отказ без пересборки.
++    expect(act('p1', 'c1', 'start').error).toBe(ERROR_CODE.TERMINAL_ALREADY_ACTIVE);
++    // Другая вкладка / другой персонаж: раньше здесь собиралась новая доска.
++    expect(act('p2', 'c2', 'start').error).toBe(ERROR_CODE.TERMINAL_ALREADY_ACTIVE);
++    // Чужой персонаж не подменяется: лист c1 опубликован с p1.
++    expect(act('p2', 'c1', 'start').error).toBe(ERROR_CODE.SESSION_FORBIDDEN);
++    expect(hidden().status).toBe('won');
++    expect(hidden().revision).toBe(revision);
++    expect(state().game.status).toBe('won');
++  });
++
++  it('только reissue Мастера обнуляет доску и разрешает новую партию', () => {
++    const { hidden, state, act, win } = setup();
++    win();
++    const reissued = act('gm-1', null, 'reissue');
++    expect(reissued.error).toBeUndefined();
++    expect(state().game).toBeNull();
++    expect(state().closed).toBe(false);
++    const fresh = act('p1', 'c1', 'start');
++    expect(fresh.error).toBeUndefined();
++    expect(hidden().status).toBe('playing');
++    expect(hidden().attempts).toBe(4);
++  });
++
++  it('игрок не может обойти победу через guess или bracket', () => {
++    const { hidden, act, win } = setup();
++    win();
++    expect(act('p1', 'c1', 'guess', hidden().wordRanges[0].id).error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(act('p1', 'c1', 'bracket', hidden().bracketRanges[0]?.id).error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(hidden().status).toBe('won');
++  });
++});
++
++describe('505: Мастер узнаёт об успехе', () => {
++  const roomWith = (role, terminal) => ({ R: { role, terminalStates: { t1: terminal } } });
++  const wonTerminal = {
++    closed: false,
++    config: { name: 'Терминал', difficulty: 3 },
++    game: { status: 'won', revision: 7, operatorName: 'Оператор' },
++  };
++
++  it('findCompleted видит won только в комнате Мастера', () => {
++    expect(findCompleted(roomWith('gm', wonTerminal))).toEqual([{
++      code: 'R',
++      containerId: 't1',
++      kind: 'won',
++      key: `won:${decisionKey('R', 't1', wonTerminal.game)}`,
++      name: 'Терминал',
++      difficulty: 3,
++      operatorName: 'Оператор',
++    }]);
++    expect(findCompleted(roomWith('player', wonTerminal))).toEqual([]);
++    expect(findCompleted(roomWith('gm', { ...wonTerminal, closed: true }))).toEqual([]);
++    expect(findCompleted(roomWith('gm', {
++      ...wonTerminal, game: { status: 'awaitingRetry', revision: 7 },
++    }))).toEqual([]);
++  });
++
++  it('успех не порождает вопрос «Разрешить повторный взлом?»', () => {
++    expect(findPending(roomWith('gm', wonTerminal))).toEqual([]);
++    expect(findCompleted(roomWith('gm', {
++      ...wonTerminal, game: { status: 'awaitingRetry', revision: 7 },
++    }))).toEqual([]);
++  });
++
++  it('ключи вопроса и уведомления не конфликтуют', () => {
++    const pending = findPending(roomWith('gm', {
++      ...wonTerminal, game: { status: 'awaitingRetry', revision: 7 },
++    }))[0];
++    const completed = findCompleted(roomWith('gm', {
++      ...wonTerminal, game: { status: 'won', revision: 7 },
++    }))[0];
++    expect(pending.key).not.toBe(completed.key);
++  });
++});
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index 9db6244..a8537f6 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -21,6 +21,7 @@ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacter
+ import { useLocale } from '../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import { showRawAlert } from '../alerts/alertService';
++import { shouldAutoStart, autoStartKey } from './terminalAutoStart';
+ 
+ const COLUMN_WIDTH = 12;
+ const ATTEMPTS_MAX = 4;
+@@ -93,17 +94,36 @@ ${tLootTrade('terminal.retryMessage')}`,
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [visible, localMode, awaitingGm, game?.revision, terminal?.containerId]);
+ 
++  // Патч 505: после ACCESS GRANTED окно больше не шлёт лишний `start`.
++  // Раньше статус `won` не входил в guard, и доска пересобиралась заново,
++  // стоило clientId вкладки разойтись с оператором (две вкладки одного
++  // браузера, переподключение). Правило вынесено в чистый модуль и покрыто
++  // тестами отдельно от React Native.
+   useEffect(() => {
+-    if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
+-    if (isClosed || awaitingGm) return;
+-    if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return;
+-    const key = `${roomCode}:${terminal.containerId}:${characterId}:${game?.operatorCharacterId || ''}`;
++    const allowed = shouldAutoStart({
++      visible,
++      autoStart,
++      hasTerminal: Boolean(terminal?.containerId),
++      hasRoom: Boolean(roomCode || localMode),
++      characterId,
++      isClosed,
++      awaitingGm,
++      game,
++      boardOfAnotherOperator,
++    });
++    if (!allowed) return;
++    const key = autoStartKey({
++      roomCode,
++      containerId: terminal.containerId,
++      characterId,
++      game,
++    });
+     if (lastAutoStartKey.current === key) return;
+     lastAutoStartKey.current = key;
+     void doAction('start');
+-  // State intentionally tracks the terminal's latest game revision.
++  // State intentionally tracks the terminal's latest game status.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
++  }, [visible, autoStart, terminal?.containerId, roomCode, localMode, characterId, game?.status, game?.operatorCharacterId, boardOfAnotherOperator, isClosed, awaitingGm]);
+ 
+   useEffect(() => {
+     if (game?.status === 'won' && game.scrollUp) {
+@@ -163,7 +183,9 @@ ${tLootTrade('terminal.retryMessage')}`,
+       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
+       else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
+       else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
+-      else if (code !== 'ROOM_TIMEOUT' && code !== 'TERMINAL_NOT_ACTIVE') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++      else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
++        showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++      }
+     } finally {
+       setBusy(false);
+     }
+@@ -248,6 +270,21 @@ ${tLootTrade('terminal.retryMessage')}`,
+       : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset')
+         : game?.result === 'ATTEMPTS EXHAUSTED' ? tLootTrade('terminal.attemptsExhausted') : null;
+   const shownAttempts = Math.max(game?.attempts || 0, game?.maxAttempts || ATTEMPTS_MAX);
++  // Патч 505: история подсказок остаётся на экране и при провале, и при
++  // успехе. Раньше панель «ВЗЛОМ ПРОВАЛЕН» полностью заменяла доску, и
++  // игрок терял только что найденную комбинацию вроде «5 из 7».
++  const guessesPanel = game?.guesses?.length > 0 ? (
++    <View style={styles.guessesPanel}>
++      <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
++      <View style={styles.guessesRow}>
++        {game.guesses.map((guess, index) => (
++          <Text key={`${guess.word}-${index}`} style={styles.guessText}>
++            {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
++          </Text>
++        ))}
++      </View>
++    </View>
++  ) : null;
+ 
+   return (
+     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
+@@ -278,6 +315,7 @@ ${tLootTrade('terminal.retryMessage')}`,
+               <Text style={styles.statusHint}>{tLootTrade('terminal.attemptsExhausted')}</Text>
+               <Text style={styles.retryWaiting}>{tLootTrade('terminal.retryWaiting')}</Text>
+               <Text style={styles.statusHint}>{tLootTrade('terminal.retryWaitingHint')}</Text>
++              {guessesPanel}
+             </View>
+           ) : game?.status === 'won' ? (
+             <View style={styles.successPanel}>
+@@ -288,6 +326,8 @@ ${tLootTrade('terminal.retryMessage')}`,
+                 </View>
+               </Animated.View>
+               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.wonHint')}</Text>
++              {guessesPanel}
+             </View>
+           ) : !game ? (
+             <View style={styles.idlePanel}>
+@@ -351,18 +391,7 @@ ${tLootTrade('terminal.retryMessage')}`,
+                 {renderColumn(1)}
+               </ScrollView>
+ 
+-              {game.guesses?.length > 0 && (
+-                <View style={styles.guessesPanel}>
+-                  <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
+-                  <View style={styles.guessesRow}>
+-                    {game.guesses.map((guess, index) => (
+-                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>
+-                        {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
+-                      </Text>
+-                    ))}
+-                  </View>
+-                </View>
+-              )}
++              {guessesPanel}
+               {statusLabel ? <Text style={styles.statusLabel}>{statusLabel}</Text> : null}
+               {resultLabel ? <Text style={styles.resultLabel}>{resultLabel}</Text> : null}
+             </>
+diff --git a/components/lootTrade/TerminalRetryPromptHost.js b/components/lootTrade/TerminalRetryPromptHost.js
+index fc5b0d4..cc9470b 100644
+--- a/components/lootTrade/TerminalRetryPromptHost.js
++++ b/components/lootTrade/TerminalRetryPromptHost.js
+@@ -1,14 +1,17 @@
+ /**
+  * Патч 504 — вопрос Мастеру «Разрешить повторный взлом? Да/Нет».
++ * Патч 505 — уведомление Мастеру «Терминал взломан» после ACCESS GRANTED.
+  *
+  * Монтируется один раз в App.js поверх ЛЮБОГО экрана: Мастер может в этот
+- * момент править лист, смотреть карту или быть в админке, а вопрос всё равно
+- * всплывёт. Источник правды — terminalStates комнат из roomStore: сервер
+- * выставляет `awaitingGm`, когда у партии закончились все попытки. Решение
+- * уходит на сервер действием `retry` со значением `yes` / `no`.
++ * момент править лист, смотреть карту или быть в админке, а сообщение всё
++ * равно всплывёт. Источник правды — terminalStates комнат из roomStore:
++ * сервер выставляет `awaitingGm` при исчерпании попыток и присылает `won`
++ * при победе. Диалоги рисует AlertHost через showRawAlert; этот компонент
++ * ничего не рендерит (return null), он только слушает сеть и решает, какой
++ * запрос отправить.
+  *
+  * Диалоги показываются по очереди: AlertHost держит один запрос, поэтому
+- * несколько провалившихся терминалов обрабатываются последовательной очередью.
++ * несколько событий обрабатываются последовательной очередью.
+  */
+ 
+ import React, { useEffect, useRef } from 'react';
+@@ -21,7 +24,7 @@ import {
+   formatLootTrade,
+ } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import { debugLog } from '../../src/debug/falloutDebug';
+-import { findPending } from './terminalRetryPrompt';
++import { findPending, findCompleted } from './terminalRetryPrompt';
+ 
+ const TerminalRetryPromptHost = () => {
+   useLocale();
+@@ -48,6 +51,23 @@ const TerminalRetryPromptHost = () => {
+         }
+         while (queueRef.current.length > 0) {
+           const item = queueRef.current.shift();
++
++          // Патч 505: успех — просто видимое уведомление Мастеру. Никакого
++          // действия на сервер: доска после победы не пересобирается, новую
++          // партию Мастер начинает явной повторной трансляцией.
++          if (item.kind === 'won') {
++            // eslint-disable-next-line no-await-in-loop
++            await showRawAlert({
++              title: tLootTrade('terminal.hackedTitle'),
++              message: formatLootTrade(tLootTrade('terminal.hackedMessage'), {
++                name: item.name,
++                operator: item.operatorName || '—',
++              }),
++              kind: 'info',
++            });
++            continue;
++          }
++
+           const message = [
+             tLootTrade('terminal.attemptsExhausted'),
+             `${item.name} · ${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty })}`,
+@@ -65,12 +85,13 @@ const TerminalRetryPromptHost = () => {
+           });
+           if (index !== 0 && index !== 1) {
+             // Диалог закрыли без ответа — вопрос остаётся обязательным.
+-            handledRef.current.delete(item.key);
+-            timerRef.current = setTimeout(() => {
++            const requeue = () => {
+               queueRef.current.push(item);
+               busyRef.current = false;
+               void drain();
+-            }, 1500);
++            };
++            handledRef.current.delete(item.key);
++            timerRef.current = setTimeout(requeue, 1500);
+             return;
+           }
+           const value = index === 0 ? 'yes' : 'no';
+@@ -102,7 +123,11 @@ const TerminalRetryPromptHost = () => {
+     };
+ 
+     const collect = (state) => {
+-      for (const item of findPending(state?.rooms)) {
++      const events = [
++        ...findPending(state?.rooms).map((item) => ({ ...item, kind: 'retry' })),
++        ...findCompleted(state?.rooms),
++      ];
++      for (const item of events) {
+         if (handledRef.current.has(item.key)) continue;
+         handledRef.current.add(item.key);
+         queueRef.current.push(item);
+diff --git a/components/lootTrade/terminalAutoStart.js b/components/lootTrade/terminalAutoStart.js
+new file mode 100644
+index 0000000..863e748
+--- /dev/null
++++ b/components/lootTrade/terminalAutoStart.js
+@@ -0,0 +1,51 @@
++/**
++ * Чистая логика автозапуска партии взлома (патч 505).
++ *
++ * Вынесена из TerminalHackingModal, чтобы правило «не начинать новую доску
++ * после победы» можно было проверить без React Native. Окно взлома получает
++ * `autoStart` от кнопки «Взломать» в локации; эффект должен отправить ровно
++ * один `start` на открытие, а не на каждое изменение статуса доски.
++ *
++ * Раньше guard пропускал только `playing` / `pendingDigest`: после
++ * `ACCESS GRANTED` эффект снова уходил в `start`, а другой clientId (вторая
++ * вкладка браузера, переподключение) расценивался сервером как передача хода
++ * и собирал свежую доску — победа исчезала с экрана.
++ */
++
++/** Статусы, в которых новая партия недопустима без явного решения Мастера. */
++export const TERMINAL_FINISHED_STATUSES = Object.freeze([
++  'won',
++  'awaitingRetry',
++  'closed',
++]);
++
++/**
++ * Нужно ли отправлять `start` при текущем состоянии окна.
++ * Все аргументы — примитивы, функция ничего не знает о сторе и сервере.
++ */
++export const shouldAutoStart = ({
++  visible,
++  autoStart,
++  hasTerminal,
++  hasRoom,
++  characterId,
++  isClosed,
++  awaitingGm,
++  game,
++  boardOfAnotherOperator,
++}) => {
++  if (!visible || !autoStart || !hasTerminal || !hasRoom || !characterId) return false;
++  if (isClosed || awaitingGm) return false;
++  // Победа, провал и «Закрыт» — финальные состояния carte: доска не должна
++  // пересобираться сама ни при каком операторе.
++  if (TERMINAL_FINISHED_STATUSES.includes(game?.status)) return false;
++  if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return false;
++  return true;
++};
++
++/** Ключ дедупликации: один `start` на открытие окна для конкретной доски. */
++export const autoStartKey = ({ roomCode, containerId, characterId, game }) => (
++  `${roomCode}:${containerId}:${characterId}:${game?.operatorCharacterId || ''}:${game?.status || ''}`
++);
++
++export default shouldAutoStart;
+diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
+index 1ef70e0..689b40a 100644
+--- a/components/lootTrade/terminalRetryPrompt.js
++++ b/components/lootTrade/terminalRetryPrompt.js
+@@ -1,7 +1,9 @@
+ /**
+- * Чистая логика поиска терминалов, которые ждут решения Мастера (патч 504).
++ * Чистая логика отбора событий терминалов для Мастера (патчи 504–505).
+  * Вынесена отдельно, чтобы её можно было проверять без React Native и чтобы
+- * глобальный хост не содержал доменной логики.
++ * глобальный хост не содержал доменной логики:
++ *   findPending   — провал, ждём «Разрешить повторный взлом? Да/Нет»;
++ *   findCompleted — успех, Мастеру нужно уведомление «Терминал взломан».
+  */
+ 
+ export const decisionKey = (code, containerId, game) => (
+@@ -31,3 +33,31 @@ export const findPending = (rooms) => {
+   }
+   return pending;
+ };
++
++
++/**
++ * Патч 505: об успехе Мастер раньше не узнавал вовсе — глобальный хост умел
++ * показывать только вопрос о повторном взломе. Теперь `won` тоже приходит
++ * Мастеру как отдельное событие. Префикс в ключе исключает коллизию с
++ * вопросом `findPending` по той же ревизии партии.
++ */
++export const findCompleted = (rooms) => {
++  const completed = [];
++  for (const [code, room] of Object.entries(rooms || {})) {
++    if (room?.role !== 'gm') continue;
++    for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
++      if (terminal?.game?.status !== 'won') continue;
++      if (terminal?.closed) continue;
++      completed.push({
++        code,
++        containerId,
++        kind: 'won',
++        key: `won:${decisionKey(code, containerId, terminal.game)}`,
++        name: terminal?.config?.name || containerId,
++        difficulty: terminal?.config?.difficulty ?? 0,
++        operatorName: terminal?.game?.operatorName || '',
++      });
++    }
++  }
++  return completed;
++};
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 56e1af4..3add979 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -1732,9 +1732,14 @@ export default function LootTradeScreen() {
+                   const awaiting = !closed && Boolean(
+                     terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
+                   );
++                  // Патч 505: успех виден и в админ-панели. Повторная
++                  // трансляция — единственный способ начать новую партию
++                  // после ACCESS GRANTED (доска сама больше не пересобирается).
++                  const won = !closed && !awaiting && terminal.game?.status === 'won';
+                   const stateLabel = closed
+                     ? tLootTrade('terminal.stateClosed')
+-                    : (awaiting ? tLootTrade('terminal.stateAwaiting') : tLootTrade('terminal.stateReady'));
++                    : (awaiting ? tLootTrade('terminal.stateAwaiting')
++                      : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')));
+                   const decide = (value) => useRoomStore.getState().actOnTerminal({
+                     code,
+                     containerId: activeContainer.id,
+@@ -1763,7 +1768,7 @@ export default function LootTradeScreen() {
+                           </TouchableOpacity>
+                         </View>
+                       )}
+-                      {closed && (
++                      {(closed || won) && (
+                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
+                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
+                         </TouchableOpacity>
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2506cc0..20c68e8 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,41 @@
+ # Changelog
+ ---
++## A successful hack no longer disappears (patch 505)
++
++The owner tested the game in two tabs of one browser: "I found a 5/7 match,
++picked the next word. The board reset and I had to start over. I could not tell
++whether I hacked it or not, and the Game Master got no notice."
++
++The next word was the password, so the server returned `ACCESS GRANTED` — but
++the hacking window immediately sent an extra `start`: its guard skipped only
++`playing` and `pendingDigest`. With a different `clientId` (second tab,
++reconnect) the operator-takeover rule from 503 set `entry.game = null` and
++built a fresh board with four attempts. The win was erased before the player
++could read it. Separately, the 504 GM notice was wired only to failure.
++
++- **The win is final.** `applyGameAction()` and the room registry now reject
++  `start` while `status: 'won'` with `TERMINAL_ALREADY_ACTIVE` for any
++  operator; board, revision and result stay unchanged. Only an explicit GM
++  re-broadcast (`reissue`) starts another run after a success.
++- **Window auto-start.** The pure `shouldAutoStart()` rule (new module
++  `components/lootTrade/terminalAutoStart.js`) forbids `start` in the final
++  states `won` / `awaitingRetry` / `closed`. Operator takeover via "Hack"
++  during an active run still works. The expected `TERMINAL_ALREADY_ACTIVE`
++  refusal no longer shows an error dialog.
++- **The GM hears about success.** The global host now also selects `won`
++  events (`findCompleted`) and shows a "Terminal hacked" notice through
++  `AlertHost` with the terminal and operator names. The live card panel shows
++  a "Hacked" state and a "Broadcast again" button.
++- **Hints stay visible.** The `N/M` history remains on both the failure and
++  the success screens, so a discovered "5 of 7" is visible even after all
++  attempts are used. Paired RU/EN labels were added to the dictionaries.
++
++Unchanged: all 504 rules (the "Allow another hack?" prompt only on failure),
++the word-count formula, three groups, 4 attempts, Science brackets, Luck,
++the Hacker perk, operator takeover and the dictionary.
++
++Installation: `docs/patch-505-install.md`.
++
+ ## Game Master decision instead of lockout after failure (patch 504)
+ 
+ The owner replaced the "lock after failure" checkbox with an explicit decision:
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 23f0621..bfe8ed6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,43 @@
+ # История изменений
+ 
+ ---
++## Успешный взлом больше не пропадает (патч 505)
++
++Владелец проверял игру в одном браузере в двух вкладках: «Нашёл комбинацию
++5/7, выбираю следующее слово. Доска сбросилась и всё надо заново. Я не понял
++я взломал, не взломал, почему сброс? У мастера никаких уведомлений».
++
++Причина: следующее слово оказалось паролем, сервер вернул `ACCESS GRANTED`,
++но окно взлома сразу отправляло лишний `start` — его guard пропускал только
++`playing` и `pendingDigest`. При другом `clientId` (вторая вкладка,
++переподключение) срабатывала передача хода из 503: `entry.game = null` и
++свежая доска с четырьмя попытками. Победа стиралась быстрее, чем игрок успевал
++её прочитать. Отдельно: уведомление Мастеру в 504 было привязано только к
++провалу.
++
++- **Победа зафиксирована.** `applyGameAction()` и реестр комнат отклоняют
++  `start` при `status: 'won'` с `TERMINAL_ALREADY_ACTIVE` у любого оператора;
++  доска, ревизия и результат не меняются. Новая партия после успеха — только
++  по явной повторной трансляции Мастера (`reissue`).
++- **Автозапуск окна.** Чистое правило `shouldAutoStart()` (новый модуль
++  `components/lootTrade/terminalAutoStart.js`) запрещает `start` в финальных
++  состояниях `won` / `awaitingRetry` / `closed`. Передача хода по кнопке
++  «Взломать» в активной партии сохранена. Штатный отказ
++  `TERMINAL_ALREADY_ACTIVE` больше не показывает алерт об ошибке.
++- **Мастер узнаёт об успехе.** Глобальный хост теперь отбирает и события
++  `won` (`findCompleted`) и показывает через `AlertHost` уведомление
++  «Терминал взломан» с именем терминала и оператора. В живой панели карточки
++  появилось состояние «Взломан» и кнопка «Транслировать заново».
++- **Подсказки не теряются.** История `N/M` остаётся и на экране провала, и на
++  экране успеха: найденная комбинация «5 из 7» видна даже когда попытки
++  кончились. Подписи добавлены парно в RU/EN словари.
++
++Не изменились: условия 504 (вопрос «Разрешить повторный взлом?» только при
++провале), формула числа слов, три группы, 4 попытки, скобки по Науке, удача,
++перк «Хакер», смена оператора и словарь.
++
++Установка: `docs/patch-505-install.md`.
++
+ ## Решение Мастера вместо блокировки после провала (патч 504)
+ 
+ Владелец заменил галочку «блокировать после провала» на явное решение: «мастеру
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 2b16261..ccc5e16 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -136,6 +136,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. A *Programmer’s Digest* magazine grants one more attempt before the GM decides.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
++- **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 9a8f3a8..f01319c 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -136,6 +136,7 @@
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. *Programmer’s Digest* даёт ещё одну попытку до решения Мастера.
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
++- **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 96270ed..2c1048b 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 85c9d8b..24a06ca 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 1c44e24..3a4a2e7 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index ab0fa41..315ed0f 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 3fe0ee3..39271e1 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index fe88d54..fbc8c1b 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 2d39f4f..dab85f1 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+ 
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 35c3849..5349ea5 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,6 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 502** (коммит `2f89930`, ветка
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 858e8d6..bb812fe 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
++
+ Патч подготовлен от состояния **версии 503** (коммит `13f2ff6`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–504
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+new file mode 100644
+index 0000000..40ed062
+--- /dev/null
++++ b/docs/patch-505-install.md
+@@ -0,0 +1,166 @@
++# Установка патча 505: успешный взлом больше не пропадает
++
++Патч подготовлен от состояния **версии 504** (коммит `c4a3510`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–505
++цепочкой.
++
++## Что изменилось
++
++Владелец тестировал игру **в одном браузере в двух вкладках**: «Нашёл
++комбинацию 5/7, выбираю следующее слово. Доска сбросилась и всё надо заново.
++Я не понял я взломал, не взломал, почему сброс? У мастера никаких
++уведомлений».
++
++Воспроизведение по WebSocket подтвердило три отдельные проблемы:
++
++1. Следующее слово оказалось **паролем** — сервер вернул `status: won` и
++   `ACCESS GRANTED`, то есть игрок **взломал** терминал.
++2. В 504 уведомление Мастеру было привязано только к `awaitingRetry`
++   (все попытки исчерпаны). Состояние `won` приходило Мастеру как обычное
++   `terminal.state`, без единого сообщения в интерфейсе.
++3. Эффект автозапуска в `TerminalHackingModal` пропускал только `playing` и
++   `pendingDigest`. На смену статуса на `won` он отправлял лишний
++   `terminal.action: start`. Пока `clientId` совпадал с оператором, сервер
++   отвечал `TERMINAL_ALREADY_ACTIVE`. Но при другом `clientId` (вторая
++   вкладка, переподключение, повторная публикация листа) включалась механика
++   передачи хода из патча 503: `entry.game = null` → **новая доска
++   `rev=1, playing, attempts=4`**. Победа стиралась быстрее, чем игрок успевал
++   её прочитать. Проверено на живой комнате:
++
++   ```
++   GUESS GOSLING: status=won result=ACCESS GRANTED
++   start (тот же клиент)      → TERMINAL_ALREADY_ACTIVE
++   start (второе соединение)  → rev=1 status=playing attempts=4   ← баг
++   ```
++
++### 1. Победа — финальное состояние
++
++`server/terminalHacking.js` и `server/roomRegistry.js`:
++
++- `applyGameAction()` при `action: 'start'` и `status: 'won'` возвращает
++  `TERMINAL_ALREADY_ACTIVE` **для любого оператора** (раньше отказ действовал
++  только для того же);
++- реестр комнат отклоняет `start` после `won` **до** блока `switchingOperator`,
++  поэтому ни переподключение вкладки, ни «Взломать» от другого персонажа не
++  обнуляют доску;
++- `guess` и `bracket` в этом состоянии по-прежнему отклоняются с
++  `TERMINAL_NOT_ACTIVE`;
++- новую партию после успеха можно начать **только** явной повторной
++  трансляцией Мастера: `reissue`, повторная выдача терминала или локации.
++  `reissue` обнуляет `game`, следующий `start` собирает свежую доску.
++
++### 2. Окно взлома не шлёт лишний `start`
++
++Новый чистый модуль `components/lootTrade/terminalAutoStart.js`:
++
++- `shouldAutoStart()` запрещает запуск в финальных состояниях `won`,
++  `awaitingRetry`, `closed`, а также при `isClosed` / `awaitingGm`, без
++  выбранного персонажа и без комнаты;
++- передача хода по кнопке «Взломать» (`boardOfAnotherOperator`) в активной
++  партии сохранена;
++- `autoStartKey()` различает статус доски и оператора, поэтому один `start`
++  приходится ровно на одно открытие окна;
++- штатный отказ `TERMINAL_ALREADY_ACTIVE` больше не показывает игроку алерт
++  «Не удалось выполнить действие терминала».
++
++Правило вынесено из React-компонента, чтобы покрывать его юнит-тестами без
++`react-native` (в 504 импорт компонента в тест ломался на Flow-синтаксисе).
++
++### 3. Мастер узнаёт об успехе
++
++`components/lootTrade/terminalRetryPrompt.js` получил `findCompleted()`: он
++отбирает `won` только в комнатах с `role: 'gm'`, исключает закрытые карточки и
++даёт ключ `won:<code>|<container>|<revision>` — он не конфликтует с ключом
++вопроса «Разрешить повторный взлом?».
++
++`TerminalRetryPromptHost.js` (смонтирован один раз в `App.js`) теперь ставит в
++общую очередь оба типа событий и показывает их **через `AlertHost`** вызовом
++`showRawAlert`:
++
++- провал — вопрос с кнопками «Да» / «Нет» и отправкой `retry` (как в 504);
++- успех — уведомление **«Терминал взломан»** с именем терминала и оператора,
++  без какого-либо действия на сервер.
++
++Диалоги по-прежнему идут по очереди: `AlertHost` держит один запрос, поэтому
++несколько терминалов не перезаписывают друг друга. В живой панели карточки
++терминала на экране «Добыча/Торговля» добавлено состояние **«Взломан»** и
++кнопка **«Транслировать заново»**.
++
++### 4. Подсказки не пропадают
++
++Раньше панель «ВЗЛОМ ПРОВАЛЕН» полностью заменяла доску: найденная
++комбинация `5/7` исчезала, и игрок не понимал, что случилось. Теперь история
++подсказок — общий блок `guessesPanel` — рисуется и на экране провала, и на
++экране успеха, и в активной партии. На экране успеха добавлена подпись о том,
++что новую партию начинает только повторная трансляция Мастера.
++
++Парные RU/EN подписи: `terminal.hackedTitle`, `terminal.hackedMessage`,
++`terminal.wonHint`, `terminal.stateWon`. Механика 504 не тронута: вопрос
++«Разрешить повторный взлом?» задаётся **только** при провале.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/terminalHacking.js` | `start` после `won` → `TERMINAL_ALREADY_ACTIVE` у любого оператора |
++| `server/roomRegistry.js` | запрет takeover после победы до блока `switchingOperator` |
++| `components/lootTrade/terminalAutoStart.js` | новый чистый модуль правила автозапуска |
++| `components/lootTrade/TerminalHackingModal.js` | новый guard, общий блок подсказок, без ложного алерта |
++| `components/lootTrade/terminalRetryPrompt.js` | `findCompleted()` для событий успеха |
++| `components/lootTrade/TerminalRetryPromptHost.js` | очередь вопросов и уведомлений Мастеру |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | состояние «Взломан» + повторная трансляция |
++| `i18n/ru-RU/screens/lootTrade/screen.json`, `i18n/en-EN/...` | парные подписи |
++| `__tests__/room/terminal-win-505.test.js` | 9 приёмочных проверок |
++| `__tests__/room/room-server.integration.test.js` | WS-сценарий с двумя вкладками |
++| `public/version.json`, `patchs/baseline.json` | версия 505, 56/56 заметок |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `patchs/505-terminal-win-notice.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 504:
++
++```bash
++./apply-patch.sh 505
++# ✓ Установлен патч: №505 (версия 504 → 505)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 505
++```
++
++`patchs/baseline.json` в источнике равен `505`. После установки
++`public/version.json` → `505`; закоммитьте изменения, **перезапустите сервис
++Node.js** (состояние партий живёт на сервере) и пересоберите веб-сборку.
++Партии, начатые до обновления, запустите заново.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-win-505.test.js
++npx vitest run __tests__/room/room-server.integration.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "505"'
++```
++
++Приёмочный тест `__tests__/room/terminal-win-505.test.js` покрывает: чистое
++правило автозапуска, ключ дедупликации, отказ движка на `start` после победы
++для трёх операторов, неизменность ревизии и результата в реестре, `reissue`
++как единственный путь к новой партии, запрет `guess`/`bracket` после `won`,
++отбор `findCompleted` и независимость ключей провала и успеха. WS-тест
++воспроизводит две вкладки одного браузера: победа приходит Мастеру, `start`
++второй вкладки отклоняется, после `reissue` собирается свежая доска.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/505-terminal-win-notice.patch
++cp /path/to/505-terminal-win-notice.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index b2042d4..3f1c5c0 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -7,6 +7,8 @@
+ > `docs/patch-503-install.md` (три группы слов, градиент подсказок).
+ > Патч 504 заменил галочку «блокировать после провала» на решение Мастера
+ > «Разрешить повторный взлом? Да/Нет» — см. `docs/patch-504-install.md`.
++> Патч 505 зафиксировал «ДОСТУП РАЗРЕШЁН» и добавил уведомление Мастеру
++> об успехе — см. `docs/patch-505-install.md`.
+ > История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index f79eef3..401b235 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -270,6 +270,10 @@
+     "stateReady": "Available",
+     "stateAwaiting": "Awaiting decision",
+     "stateClosed": "Closed",
+-    "retryFailed": "Could not apply the Game Master decision"
++    "stateWon": "Hacked",
++    "retryFailed": "Could not apply the Game Master decision",
++    "hackedTitle": "Terminal hacked",
++    "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
++    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 725ccec..89cbb73 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -270,6 +270,10 @@
+     "stateReady": "Доступен",
+     "stateAwaiting": "Ожидает решения",
+     "stateClosed": "Закрыт",
+-    "retryFailed": "Не удалось применить решение Мастера"
++    "stateWon": "Взломан",
++    "retryFailed": "Не удалось применить решение Мастера",
++    "hackedTitle": "Терминал взломан",
++    "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
++    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера."
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index c0e9780..05fc1f4 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "504"
++  "baseline": "505"
+ }
+diff --git a/public/version.json b/public/version.json
+index 0fce8c0..a0639f0 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "504",
++  "version": "505",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Теперь после удачного взлома доска не сбрасывается: надпись «ДОСТУП РАЗРЕШЁН» и все подсказки остаются на экране, пока ведущий не транслирует терминал заново.",
++      "Ведущий получает уведомление «Терминал взломан» с именем оператора, даже если в этот момент открыт другой раздел приложения.",
++      "Если попытки закончились, найденные подсказки вроде «5 из 7» больше не пропадают: они видны рядом с сообщением о провале.",
++      "В карточке терминала у ведущего появилось состояние «Взломан» и кнопка повторной трансляции для новой партии.",
+       "Доска взлома теперь собрана из трёх групп слов с общими окончаниями или приставками: сначала нужно понять верную группу, а затем верный вариант сочетания внутри неё. Логический разбор почти гарантирует победу, а слепой перебор остаётся ненадёжным.",
+       "Если терминал открывает другой игрок, доска, число слов и скобки считаются по его листу персонажа; одновременно взламывает только один, остальные наблюдают.",
+       "Полное восстановление попыток теперь может выпасть не более одного раза на доску. Подсказка в окне взлома показывает совпавшие буквы как «N из M».",
+@@ -57,6 +61,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "After a successful hack the board no longer resets: «ACCESS GRANTED» and every hint stay on screen until the Game Master broadcasts the terminal again.",
++      "The Game Master now receives a «Terminal hacked» notice with the operator name, even while viewing a different part of the app.",
++      "When all attempts are used, discovered hints such as «5 of 7» remain visible next to the failure message.",
++      "The terminal card for the Game Master now shows a «Hacked» state and a broadcast-again button for a new run.",
+       "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
+       "When another player opens a terminal, the board, word count and brackets are rebuilt from their character sheet; only one player hacks at a time and everyone else watches.",
+       "A full attempt restore can now appear at most once per board. The hacking window shows matching letters as N out of M.",
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 5be3464..4d618d1 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -472,6 +472,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
+     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
++    // Патч 505: взломанный терминал не переходит к другому оператору и не
++    // собирает новую доску. Иначе лишний start после ACCESS GRANTED (в том
++    // числе от переподключившейся вкладки) стирал победу. Сбросить партию
++    // может только Мастер явной повторной трансляцией (reissue).
++    if (action === 'start' && entry.game?.status === 'won') {
++      return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
++    }
+     // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
+     // Партия всё равно одна на всех: прежний оператор становится зрителем,
+     // а повторный start от того же оператора не сбрасывает его прогресс.
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index f0ba601..6c98ae4 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -941,9 +941,12 @@ const applyGameAction = ({ game, config = null, action, clientId, characterId, c
+   if (game.status === 'closed') return { error: 'TERMINAL_CLOSED' };
+   if (game.status === 'awaitingRetry') return { error: 'TERMINAL_AWAITING_RETRY' };
+   if (action === 'start') {
+-    const isSameOperator = game.operatorCharacterId === characterId
+-      && game.operatorClientId === clientId;
+-    if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
++    // Патч 505: «ДОСТУП РАЗРЕШЁН» не стирается. Раньше повторный start от
++    // другого clientId (переподключение вкладки, второй вход в комнату)
++    // пересобирал доску по механике передачи хода из патча 503, и игрок
++    // видел новую партию вместо сообщения об успехе. Новая доска после
++    // победы — только по явной повторной трансляции Мастера (reissue).
++    if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
+     // Новая партия всегда собирается по ТЕКУЩИМ настройкам карточки, а не
+     // по полям предыдущей доски.
+     const fresh = createGame({

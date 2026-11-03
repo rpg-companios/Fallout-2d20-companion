@@ -58,7 +58,7 @@ const withServer = async (fn) => {
   const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent-dist' });
   const address = await app.start();
   try {
-    await fn(address.port);
+    await fn(address.port, app);
   } finally {
     await app.close();
   }
@@ -163,7 +163,7 @@ describe('roomServer: create/join/presence', () => {
       }, code);
 
       const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
-        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true },
+        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2 },
       }, code);
       const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
       expect(issued.payload.terminal).toMatchObject({ containerId: 'term-1', standaloneIssued: true, game: null });
@@ -177,11 +177,28 @@ describe('roomServer: create/join/presence', () => {
 
       const observerState = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.containerId === 'term-1' && m.payload.terminal?.game?.status === 'playing');
       expect(observerState.payload.terminal.game.operatorClientId).toBe('player-terminal-1');
-      const blockedReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+      // Патч 503: «Взломать» от другого персонажа собирает доску под ЕГО лист.
+      // Партия остаётся одна на всех; прежний оператор становится зрителем.
+      const takeoverReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
         containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
       }, code);
-      const blocked = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === blockedReq);
-      expect(blocked.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+      const takeover = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === takeoverReq);
+      expect(takeover.payload.terminal.game).toMatchObject({
+        operatorClientId: 'player-terminal-2', operatorCharacterId: 'char-terminal-2', status: 'playing',
+      });
+      // Повторный start от того же оператора не сбрасывает его прогресс.
+      const repeatReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
+      }, code);
+      const repeat = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === repeatReq);
+      expect(repeat.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+      // Прежний оператор теперь только наблюдает.
+      const oldGuessReq = await operator.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'guess', characterId: 'char-terminal-1',
+        value: takeover.payload.terminal.game.wordRanges[0].id,
+      }, code);
+      const oldGuess = await operator.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === oldGuessReq);
+      expect(oldGuess.payload.code).toBe('TERMINAL_VIEW_ONLY');
 
       gm.close();
       operator.close();
@@ -251,6 +268,336 @@ describe('roomServer: create/join/presence', () => {
       gm.close();
       medic.close();
       wounded.close();
+    });
+  });
+
+  // Патч 504: провал доходит до Мастера как awaitingGm, «Да» пересобирает
+  // доску по свежим настройкам, «Нет» закрывает терминал до новой трансляции.
+  it('504: решение Мастера о повторном взломе синхронизируется по WS', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-504');
+      const player = makeClient(port, 'player-504');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 504' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор', role: 'player' });
+      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await player.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'char-504', revision: 1,
+        snapshot: { characterName: 'Оператор', data: { attributes: { INT: { value: 4 } }, skills: [] } },
+      }, code);
+
+      const config = { containerId: 'term-504', name: 'Терминал', difficulty: 5 };
+      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
+      await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+      const startReq = await player.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-504',
+      }, code);
+      const started = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
+      expect(started.payload.terminal).toMatchObject({ awaitingGm: false, closed: false });
+
+      // Скрытый пароль берём из реестра: публичное состояние его не выдаёт.
+      const hidden = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
+      const wrong = hidden.wordRanges.filter((range) => range.word !== hidden.password).slice(0, 4);
+      let last = null;
+      for (const range of wrong) {
+        const req = await player.send(MESSAGE.TERMINAL_ACTION, {
+          containerId: config.containerId, action: 'guess', characterId: 'char-504', value: range.id,
+        }, code);
+        last = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === req);
+      }
+      expect(last.payload.terminal.game).toMatchObject({ status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED' });
+      expect(last.payload.terminal.awaitingGm).toBe(true);
+      // Мастер получил то же состояние — именно по нему всплывает вопрос.
+      const gmPrompt = await gm.waitFor((m) => (
+        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.awaitingGm === true
+      ));
+      expect(gmPrompt.payload.terminal.game.status).toBe('awaitingRetry');
+
+      // Игрок не может начать заново без ответа Мастера.
+      const deniedReq = await player.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-504',
+      }, code);
+      const denied = await player.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === deniedReq);
+      expect(denied.payload.code).toBe('TERMINAL_AWAITING_RETRY');
+
+      // Мастер меняет настройки и отвечает «Да»: сразу свежая доска.
+      const editReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
+        config: { ...config, name: 'Перепрошитый', difficulty: 1 },
+      }, code);
+      const edited = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === editReq);
+      expect(edited.payload.terminal.awaitingGm).toBe(true);
+      const yesReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'retry', value: 'yes',
+      }, code);
+      const yes = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === yesReq);
+      expect(yes.payload.terminal).toMatchObject({ awaitingGm: false, closed: false });
+      expect(yes.payload.terminal.game).toMatchObject({
+        status: 'playing', difficulty: 1, wordLength: 5, name: 'Перепрошитый', attempts: 4,
+      });
+      const playerYes = await player.waitFor((m) => (
+        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.game?.status === 'playing'
+        && m.payload.terminal?.game?.difficulty === 1
+      ));
+      expect(playerYes.payload.terminal.game.attempts).toBe(4);
+
+      // Второй провал и ответ «Нет»: карточка «Закрыт», обе кнопки запрещены.
+      const hidden2 = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
+      const wrong2 = hidden2.wordRanges.filter((range) => range.word !== hidden2.password).slice(0, 4);
+      for (const range of wrong2) {
+        const req = await player.send(MESSAGE.TERMINAL_ACTION, {
+          containerId: config.containerId, action: 'guess', characterId: 'char-504', value: range.id,
+        }, code);
+        await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === req);
+      }
+      const noReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'retry', value: 'no',
+      }, code);
+      const no = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === noReq);
+      expect(no.payload.terminal).toMatchObject({ closed: true, locked: true, awaitingGm: false });
+      expect(no.payload.terminal.game.status).toBe('closed');
+      const closedReq = await player.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-504',
+      }, code);
+      const closed = await player.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === closedReq);
+      expect(closed.payload.code).toBe('TERMINAL_CLOSED');
+
+      // Новая трансляция Мастера снимает «Закрыт».
+      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'reissue',
+      }, code);
+      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
+      expect(reissued.payload.terminal).toMatchObject({ closed: false, game: null });
+
+      gm.close();
+      player.close();
+    });
+  });
+
+  // Патч 505: ACCESS GRANTED больше не стирается лишним `start` окна взлома.
+  // Воспроизводим две вкладки одного браузера: второе соединение с тем же
+  // листом персонажа раньше расценивалось как передача хода и собирало новую
+  // доску, а Мастер не получал уведомления об успехе.
+  it('505: победа не пересобирает доску и приходит Мастеру', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-505');
+      const player = makeClient(port, 'player-505');
+      const secondTab = makeClient(port, 'player-505-tab2');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 505' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор', role: 'player' });
+      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await secondTab.send(MESSAGE.ROOM_JOIN, { code, name: 'Оператор (вкладка 2)', role: 'player' });
+      await secondTab.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      const sheet = {
+        characterName: 'Оператор',
+        data: { attributes: { INT: { value: 8 }, LCK: { value: 6 } }, skills: [] },
+      };
+      await player.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'char-505', revision: 1, snapshot: sheet,
+      }, code);
+
+      const config = { containerId: 'term-505', name: 'Терминал', difficulty: 3 };
+      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
+      await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+      const startReq = await player.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-505',
+      }, code);
+      const started = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
+      expect(started.payload.terminal.game.wordLength).toBe(7);
+
+      // Угадываем пароль: его знает только сервер, публичное состояние — нет.
+      const hidden = app.registry._rooms.get(code).terminalStates.get(config.containerId).game;
+      const passwordRange = hidden.wordRanges.find((range) => range.word === hidden.password);
+      const winReq = await player.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'guess', characterId: 'char-505', value: passwordRange.id,
+      }, code);
+      const won = await player.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === winReq);
+      expect(won.payload.terminal.game).toMatchObject({ status: 'won', result: 'ACCESS GRANTED' });
+      expect(won.payload.terminal.awaitingGm).toBe(false);
+      expect(won.payload.terminal.game.password).toBeUndefined();
+      // Именно по этому состоянию Мастеру всплывает «Терминал взломан».
+      const gmWon = await gm.waitFor((m) => (
+        m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.game?.status === 'won'
+      ));
+      expect(gmWon.payload.terminal.game.result).toBe('ACCESS GRANTED');
+
+      // Вторая вкладка публикует тот же лист от своего clientId и шлёт start.
+      await secondTab.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'char-505', revision: 2, snapshot: sheet,
+      }, code);
+      // Дожидаемся, что сервер обработал публикацию на этом соединении.
+      await secondTab.send(MESSAGE.PRESENCE_PING, {});
+      await secondTab.waitFor((m) => m.type === MESSAGE.PRESENCE_PONG);
+      const againReq = await secondTab.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-505',
+      }, code);
+      const again = await secondTab.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === againReq);
+      expect(again.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+      expect(app.registry._rooms.get(code).terminalStates.get(config.containerId).game.status).toBe('won');
+
+      // Новая партия — только по явной повторной трансляции Мастера.
+      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'reissue',
+      }, code);
+      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
+      expect(reissued.payload.terminal.game).toBeNull();
+      // Лист теперь опубликован со второй вкладки, она и начинает новую партию.
+      const freshReq = await secondTab.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'start', characterId: 'char-505',
+      }, code);
+      const fresh = await secondTab.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === freshReq);
+      expect(fresh.payload.terminal.game).toMatchObject({ status: 'playing', attempts: 4 });
+
+      gm.close();
+      player.close();
+      secondTab.close();
+    });
+  });
+
+  // Патч 506: выход игрока из локации персональный, а билет доступа к
+  // терминалу обновляется только после явной повторной трансляции Мастера.
+  it('506: игрок покидает локацию, остальные остаются; reissue выдаёт новый accessId', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-506');
+      const player = makeClient(port, 'player-506');
+      const other = makeClient(port, 'player-506-other');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 506' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
+      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await other.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
+      await other.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+
+      const config = { containerId: 'term-506', name: 'Терминал', difficulty: 3 };
+      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
+      const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+      const firstAccessId = issued.payload.terminal.accessId;
+      expect(firstAccessId).toMatch(/^broadcast-\d+$/);
+
+      const openReq = await gm.send(MESSAGE.SESSION_OPEN, {
+        session: {
+          kind: 'hub', name: 'Убежище', targetType: 'room',
+          nodes: [{ containerId: config.containerId, kind: 'terminal', name: 'Терминал', difficulty: 3 }],
+        },
+      }, code);
+      const opened = await gm.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === openReq);
+      const sessionId = opened.payload.session.sessionId;
+      expect(opened.payload.session.kind).toBe('hub');
+
+      // Игрок уходит сам: сессия Мастера остаётся активной.
+      const leaveReq = await player.send(MESSAGE.SESSION_PLAYER_CLOSE, { sessionId }, code);
+      const left = await player.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === leaveReq);
+      expect(left.payload.session).toBeTruthy();
+      expect(left.payload.session.kind).toBe('hub');
+      expect(left.payload.session.closedByClientIds).toContain(player.clientId);
+      expect(left.payload.session.closedByClientIds).not.toContain(other.clientId);
+      expect(app.registry.getRoom(code).activeSession).toBeTruthy();
+      const otherState = await other.waitFor((m) => (
+        m.type === MESSAGE.SESSION_STATE && m.payload.session?.closedByClientIds?.includes(player.clientId)
+      ));
+      expect(otherState.payload.session.sessionId).toBe(sessionId);
+
+      // Повторная трансляция терминала выдаёт новый билет доступа.
+      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: config.containerId, action: 'reissue',
+      }, code);
+      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
+      expect(reissued.payload.terminal.accessId).not.toBe(firstAccessId);
+
+      gm.close();
+      player.close();
+      other.close();
+    });
+  });
+
+  // Патч 507: «Общее хранилище». Состояние приходит при подключении,
+  // изменения рассылаются всем; Мастер может положить, но не забрать.
+  it('507: общее хранилище синхронизируется по WS', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-507');
+      const p1 = makeClient(port, 'p-507-1');
+      const p2 = makeClient(port, 'p-507-2');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Storage 507' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
+      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      // «Подключился — получил обновления»: склад уже в состоянии комнаты.
+      expect(joined.payload.partyStorage).toMatchObject({ revision: 0, entries: [] });
+      await p2.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
+      await p2.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+
+      const item = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
+      const depReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item, quantity: 2, name: 'Пулемёт' }, code);
+      const dep = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === depReq);
+      expect(dep.payload.storage.entries[0]).toMatchObject({ name: 'Пулемёт', quantity: 2 });
+      const broadcast = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
+      expect(broadcast.payload.storage.entries).toHaveLength(1);
+
+      const entryId = dep.payload.storage.entries[0].entryId;
+      const wReq = await p2.send(MESSAGE.STORAGE_WITHDRAW, { entryId, quantity: 1 }, code);
+      const withdrawn = await p2.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === wReq);
+      expect(withdrawn.payload.withdrawn.quantity).toBe(1);
+      expect(withdrawn.payload.storage.entries[0].quantity).toBe(1);
+      expect(app.registry.getPartyStorage(code).entries[0].quantity).toBe(1);
+
+      // Мастер не забирает чужое.
+      const gmReq = await gm.send(MESSAGE.STORAGE_WITHDRAW, { entryId }, code);
+      const denied = await gm.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === gmReq);
+      expect(denied.payload.code).toBe('STORAGE_FORBIDDEN');
+      expect(app.registry.getPartyStorage(code).entries).toHaveLength(1);
+
+      gm.close(); p1.close(); p2.close();
+    });
+  });
+
+  // Патч 508: канон — хранилище Мастера; игрокам снапшот. Без Мастера
+  // онлайн запись запрещена, но снимок доступен; Мастер поднимает свой сейв.
+  it('508: Master storage, player snapshot, offline = read-only', async () => {
+    await withServer(async (port, app) => {
+      const gm = makeClient(port, 'gm-508');
+      const p1 = makeClient(port, 'p-508-1');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Master storage 508' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      const ownerToken = created.payload.ownerToken;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm', ownerToken });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await p1.send(MESSAGE.ROOM_JOIN, { code, name: 'Игрок', role: 'player' });
+      const joined = await p1.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      expect(joined.payload.partyStorage).toMatchObject({ gmOnline: true, revision: 0, entries: [] });
+
+      // Мастер поднимает сохранённое хранилище — игрок получает свежий снимок.
+      const saved = { revision: 4, entries: [{ entryId: 'st_saved', item: { name: 'Карточка' }, name: 'Карточка', itemType: 'misc', quantity: 1 }] };
+      const restoreReq = await gm.send(MESSAGE.STORAGE_RESTORE, { ownerToken, storage: saved }, code);
+      const restored = await gm.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && m.payload.requestId === restoreReq);
+      expect(restored.payload.storage.entries[0].name).toBe('Карточка');
+      const snapshot = await p1.waitFor((m) => m.type === MESSAGE.STORAGE_STATE && !m.payload.requestId);
+      expect(snapshot.payload.storage.entries).toHaveLength(1);
+
+      // Мастер ушёл: игрок видит снимок, но не может писать.
+      // Уводим Мастера напрямую через реестр: детерминированно и без гонки
+      // с уже полученными сообщениями в inbox клиента.
+      app.registry.leaveRoom({ code, clientId: gm.clientId });
+      const offlineState = app.registry.getState(code).partyStorage;
+      expect(offlineState.gmOnline).toBe(false);
+      expect(offlineState.entries).toHaveLength(1);
+      const deniedReq = await p1.send(MESSAGE.STORAGE_DEPOSIT, { item: { name: 'Пулемёт' }, quantity: 1 }, code);
+      const denied = await p1.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === deniedReq);
+      expect(denied.payload.code).toBe('STORAGE_GM_OFFLINE');
+
+      gm.close(); p1.close();
     });
   });
 

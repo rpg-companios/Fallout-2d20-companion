@@ -656,6 +656,7 @@ const attachRoomWebSocketServer = (httpServer, {
             code: canonical,
             clientId,
             config: payload.config,
+            reissue: Boolean(payload.reissue),
             ownerToken: payload.ownerToken || null,
             ws,
           });
@@ -701,6 +702,81 @@ const attachRoomWebSocketServer = (httpServer, {
             terminal: result.terminal,
             usedDigest: result.usedDigest || false,
           });
+          break;
+        }
+
+        // Патч 507: «Общее хранилище». Кладём/забираем атомарно на сервере и
+        // рассылаем свежий снимок всем участникам комнаты.
+        case MESSAGE.STORAGE_DEPOSIT: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.depositToPartyStorage({
+            code: canonical,
+            clientId,
+            name: payload.name || null,
+            item: payload.item,
+            quantity: payload.quantity,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
+        case MESSAGE.STORAGE_WITHDRAW: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.withdrawFromPartyStorage({
+            code: canonical,
+            clientId,
+            entryId: payload.entryId,
+            quantity: payload.quantity,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = {
+            storage: result.storage,
+            withdrawn: result.withdrawn,
+            requestId: payload.requestId || null,
+          };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
+        // Патч 510: Мастер выдаёт ключевую запись на общий склад.
+        case MESSAGE.STORAGE_ADD_KEY: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.addKeyItemToStorage({
+            code: canonical,
+            clientId,
+            keyItemId: payload.keyItemId,
+            name: payload.name,
+            description: payload.description,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
+        // Патч 508: Мастер поднимает своё сохранённое хранилище в комнату.
+        // После этого все подключившиеся игроки получают актуальный снапшот.
+        case MESSAGE.STORAGE_RESTORE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.restorePartyStorage({
+            code: canonical,
+            clientId,
+            ownerToken: payload.ownerToken || null,
+            storage: payload.storage,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
           break;
         }
 
@@ -905,6 +981,13 @@ const attachRoomWebSocketServer = (httpServer, {
             session: result.session,
             ...closeMeta,
           });
+          // Патч 510: если в добыче лежала ключевая запись, все видят её
+          // появление на общем складе.
+          if ((result.granted || []).some((entry) => entry?.keyItemId)) {
+            const storage = registry.getPartyStorage(canonical);
+            sendEnvelope(ws, MESSAGE.STORAGE_STATE, { storage }, canonical, clientId);
+            broadcastToRoom(result.room, null, MESSAGE.STORAGE_STATE, { storage });
+          }
           break;
         }
 

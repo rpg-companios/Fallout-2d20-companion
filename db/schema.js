@@ -83,6 +83,24 @@ export const CREATE_TABLES = [
   )`,
 
   // Сохранённые состояния (плитки) и папки экрана «Окружающая среда/бой» (патч 482).
+  // Патч 508: локальное хранилище Мастера для «Общего хранилища» комнаты.
+  // Сервер ничего не пишет на диск; канон лежит здесь и уезжает в Drive.
+  `CREATE TABLE IF NOT EXISTS gm_room_storage (
+    code TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+
+  // Патч 510: справочник ключевых записей Мастера.
+  `CREATE TABLE IF NOT EXISTS gm_key_items (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    room_code TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+
   `CREATE TABLE IF NOT EXISTS gm_env_entries (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,

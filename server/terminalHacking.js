@@ -37,10 +37,12 @@ const MIN_AMBIGUITY_BY_DIFFICULTY = [2, 2, 2, 2, 4, 4];
 const AMBIGUITY_TARGET_BY_DIFFICULTY = [2, 2, 2, 2, 8, 8];
 // Минимум общих букв с опорным словом = L − 3.
 const MIN_SHARED_BY_DIFFICULTY = [1, 2, 3, 4, 5, 6];
-// N при ИНТ 4: 16 + 2·D. ИНТ вычитается из базы по одному слову за очко.
-const BASE_WORDS_BY_DIFFICULTY = [16, 18, 20, 22, 24, 26];
+// Патч 500: N = 15 + 2·D − ИНТ. На сложности 5 это «25 − ИНТ»:
+// 21 слово при ИНТ 4 и 15 при ИНТ 10. База при ИНТ 4 = 11 + 2·D,
+// дальше каждое очко ИНТ убирает ровно одно слово.
+const BASE_WORDS_BY_DIFFICULTY = [11, 13, 15, 17, 19, 21];
 const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
-const BASE_WORD_COUNT = 20; // экспорт для совместимости
+const BASE_WORD_COUNT = 15; // запасной размер доски, если wordCount не передан
 const MIN_WORDS = 4;
 const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
 // Патч 499: запись «W слов + A попыток» означает W+A СКОБОК, а не эффекты
@@ -63,20 +65,19 @@ const normalizeTerminalConfig = (raw = {}) => ({
   name: String(raw.name || '').trim(),
   description: String(raw.description || '').trim(),
   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
-  lockOnFailure: Boolean(raw.lockOnFailure),
 });
 
 // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
 // Старые серверы комнат понижали `kind: 'terminal'` узла локации до 'loot' и
-// теряли difficulty/lockOnFailure; lockLabel при этом сохранялся. Обновлённый
-// сервер восстанавливает терминал из маркера, а клиент — даже если сервер
-// вообще не обновлялся (локальная мини-игра).
+// теряли difficulty; lockLabel при этом сохранялся. Обновлённый сервер
+// восстанавливает терминал из маркера, а клиент — даже если сервер вообще
+// не обновлялся (локальная мини-игра). Патч 504: поле `f` («блокировать после
+// провала») убрано из записи; при чтении старых маркеров оно игнорируется.
 const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
-const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
+const encodeTerminalNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
   `${TERMINAL_NODE_MARKER}${JSON.stringify({
     v: 1,
     d: clamp(Math.floor(Number(difficulty) || 0), 0, 5),
-    f: lockOnFailure ? 1 : 0,
     l: String(label || ''),
   })}`
 );
@@ -88,7 +89,6 @@ const decodeTerminalNodeMarker = (value) => {
     if (!parsed || parsed.v !== 1) return null;
     return {
       difficulty: clamp(Math.floor(Number(parsed.d) || 0), 0, 5),
-      lockOnFailure: Boolean(parsed.f),
       label: String(parsed.l || ''),
     };
   } catch {
@@ -109,7 +109,8 @@ const bracketSplitFor = (science) => {
 
 // Число скобок задаёт ТОЛЬКО Наука. Сложность не ограничивает: на 1-м уровне
 // при высоких Науке + ИНТ взлом действительно лёгкий, на 5-м Наука 6 даёт
-// все 4 скобки. Предохранитель N−3 не даёт вычистить доску целиком.
+// все 4 скобки. Предохранитель N−1: с маленькой доски (D0/ИНТ 10 = 5 слов)
+// Наука 6 всё равно получает 4 скобки, но пустышки не кончаются полностью.
 const bracketCountFor = (difficulty, science, wordCount = 20) => {
   const sci = clamp(Number(science) || 0, 0, 6);
   const split = bracketSplitFor(sci);
@@ -118,7 +119,7 @@ const bracketCountFor = (difficulty, science, wordCount = 20) => {
   // difficulty сохранён в сигнатуре для совместимости вызывающих:
   // сложность больше НЕ влияет на число скобок.
   void difficulty;
-  return Math.max(0, Math.min(count, n - 3));
+  return Math.max(0, Math.min(count, n - 1));
 };
 
 // Эффект ОДНОЙ скобки: kind = 'word' -> убрать 1 ложное слово,
@@ -135,54 +136,140 @@ const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
   return { words, attempts: full ? 0 : attempts, full, kind };
 };
 
-const toNumber = (entry) => Number(typeof entry === 'object'
-  ? (entry?.value ?? entry?.base ?? entry?.total ?? entry?.rank)
-  : entry) || 0;
-const readAttribute = (snapshot, id) => {
-  const attrs = snapshot?.attributes || {};
-  const keys = { INT: ['INT', 'int', 'intelligence'], SCI: ['SCI', 'science', 'Science'], LCK: ['LCK', 'lck', 'luck'] }[id];
-  for (const key of keys) if (attrs[key] !== undefined) return toNumber(attrs[key]);
-  if (Array.isArray(attrs)) {
-    const found = attrs.find((x) => String(x?.id || x?.key || '').toUpperCase() === id);
-    if (found) return toNumber(found);
+// Патч 501/502. Лист персонажа приходит во взлом в нескольких обличьях:
+//   1) живой стор приложения:  attributes: { INT: { base, total } },
+//                              skills:     { SCIENCE: { base, total } };
+//   2) сохранение из БД:       attributes: [{ name: 'INT', value: 10 }],
+//                              skills:     [{ name: 'SCIENCE', value: 6 }];
+//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <лист из п.2> };
+//   4) файл экспорта «rpg-companion-character»:
+//        { format, version, exportedAt, character: { id, name, data: <лист> } };
+//   5) любая комбинация этих обёрток, в том числе строковый JSON внутри `data`.
+// Патч 501 снимал ровно один конверт `data`. Если в комнату публиковался весь
+// файл экспорта, атрибуты оставались в `character.data`, ИНТ снова падал на 4
+// и доска собиралась как 25−4=21 слово. Патч 502 ищет лист на любой глубине.
+const ENVELOPE_KEYS = ['data', 'character', 'characterData', 'payload', 'snapshot', 'save'];
+const MAX_SNAPSHOT_LAYERS = 12;
+const parseObject = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return parseObject(JSON.parse(value)); } catch { return null; }
   }
-  return 0;
+  return typeof value === 'object' && !Array.isArray(value) ? value : null;
+};
+const isCharacterSheet = (obj) => Boolean(obj && (
+  obj.attributes !== undefined || obj.skills !== undefined
+  || obj.selectedPerks !== undefined || obj.usedMagazineEffects !== undefined
+  || obj.terminalHacking !== undefined
+));
+/**
+ * Снимает любое количество конвертов (CHAR_PUBLISH, файл экспорта, строковый
+ * JSON) и возвращает плоский лист персонажа. Служебные поля внешних обёрток
+ * (`terminalHacking` из CHAR_PUBLISH, `equipment` из сохранения) сохраняются.
+ */
+const normalizeCharacterSnapshot = (snapshot) => {
+  const root = parseObject(snapshot) || {};
+  const layers = [root];
+  const seen = new Set([root]);
+  for (let i = 0; i < layers.length && layers.length < MAX_SNAPSHOT_LAYERS; i += 1) {
+    for (const key of ENVELOPE_KEYS) {
+      const child = parseObject(layers[i]?.[key]);
+      if (child && !seen.has(child)) {
+        seen.add(child);
+        layers.push(child);
+      }
+    }
+  }
+  // Лист — самый глубокий слой, где реально есть характеристики или навыки.
+  const sheet = [...layers].reverse().find(isCharacterSheet) || root;
+  const merged = {};
+  for (const layer of layers) Object.assign(merged, layer);
+  Object.assign(merged, sheet); // поля листа главнее одноимённых полей конверта
+  const name = layers.map((layer) => layer.characterName).find(Boolean)
+    || layers.map((layer) => layer.name).find(Boolean) || '';
+  return { ...merged, characterName: String(name || '') };
+};
+
+const ATTRIBUTE_ALIASES = {
+  INT: ['INT', 'INTELLIGENCE', 'ИНТ', 'ИНТЕЛЛЕКТ'],
+  LCK: ['LCK', 'LUCK', 'УДЧ', 'УДАЧА'],
+  SCI: ['SCI', 'SCIENCE', 'НАУКА'],
+};
+const nameOf = (entry) => String(
+  typeof entry === 'string' ? entry : (entry?.name ?? entry?.id ?? entry?.key ?? entry?.attr ?? entry?.attribute ?? ''),
+).trim().toUpperCase();
+const toNumber = (entry) => {
+  if (entry === null || entry === undefined) return 0;
+  if (typeof entry === 'object') {
+    return Number(entry.value ?? entry.total ?? entry.base ?? entry.rank ?? entry.ranks ?? entry.count) || 0;
+  }
+  return Number(entry) || 0;
+};
+// Словарь { INT: {…} } и массив [{ name: 'INT', value: 10 }] -> единый список.
+const namedEntries = (collection) => {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (typeof collection !== 'object') return [];
+  return Object.entries(collection).map(([key, value]) => (
+    value && typeof value === 'object' ? { ...value, name: value.name ?? key } : { name: key, value }
+  ));
+};
+const readAttribute = (snapshot, id) => {
+  const attrs = normalizeCharacterSnapshot(snapshot).attributes;
+  const aliases = ATTRIBUTE_ALIASES[id] || [id];
+  const found = namedEntries(attrs).find((entry) => aliases.includes(nameOf(entry)));
+  return found ? toNumber(found) : 0;
 };
 const scienceRank = (snapshot) => {
-  const skills = snapshot?.skills || {};
-  if (Array.isArray(skills)) {
-    const found = skills.find((x) => /^(science|наука)$/i.test(String(x?.id || x?.name || '')));
-    return Math.max(0, Math.floor(toNumber(found?.rank !== undefined ? found.rank : found)));
-  }
-  for (const key of ['science', 'Science', 'SCIENCE', 'Наука', 'наука']) {
-    if (skills[key] !== undefined) return Math.max(0, Math.floor(toNumber(skills[key])));
-  }
-  const selected = Array.isArray(snapshot?.selectedSkills) ? snapshot.selectedSkills : [];
-  const selectedScience = selected.find((x) => /^(science|наука)$/i.test(String(typeof x === 'string' ? x : x?.id || x?.name || '')));
-  return Math.max(0, Math.floor(toNumber(selectedScience?.rank !== undefined ? selectedScience.rank : selectedScience)));
+  const source = normalizeCharacterSnapshot(snapshot);
+  const aliases = ATTRIBUTE_ALIASES.SCI;
+  const found = namedEntries(source.skills).find((entry) => aliases.includes(nameOf(entry)));
+  if (found) return clamp(Math.floor(toNumber(found)), 0, 6);
+  const selected = Array.isArray(source.selectedSkills) ? source.selectedSkills : [];
+  const selectedScience = selected.find((entry) => aliases.includes(nameOf(entry)));
+  return clamp(Math.floor(toNumber(selectedScience)), 0, 6);
 };
-const rankOfPerk = (snapshot, id) => (Array.isArray(snapshot?.selectedPerks) ? snapshot.selectedPerks : [])
-  .reduce((rank, entry) => {
-    const entryId = typeof entry === 'string' ? entry : (entry?.id || entry?.perkId);
-    if (entryId !== id) return rank;
-    return Math.max(rank, Math.max(1, Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 1)));
-  }, 0);
+const rankOfPerk = (snapshot, id) => {
+  const selected = normalizeCharacterSnapshot(snapshot).selectedPerks;
+  const perks = Array.isArray(selected) ? selected : [];
+  const matches = perks.filter((entry) => {
+    const entryId = typeof entry === 'string' ? entry : (entry?.id ?? entry?.perkId ?? entry?.name ?? entry?.key);
+    return String(entryId).toLowerCase() === id;
+  });
+  if (!matches.length) return 0;
+  // Явный ранг из тестов/старых клиентов имеет приоритет; иначе ранг равен числу
+  // взятых копий перка (в сохранении это [{ perkId, index }, …]).
+  const explicit = matches
+    .map((entry) => Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 0))
+    .filter((rank) => rank > 0);
+  return explicit.length ? Math.max(...explicit) : matches.length;
+};
+const inventoryEntries = (source) => [source.items, source.equipment?.items, source.inventory]
+  .flatMap((bucket) => {
+    if (!bucket) return [];
+    if (Array.isArray(bucket)) return bucket.map((item, index) => [String(item?.id ?? index), item]);
+    if (typeof bucket === 'object') return Object.entries(bucket);
+    return [];
+  });
 
-const characterStats = (snapshot) => ({
-  intelligence: clamp(readAttribute(snapshot, 'INT') || 4, 4, 10),
-  science: clamp(scienceRank(snapshot), 0, 6),
-  luck: clamp(readAttribute(snapshot, 'LCK') || 4, 4, 10),
-  hackerRank: rankOfPerk(snapshot, 'hacker'),
-  digestUsed: Boolean(snapshot?.terminalHacking?.digestUsed)
-    || (Array.isArray(snapshot?.usedMagazineEffects) ? snapshot.usedMagazineEffects : []).includes('mag_programmers_digest'),
-  hasDigest: Boolean(snapshot?.terminalHacking?.hasProgrammersDigest) || Object.entries(snapshot?.items || {}).some(([key, item]) => (
-    key === 'mag_programmers_digest'
-    || item?.itemId === 'mag_programmers_digest'
-    || item?.catalogId === 'mag_programmers_digest'
-    || item?.id === 'mag_programmers_digest'
-    || item?.snapshot?.id === 'mag_programmers_digest'
-  )),
-});
+const characterStats = (snapshot) => {
+  const source = normalizeCharacterSnapshot(snapshot);
+  return {
+    intelligence: clamp(readAttribute(source, 'INT') || 4, 4, 10),
+    science: clamp(scienceRank(source), 0, 6),
+    luck: clamp(readAttribute(source, 'LCK') || 4, 4, 10),
+    hackerRank: rankOfPerk(source, 'hacker'),
+    digestUsed: Boolean(source.terminalHacking?.digestUsed)
+      || (Array.isArray(source.usedMagazineEffects) ? source.usedMagazineEffects : []).includes('mag_programmers_digest'),
+    hasDigest: Boolean(source.terminalHacking?.hasProgrammersDigest) || inventoryEntries(source).some(([key, item]) => (
+      key === 'mag_programmers_digest'
+      || item?.itemId === 'mag_programmers_digest'
+      || item?.catalogId === 'mag_programmers_digest'
+      || item?.id === 'mag_programmers_digest'
+      || item?.snapshot?.id === 'mag_programmers_digest'
+    )),
+  };
+};
 
 const shuffle = (items, rng) => {
   const result = [...items];
@@ -217,7 +304,8 @@ const skillScore = (intelligence, science) => (
 );
 const skillBonus = (intelligence, science) => skillScore(intelligence, science) - 4;
 
-// Патч 497: N = max(4, 20 + 2·D − ИНТ). ИНТ 10 на D5 -> 20 слов, ИНТ 4 -> 26.
+// Патч 500: N = max(4, 15 + 2·D − ИНТ) = «25 − ИНТ» на D5.
+// ИНТ 10 на D5 -> 15 слов, ИНТ 4 -> 21.
 const passwordWordCount = (effectiveDifficulty, intelligence) => {
   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const int = clamp(Number(intelligence) || 4, 4, 10);
@@ -259,7 +347,199 @@ const seededRng = (rng) => {
  *
  * Матрица попарных совпадений считается только для выбранных ~26 слов.
  */
-const buildPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
+// Патч 503. Доска из ТРЁХ ГРУПП с общими сочетаниями (окончания, приставки,
+// суффиксы). Внутри каждой группы ДВА варианта последовательности — например
+// `ION`/`ON`, `TLY`/`LY`, `THE`/`THO`. Игрок сначала по подсказке понимает,
+// какая группа верная, затем внутри неё — какой вариант, и только потом
+// выбирает пароль. Высокая подсказка (вплоть до L−1 из L) здесь не делает
+// взлом перебором: лишние слова и чужие группы занижают слепой шанс, а верная
+// последовательность почти гарантирует победу при канонических 4 попытках.
+const WORD_GROUPS = 3;
+const GROUP_VARIANTS = 2;
+const MAX_GROUP_FRAGMENT = 4;
+
+const findWordFamilies = (pool, wordLength, position, fragmentLength) => {
+  const baseLength = fragmentLength - 1;
+  const byBase = new Map();
+  for (const word of pool) {
+    const fragment = position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
+    const base = position === 'end' ? fragment.slice(1) : fragment.slice(0, -1);
+    if (base.length !== baseLength) continue;
+    if (!byBase.has(base)) byBase.set(base, new Map());
+    const variants = byBase.get(base);
+    if (!variants.has(fragment)) variants.set(fragment, []);
+    variants.get(fragment).push(word);
+  }
+  const families = [];
+  for (const [base, variants] of byBase) {
+    const entries = [...variants.entries()]
+      .filter(([, words]) => words.length >= GROUP_VARIANTS)
+      .sort((a, b) => b[1].length - a[1].length);
+    if (entries.length < GROUP_VARIANTS) continue;
+    families.push({
+      position, base,
+      variants: entries.slice(0, GROUP_VARIANTS).map(([fragment, words]) => ({ fragment, words })),
+    });
+  }
+  return families;
+};
+
+const groupSetMetrics = (set, password) => {
+  let minCandidates = 99;
+  const hintKinds = new Set();
+  for (const guess of set) {
+    if (guess === password) continue;
+    const hint = positionalLikeness(guess, password);
+    hintKinds.add(hint);
+    minCandidates = Math.min(minCandidates, set.filter(
+      (word) => word !== guess && positionalLikeness(guess, word) === hint,
+    ).length);
+  }
+  const sums = set.map((x) => set.reduce(
+    (total, w) => total + (w === x ? 0 : sharedLetters(x, w)), 0,
+  ));
+  const own = sums[set.indexOf(password)];
+  return {
+    minCandidates,
+    hintKinds: hintKinds.size,
+    centralityRank: sums.filter((value) => value > own).length + 1,
+  };
+};
+
+const buildGroupedPasswordSet = ({ wordLength, wordCount, rng = Math.random, excludeWords = [] }) => {
+  const excluded = new Set((Array.isArray(excludeWords) ? excludeWords : []).map((w) => String(w).toUpperCase()));
+  const pool = [...new Set((getWordsByLength(wordLength) || []).filter(
+    (word) => word.length === wordLength && !excluded.has(word),
+  ))];
+  const internal = seededRng(rng);
+  const fragmentLength = Math.min(MAX_GROUP_FRAGMENT, wordLength - 1);
+  const families = [
+    ...findWordFamilies(pool, wordLength, 'end', fragmentLength),
+    ...findWordFamilies(pool, wordLength, 'start', fragmentLength),
+  ];
+  // Обильные семьи предпочтительнее, но порядок всё равно случаен.
+  const ranked = shuffle(families, internal).sort((a, b) => (
+    (b.variants[0].words.length + b.variants[1].words.length)
+    - (a.variants[0].words.length + a.variants[1].words.length)
+  ));
+  const groups = [];
+  const usedBases = new Set();
+  for (const family of ranked.slice(0, 60)) {
+    if (usedBases.has(family.base)) continue;
+    // Все три группы на одной позиции: подсказки чужих групп остаются низкими.
+    // Позиции могут смешиваться, если на коротких словах семей мало;
+    // градиент подсказок всё равно проверяется при отборе доски.
+    groups.push(family);
+    usedBases.add(family.base);
+    if (groups.length === WORD_GROUPS) break;
+  }
+  if (groups.length < WORD_GROUPS) return null;
+
+  const wanted = clamp(Math.floor(Number(wordCount) || BASE_WORD_COUNT), 2, 32);
+  // Четыре слова чужих групп — по одному на каждый из двух вариантов
+  // каждой из двух остальных групп. Остальное добирается «шумом»: он и
+  // занижает вероятность слепого перебора, как просил владелец.
+  const twinsCount = clamp(Math.round((wanted - 5) * 0.3), 1, 5);
+  const otherCount = clamp(Math.round((wanted - 5) * 0.15), 1, 3);
+  let best = null;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const groupIndex = randomInt(WORD_GROUPS, internal);
+    const variantIndex = randomInt(GROUP_VARIANTS, internal);
+    const family = groups[groupIndex];
+    const winners = shuffle(family.variants[variantIndex].words, internal);
+    if (winners.length < 2) continue;
+    const password = winners[0];
+    // «Близнецы» — слова того же варианта, максимально похожие на пароль.
+    const twins = winners.slice(1)
+      .sort((a, b) => positionalLikeness(b, password) - positionalLikeness(a, password))
+      .slice(0, twinsCount);
+    const siblingVariant = shuffle(family.variants[1 - variantIndex].words, internal).slice(0, otherCount);
+    const otherGroups = [];
+    for (let i = 0; i < WORD_GROUPS; i += 1) {
+      if (i === groupIndex) continue;
+      for (const variant of groups[i].variants) {
+        const word = shuffle(variant.words, internal)[0];
+        if (word) otherGroups.push(word);
+      }
+    }
+    const used = new Set([password, ...twins, ...siblingVariant, ...otherGroups]);
+    const fragments = new Set(groups.flatMap((f) => f.variants.map((v) => v.fragment)));
+    const noise = shuffle(pool.filter((word) => !used.has(word) && !groups.some((f) => {
+      const fragment = f.position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
+      return fragments.has(fragment);
+    })), internal);
+    const set = [password, ...twins, ...siblingVariant, ...otherGroups];
+    for (const word of noise) {
+      if (set.length >= wanted) break;
+      if (used.has(word)) continue;
+      set.push(word);
+      used.add(word);
+    }
+    if (set.length !== wanted) continue;
+    if (new Set(set).size !== wanted) continue;
+    const metrics = groupSetMetrics(set, password);
+    // Градиент подсказок: слова СВОЕГО варианта > другой вариант своей
+    // группы > чужие группы и шум. Без этого логика «сначала группа, потом
+    // последовательность» не работает.
+    const variantFragments = family.variants.map((v) => v.fragment);
+    const levelOf = (word) => {
+      if (variantFragments[variantIndex] === (family.position === 'end'
+        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 2;
+      if (variantFragments[1 - variantIndex] === (family.position === 'end'
+        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 1;
+      return 0;
+    };
+    const levels = [[], [], []];
+    for (const word of set) {
+      if (word === password) continue;
+      levels[levelOf(word)].push(positionalLikeness(word, password));
+    }
+    const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
+    const gradient = mean(levels[2]) > mean(levels[1]) && mean(levels[1]) > mean(levels[0]);
+    // Пароль не должен выдаваться «самым похожим на всех» словом доски.
+    const score = (gradient ? 10000 : 0) + (metrics.centralityRank > 3 ? 1000 : 0)
+      + metrics.hintKinds * 10 + metrics.minCandidates;
+    if (!best || score > best.score) {
+      best = { set, password, metrics, score, groupIndex, variantIndex, gradient };
+    }
+    if (gradient && metrics.centralityRank > 3 && metrics.hintKinds >= 3) break;
+  }
+  if (!best) return null;
+  const words = shuffle(best.set, internal);
+  const metrics = groupSetMetrics(words, best.password);
+  return {
+    words,
+    password: best.password,
+    // Патч 503: подсказка может быть L−1 из L, но выводить её надо логикой.
+    likenessCap: wordLength - 1,
+    minAmbiguity: metrics.minCandidates,
+    minShared: Math.min(...words.filter((w) => w !== best.password).map(
+      (w) => sharedLetters(w, best.password),
+    )),
+    centralityRank: metrics.centralityRank,
+    hintKinds: metrics.hintKinds,
+    wordCount: words.length,
+    groupCount: WORD_GROUPS,
+    groupVariants: GROUP_VARIANTS,
+    groups: groups.map((family, index) => ({
+      base: family.base,
+      position: family.position,
+      variants: family.variants.map((v) => v.fragment),
+      winner: index === best.groupIndex,
+    })),
+    winnerVariant: groups[best.groupIndex].variants[best.variantIndex].fragment,
+  };
+};
+
+const buildPasswordSet = (options) => {
+  const tier = clamp(Math.floor(Number(options.effectiveDifficulty) || 0), 0, 5);
+  // D0 остаётся особым случаем: анаграммные семьи и пароль-выброс.
+  if (tier === 0) return buildLegacyPasswordSet(options);
+  const grouped = buildGroupedPasswordSet(options);
+  return grouped || buildLegacyPasswordSet(options);
+};
+
+const buildLegacyPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const likenessCap = MAX_LIKENESS_BY_DIFFICULTY[tier];
   const floor = MIN_AMBIGUITY_BY_DIFFICULTY[tier];
@@ -509,9 +789,14 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
   }
   kinds = shuffle(kinds, rng);
   const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
+  let fullRestoreAvailable = true; // 503: полное восстановление не более 1 раза на доску
   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
     const kind = kinds[groupIndex] || 'word';
-    const effect = bracketEffectFor(stats.science, stats.luck, rng, kind);
+    const rolled = bracketEffectFor(stats.science, stats.luck, rng, kind);
+    const effect = rolled.full && !fullRestoreAvailable
+      ? { words: kind === 'word' ? 1 : 0, attempts: kind === 'attempt' ? 1 : 0, full: false, kind }
+      : rolled;
+    if (effect.full) fullRestoreAvailable = false;
     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
     const length = 3 + randomInt(6, rng);
     const preferredRow = randomInt(board.length / width, rng);
@@ -552,11 +837,12 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     name: config.name,
     description: config.description,
     difficulty,
-    lockOnFailure: config.lockOnFailure,
+    // Патч 504: блокировки по галочке больше нет. Исход партии решает Мастер
+    // в диалоге «Разрешить повторный взлом?», когда попытки исчерпаны.
     status: 'playing',
     operatorClientId,
     operatorCharacterId,
-    operatorName: '',
+    operatorName: String(normalizeCharacterSnapshot(characterSnapshot).characterName || ''),
     intelligence: stats.intelligence,
     science: stats.science,
     luck: stats.luck,
@@ -566,6 +852,9 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     wordLength,
     wordCount: safeWordRanges.length,
     likenessCap: selection.likenessCap,
+    groupCount: selection.groupCount || 0,
+    groupVariants: selection.groupVariants || 0,
+    hintKinds: selection.hintKinds || 0,
     minAmbiguity: selection.minAmbiguity,
     centralityRank: selection.centralityRank,
     bracketSplit: bracketSplitFor(stats.science),
@@ -607,27 +896,61 @@ const publicGameState = (game) => {
   };
 };
 
-const failGame = (game, { now }) => {
-  if (game.attempts > 0) return game;
-  if (game.lockOnFailure && game.digestEligible && !game.digestUsed) {
-    return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+// Патч 504: «живые» поля карточки применяются к уже открытой доске без
+// пересборки. Сложность меняется только при следующей новой партии: доска
+// собрана под конкретную длину слова и не может поменяться на ходу.
+const syncGameConfig = (game, config) => {
+  if (!game || !config) return game;
+  let next = game;
+  for (const field of ['name', 'description']) {
+    if (config[field] === undefined || next[field] === config[field]) continue;
+    if (next === game) next = { ...game };
+    next[field] = config[field];
   }
-  if (game.lockOnFailure) {
-    return { ...game, status: 'locked', result: 'ACCESS DENIED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
-  }
-  return { ...game, status: 'failed', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+  return next;
 };
 
-const applyGameAction = ({ game, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
+const failGame = (game, { now }) => {
+  if (game.attempts > 0) return game;
+  // «Дайджест программиста» по-прежнему даёт последнюю попытку до решения
+  // Мастера, но теперь предлагается на любом терминале.
+  if (game.digestEligible && !game.digestUsed) {
+    return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+  }
+  // Патч 504: попытки исчерпаны — партия НЕ завершается молча и НЕ
+  // блокируется автоматически. Сервер ждёт ответа Мастера на вопрос
+  // «Разрешить повторный взлом?», а игрок видит явное сообщение о провале.
+  return { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+};
+
+const closeGame = (game, { now }) => ({
+  ...game,
+  status: 'closed',
+  result: 'TERMINAL CLOSED',
+  scrollUp: false,
+  updatedAt: now,
+  revision: game.revision + 1,
+});
+
+const applyGameAction = ({ game, config = null, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
   if (!game) return { error: 'TERMINAL_NOT_ISSUED' };
-  if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
-  if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
+  // Патч 504: настройки карточки читаются на каждом ходу, а не «запекаются»
+  // в доску при первом «Взломать».
+  game = syncGameConfig(game, config);
+  if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) return { error: 'TERMINAL_GM_ONLY' };
+  if (game.status === 'closed') return { error: 'TERMINAL_CLOSED' };
+  if (game.status === 'awaitingRetry') return { error: 'TERMINAL_AWAITING_RETRY' };
   if (action === 'start') {
+    // Патч 505: «ДОСТУП РАЗРЕШЁН» не стирается. Раньше повторный start от
+    // другого clientId (переподключение вкладки, второй вход в комнату)
+    // пересобирал доску по механике передачи хода из патча 503, и игрок
+    // видел новую партию вместо сообщения об успехе. Новая доска после
+    // победы — только по явной повторной трансляции Мастера (reissue).
     if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
-    const stats = characterStats(characterSnapshot);
-    const effectiveDifficulty = Math.max(0, game.difficulty - stats.hackerRank);
+    // Новая партия всегда собирается по ТЕКУЩИМ настройкам карточки, а не
+    // по полям предыдущей доски.
     const fresh = createGame({
-      config: game,
+      config: config || game,
       operatorClientId: clientId,
       operatorCharacterId: characterId,
       characterSnapshot,
@@ -635,7 +958,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
       rng,
       excludeWords,
     });
-    fresh.operatorName = String(characterSnapshot?.characterName || characterSnapshot?.name || '');
+    fresh.operatorName = String(normalizeCharacterSnapshot(characterSnapshot).characterName || '');
     return { game: fresh };
   }
   if (game.status === 'pendingDigest') {
@@ -645,8 +968,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
       return { game: { ...game, status: 'playing', attempts: 1, digestEligible: false, digestUsed: true, result: 'DIGEST USED', updatedAt: now, revision: game.revision + 1 }, usedDigest: true };
     }
     if (action === 'declineDigest') {
-      const status = game.lockOnFailure ? 'locked' : 'failed';
-      return { game: { ...game, status, digestEligible: false, result: status === 'locked' ? 'ACCESS DENIED' : '', updatedAt: now, revision: game.revision + 1 } };
+      return { game: { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', digestEligible: false, scrollUp: false, updatedAt: now, revision: game.revision + 1 } };
     }
     return { error: 'TERMINAL_DIGEST_DECISION_REQUIRED' };
   }
@@ -674,7 +996,11 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
     if (!bracket || bracket.used) return { error: 'TERMINAL_INVALID_BRACKET' };
     let next = { ...game, bracketRanges: game.bracketRanges.map((entry) => entry.id === bracket.id ? { ...entry, used: true } : entry) };
     // Патч 497: пакет Науки + удача. Попытки НИКОГДА не выше 4.
-    const effect = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
+    // Патч 503: полное восстановление — не более одного раза на доску.
+    const rolled = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
+    const effect = rolled.full && game.resetUsed
+      ? { ...rolled, full: false, words: 0, attempts: 1 }
+      : rolled;
     for (let i = 0; i < (effect.words || 0); i += 1) {
       const duds = next.wordRanges.filter((entry) => !entry.isPassword && !entry.removed);
       if (duds.length) {
@@ -731,8 +1057,15 @@ module.exports = {
   positionalLikeness,
   sharedLetters,
   buildPasswordSet,
+  buildGroupedPasswordSet,
+  WORD_GROUPS,
+  GROUP_VARIANTS,
+  MAX_GROUP_FRAGMENT,
   characterStats,
+  normalizeCharacterSnapshot,
   createGame,
   publicGameState,
+  syncGameConfig,
+  closeGame,
   applyGameAction,
 };

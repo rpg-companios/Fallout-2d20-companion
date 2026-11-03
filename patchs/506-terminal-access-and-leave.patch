@@ -1,0 +1,1267 @@
+diff --git a/App.js b/App.js
+index 02cdd76..7d18dbc 100644
+--- a/App.js
++++ b/App.js
+@@ -346,10 +346,12 @@ function App() {
+           <FusionCoreChoiceModal />
+           <PlayerLootTradeOverlay />
+           <PlayerDirectiveOverlay />
++          {/* Патч 506: «Что нового» рисуется ДО диалогов, иначе окно обновления
++              перекрывало уведомление Мастера о взломе терминала. */}
++          <UpdateNoticeModal />
+           <AlertHost />
+           {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
+           <TerminalRetryPromptHost />
+-          <UpdateNoticeModal />
+           <SurvivalClock />
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index b8942ac..6b62204 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -460,6 +460,65 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  // Патч 506: выход игрока из локации персональный, а билет доступа к
++  // терминалу обновляется только после явной повторной трансляции Мастера.
++  it('506: игрок покидает локацию, остальные остаются; reissue выдаёт новый accessId', async () => {
++    await withServer(async (port, app) => {
++      const gm = makeClient(port, 'gm-506');
++      const player = makeClient(port, 'player-506');
++      const other = makeClient(port, 'player-506-other');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault 506' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await player.send(MESSAGE.ROOM_JOIN, { code, name: 'Первый', role: 'player' });
++      await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await other.send(MESSAGE.ROOM_JOIN, { code, name: 'Второй', role: 'player' });
++      await other.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++
++      const config = { containerId: 'term-506', name: 'Терминал', difficulty: 3 };
++      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, { config }, code);
++      const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
++      const firstAccessId = issued.payload.terminal.accessId;
++      expect(firstAccessId).toMatch(/^broadcast-\d+$/);
++
++      const openReq = await gm.send(MESSAGE.SESSION_OPEN, {
++        session: {
++          kind: 'hub', name: 'Убежище', targetType: 'room',
++          nodes: [{ containerId: config.containerId, kind: 'terminal', name: 'Терминал', difficulty: 3 }],
++        },
++      }, code);
++      const opened = await gm.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === openReq);
++      const sessionId = opened.payload.session.sessionId;
++      expect(opened.payload.session.kind).toBe('hub');
++
++      // Игрок уходит сам: сессия Мастера остаётся активной.
++      const leaveReq = await player.send(MESSAGE.SESSION_PLAYER_CLOSE, { sessionId }, code);
++      const left = await player.waitFor((m) => m.type === MESSAGE.SESSION_STATE && m.payload.requestId === leaveReq);
++      expect(left.payload.session).toBeTruthy();
++      expect(left.payload.session.kind).toBe('hub');
++      expect(left.payload.session.closedByClientIds).toContain(player.clientId);
++      expect(left.payload.session.closedByClientIds).not.toContain(other.clientId);
++      expect(app.registry.getRoom(code).activeSession).toBeTruthy();
++      const otherState = await other.waitFor((m) => (
++        m.type === MESSAGE.SESSION_STATE && m.payload.session?.closedByClientIds?.includes(player.clientId)
++      ));
++      expect(otherState.payload.session.sessionId).toBe(sessionId);
++
++      // Повторная трансляция терминала выдаёт новый билет доступа.
++      const reissueReq = await gm.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: config.containerId, action: 'reissue',
++      }, code);
++      const reissued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === reissueReq);
++      expect(reissued.payload.terminal.accessId).not.toBe(firstAccessId);
++
++      gm.close();
++      player.close();
++      other.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/__tests__/room/terminal-access-506.test.js b/__tests__/room/terminal-access-506.test.js
+new file mode 100644
+index 0000000..2f9945a
+--- /dev/null
++++ b/__tests__/room/terminal-access-506.test.js
+@@ -0,0 +1,186 @@
++// Приёмочный тест 506. Владелец проверял игру в одном браузере в двух
++// вкладках и сообщил: «я во вкладке мастера не вижу уведомление, что
++// терминал взломан. А игроком я могу закрыть терминал … и могу терминал
++// взломать ещё раз и ещё и ещё. Терминал не должен открываться снова.
++// Игроки должны иметь возможность сами отключаться от локации по кнопке
++// "покинуть локацию" рядом с кнопкой "свернуть"».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  terminalAccessKey,
++  canHackTerminal,
++  terminalBlockedReason,
++} from '../../components/lootTrade/terminalAccess.js';
++import { isGmRoom, findPending, findCompleted } from '../../components/lootTrade/terminalRetryPrompt.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const CONFIG = { containerId: 't1', name: 'Терминал', description: '', difficulty: 3 };
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
++  registry.issueTerminal({ code: room.code, clientId: 'gm-1', config: CONFIG });
++  const state = () => registry.getState(room.code).terminalStates.t1;
++  const act = (clientId, characterId, action, value) => registry.terminalAction({
++    code: room.code, clientId, characterId, containerId: 't1', action, value,
++  });
++  return { registry, room, state, act };
++};
++
++describe('506: одноразовый доступ к терминалу привязан к трансляции', () => {
++  it('чистое правило: один «Взломать» на билет, финальные статусы закрывают обе кнопки', () => {
++    const key = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-1' });
++    expect(key).toBe('R|t1|broadcast-1');
++    expect(terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' })).not.toBe(key);
++    // до первого нажатия доступ есть даже если партия уже идёт
++    expect(canHackTerminal({ used: {}, key, game: { status: 'playing' } })).toBe(true);
++    // после нажатия билет израсходован
++    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(false);
++    // новая трансляция Мастера выдаёт новый билет
++    const freshKey = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' });
++    expect(canHackTerminal({ used: { [key]: true }, key: freshKey, game: null })).toBe(true);
++
++    for (const status of ['won', 'awaitingRetry', 'closed']) {
++      expect(canHackTerminal({ used: {}, key, game: { status } })).toBe(false);
++      expect(terminalBlockedReason({ used: {}, key, game: { status } })).toBeTruthy();
++    }
++    expect(canHackTerminal({ used: {}, key, terminalClosed: true })).toBe(false);
++    expect(canHackTerminal({ used: {}, key, terminalAwaiting: true })).toBe(false);
++    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBe('used');
++    expect(terminalBlockedReason({ used: {}, key, game: { status: 'won' } })).toBe('won');
++    expect(terminalBlockedReason({ used: {}, key, game: null })).toBeNull();
++  });
++
++  it('accessId стабилен на ходах и при правке карточки, обновляется при повторной трансляции', () => {
++    const { registry, room, state } = setup();
++    const first = state().accessId;
++    expect(first).toMatch(/^broadcast-\d+$/);
++    // Правка настроек во время доступа — не новая трансляция.
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm-1',
++      config: { ...CONFIG, name: 'Переименованный', difficulty: 1 },
++    });
++    expect(state().accessId).toBe(first);
++    // Явная повторная трансляция Мастера.
++    registry.issueTerminal({ code: room.code, clientId: 'gm-1', config: CONFIG, reissue: true });
++    const second = state().accessId;
++    expect(second).not.toBe(first);
++    // reissue-действие и «Да» после провала тоже выдают новый билет.
++    registry.terminalAction({ code: room.code, clientId: 'gm-1', containerId: 't1', action: 'reissue' });
++    expect(state().accessId).not.toBe(second);
++  });
++
++  it('открытие локации — новая трансляция, updateSession — нет', () => {
++    const { registry, room, state } = setup();
++    const before = state().accessId;
++    registry.openSession({
++      code: room.code, clientId: 'gm-1',
++      session: {
++        kind: 'hub', name: 'Убежище', targetType: 'room',
++        nodes: [{ containerId: 't1', kind: 'terminal', name: 'T', difficulty: 3 }],
++      },
++    });
++    const afterOpen = state().accessId;
++    expect(afterOpen).not.toBe(before);
++    registry.updateSession({
++      code: room.code, clientId: 'gm-1',
++      payload: { nodeContainerId: 't1', nodeDifficulty: 4 },
++    });
++    expect(state().accessId).toBe(afterOpen);
++  });
++});
++
++describe('506: Мастера определяют по участнику, а не по UI-режиму вкладки', () => {
++  const won = {
++    closed: false,
++    config: { name: 'Терминал', difficulty: 3 },
++    game: { status: 'won', revision: 7, operatorName: 'Оператор' },
++  };
++  const rooms = (role, members) => ({ R: { role, members, terminalStates: { t1: won } } });
++
++  it('role gm по-прежнему работает', () => {
++    expect(isGmRoom({ role: 'gm' })).toBe(true);
++    expect(findCompleted(rooms('gm', []))).toHaveLength(1);
++  });
++
++  it('вкладка с role player, но с моим gm-участником получает уведомление', () => {
++    const list = rooms('player', [
++      { clientId: 'gm-tab', role: 'gm' },
++      { clientId: 'player-tab', role: 'player' },
++    ]);
++    expect(isGmRoom(list.R, 'gm-tab')).toBe(true);
++    expect(findCompleted(list, 'gm-tab')).toHaveLength(1);
++    expect(findCompleted(list, 'player-tab')).toHaveLength(0);
++  });
++
++  it('вопрос о повторном взломе использует тот же признак владельца', () => {
++    const pendingTerminal = { ...won, game: { status: 'awaitingRetry', revision: 7 }, awaitingGm: true };
++    const list = { R: {
++      role: 'player',
++      members: [{ clientId: 'gm-tab', role: 'gm' }],
++      terminalStates: { t1: pendingTerminal },
++    } };
++    expect(findPending(list, 'gm-tab')).toHaveLength(1);
++    expect(findPending(list, 'other-tab')).toHaveLength(0);
++  });
++
++  it('хост не ждёт БД перед показом и AlertHost рисуется поверх «Что нового»', () => {
++    const host = read('components/lootTrade/TerminalRetryPromptHost.js');
++    const app = read('App.js');
++    expect(host).toContain('Promise.race');
++    expect(host).toContain('findCompleted(state?.rooms, clientId)');
++    expect(app.indexOf('<UpdateNoticeModal />')).toBeLessThan(app.indexOf('<AlertHost />'));
++  });
++});
++
++describe('506: игрок сам покидает локацию, сессия остаётся для остальных', () => {
++  const openHub = (registry, room) => registry.openSession({
++    code: room.code, clientId: 'gm-1',
++    session: {
++      kind: 'hub', name: 'Убежище', targetType: 'room',
++      nodes: [{ containerId: 't1', kind: 'terminal', name: 'T', difficulty: 3 }],
++    },
++  });
++
++  it('playerCloseSession для hub не гасит сессию и помечает только ушедшего', () => {
++    const { registry, room } = setup();
++    openHub(registry, room);
++    const before = registry.getState(room.code).activeSession;
++    expect(before.kind).toBe('hub');
++    const result = registry.playerCloseSession({ code: room.code, clientId: 'p1', sessionId: before.sessionId });
++    expect(result.error).toBeUndefined();
++    expect(result.session).toBeTruthy();
++    expect(result.session.kind).toBe('hub');
++    expect(result.closedSession).toBeNull();
++    expect(result.session.closedByClientIds).toContain('p1');
++    expect(result.session.closedByClientIds).not.toContain('p2');
++    expect(registry.getState(room.code).activeSession.sessionId).toBe(before.sessionId);
++    // Второй игрок тоже может уйти — сессия всё ещё живёт.
++    const second = registry.playerCloseSession({ code: room.code, clientId: 'p2', sessionId: before.sessionId });
++    expect(second.session.closedByClientIds).toEqual(expect.arrayContaining(['p1', 'p2']));
++    expect(registry.getState(room.code).activeSession).toBeTruthy();
++  });
++
++  it('кнопка «Покинуть локацию» рядом со «Свернуть» и подписи RU/EN на месте', () => {
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlay).toContain('testID="leave-hub-button"');
++    expect(overlay).toContain("tLootTrade('player.leaveHub')");
++    expect(overlay).toContain("tLootTrade('player.minimize')");
++    expect(overlay).toContain('playerCloseRoomSession');
++    expect(overlay).toContain('markTerminalAccess(accessKey)');
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    expect(ru.player.leaveHub).toBe('Покинуть локацию');
++    expect(en.player.leaveHub).toBe('Leave location');
++    expect(ru.terminal.accessUsed).toBeTruthy();
++    expect(en.terminal.accessUsed).toBeTruthy();
++  });
++});
+diff --git a/__tests__/room/terminal-gm-retry-504.test.js b/__tests__/room/terminal-gm-retry-504.test.js
+index 188446f..a9b43ca 100644
+--- a/__tests__/room/terminal-gm-retry-504.test.js
++++ b/__tests__/room/terminal-gm-retry-504.test.js
+@@ -441,7 +441,10 @@ describe('504: диалог Мастера и экраны', () => {
+   it('оверлей игрока показывает «Закрыт» и отключает обе кнопки; модалка сообщает о провале', () => {
+     const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
+     expect(overlay).toContain('terminal-closed-badge');
+-    expect(overlay).toContain('disabled={terminalClosed}');
++    // Патч 506: обе кнопки блокируются единым признаком завершённого
++    // доступа (закрыт / ждёт решения / взломан / билет уже использован).
++    expect(overlay).toContain('disabled={Boolean(accessBlockedReason)}');
++    expect(overlay).toContain('disabled={!hackAllowed}');
+     expect(overlay).toContain('terminalClosedBadge');
+     expect(overlay).toContain('terminalAwaiting');
+     const modal = read('components/lootTrade/TerminalHackingModal.js');
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 5d90bbd..5da8acd 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -38,6 +38,11 @@ import {
+ } from '../../src/lootTrade/grantCharacterItems';
+ import { showRawAlert } from '../alerts/alertService';
+ import TerminalHackingModal from './TerminalHackingModal';
++import {
++  terminalAccessKey,
++  canHackTerminal,
++  terminalBlockedReason,
++} from './terminalAccess';
+ import { debugLog } from '../../src/debug/falloutDebug';
+ 
+ const getItemIcon = (itemType) => {
+@@ -83,6 +88,15 @@ export default function PlayerLootTradeOverlay() {
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+   const [terminalSelection, setTerminalSelection] = useState(null);
+   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
++  // Патч 506: одноразовый доступ к терминалу в рамках ОДНОЙ трансляции.
++  // Раньше признак «терминал открыт» жил в модалке: закрыл окно — и кнопка
++  // «Взломать» снова считала терминал свободным, сколько угодно раз.
++  // Ключ содержит accessId сервера: новая трансляция Мастера выдаёт новый.
++  const [usedTerminalAccess, setUsedTerminalAccess] = useState({});
++  const markTerminalAccess = useCallback((key) => {
++    if (!key) return;
++    setUsedTerminalAccess((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
++  }, []);
+ 
+   // Буферы обмена с торговцем
+   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
+@@ -172,6 +186,28 @@ export default function PlayerLootTradeOverlay() {
+   }, [isGmMode, bindings, currentCharacterId, rooms]);
+ 
+   const activeSession = matchedContext?.session || null;
++  /**
++   * Патч 506: «Покинуть локацию». Игрок отключается сам, сессия Мастера
++   * остаётся активной для остальных. Сервер помечает этого участника в
++   * session.closedByClientIds, и matchedContext выше перестаёт показывать
++   * окно — источник правды не локальный useState, а состояние комнаты.
++   */
++  const leaveLocation = async () => {
++    const session = matchedContext?.session;
++    if (!session || !matchedContext) return;
++    setTerminalSelection(null);
++    setDismissedTerminalId(null);
++    try {
++      await useRoomStore.getState().playerCloseRoomSession({
++        code: matchedContext.roomCode,
++        sessionId: session.sessionId,
++      });
++    } catch (error) {
++      debugLog('playerOverlay.leaveLocation:failed', { message: error?.message });
++      markSessionClosedLocally(session.sessionId);
++    }
++  };
++
+   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
+ 
+   const selectedHubNode = useMemo(() => {
+@@ -298,12 +334,26 @@ export default function PlayerLootTradeOverlay() {
+         </View>
+       );
+     }
+-    if (dismissedTerminalId === config.containerId) {
++    // Патч 506: та же одноразовость для терминала, выданного напрямую.
++    // Закрыл окно — «Открыть терминал» больше не возвращает к мини-игре.
++    const directAccessKey = terminalAccessKey({
++      roomCode: directTerminalContext.roomCode,
++      containerId: config.containerId,
++      accessId: directTerminalContext.terminalState?.accessId,
++    });
++    const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
++    if (dismissedTerminalId === config.containerId || directUsed) {
+       return (
+         <View style={styles.floatingBar} pointerEvents="box-none">
+-          <TouchableOpacity style={styles.floatingPill} onPress={() => setDismissedTerminalId(null)}>
++          <TouchableOpacity
++            style={styles.floatingPill}
++            disabled={directUsed}
++            onPress={() => setDismissedTerminalId(null)}
++          >
+             <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
+-            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
++            <Text style={styles.floatingPillAction}>
++              {directUsed ? tLootTrade('terminal.accessUsed') : tLootTrade('terminal.openTerminal')}
++            </Text>
+           </TouchableOpacity>
+         </View>
+       );
+@@ -313,7 +363,10 @@ export default function PlayerLootTradeOverlay() {
+         visible
+         terminal={config}
+         roomCode={directTerminalContext.roomCode}
+-        onClose={() => setDismissedTerminalId(config.containerId)}
++        onClose={() => {
++          markTerminalAccess(directAccessKey);
++          setDismissedTerminalId(config.containerId);
++        }}
+       />
+     );
+   }
+@@ -385,13 +438,22 @@ export default function PlayerLootTradeOverlay() {
+                   <Text style={styles.modalTitle}>{activeSession.name}</Text>
+                 </View>
+                 <View style={styles.headerActionsRow}>
+-                  {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
++                  {/* Патч 506: «Свернуть» и «Покинуть локацию». Закрыть сцену
++                      по-прежнему может только Мастер; игрок отключается сам. */}
+                   <TouchableOpacity
+                     style={styles.minimizeBtn}
+                     onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+                   >
+                     <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                   </TouchableOpacity>
++                  <TouchableOpacity
++                    testID="leave-hub-button"
++                    accessibilityRole="button"
++                    style={styles.leaveHubBtn}
++                    onPress={() => { void leaveLocation(); }}
++                  >
++                    <Text style={styles.leaveHubBtnText}>{tLootTrade('player.leaveHub')}</Text>
++                  </TouchableOpacity>
+                 </View>
+               </View>
+ 
+@@ -431,6 +493,33 @@ export default function PlayerLootTradeOverlay() {
+                     const terminalAwaiting = !terminalClosed && Boolean(
+                       terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
+                     );
++                    // Патч 506: доступ привязан к трансляции, а не к окну.
++                    const accessKey = terminalAccessKey({
++                      roomCode: matchedContext.roomCode,
++                      containerId: node.containerId,
++                      accessId: terminalState?.accessId,
++                    });
++                    const hackAllowed = canHackTerminal({
++                      used: usedTerminalAccess,
++                      key: accessKey,
++                      game: terminalState?.game,
++                      terminalClosed,
++                      terminalAwaiting,
++                    });
++                    const accessBlockedReason = terminalBlockedReason({
++                      used: usedTerminalAccess,
++                      key: accessKey,
++                      game: terminalState?.game,
++                      terminalClosed,
++                      terminalAwaiting,
++                    });
++                    const accessBadgeKey = {
++                      closed: 'terminal.closedBadge',
++                      awaiting: 'terminal.retryWaiting',
++                      won: 'terminal.stateWon',
++                      finished: 'terminal.accessUsed',
++                      used: 'terminal.accessUsed',
++                    }[accessBlockedReason] || null;
+                     const piecesCount = (node.items || []).reduce(
+                       (sum, entry) => sum + (Number(entry.quantity) || 0),
+                       0,
+@@ -496,42 +585,36 @@ export default function PlayerLootTradeOverlay() {
+                             </View>
+                           ) : nodeIsTerminal ? (
+                             <View style={styles.terminalButtons}>
+-                              {terminalClosed && (
++                              {accessBadgeKey && (
+                                 <View testID="terminal-closed-badge" style={styles.terminalClosedBadge}>
+-                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade('terminal.closedBadge')}</Text>
++                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade(accessBadgeKey)}</Text>
+                                 </View>
+                               )}
+                               <TouchableOpacity
+                                 accessibilityRole="button"
+-                                accessibilityState={{ disabled: terminalClosed }}
+-                                disabled={terminalClosed}
++                                accessibilityState={{ disabled: Boolean(accessBlockedReason) }}
++                                disabled={Boolean(accessBlockedReason)}
+                                 testID="terminal-view-button"
+-                                style={[styles.terminalViewButton, terminalClosed && styles.terminalButtonDisabled]}
++                                style={[styles.terminalViewButton, accessBlockedReason && styles.terminalButtonDisabled]}
+                                 onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
+                               >
+                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                               </TouchableOpacity>
+-                              {!terminalClosed && !terminalAwaiting
+-                                && !['playing', 'pendingDigest', 'won', 'awaitingRetry'].includes(terminalState?.game?.status) ? (
+-                                <TouchableOpacity
+-                                  accessibilityRole="button"
+-                                  testID="terminal-hack-button"
+-                                  style={styles.terminalHackButton}
+-                                  onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
+-                                >
+-                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+-                                </TouchableOpacity>
+-                              ) : (terminalClosed || terminalAwaiting) && (
+-                                <TouchableOpacity
+-                                  accessibilityRole="button"
+-                                  accessibilityState={{ disabled: true }}
+-                                  disabled
+-                                  testID="terminal-hack-button"
+-                                  style={[styles.terminalHackButton, styles.terminalButtonDisabled]}
+-                                >
+-                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+-                                </TouchableOpacity>
+-                              )}
++                              <TouchableOpacity
++                                accessibilityRole="button"
++                                accessibilityState={{ disabled: !hackAllowed }}
++                                disabled={!hackAllowed}
++                                testID="terminal-hack-button"
++                                style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
++                                onPress={() => {
++                                  // Один «Взломать» на трансляцию: даже если
++                                  // игрок закроет окно, кнопка не оживёт.
++                                  markTerminalAccess(accessKey);
++                                  setTerminalSelection({ node: terminalForSelection, autoStart: true });
++                                }}
++                              >
++                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                              </TouchableOpacity>
+                             </View>
+                           ) : (
+                             <TouchableOpacity
+@@ -562,6 +645,9 @@ export default function PlayerLootTradeOverlay() {
+               <Text style={styles.hubMasterClosesHint}>
+                 {tLootTrade('player.hubMasterClosesHint')}
+               </Text>
++              <Text style={styles.hubMasterClosesHint}>
++                {tLootTrade('player.leaveHubHint')}
++              </Text>
+             </View>
+           </View>
+         </Modal>
+@@ -1462,6 +1548,15 @@ const styles = StyleSheet.create({
+     borderColor: '#777777',
+     backgroundColor: '#2a2a2a',
+   },
++  leaveHubBtn: {
++    paddingHorizontal: 10,
++    paddingVertical: 7,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#8a5555',
++    backgroundColor: '#2b2222',
++  },
++  leaveHubBtnText: { color: '#e2a3a3', fontSize: 11, fontWeight: '700' },
+   minimizeBtnText: {
+     color: '#e5e5e5',
+     fontSize: 12,
+diff --git a/components/lootTrade/TerminalRetryPromptHost.js b/components/lootTrade/TerminalRetryPromptHost.js
+index cc9470b..9db2e62 100644
+--- a/components/lootTrade/TerminalRetryPromptHost.js
++++ b/components/lootTrade/TerminalRetryPromptHost.js
+@@ -38,9 +38,15 @@ const TerminalRetryPromptHost = () => {
+       if (busyRef.current) return;
+       busyRef.current = true;
+       try {
++        // Патч 506: БД больше не может заблокировать показ уведомления.
++        // Если локальное хранилище недоступно или транзакция зависла,
++        // продолжаем без ownerToken (он нужен только для ответа «Да/Нет»).
+         let ownerTokens = {};
+         try {
+-          const rows = await db.getFolderRooms();
++          const rows = await Promise.race([
++            db.getFolderRooms(),
++            new Promise((resolve) => setTimeout(() => resolve([]), 1000)),
++          ]);
+           ownerTokens = Object.fromEntries(
+             (rows || [])
+               .filter((row) => row?.code && row?.owner_token)
+@@ -123,9 +129,12 @@ const TerminalRetryPromptHost = () => {
+     };
+ 
+     const collect = (state) => {
++      // Патч 506: владельца определяем и по participant'у с role 'gm' —
++      // UI-режим вкладки больше не влияет на доставку сообщений Мастеру.
++      const clientId = state?.clientId || useRoomStore.getState().clientId;
+       const events = [
+-        ...findPending(state?.rooms).map((item) => ({ ...item, kind: 'retry' })),
+-        ...findCompleted(state?.rooms),
++        ...findPending(state?.rooms, clientId).map((item) => ({ ...item, kind: 'retry' })),
++        ...findCompleted(state?.rooms, clientId),
+       ];
+       for (const item of events) {
+         if (handledRef.current.has(item.key)) continue;
+diff --git a/components/lootTrade/terminalAccess.js b/components/lootTrade/terminalAccess.js
+new file mode 100644
+index 0000000..19cb10f
+--- /dev/null
++++ b/components/lootTrade/terminalAccess.js
+@@ -0,0 +1,47 @@
++/**
++ * Патч 506: доступ к терминалу привязан к трансляции, а не к локальному
++ * «открыто/закрыто» окну.
++ *
++ * Раньше признак «терминал открыт» жил в useState модалки: игрок закрывал
++ * окно, состояние исчезало, и кнопка «Взломать» в локации снова считала
++ * терминал доступным — сколько угодно раз подряд. Теперь сервер выдаёт
++ * стабильный `accessId` на каждую трансляцию; он не меняется на ходах и при
++ * правке карточки, но обновляется после явной повторной трансляции Мастера
++ * (reissue, повторная выдача локации или разрешение повторного взлома).
++ *
++ * Модуль чистый: его можно проверять без React Native.
++ */
++
++export const TERMINAL_BLOCKED_STATUSES = Object.freeze([
++  'won',
++  'awaitingRetry',
++  'closed',
++]);
++
++/** Ключ одноразового доступа: одна трансляция = один билет. */
++export const terminalAccessKey = ({ roomCode, containerId, accessId }) => (
++  `${roomCode}|${containerId}|${accessId || 'legacy'}`
++);
++
++/**
++ * Можно ли ещё нажимать «Взломать».
++ * `used` — отметки этой вкладки (объект accessKey → true).
++ */
++export const canHackTerminal = ({ used, key, game, terminalClosed, terminalAwaiting }) => {
++  if (terminalClosed || terminalAwaiting) return false;
++  if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return false;
++  if (used?.[key]) return false;
++  return true;
++};
++
++/** Подпись состояния терминала в списке локации. */
++export const terminalBlockedReason = ({ game, terminalClosed, terminalAwaiting, used, key }) => {
++  if (terminalClosed) return 'closed';
++  if (terminalAwaiting) return 'awaiting';
++  if (game?.status === 'won') return 'won';
++  if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return 'finished';
++  if (used?.[key]) return 'used';
++  return null;
++};
++
++export default canHackTerminal;
+diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
+index 689b40a..8ce9962 100644
+--- a/components/lootTrade/terminalRetryPrompt.js
++++ b/components/lootTrade/terminalRetryPrompt.js
+@@ -10,15 +10,30 @@ export const decisionKey = (code, containerId, game) => (
+   `${code}|${containerId}|${game?.revision ?? 'none'}`
+ );
+ 
++/**
++ * Патч 506: вкладки одного браузера делят UI-режим (localStorage), поэтому
++ * `role: 'gm'` в сторе у Мастера легко оказывается 'player' — глобальный хост
++ * тогда молчал и на провал, и на успех. Надёжный признак владельца — запись
++ * участника с role 'gm' и clientId ЭТОЙ вкладки (сервер её присылает в
++ * room.state / room.member независимо от UI-режима).
++ */
++export const isGmRoom = (room, clientId = null) => {
++  if (room?.role === 'gm') return true;
++  if (!clientId || !Array.isArray(room?.members)) return false;
++  return room.members.some(
++    (member) => member?.role === 'gm' && member?.clientId === clientId,
++  );
++};
++
+ /**
+  * Из состояний комнат выбирает провалившиеся партии, по которым Мастер ещё
+  * не ответил. Игровые комнаты (role: 'player') и уже закрытые терминалы
+  * никогда не порождают вопрос.
+  */
+-export const findPending = (rooms) => {
++export const findPending = (rooms, clientId = null) => {
+   const pending = [];
+   for (const [code, room] of Object.entries(rooms || {})) {
+-    if (room?.role !== 'gm') continue;
++    if (!isGmRoom(room, clientId)) continue;
+     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
+       if (terminal?.game?.status !== 'awaitingRetry') continue;
+       if (terminal?.closed) continue;
+@@ -41,10 +56,10 @@ export const findPending = (rooms) => {
+  * Мастеру как отдельное событие. Префикс в ключе исключает коллизию с
+  * вопросом `findPending` по той же ревизии партии.
+  */
+-export const findCompleted = (rooms) => {
++export const findCompleted = (rooms, clientId = null) => {
+   const completed = [];
+   for (const [code, room] of Object.entries(rooms || {})) {
+-    if (room?.role !== 'gm') continue;
++    if (!isGmRoom(room, clientId)) continue;
+     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
+       if (terminal?.game?.status !== 'won') continue;
+       if (terminal?.closed) continue;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 20c68e8..719dc22 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,46 @@
+ # Changelog
+ ---
++## GM notice, one-time terminal access and leaving a location (patch 506)
++
++The owner tested 505 in two tabs of one browser: "in the GM tab I do not see
++the terminal-hacked notice. As a player I can close the terminal and the
++terminal window remains, but it is actually the location window. And since
++it is an active location window I can hack the terminal again and again and
++again. This looks like an architectural bug. The terminal must not open again.
++Players should be able to disconnect from a location themselves with a
++'leave location' button next to 'minimize' in the modal."
++
++- **GM notice.** The global host selected events only by `role: 'gm'` in the
++  store. But the UI mode of tabs in one browser is shared (localStorage), so
++  the owner easily ended up with `role: 'player'` — both the failure question
++  and the success notice stayed silent. Ownership is now also detected from
++  the room member with `role: 'gm'` and this tab's `clientId` (the server
++  sends the member list regardless of interface mode). Loading `ownerToken`
++  can no longer block display (one-second cap), and `AlertHost` is mounted
++  above the "What's new" window so it cannot be covered.
++- **One-time access.** Whether a terminal is open no longer lives in the
++  modal's local state. The server issues a stable `accessId` per broadcast:
++  it does not change on turns or card edits, but is renewed after `reissue`,
++  re-broadcasting the location, or the GM answering "Yes". The pure
++  `terminalAccess.js` rule disables "Hack" after the first press and both
++  buttons after `won` / `awaitingRetry` / `closed`; the player sees a state
++  badge instead of another opening. The same rule applies to a standalone
++  terminal.
++- **"Leave location".** `playerCloseSession` previously refused to close a
++  `hub` for players, and the outer location window offered only "Minimize".
++  A "Leave location" button now sits next to it: the server adds the
++  `clientId` to `session.closedByClientIds`, that player's overlay stops
++  showing the scene, and the GM session stays active for everyone else.
++  Only the GM can still end the scene for all.
++- Paired RU/EN labels: "Leave location", its hint, "ACCESS USED", and an
++  updated note about ending the scene.
++
++Unchanged: all 504/505 rules, the word-count formula, three groups,
++4 attempts, Science brackets, Luck, the Hacker perk, operator takeover and
++the dictionary.
++
++Installation: `docs/patch-506-install.md`.
++
+ ## A successful hack no longer disappears (patch 505)
+ 
+ The owner tested the game in two tabs of one browser: "I found a 5/7 match,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index bfe8ed6..33f4e1f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,47 @@
+ # История изменений
+ 
+ ---
++## Уведомление Мастера, одноразовый доступ и выход из локации (патч 506)
++
++Владелец проверил 505 в одном браузере в двух вкладках: «я во вкладке мастера
++не вижу уведомление, что терминал взломан. А игроком я могу закрыть терминал
++и останется окно терминала, но по факту оно считается окном локации. И
++поскольку это активное окно локации я могу терминал взломать ещё раз и ещё и
++ещё. Тут видимо архитектурный баг. Терминал не должен открываться снова. И
++игроки должны иметь возможность сами отключаться от локации по кнопке
++"покинуть локацию". Предлагаю её разместить рядом с кнопкой "свернуть" в
++модалке».
++
++- **Уведомление Мастеру.** Глобальный хост отбирал события только по
++  `role: 'gm'` в сторе. Но UI-режим вкладок одного браузера общий
++  (localStorage), поэтому владелец легко оказывался с ролью `player` — молчал
++  и вопрос о провале, и сообщение об успехе. Теперь владелец определяется и
++  по участнику комнаты с `role: 'gm'` и `clientId` этой вкладки (сервер
++  присылает список независимо от режима интерфейса). Загрузка `ownerToken`
++  больше не может заблокировать показ (ограничена секундой), а `AlertHost`
++  смонтирован поверх окна «Что нового», чтобы его не перекрывало.
++- **Одноразовый доступ.** Признак «терминал открыт» больше не живёт в
++  локальном состоянии модалки. Сервер выдаёт стабильный `accessId` на каждую
++  трансляцию: он не меняется на ходах и при правке карточки, но обновляется
++  после `reissue`, повторной выдачи локации или ответа «Да» Мастера. Чистое
++  правило `terminalAccess.js` блокирует «Взломать» после первого нажатия и
++  обе кнопки — после `won` / `awaitingRetry` / `closed`; вместо повторного
++  открытия игрок видит отметку состояния. То же правило применено к
++  терминалу, выданному напрямую.
++- **«Покинуть локацию».** Раньше `playerCloseSession` явно запрещал игрокам
++  закрывать `hub`, а внешнее окно локации предлагало только «Свернуть».
++  Теперь рядом с ней стоит кнопка «Покинуть локацию»: сервер добавляет
++  `clientId` в `session.closedByClientIds`, оверлей игрока перестаёт
++  показывать сцену, а сессия Мастера остаётся активной для остальных.
++  Закрыть сцену целиком по-прежнему может только Мастер.
++- Парные RU/EN подписи: «Покинуть локацию», пояснение к ней,
++  «ДОСТУП ИСПОЛЬЗОВАН», обновлённая подсказка о завершении сцены.
++
++Не изменились: условия 504/505, формула числа слов, три группы, 4 попытки,
++скобки по Науке, удача, перк «Хакер», смена оператора и словарь.
++
++Установка: `docs/patch-506-install.md`.
++
+ ## Успешный взлом больше не пропадает (патч 505)
+ 
+ Владелец проверял игру в одном браузере в двух вкладках: «Нашёл комбинацию
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index ccc5e16..1f6bffc 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -137,6 +137,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. A *Programmer’s Digest* magazine grants one more attempt before the GM decides.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
++- **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index f01319c..44e8a13 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -137,6 +137,7 @@
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. *Programmer’s Digest* даёт ещё одну попытку до решения Мастера.
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
++- **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 2c1048b..420f7e6 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 24a06ca..567d547 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 3a4a2e7..308d875 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 315ed0f..26bef0d 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 39271e1..9091dd3 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index fbc8c1b..7887868 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index dab85f1..9436ab2 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ > **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 5349ea5..c857cc1 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ > **Решение Мастера вместо блокировки после провала — в `docs/patch-504-install.md`.**
+ 
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index bb812fe..92f4c53 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ > **Успешный взлом больше не пропадает, Мастер получает уведомление — в `docs/patch-505-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 503** (коммит `13f2ff6`, ветка
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 40ed062..15d81dc 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Одноразовый доступ к терминалу, уведомление Мастеру и «Покинуть локацию» — в `docs/patch-506-install.md`.**
++
+ Патч подготовлен от состояния **версии 504** (коммит `c4a3510`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–505
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+new file mode 100644
+index 0000000..08138f3
+--- /dev/null
++++ b/docs/patch-506-install.md
+@@ -0,0 +1,143 @@
++# Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++
++Патч подготовлен от состояния **версии 505** (коммит `d1adc5f`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–506
++цепочкой.
++
++## Что изменилось
++
++Владелец тестировал **в одном браузере в двух вкладках** и сообщил: «я во
++вкладке мастера не вижу уведомление, что терминал взломан. А игроком я могу
++закрыть терминал и останется окно терминала, но по факту оно считается окном
++локации. И поскольку это активное окно локации я могу терминал взломать ещё
++раз и ещё и ещё. Тут видимо архитектурный баг. Терминал не должен открываться
++снова. И игроки должны иметь возможность сами отключаться от локации по
++кнопке "покинуть локацию". Предлагаю её разместить рядом с кнопкой "свернуть"
++в модалке».
++
++### 1. Уведомление Мастера больше не теряется
++
++Глобальный хост `TerminalRetryPromptHost` отбирал события только по
++`room.role === 'gm'` в сторе. UI-режим вкладок одного браузера общий
++(`localStorage`), поэтому вкладка владельца легко оказывалась с ролью
++`player`: молчал и вопрос «Разрешить повторный взлом?», и сообщение
++«Терминал взломан». Проверено рендер-тестом: при `role: 'gm'` алерт
++вызывается, при `role: 'player'` — нет.
++
++- `terminalRetryPrompt.js`: новый `isGmRoom(room, clientId)` считает комнату
++  мастерской и по `role: 'gm'`, **и** по участнику с `role: 'gm'` и `clientId`
++  этой вкладки. Список участников присылает сервер, он не зависит от
++  переключателя «Пользователь / Админ».
++- `findPending()` и `findCompleted()` принимают `clientId`; хост передаёт его
++  из стора.
++- Загрузка `ownerToken` из локальной БД обёрнута в `Promise.race` с
++  секундным ограничением: зависшая транзакция больше не блокирует очередь диалогов.
++- В `App.js` `<UpdateNoticeModal />` теперь смонтирован **до** `<AlertHost />`:
++  окно «Что нового» после обновления больше не перекрывает уведомление.
++
++### 2. Терминал не открывается снова
++
++Признак «терминал открыт» жил в `useState` модалки — закрыл окно, состояние
++исчезло, и кнопка «Взломать» в окне локации снова считала терминал
++свободным. Это и был архитектурный дефект: состояние игрового доступа
++принадлежало экрану, а не домену.
++
++- **Сервер.** `terminalPublic` теперь отдаёт `accessId` — стабильный номер
++  трансляции. Он создаётся при первой выдаче, **не меняется** на ходах, при
++  правке карточки и при обычном `issueTerminal`, но обновляется после
++  `reissue`, повторной выдачи локации (`openSession`) и ответа Мастера «Да».
++- **Клиент.** Чистый модуль `components/lootTrade/terminalAccess.js` даёт
++  `terminalAccessKey`, `canHackTerminal` и `terminalBlockedReason`.
++  `PlayerLootTradeOverlay` запоминает израсходованный билет в своём состоянии
++  (а не в модалке): первое нажатие «Взломать» блокирует кнопку до новой
++  трансляции, а после `won` / `awaitingRetry` / `closed` блокируются **обе**
++  кнопки с отметкой «Взломан» / «Ожидает решения» / «ЗАКРЫТ» /
++  «ДОСТУП ИСПОЛЬЗОВАН». Наблюдать за активной доской по «Смотреть» до взлома
++  по-прежнему можно.
++- Та же одноразовость применена к терминалу, выданному напрямую: после
++  закрытия плашка «Открыть терминал» больше не возвращает в мини-игру.
++
++### 3. «Покинуть локацию» рядом со «Свернуть»
++
++Раньше `playerCloseSession` явно запрещал игрокам закрывать `hub` («Локацию
++может закрыть только Мастер»), а внешнее окно локации предлагало только
++«Свернуть».
++
++- В шапке внешнего окна локации добавлена кнопка **«Покинуть локацию»**
++  (`testID="leave-hub-button"`) рядом с **«Свернуть»**.
++- `leaveLocation()` вызывает `playerCloseRoomSession`; сервер для `hub`
++  теперь добавляет `clientId` в `session.closedByClientIds`, **не гасит**
++  сессию и рассылает обновление всем. `matchedContext` оверлея уже читает это
++  поле — окно исчезает только у ушедшего игрока.
++- Сцену целиком по-прежнему закрывает только Мастер; `lastClosedSession` для
++  локации не создаётся. Подсказка под списком узлов обновлена.
++- Парные RU/EN подписи: `player.leaveHub`, `player.leaveHubHint`, обновлённый
++  `player.hubMasterClosesHint`, `terminal.accessUsed`.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/roomRegistry.js` | `accessId` на трансляцию; игрок может покинуть `hub` |
++| `components/lootTrade/terminalAccess.js` | новый чистый модуль одноразового доступа |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | билеты доступа, блокировка кнопок, «Покинуть локацию» |
++| `components/lootTrade/terminalRetryPrompt.js` | `isGmRoom()` по участнику комнаты |
++| `components/lootTrade/TerminalRetryPromptHost.js` | `clientId`, защита от зависшей БД |
++| `App.js` | `AlertHost` поверх «Что нового» |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
++| `__tests__/room/terminal-access-506.test.js` | 9 приёмочных проверок |
++| `__tests__/room/room-server.integration.test.js` | WS: выход из локации и новый `accessId` |
++| `__tests__/room/terminal-gm-retry-504.test.js` | обновлено ожидание блокировки кнопок |
++| `public/version.json`, `patchs/baseline.json` | версия 506, 60/60 заметок |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `patchs/506-terminal-access-and-leave.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 505:
++
++```bash
++./apply-patch.sh 506
++# ✓ Установлен патч: №506 (версия 505 → 506)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 506
++```
++
++`patchs/baseline.json` в источнике равен `506`. После установки
++`public/version.json` → `506`; закоммитьте изменения, **перезапустите сервис
++Node.js** (новое поле `accessId` и правило выхода из локации живут на
++сервере) и пересоберите веб-сборку. Уже открытые партии начните заново.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-access-506.test.js
++npx vitest run __tests__/room/room-server.integration.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "506"'
++```
++
++Приёмочный тест `__tests__/room/terminal-access-506.test.js` покрывает: чистое
++правило одного «Взломать» на билет, блокировку финальными статусами,
++стабильность `accessId` на ходах и правке карточки, смену после `reissue` и
++повторной выдачи локации, определение владельца по участнику (вкладка с
++ролью `player` получает уведомление), приоритет `AlertHost`, порядок
++«Покинуть локацию» рядом со «Свернуть» и парность словарей. WS-тест
++проверяет, что после ухода первого игрока сессия остаётся активной для
++второго, а `reissue` выдаёт новый `accessId`.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/506-terminal-access-and-leave.patch
++cp /path/to/506-terminal-access-and-leave.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index 3f1c5c0..9fd3269 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -9,6 +9,8 @@
+ > «Разрешить повторный взлом? Да/Нет» — см. `docs/patch-504-install.md`.
+ > Патч 505 зафиксировал «ДОСТУП РАЗРЕШЁН» и добавил уведомление Мастеру
+ > об успехе — см. `docs/patch-505-install.md`.
++> Патч 506 привязал доступ к терминалу к трансляции и добавил выход из локации —
++> см. `docs/patch-506-install.md`.
+ > История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 401b235..bf9ff40 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -187,7 +187,9 @@
+     "close": "Close",
+     "backToLocation": "← Location",
+     "hubEmpty": "No accessible objects in this location yet.",
+-    "hubMasterClosesHint": "This location window stays open until the GM ends the scene.",
++    "hubMasterClosesHint": "The GM ends the scene for everyone; you may leave on your own.",
++    "leaveHub": "Leave location",
++    "leaveHubHint": "You will disconnect from the location; other players stay in it.",
+     "hubNodeLockedBadge": "🔒 Locked",
+     "hubNodeLockedDefaultHint": "Requires lockpicking or GM permission",
+     "hubNodeOpenLoot": "Open",
+@@ -272,6 +274,7 @@
+     "stateClosed": "Closed",
+     "stateWon": "Hacked",
+     "retryFailed": "Could not apply the Game Master decision",
++    "accessUsed": "ACCESS USED",
+     "hackedTitle": "Terminal hacked",
+     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
+     "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 89cbb73..4934f8c 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -187,7 +187,9 @@
+     "close": "Закрыть",
+     "backToLocation": "← К локации",
+     "hubEmpty": "В этой локации пока нет доступных объектов.",
+-    "hubMasterClosesHint": "Окно локации закроется, когда Мастер завершит сцену.",
++    "hubMasterClosesHint": "Сцену целиком завершает Мастер; покинуть локацию игрок может сам.",
++    "leaveHub": "Покинуть локацию",
++    "leaveHubHint": "Вы отключитесь от локации, остальные игроки останутся в ней.",
+     "hubNodeLockedBadge": "🔒 Заперто",
+     "hubNodeLockedDefaultHint": "Требуется взлом или разрешение Мастера",
+     "hubNodeOpenLoot": "Открыть",
+@@ -272,6 +274,7 @@
+     "stateClosed": "Закрыт",
+     "stateWon": "Взломан",
+     "retryFailed": "Не удалось применить решение Мастера",
++    "accessUsed": "ДОСТУП ИСПОЛЬЗОВАН",
+     "hackedTitle": "Терминал взломан",
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
+     "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера."
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 05fc1f4..bbea7e3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "505"
++  "baseline": "506"
+ }
+diff --git a/public/version.json b/public/version.json
+index a0639f0..d9c3b6c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "505",
++  "version": "506",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Мастер теперь получает уведомление о взломанном терминале в любой вкладке браузера: владелец определяется по участнику комнаты, а не по переключателю режима интерфейса.",
++      "Терминал нельзя открыть заново после первого взлома: доступ привязан к трансляции Мастера, поэтому закрытие окна больше не возвращает кнопку «Взломать».",
++      "В окне локации рядом с «Свернуть» появилась кнопка «Покинуть локацию»: игрок отключается сам, а сцена остаётся открытой для остальных участников.",
++      "После успеха, провала или закрытия терминала обе кнопки карточки блокируются с понятной отметкой состояния; новая трансляция Мастера снова открывает доступ.",
+       "Теперь после удачного взлома доска не сбрасывается: надпись «ДОСТУП РАЗРЕШЁН» и все подсказки остаются на экране, пока ведущий не транслирует терминал заново.",
+       "Ведущий получает уведомление «Терминал взломан» с именем оператора, даже если в этот момент открыт другой раздел приложения.",
+       "Если попытки закончились, найденные подсказки вроде «5 из 7» больше не пропадают: они видны рядом с сообщением о провале.",
+@@ -61,6 +65,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The Game Master now receives the terminal-hacked notice in any browser tab: ownership is detected from the room member list rather than the interface mode switch.",
++      "A terminal can no longer be opened again after the first hack: access is tied to the Game Master broadcast, so closing the window no longer restores the \"Hack\" button.",
++      "The location window now has a \"Leave location\" button next to \"Minimize\": the player disconnects on their own while the scene stays open for everyone else.",
++      "After a success, a failure or a closed terminal both card buttons are disabled with a clear state badge; a new broadcast by the Game Master restores access.",
+       "After a successful hack the board no longer resets: «ACCESS GRANTED» and every hint stay on screen until the Game Master broadcasts the terminal again.",
+       "The Game Master now receives a «Terminal hacked» notice with the operator name, even while viewing a different part of the app.",
+       "When all attempts are used, discovered hints such as «5 of 7» remain visible next to the failure message.",
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 4d618d1..1f25416 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -35,6 +35,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
+   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
+   const lastRng = rng; // jest/vitest подмена
++  // Патч 506: номер трансляции терминала. Не меняется на ходах и при правке
++  // карточки; обновляется только после явной повторной выдачи Мастером.
++  // Клиент использует его как «билет» одноразового доступа к мини-игре.
++  let broadcastCounter = 0;
++  const newBroadcastId = () => `broadcast-${++broadcastCounter}`;
+ 
+   const touchRateLog = (log, key, windowMs, max) => {
+     const cutoff = now() - windowMs;
+@@ -337,6 +342,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
+     awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
+     standaloneIssued: Boolean(entry.standaloneIssued),
++    // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
++    // открыть терминал один раз за трансляцию, даже если закрыл окно.
++    accessId: entry.accessId || null,
+     game: publicGameState(entry.game),
+     updatedAt: entry.updatedAt,
+   });
+@@ -353,6 +361,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         config,
+         closed: false,
+         standaloneIssued,
++        accessId: newBroadcastId(),
+         game: null,
+         updatedAt: now(),
+       };
+@@ -367,6 +376,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       config,
+       closed: reissue ? false : Boolean(previous.closed),
+       standaloneIssued: standaloneIssued || Boolean(previous.standaloneIssued),
++      // Повторная трансляция выдаёт новый «билет»; обычная правка карточки — нет.
++      accessId: reissue ? newBroadcastId() : (previous.accessId || newBroadcastId()),
+       game,
+       updatedAt: now(),
+     };
+@@ -452,6 +463,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         fresh.operatorName = operatorName;
+         entry.game = fresh;
+         entry.closed = false;
++        entry.accessId = newBroadcastId();
+         if (Array.isArray(fresh.wordRanges)) {
+           const words = fresh.wordRanges.map((range) => range.word);
+           room.recentTerminalWords = [...words, ...(room.recentTerminalWords || [])].slice(0, 60);
+@@ -462,6 +474,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       // unlock/reset/reissue — повторная трансляция терминала.
+       entry.closed = false;
+       entry.game = null;
++      entry.accessId = newBroadcastId();
+       entry.updatedAt = now();
+       return { room, terminal: terminalPublic(id, entry) };
+     }
+@@ -570,14 +583,24 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (sessionId && current.sessionId !== String(sessionId)) {
+       return { room, session: current, closedSession: null, closedReason: null };
+     }
+-    // Локацию ('hub') может закрыть только Мастер; игроки закрывают лишь вложенные окна внутри неё.
+-    if (current.kind === 'hub') {
+-      return { room, session: current, closedSession: null, closedReason: null };
+-    }
+-
+     const closedSet = new Set(current.closedByClientIds || []);
+     closedSet.add(clientId);
+ 
++    // Патч 506: «Покинуть локацию». Игрок отключается от выданной локации
++    // сам, но сессия Мастера остаётся активной для остальных игроков —
++    // локацию по-прежнему закрывает только Мастер. Просто помечаем этого
++    // участника в closedByClientIds (оверлей игрока уже читает это поле).
++    if (current.kind === 'hub') {
++      const nextSession = {
++        ...current,
++        closedByClientIds: [...closedSet],
++        revision: current.revision + 1,
++        updatedAt: now(),
++      };
++      room.activeSession = nextSession;
++      return { room, session: nextSession, closedSession: null, closedReason: null };
++    }
++
+     if (!hasRemainingActiveSessionViewers(room, current, closedSet)) {
+       const closedSession = {
+         ...current,

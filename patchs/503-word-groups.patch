@@ -1,0 +1,1221 @@
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index ec588f5..c253318 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -177,11 +177,28 @@ describe('roomServer: create/join/presence', () => {
+ 
+       const observerState = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.containerId === 'term-1' && m.payload.terminal?.game?.status === 'playing');
+       expect(observerState.payload.terminal.game.operatorClientId).toBe('player-terminal-1');
+-      const blockedReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
++      // Патч 503: «Взломать» от другого персонажа собирает доску под ЕГО лист.
++      // Партия остаётся одна на всех; прежний оператор становится зрителем.
++      const takeoverReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+         containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
+       }, code);
+-      const blocked = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === blockedReq);
+-      expect(blocked.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
++      const takeover = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === takeoverReq);
++      expect(takeover.payload.terminal.game).toMatchObject({
++        operatorClientId: 'player-terminal-2', operatorCharacterId: 'char-terminal-2', status: 'playing',
++      });
++      // Повторный start от того же оператора не сбрасывает его прогресс.
++      const repeatReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
++      }, code);
++      const repeat = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === repeatReq);
++      expect(repeat.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
++      // Прежний оператор теперь только наблюдает.
++      const oldGuessReq = await operator.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: 'term-1', action: 'guess', characterId: 'char-terminal-1',
++        value: takeover.payload.terminal.game.wordRanges[0].id,
++      }, code);
++      const oldGuess = await operator.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === oldGuessReq);
++      expect(oldGuess.payload.code).toBe('TERMINAL_VIEW_ONLY');
+ 
+       gm.close();
+       operator.close();
+diff --git a/__tests__/room/terminal-groups-503.test.js b/__tests__/room/terminal-groups-503.test.js
+new file mode 100644
+index 0000000..0ad6e13
+--- /dev/null
++++ b/__tests__/room/terminal-groups-503.test.js
+@@ -0,0 +1,237 @@
++// Приёмочный тест патча 503. Владелец сообщил о трёх проблемах:
++//   1) «Сначала одним персонажем из комнаты пытался взломать (ИНТ 8, Наука 4).
++//      Потом подключил другого игрока и попробовал им. Но терминал считал
++//      кол-во слов и скобок от старого персонажа, хотя терминал открыл новый».
++//      Ответ владельца: «Взламывать терминал одновременно может только 1 игрок.
++//      Другие могут только смотреть. При нажатии взлом проверять характеристики
++//      игрока, который нажал взлом. Может все 5 человек по очереди захотят
++//      попробовать? Каждому свои условия».
++//   2) «Полное восстановление попытки должно появиться не более 1 раза на доску».
++//   3) «Пусть будет 3 группы слов у которых есть некоторые общие сочетания
++//      для группы. Допустим окончания, on/ion, ly/tly, The/tho. Сначала надо
++//      будет понять какая группа окончаний верная, потом в этой группе понять
++//      например ion или on верная последовательность. Это могут быть не
++//      окончания, а приставки или суффиксы».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  GROUP_VARIANTS,
++  WORD_GROUPS,
++  applyGameAction,
++  buildGroupedPasswordSet,
++  createGame,
++  passwordWordCount,
++  positionalLikeness,
++  publicGameState,
++} from '../../server/terminalHacking.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const snapshot = (int = 4, science = 0, luck = 4, name = 'Оператор') => ({
++  characterName: name,
++  attributes: [{ name: 'INT', value: int }, { name: 'LCK', value: luck }],
++  skills: [{ name: 'SCIENCE', value: science }],
++});
++const gameFor = (int, science, difficulty = 5, luck = 4, seed = 0.42) => createGame({
++  config: { containerId: 't', name: 'T', difficulty, lockOnFailure: false },
++  operatorClientId: 'p', operatorCharacterId: 'c',
++  characterSnapshot: snapshot(int, science, luck), now: 100, rng: () => seed,
++});
++
++describe('503: три группы с общими сочетаниями', () => {
++  it('ровно 3 группы по 2 варианта; все слова реальные; пароль один', () => {
++    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
++      for (const int of [4, 10]) {
++        const selection = buildGroupedPasswordSet({
++          wordLength: difficulty + 4,
++          wordCount: passwordWordCount(difficulty, int),
++          rng: () => 0.31,
++        });
++        expect(selection).toBeTruthy();
++        expect(selection.groups).toHaveLength(WORD_GROUPS);
++        expect(selection.groupVariants).toBe(GROUP_VARIANTS);
++        expect(selection.groups.filter((g) => g.winner)).toHaveLength(1);
++        expect(new Set(selection.words).size).toBe(selection.wordCount);
++        expect(selection.words.filter((w) => w === selection.password)).toHaveLength(1);
++        for (const group of selection.groups) {
++          expect(group.base.length).toBeGreaterThanOrEqual(2);
++          expect(group.variants).toHaveLength(GROUP_VARIANTS);
++          // Варианты — разные последовательности с общей основой (например
++          // TION/SION при основе ION), а не одно и то же сочетание.
++          expect(group.variants[0]).not.toBe(group.variants[1]);
++          expect(group.variants.every((v) => v.includes(group.base))).toBe(true);
++        }
++      }
++    }
++  });
++
++  it('-gradient: свой вариант > другой вариант своей группы > чужие группы', () => {
++    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
++      for (let k = 1; k <= 10; k += 1) {
++        const selection = buildGroupedPasswordSet({
++          wordLength: difficulty + 4,
++          wordCount: passwordWordCount(difficulty, 10),
++          rng: () => k / 11,
++        });
++        const winner = selection.groups.find((g) => g.winner);
++        const sibling = winner.variants.find((v) => v !== selection.winnerVariant);
++        const belongs = (word, fragment) => (winner.position === 'end'
++          ? word.endsWith(fragment) : word.startsWith(fragment));
++        const level = (word) => {
++          if (belongs(word, selection.winnerVariant)) return 2;
++          if (belongs(word, sibling)) return 1;
++          return 0;
++        };
++        const levels = [[], [], []];
++        for (const word of selection.words) {
++          if (word === selection.password) continue;
++          levels[level(word)].push(positionalLikeness(word, selection.password));
++        }
++        const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
++        expect(mean(levels[2]), `D${difficulty} свой вариант`).toBeGreaterThan(mean(levels[1]));
++        expect(mean(levels[1]), `D${difficulty} другой вариант`).toBeGreaterThan(mean(levels[0]));
++        // Высокая подсказка допустима: вплоть до L−1 из L.
++        expect(selection.likenessCap).toBe(difficulty + 3);
++      }
++    }
++  });
++
++  it('подсказка в окне показывает N из M, а не голое число', () => {
++    const modal = read('components/lootTrade/TerminalHackingModal.js');
++    expect(modal).toContain('${guess.likeness}/${game?.wordLength');
++  });
++
++  it('публичное состояние не выдаёт пароль и состав групп', () => {
++    const view = publicGameState(gameFor(10, 6));
++    expect(view.password).toBeUndefined();
++    expect(view.groups).toBeUndefined();
++    expect(view.groupCount).toBe(WORD_GROUPS);
++    expect(view.groupVariants).toBe(GROUP_VARIANTS);
++    expect(view.wordRanges.every((entry) => !('isPassword' in entry))).toBe(true);
++    expect(view.bracketRanges.every((entry) => !('effect' in entry) && !('recovery' in entry))).toBe(true);
++  });
++});
++
++describe('503: полное восстановление не более 1 раза на доску', () => {
++  it('при Удаче 10 и Науке 6 только ОДНА скобка несёт полный возврат', () => {
++    expect(GROUP_VARIANTS).toBe(2);
++    for (let k = 1; k <= 24; k += 1) {
++      const game = gameFor(10, 6, 5, 10, k / 25);
++      const full = game.bracketRanges.filter((b) => b.effect.full);
++      expect(full.length, `доска ${k}`).toBeLessThanOrEqual(1);
++      // Остальные скобки сохраняют свой обычный эффект (скорбка = один эффект).
++      for (const bracket of game.bracketRanges) {
++        expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
++      }
++    }
++  });
++
++  it('даже если все скобки принудительно «полные», попытки не выше 4 и сброс один', () => {
++    const game = gameFor(10, 6, 5, 10);
++    const forced = {
++      ...game,
++      attempts: 1,
++      bracketRanges: game.bracketRanges.map((b) => ({
++        ...b, effect: { words: 0, attempts: 0, full: true, kind: b.kind }, recovery: true,
++      })),
++    };
++    let next = forced;
++    let resets = 0;
++    for (const bracket of forced.bracketRanges) {
++      const before = next.result;
++      next = applyGameAction({
++        game: next, action: 'bracket', clientId: 'p', characterId: 'c',
++        characterSnapshot: {}, value: bracket.id, now: 101, rng: () => 0,
++      }).game;
++      if (next.result === 'ATTEMPTS RESET' && before !== 'ATTEMPTS RESET') resets += 1;
++      expect(next.attempts).toBeLessThanOrEqual(next.maxAttempts);
++    }
++    expect(resets).toBe(1);
++    expect(next.resetUsed).toBe(true);
++    expect(next.attempts).toBeLessThanOrEqual(4);
++  });
++});
++
++describe('503: смена оператора по нажатию «Взломать»', () => {
++  it('доска второго игрока считается по ЕГО ИНТ и Науке; первый становится зрителем', () => {
++    const registry = createRoomRegistry();
++    const { room } = registry.createRoom({ clientId: 'gm-1' });
++    registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++    registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Второй', role: 'player' });
++    // Точный сценарий владельца: ИНТ 8 / Наука 4 у первого игрока.
++    registry.putSnapshot({
++      code: room.code, characterId: 'char-1', revision: 1, fromClientId: 'p1',
++      snapshot: { name: 'Первый', data: snapshot(8, 4, 4, 'Первый') },
++    });
++    registry.putSnapshot({
++      code: room.code, characterId: 'char-2', revision: 1, fromClientId: 'p2',
++      snapshot: { name: 'Второй', data: snapshot(10, 6, 8, 'Второй') },
++    });
++    const config = { containerId: 'term-5', name: 'Терминал', difficulty: 5 };
++    expect(registry.issueTerminal({ code: room.code, clientId: 'gm-1', config }).error).toBeUndefined();
++
++    const first = registry.terminalAction({
++      code: room.code, clientId: 'p1', characterId: 'char-1',
++      containerId: config.containerId, action: 'start',
++    });
++    expect(first.error).toBeUndefined();
++    const g1 = first.terminal.game;
++    expect(g1.intelligence).toBe(8);
++    expect(g1.science).toBe(4);
++    expect(g1.wordCount).toBe(passwordWordCount(5, 8)); // 17 слов
++    expect(g1.bracketRanges).toHaveLength(3);           // Наука 4
++
++    // Первый игрок ещё не закончил — второй нажимает «Взломать».
++    const second = registry.terminalAction({
++      code: room.code, clientId: 'p2', characterId: 'char-2',
++      containerId: config.containerId, action: 'start',
++    });
++    expect(second.error).toBeUndefined();
++    const g2 = second.terminal.game;
++    expect(g2.operatorClientId).toBe('p2');
++    expect(g2.operatorCharacterId).toBe('char-2');
++    expect(g2.operatorName).toBe('Второй');
++    expect(g2.intelligence).toBe(10);
++    expect(g2.science).toBe(6);
++    expect(g2.luck).toBe(8);
++    expect(g2.wordCount).toBe(passwordWordCount(5, 10)); // 15 слов, а не 17
++    expect(g2.bracketRanges).toHaveLength(4);            // Наука 6, а не 3
++    expect(g2.attempts).toBe(4);                         // новая партия
++    expect(g2.guesses).toHaveLength(0);
++    expect(g2.groupCount).toBe(WORD_GROUPS);
++
++    // Повторный start от того же оператора не сбрасывает прогресс.
++    const repeat = registry.terminalAction({
++      code: room.code, clientId: 'p2', characterId: 'char-2',
++      containerId: config.containerId, action: 'start',
++    });
++    expect(repeat.error).toBe('TERMINAL_ALREADY_ACTIVE');
++
++    // Первый игрок теперь только наблюдает: его ход отклоняется.
++    const spectator = registry.terminalAction({
++      code: room.code, clientId: 'p1', characterId: 'char-1',
++      containerId: config.containerId, action: 'guess', value: g2.wordRanges[0].id,
++    });
++    expect(spectator.error).toBe('TERMINAL_VIEW_ONLY');
++
++    // Пятый игрок тоже может попробовать в свою очередь — со своими условиями.
++    registry.joinRoom({ code: room.code, clientId: 'p5', name: 'Пятый', role: 'player' });
++    registry.putSnapshot({
++      code: room.code, characterId: 'char-5', revision: 1, fromClientId: 'p5',
++      snapshot: { name: 'Пятый', data: snapshot(4, 0, 4, 'Пятый') },
++    });
++    const fifth = registry.terminalAction({
++      code: room.code, clientId: 'p5', characterId: 'char-5',
++      containerId: config.containerId, action: 'start',
++    });
++    expect(fifth.error).toBeUndefined();
++    expect(fifth.terminal.game.wordCount).toBe(passwordWordCount(5, 4)); // 21 слово
++    expect(fifth.terminal.game.bracketRanges).toHaveLength(0);
++    expect(fifth.terminal.game.operatorName).toBe('Пятый');
++  });
++});
+diff --git a/__tests__/room/terminal-hacking-balance-500.test.js b/__tests__/room/terminal-hacking-balance-500.test.js
+index e09c5be..568aa52 100644
+--- a/__tests__/room/terminal-hacking-balance-500.test.js
++++ b/__tests__/room/terminal-hacking-balance-500.test.js
+@@ -1,6 +1,6 @@
+ // Приёмочный тест патча 500: канонические 4 попытки, N = 15 + 2·D − ИНТ,
+ // скобки двух сортов, число скобок задаёт Наука, удача 5–20 %,
+-// доска «последовательности».
++// доска из трёх групп с общими сочетаниями (патч 503).
+ import { describe, expect, it } from 'vitest';
+ import { getWordsByLength } from '../../server/terminalWords/index.js';
+ import {
+@@ -11,6 +11,9 @@ import {
+   MAX_LIKENESS_BY_DIFFICULTY,
+   MIN_AMBIGUITY_BY_DIFFICULTY,
+   MIN_SHARED_BY_DIFFICULTY,
++  WORD_GROUPS,
++  GROUP_VARIANTS,
++  buildGroupedPasswordSet,
+   bracketSplitFor,
+   applyGameAction,
+   attemptsForDifficulty,
+@@ -118,7 +121,7 @@ describe('патч 500: число слов, попытки и скобочны
+   });
+ });
+ 
+-describe('патч 500: доска «последовательности»', () => {
++describe('патч 503: доска из трёх групп', () => {
+   it('MIN_SHARED = L−3, предел подсказки из 495, пол неоднозначности поднят на D4–D5', () => {
+     expect(MIN_SHARED_BY_DIFFICULTY).toEqual([1, 2, 3, 4, 5, 6]);
+     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
+@@ -126,40 +129,81 @@ describe('патч 500: доска «последовательности»', ()
+     expect(AMBIGUITY_TARGET_BY_DIFFICULTY).toEqual([2, 2, 2, 2, 8, 8]);
+   });
+ 
+-  it('на всех сложностях слова реальные, почти одинаковые и подсказка ограничена', () => {
+-    for (let difficulty = 0; difficulty <= 5; difficulty += 1) {
+-      const game = gameFor({ difficulty, seed: 0.37 });
+-      const dictionary = new Set(getWordsByLength(game.wordLength));
+-      const cap = MAX_LIKENESS_BY_DIFFICULTY[difficulty];
+-      expect(game.likenessCap).toBe(cap);
+-      expect(game.wordCount).toBe(passwordWordCount(difficulty, 4));
+-      for (const entry of game.wordRanges) expect(dictionary.has(entry.word)).toBe(true);
+-      const duds = game.wordRanges.filter((entry) => entry.word !== game.password);
+-      expect(Math.max(...duds.map((entry) => positionalLikeness(entry.word, game.password)))).toBeLessThanOrEqual(cap);
+-      expect(new Set(duds.map((entry) => positionalLikeness(entry.word, game.password))).size).toBeGreaterThanOrEqual(2);
+-      if (difficulty > 0) {
+-        // Пустышки — «родственники» опорного слова; пароль выбран внутри
+-        // набора, поэтому смотрим СРЕДНЮЮ близость, а не минимум.
+-        const common = duds.map((entry) => sharedLetters(entry.word, game.password));
+-        const average = common.reduce((total, value) => total + value, 0) / common.length;
+-        expect(average).toBeGreaterThanOrEqual(MIN_SHARED_BY_DIFFICULTY[difficulty] - 2);
+-        expect(common.filter((value) => value >= MIN_SHARED_BY_DIFFICULTY[difficulty] - 1).length)
+-          .toBeGreaterThanOrEqual(Math.floor(common.length / 2));
++  it('на всех сложностях слова реальные, три группы и градиент подсказок', () => {
++    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
++      for (const seed of [0.21, 0.37, 0.53, 0.71]) {
++        const selection = buildGroupedPasswordSet({
++          wordLength: difficulty + 4,
++          wordCount: passwordWordCount(difficulty, 10),
++          rng: () => seed,
++        });
++        expect(selection, `D${difficulty} seed ${seed}`).toBeTruthy();
++        expect(selection.wordCount).toBe(passwordWordCount(difficulty, 10));
++        expect(selection.groups).toHaveLength(WORD_GROUPS);
++        expect(new Set(selection.groups.map((g) => g.base)).size).toBe(WORD_GROUPS);
++        expect(selection.groups.every((g) => g.position === 'end' || g.position === 'start')).toBe(true);
++        for (const group of selection.groups) {
++          expect(group.variants).toHaveLength(GROUP_VARIANTS);
++          expect(new Set(group.variants).size).toBe(GROUP_VARIANTS);
++          for (const variant of group.variants) {
++            expect(selection.words.some((w) => group.position === 'end'
++              ? w.endsWith(variant) : w.startsWith(variant))).toBe(true);
++          }
++        }
++        const dictionary = new Set(getWordsByLength(difficulty + 4));
++        for (const word of selection.words) expect(dictionary.has(word)).toBe(true);
++        expect(selection.words.filter((w) => w === selection.password)).toHaveLength(1);
++        // Градиент: свой вариант > другой вариант своей группы > чужие группы и шум.
++        const winner = selection.groups.find((g) => g.winner);
++        const otherVariant = winner.variants.find((v) => v !== selection.winnerVariant);
++        const belongs = (word, fragment) => (winner.position === 'end'
++          ? word.endsWith(fragment) : word.startsWith(fragment));
++        const level = (word) => {
++          if (belongs(word, selection.winnerVariant)) return 2;
++          if (belongs(word, otherVariant)) return 1;
++          return 0;
++        };
++        const levels = [[], [], []];
++        for (const word of selection.words) {
++          if (word === selection.password) continue;
++          levels[level(word)].push(positionalLikeness(word, selection.password));
++        }
++        const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
++        expect(mean(levels[2]), `D${difficulty} свой вариант`).toBeGreaterThan(mean(levels[1]));
++        expect(mean(levels[1]), `D${difficulty} другой вариант`).toBeGreaterThan(mean(levels[0]));
++        // Подсказка теперь честно показывает до L−1 из L.
++        expect(selection.likenessCap).toBe(difficulty + 3);
++        expect(Math.max(...selection.words.filter((w) => w !== selection.password)
++          .map((w) => positionalLikeness(w, selection.password)))).toBeLessThanOrEqual(selection.likenessCap);
++        expect(selection.hintKinds).toBeGreaterThanOrEqual(3);
+       }
+     }
+   });
+ 
+-  it('на D4–D5 после любого первого хода остаётся >= 4 кандидатов и пароль не «центральный»', () => {
++  it('на D1–D5 группы, формат подсказки и число слов не зависят от сложности', () => {
++    for (let difficulty = 1; difficulty <= 5; difficulty += 1) {
++      const game = gameFor({ difficulty, int: 10, seed: 0.37 });
++      expect(game.groupCount).toBe(WORD_GROUPS);
++      expect(game.groupVariants).toBe(GROUP_VARIANTS);
++      expect(game.likenessCap).toBe(game.wordLength - 1);
++      expect(game.wordCount).toBe(passwordWordCount(difficulty, 10));
++      expect(game.wordRanges).toHaveLength(game.wordCount);
++      expect(publicGameState(game).password).toBeUndefined();
++    }
++  });
++
++  it('на D4–D5 пароль не «самый центральный」, а подсказки дают несколько уровней', () => {
+     for (const difficulty of [4, 5]) {
+       for (let k = 1; k <= 8; k += 1) {
+         const game = gameFor({ difficulty, int: 10, seed: k / 9 });
+-        expect(game.minAmbiguity).toBeGreaterThanOrEqual(MIN_AMBIGUITY_BY_DIFFICULTY[difficulty]);
+         expect(game.centralityRank).toBeGreaterThan(3);
++        expect(game.hintKinds).toBeGreaterThanOrEqual(3);
++        expect(game.minAmbiguity).toBeGreaterThanOrEqual(1);
+       }
+     }
+   });
+ 
+-  it('ни один двухбуквенный префикс не повторяется больше двух раз', () => {
++  it('общие сочетания группы видны в словах доски (окончания или приставки)', () => {
+     for (const difficulty of [3, 4, 5]) {
+       const selection = buildPasswordSet({
+         wordLength: difficulty + 4,
+@@ -167,9 +211,14 @@ describe('патч 500: доска «последовательности»', ()
+         wordCount: passwordWordCount(difficulty, 4),
+         rng: () => 0.53,
+       });
+-      const counts = {};
+-      for (const word of selection.words) counts[word.slice(0, 2)] = (counts[word.slice(0, 2)] || 0) + 1;
+-      expect(Math.max(...Object.values(counts))).toBeLessThanOrEqual(2);
++      expect(selection.groups).toHaveLength(WORD_GROUPS);
++      for (const group of selection.groups) {
++        for (const variant of group.variants) {
++          const matched = selection.words.filter((word) => (group.position === 'end'
++            ? word.endsWith(variant) : word.startsWith(variant)));
++          expect(matched.length).toBeGreaterThanOrEqual(1);
++        }
++      }
+     }
+   });
+ 
+diff --git a/__tests__/room/terminal-hacking.test.js b/__tests__/room/terminal-hacking.test.js
+index 7957155..45ede9f 100644
+--- a/__tests__/room/terminal-hacking.test.js
++++ b/__tests__/room/terminal-hacking.test.js
+@@ -104,8 +104,10 @@ describe('shared Fallout terminal hacking rules', () => {
+     expect(game.bracketRanges).toHaveLength(4); // Наука 6 -> 4 скобки на ЛЮБОЙ сложности
+     expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(2);
+     expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(2);
++    // Патч 503: полное восстановление выпадает НЕ БОЛЕЕ одного раза на доску,
++    // даже если удача сработала бы на каждой скобке (rng=()=>0).
++    expect(game.bracketRanges.filter((b) => b.effect.full)).toHaveLength(1);
+     for (const bracket of game.bracketRanges) {
+-      expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
+       expect(bracket.effect.words).toBe(bracket.kind === 'word' ? 1 : 0);
+       expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
+     }
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index bb53277..5373736 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -56,18 +56,25 @@ const TerminalHackingModal = ({
+     && game.operatorCharacterId === characterId,
+   );
+   const isSpectator = localMode ? false : Boolean(game && ['playing', 'pendingDigest'].includes(game.status) && !isOperator);
++  // Патч 503: доска может принадлежать другому персонажу. Нажатие «Взломать»
++  // (autoStart) тогда собирает новую доску под текущий лист, а «Смотреть» нет.
++  const boardOfAnotherOperator = Boolean(game && !isOperator && (
++    game.operatorCharacterId !== characterId || (!localMode && game.operatorClientId !== myClientId)
++  ));
+   const canHack = Boolean(characterId && (localMode || roomCode) && !terminalState?.locked);
+ 
+   useEffect(() => {
+     if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
+-    if (['playing', 'pendingDigest'].includes(game?.status)) return;
+-    const key = `${roomCode}:${terminal.containerId}:${characterId}`;
++    if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return;
++    const key = `${roomCode}:${terminal.containerId}:${characterId}:${game?.operatorCharacterId || ''}`;
+     if (lastAutoStartKey.current === key) return;
+     lastAutoStartKey.current = key;
+     void doAction('start');
+   // State intentionally tracks the terminal's latest game revision.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status]);
++  // State intentionally tracks the terminal's latest game revision.
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId]);
+ 
+   useEffect(() => {
+     if (game?.status === 'won' && game.scrollUp) {
+@@ -308,7 +315,9 @@ const TerminalHackingModal = ({
+                   <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
+                   <View style={styles.guessesRow}>
+                     {game.guesses.map((guess, index) => (
+-                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>{`${guess.word}: ${guess.likeness}`}</Text>
++                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>
++                        {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
++                      </Text>
+                     ))}
+                   </View>
+                 </View>
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d162803..d54ee1f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,41 @@
+ # Changelog
+ ---
++## Three word groups, operator takeover and one full restore (patch 503)
++
++The owner clarified the board design: "Let there be 3 groups of words with
++some shared combinations for the group. Say endings, on/ion, ly/tly, The/tho.
++First you work out which ending group is right, then inside that group you work
++out whether e.g. ion or on is the right sequence. These need not be endings —
++they can be prefixes or suffixes." A hint as high as `L−1 out of L` is fine as
++long as it requires deduction: extra words make blind guessing poor, while
++finding the right sequence almost guarantees a win within the canonical
++4 attempts.
++
++- `buildGroupedPasswordSet()` builds **three groups** around a shared
++  fragment (2–3 letters) at one position — word end or word start. Each group
++  has **two variants** extending the fragment by one letter (`TION`/`SION`,
++  `NESS`/`LESS`, `THE`/`THO`). The password sits in one variant of one group.
++- Boards provide a **hint gradient**: words of the winning variant score high
++  (up to `L−1/L`), the sibling variant of the same group scores medium, and
++  other groups plus noise score low. The gradient is enforced during board
++  selection and holds across all 160 "difficulty × INT × seed" combinations.
++- Remaining slots are neutral noise, lowering blind-guess odds. Measured at
++  D5 (INT 10): blind 25%, careful deduction 97% without bonuses and 100% at
++  Science 6; at D1 careful 97%, blind 56%. The password is still not the most
++  "central" member of the set.
++- **Operator takeover.** Pressing "Hack" as another character rebuilds the
++  board from their INT/Science/Luck and makes them the operator; the previous
++  operator and everyone else only watch. A repeated `start` by the same
++  operator does not reset progress, so all five players can try in turn.
++- **At most one full restore per board.** Only one bracket can carry a full
++  return to 4 attempts, with a `resetUsed` guard for boards created earlier.
++  Other brackets keep their normal effect; attempts never exceed 4.
++- The hacking window shows hints as `N/M` (matching letters out of word
++  length) instead of a bare number. D0 keeps its anagram families and outlier
++  password.
++
++Installation: `docs/patch-503-install.md`.
++
+ ## Export saves are read at any nesting depth (patch 502)
+ 
+ The owner sent a fragment of a real save (`format: rpg-companion-character`,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index b686915..63b5053 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,43 @@
+ # История изменений
+ 
+ ---
++## Три группы слов, смена оператора и один полный возврат (патч 503)
++
++Владелец уточнил устройство доски: «Пусть будет 3 группы слов у которых есть
++некоторые общие сочетания для группы. Допустим окончания, on/ion, ly/tly,
++The/tho. Сначала надо будет понять какая группа окончаний верная, потом в этой
++группе понять например ion или on верная последовательность. Это могут быть не
++окончания, а приставки или суффиксы». Ключевая идея: подсказка вплоть до
++`L−1 из L` допустима, если она требует вывода; слепой перебор плохо подходит
++из-за лишних слов, а угадывание верной последовательности почти гарантирует
++победу при канонических 4 попытках.
++
++- `buildGroupedPasswordSet()` собирает **три группы** по общему фрагменту
++  (2–3 буквы) на одной позиции — в конце или в начале слова. В каждой группе
++  **два варианта** расширения фрагмента на одну букву (`TION`/`SION`,
++  `NESS`/`LESS`, `THE`/`THO`). Пароль лежит в одном варианте одной группы.
++- Доска даёт **градиент подсказок**: слова своего варианта → высокое
++  сходство (вплоть до `L−1/L`), другой вариант своей группы → среднее,
++  чужие группы и «шум» → низкое. Градиент проверяется при отборе доски и
++  обеспечен на всех 160 конфигурациях «сложность × ИНТ × сид».
++- Остальные слова добираются нейтральным шумом, который занижает вероятность
++  слепого перебора. Замеры на D5 (ИНТ 10): слепой 25 %, логический разбор
++  97 % без бонусов и 100 % при Науке 6; на D1 логический 97 %, слепой 56 %.
++  Пароль по-прежнему не «самый центральный» член набора.
++- **Смена оператора.** «Взломать» от другого персонажа пересобирает доску по
++  его ИНТ/Науке/Удаче и делает его оператором; прежний оператор и остальные
++  игроки только наблюдают. Повторный `start` от того же оператора не сбрасывает
++  прогресс. Так все пятеро могут пробовать по очереди, каждому свои условия.
++- **Полное восстановление — не более 1 раза на доску.** При генерации только
++  одна скобка может нести полный возврат к 4 попыткам; при нажатии есть защита
++  `resetUsed` для досок, созданных раньше. Остальные скобки сохраняют обычный
++  эффект, попытки никогда не выше 4.
++- Подсказка в окне взлома показывает `N/M` (сколько букв совпало из длины
++  слова), а не голое число. D0 остаётся особым случаем с анаграммами и
++  паролем-выбросом.
++
++Установка: `docs/patch-503-install.md`.
++
+ ## Сейв из файла экспорта читается на любой глубине (патч 502)
+ 
+ Владелец прислал часть реального сейва (`format: rpg-companion-character`,
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 3150d41..141d693 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -135,9 +135,9 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - Tap **«Create terminal»** to set a name and description, choose a difficulty of `1–5` and optionally lock the terminal after a failed hack. Difficulty `0` cannot be set manually: it only appears for a player with the **Hacker** perk lowering a level-1 terminal.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
+-- The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board is built from near-identical words: at least `L−3` shared letters and at most 2 matching positions, so the player must deduce the letter order. The password is picked inside the set, so neither the "most similar to everything" nor the "least similar" heuristic reveals it. Hints are capped at `3` matches for difficulty 0–2 and `2` for 3–5; at difficulty 4–5 at least four candidates survive any first wrong guess.
+-- Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+-- The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words.
++- The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
++- Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore, but such a restore can appear **at most once per board**. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
++- The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words. Pressing **"Hack"** as another player rebuilds the board from their sheet: only one player hacks at a time, everyone else watches, and any number of players may try in turn.
+ - The Hacker perk lowers effective difficulty by 1 (minimum 0). At difficulty 0 the terminal may be skipped under the rules; if the player still plays, the board uses large anagram families (`POST/SPOT/STOP/…`) and the password is a maximally dissimilar outlier. It is no longer underlined. Details: `docs/terminal-hacking-balance-proposal.md` and `docs/terminal-words.md`.
+ - On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
+ 
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 959a7a2..dd0f039 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -135,9 +135,9 @@
+ - Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `1–5` и при желании включите блокировку терминала после провала. Сложность `0` вручную задать нельзя: она возникает только у игрока с перком **Хакер**, когда тот снижает сложность `1`.
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
+-- Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска собирается из почти одинаковых слов: не менее `L−3` общих букв и не более 2 совпавших позиций, игроку нужно угадать порядок букв. Пароль выбирается внутри набора, поэтому его не выдаёт ни «самое похожее на все», ни «самое непохожее» слово. Подсказка ограничена: на сложности 0–2 максимум `3` совпадения, на 3–5 — максимум `2`; на сложностях 4–5 после любой первой ошибки остаётся не меньше четырёх кандидатов.
+-- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+-- Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов.
++- Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
++- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток, но такое восстановление может выпасть **не более одного раза на доску**. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
++- Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов. Нажатие **«Взломать»** другим игроком пересобирает доску уже по его листу: одновременно взламывает только один, остальные наблюдают, а все желающие могут пробовать по очереди.
+ - Перк «Хакер» снижает эффективную сложность на 1 (минимум 0). На сложности 0 терминал по правилам можно не проходить; если игрок всё же запускает мини-игру, доска собирается из крупных семей анаграмм (`POST/SPOT/STOP/…`), а пароль — максимально непохожее на них слово. Пароль больше не подчёркивается. Подробности — `docs/terminal-hacking-balance-proposal.md` и `docs/terminal-words.md`.
+ - На обновлённом сервере комнат партия общая: подключённые игроки видят одну доску. Если сервер ещё старой версии, окно взлома всё равно откроется, а партия пойдёт локально на устройстве игрока (в окне будет подсказка). Чтобы доска стала общей, обновите файлы `server/` и перезапустите сервис Node.js.
+ 
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 2a613e5..0734d84 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 073f59f..3197e92 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 747056a..80ab5f1 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 8695dd4..e843e1a 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 2cb680d..f733218 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ > **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 1bed2a5..35bfa08 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ > **Сейв из файла экспорта читается целиком в `docs/patch-502-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 500** (коммит `98ab994`, ветка
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 1253761..e839080 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Доска из трёх групп и новая логика подсказок — в `docs/patch-503-install.md`.**
++
+ Патч подготовлен от состояния **версии 501** (коммит `28c861b`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+new file mode 100644
+index 0000000..9c428cc
+--- /dev/null
++++ b/docs/patch-503-install.md
+@@ -0,0 +1,143 @@
++# Установка патча 503: три группы слов, смена оператора, один полный возврат
++
++Патч подготовлен от состояния **версии 502** (коммит `2f89930`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–503 цепочкой.
++
++## Что исправлено
++
++### 1. Доска из трёх групп с общими сочетаниями
++
++Владелец уточнил: «Пусть будет 3 группы слов у которых есть некоторые общие
++сочетания для группы. Допустим окончания, on/ion, ly/tly, The/tho. Сначала надо
++будет понять какая группа окончаний верная, потом в этой группе понять например
++ion или on верная последовательность. Это могут быть не окончания, а приставки
++или суффиксы».
++
++Также: «Понять последовательность можно и n=m-1/m. Но для этого надо думать,
++простым перебором тоже можно, если везёт. Но перебор из-за количества слов на
++доске плохо подходит. А вот угадывание верных последовательностей гарантируем
++победу».
++
++Новый `buildGroupedPasswordSet()` в `server/terminalHacking.js`:
++
++- **Три группы** по общему фрагменту из 2–3 букв на одной позиции — в конце
++  или в начале слова. У каждой группы **два варианта** расширения фрагмента на
++  одну букву: `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO` и т.п. Фрагменты
++  берутся из реальных слов словаря, ничего не выдумывается.
++- **Градиент подсказок**: слова своего варианта дают высокое сходство (вплоть
++  до `L−1` из `L`), другой вариант своей группы — среднее, чужие группы и
++  «шум» — низкое. Поэтому первый ход отвечает на вопрос «какая группа?»,
++  второй — «какой вариант?», третий/четвёртый — «какое слово?».
++- **Лишние слова** добираются нейтральным шумом и занижают вероятность
++  слепого перебора. Градиент enforced при отборе доски: проверен на всех
++  160 конфигурациях «сложность × ИНТ × сид».
++- Подсказка в окне взлома теперь `N/M` (`7/9`) вместо голого `7`; подпись
++  в словарях поясняет, что это число совпавших букв на своих местах из длины
++  слова. D0 остаётся особым случаем: анаграммные семьи и пароль-выброс.
++
++Замеры на реальном словаре (ИНТ 10, 24 доски × 6 повторов):
++
++| Сложность | Слепой перебор | Логический разбор | Логический при Науке 6 |
++|---|---|---|---|
++| D1 | 56 % | 97 % | 100 % |
++| D2 | 47 % | 97 % | 99 % |
++| D3 | 35 % | 97 % | 99 % |
++| D4 | 39 % | 97 % | 99 % |
++| **D5** | **25 %** | **97 %** | **100 %** |
++
++С бонусами слепой на D5 — 37 %. Сложность 5 остаётся самой трудной для
++перебора, а логический разбор почти гарантирует победу при 4 попытках.
++
++### 2. «Взломать» другим персонажем — доска под его лист
++
++Было: `roomRegistry` отвечал `TERMINAL_ALREADY_ACTIVE` на `start` от другого
++персонажа, пока партия активна, и новый игрок видел 17 слов / 3 скобки от
++ИНТ 8 + Наука 4.
++
++Стало (по ответу владельца: «Взламывать терминал одновременно может только
++1 игрок. Другие могут только смотреть. При нажатии взлом проверять
++характеристики игрока, который нажал взлом. Может все 5 человек по очереди
++захотят попробовать? Каждому свои условия»):
++
++- `start` от другого `characterId` пересобирает доску **из конфигурации
++  терминала** и листа нажавшего: число слов, скобки, удача, перк «Хакер».
++  Оператор меняется, попытки и догадки обнуляются.
++- Партия по-прежнему **одна на всех**: прежний оператор и остальные игроки
++  получают `TERMINAL_VIEW_ONLY` на `guess`/`bracket` и видят доску как зрители.
++- Повторный `start` от того же оператора не сбрасывает его прогресс.
++- В модалке `autoStart` («Взломать») теперь срабатывает и на чужой активной
++  доске; кнопка «Обзор» (`autoStart=false`) доску не трогает.
++
++Приёмочный тест повторяет точный сценарий: ИНТ 8 / Наука 4 → 17 слов и
++3 скобки; затем ИНТ 10 / Наука 6 / Удача 8 → 15 слов, 4 скобки, оператор
++«Второй»; затем пятый игрок ИНТ 4 / Наука 0 → 21 слово и 0 скобок.
++
++### 3. Полное восстановление — не более 1 раза на доску
++
++Раньше удача крутилась на **каждую скобку отдельно**: при Науке 6 (4 скобки)
++и Удаче 10 полный возврат к 4 попыткам мог выпасть 2–4 раза на одной доске.
++
++Теперь:
++
++- при генерации только **одна** скобка может нести `effect.full`; остальные
++  сохраняют обычный эффект своего сорта (убрать слово или +1 попытка);
++- при нажатии добавлена защита `game.resetUsed` — даже для досок, созданных
++  до обновления, повторный «полный» эффект превращается в +1 попытку;
++- попытки никогда не превышают 4.
++
++## Что не менялось
++
++`N = max(4, 15 + 2·D − ИНТ)` (на D5 «25 − ИНТ»), 4 попытки, число и состав
++скобок по Науке, удача 5–20 %, перк «Хакер», 12 308 слов словаря, чтение листа
++из сетевого сейва/экспорта/локального стора, модальное окно терминала внутри
++локации и локальный резерв.
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 503
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 503
++```
++
++`patchs/baseline.json` в источнике равен `503`. После установки:
++`public/version.json` → `503`; закоммитьте изменения и **перезапустите
++сервис Node.js** (доска считается на сервере), пересоберите веб-сборку. Уже
++начатые партии запустите заново кнопкой **«Сброс»** у Мастера: старая плоская
++доска не превратится в групповую сама.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-groups-503.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "503"'
++```
++
++Пример доски (D5, ИНТ 10, 15 слов) — три группы с двумя вариантами:
++
++```
++~ION : TION / SION      ← верная группа (пароль MIGRATION)
++~ESS : NESS / LESS
++~IVE : TIVE / SIVE
+++ нейтральные слова-шум
++```
++
++Средняя подсказка: свой вариант 5.7, другой вариант своей группы 3.4,
++чужие группы и шум 0.6 — градиент соблюдён в 120/120 проверенных досок.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/503-word-groups.patch
++cp /path/to/503-word-groups.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index 915f01c..ceaf611 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -3,7 +3,8 @@
+ > **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток, скобки,
+ > пакеты Науки, таблица скобок, генератор «последовательности» и приёмочные
+ > замеры — в `docs/patch-500-install.md`, чтение характеристик листа
+-> персонажа — в `docs/patch-501-install.md` и `docs/patch-502-install.md`.
++> персонажа — в `docs/patch-501-install.md`, `docs/patch-502-install.md` и
++> `docs/patch-503-install.md` (три группы слов, градиент подсказок).
+ > История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index b99760f..0fa7ff9 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -251,7 +251,7 @@
+     "digestUse": "Use magazine",
+     "digestDecline": "Decline",
+     "waitingOperator": "The terminal operator must choose.",
+-    "likeness": "Letters matching by position",
++    "likeness": "Letters in the same position (out of the word length)",
+     "view": "View",
+     "locked": "LOCKED",
+     "available": "AVAILABLE",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index b7169c0..cc7d282 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -251,7 +251,7 @@
+     "digestUse": "Использовать журнал",
+     "digestDecline": "Отказаться",
+     "waitingOperator": "Решение принимает оператор терминала.",
+-    "likeness": "Совпадение букв по позиции",
++    "likeness": "Совпавшие буквы на своих местах (из длины слова)",
+     "view": "Смотреть",
+     "locked": "ЗАБЛОКИРОВАН",
+     "available": "ДОСТУПЕН",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index e9af48f..7a288bf 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "502"
++  "baseline": "503"
+ }
+diff --git a/public/version.json b/public/version.json
+index d883053..8888ddf 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,11 @@
+ {
+-  "version": "502",
++  "version": "503",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Доска взлома теперь собрана из трёх групп слов с общими окончаниями или приставками: сначала нужно понять верную группу, а затем верный вариант сочетания внутри неё. Логический разбор почти гарантирует победу, а слепой перебор остаётся ненадёжным.",
++      "Если терминал открывает другой игрок, доска, число слов и скобки считаются по его листу персонажа; одновременно взламывает только один, остальные наблюдают.",
++      "Полное восстановление попыток теперь может выпасть не более одного раза на доску. Подсказка в окне взлома показывает совпавшие буквы как «N из M».",
+       "Исправлен взлом после импорта персонажа из файла: лист персонажа теперь находится в сейве любой вложенности, поэтому при Интеллекте 10 и Удаче 10 на пятой сложности будет 15 слов и 20 % шанс возврата попыток.",
+       "Имя персонажа в окне взлома больше не пропадает при запуске партии напрямую.",
+       "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
+@@ -50,6 +53,9 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
++      "When another player opens a terminal, the board, word count and brackets are rebuilt from their character sheet; only one player hacks at a time and everyone else watches.",
++      "A full attempt restore can now appear at most once per board. The hacking window shows matching letters as N out of M.",
+       "Fixed hacking after importing a character from a file: the sheet is now found at any nesting depth, so Intellect 10 and Luck 10 give 15 words and a 20% attempt-recovery chance at difficulty 5.",
+       "The character name no longer disappears from the hacking window when a round is started directly.",
+       "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index b9970e2..5ef2459 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -394,9 +394,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const published = room.lastSnapshots.get(charId);
+     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+     if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
+-    if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
++    // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
++    // Партия всё равно одна на всех: прежний оператор становится зрителем,
++    // а повторный start от того же оператора не сбрасывает его прогресс.
++    const activeGame = ['playing', 'pendingDigest', 'won'].includes(entry.game?.status);
++    const switchingOperator = Boolean(entry.game
++      && (entry.game.operatorCharacterId !== charId || entry.game.operatorClientId !== clientId));
++    if (action === 'start' && activeGame && !switchingOperator) {
+       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+     }
++    if (action === 'start' && switchingOperator) {
++      // Доска пересобирается createGame() из конфигурации терминала, а не из
++      // чужого состояния: число слов, скобки и удача берутся из нового листа.
++      entry.game = null;
++    }
+     // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
+     // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
+     // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index 1fd2d82..b53e59e 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -349,7 +349,199 @@ const seededRng = (rng) => {
+  *
+  * Матрица попарных совпадений считается только для выбранных ~26 слов.
+  */
+-const buildPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
++// Патч 503. Доска из ТРЁХ ГРУПП с общими сочетаниями (окончания, приставки,
++// суффиксы). Внутри каждой группы ДВА варианта последовательности — например
++// `ION`/`ON`, `TLY`/`LY`, `THE`/`THO`. Игрок сначала по подсказке понимает,
++// какая группа верная, затем внутри неё — какой вариант, и только потом
++// выбирает пароль. Высокая подсказка (вплоть до L−1 из L) здесь не делает
++// взлом перебором: лишние слова и чужие группы занижают слепой шанс, а верная
++// последовательность почти гарантирует победу при канонических 4 попытках.
++const WORD_GROUPS = 3;
++const GROUP_VARIANTS = 2;
++const MAX_GROUP_FRAGMENT = 4;
++
++const findWordFamilies = (pool, wordLength, position, fragmentLength) => {
++  const baseLength = fragmentLength - 1;
++  const byBase = new Map();
++  for (const word of pool) {
++    const fragment = position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
++    const base = position === 'end' ? fragment.slice(1) : fragment.slice(0, -1);
++    if (base.length !== baseLength) continue;
++    if (!byBase.has(base)) byBase.set(base, new Map());
++    const variants = byBase.get(base);
++    if (!variants.has(fragment)) variants.set(fragment, []);
++    variants.get(fragment).push(word);
++  }
++  const families = [];
++  for (const [base, variants] of byBase) {
++    const entries = [...variants.entries()]
++      .filter(([, words]) => words.length >= GROUP_VARIANTS)
++      .sort((a, b) => b[1].length - a[1].length);
++    if (entries.length < GROUP_VARIANTS) continue;
++    families.push({
++      position, base,
++      variants: entries.slice(0, GROUP_VARIANTS).map(([fragment, words]) => ({ fragment, words })),
++    });
++  }
++  return families;
++};
++
++const groupSetMetrics = (set, password) => {
++  let minCandidates = 99;
++  const hintKinds = new Set();
++  for (const guess of set) {
++    if (guess === password) continue;
++    const hint = positionalLikeness(guess, password);
++    hintKinds.add(hint);
++    minCandidates = Math.min(minCandidates, set.filter(
++      (word) => word !== guess && positionalLikeness(guess, word) === hint,
++    ).length);
++  }
++  const sums = set.map((x) => set.reduce(
++    (total, w) => total + (w === x ? 0 : sharedLetters(x, w)), 0,
++  ));
++  const own = sums[set.indexOf(password)];
++  return {
++    minCandidates,
++    hintKinds: hintKinds.size,
++    centralityRank: sums.filter((value) => value > own).length + 1,
++  };
++};
++
++const buildGroupedPasswordSet = ({ wordLength, wordCount, rng = Math.random, excludeWords = [] }) => {
++  const excluded = new Set((Array.isArray(excludeWords) ? excludeWords : []).map((w) => String(w).toUpperCase()));
++  const pool = [...new Set((getWordsByLength(wordLength) || []).filter(
++    (word) => word.length === wordLength && !excluded.has(word),
++  ))];
++  const internal = seededRng(rng);
++  const fragmentLength = Math.min(MAX_GROUP_FRAGMENT, wordLength - 1);
++  const families = [
++    ...findWordFamilies(pool, wordLength, 'end', fragmentLength),
++    ...findWordFamilies(pool, wordLength, 'start', fragmentLength),
++  ];
++  // Обильные семьи предпочтительнее, но порядок всё равно случаен.
++  const ranked = shuffle(families, internal).sort((a, b) => (
++    (b.variants[0].words.length + b.variants[1].words.length)
++    - (a.variants[0].words.length + a.variants[1].words.length)
++  ));
++  const groups = [];
++  const usedBases = new Set();
++  for (const family of ranked.slice(0, 60)) {
++    if (usedBases.has(family.base)) continue;
++    // Все три группы на одной позиции: подсказки чужих групп остаются низкими.
++    // Позиции могут смешиваться, если на коротких словах семей мало;
++    // градиент подсказок всё равно проверяется при отборе доски.
++    groups.push(family);
++    usedBases.add(family.base);
++    if (groups.length === WORD_GROUPS) break;
++  }
++  if (groups.length < WORD_GROUPS) return null;
++
++  const wanted = clamp(Math.floor(Number(wordCount) || BASE_WORD_COUNT), 2, 32);
++  // Четыре слова чужих групп — по одному на каждый из двух вариантов
++  // каждой из двух остальных групп. Остальное добирается «шумом»: он и
++  // занижает вероятность слепого перебора, как просил владелец.
++  const twinsCount = clamp(Math.round((wanted - 5) * 0.3), 1, 5);
++  const otherCount = clamp(Math.round((wanted - 5) * 0.15), 1, 3);
++  let best = null;
++  for (let attempt = 0; attempt < 24; attempt += 1) {
++    const groupIndex = randomInt(WORD_GROUPS, internal);
++    const variantIndex = randomInt(GROUP_VARIANTS, internal);
++    const family = groups[groupIndex];
++    const winners = shuffle(family.variants[variantIndex].words, internal);
++    if (winners.length < 2) continue;
++    const password = winners[0];
++    // «Близнецы» — слова того же варианта, максимально похожие на пароль.
++    const twins = winners.slice(1)
++      .sort((a, b) => positionalLikeness(b, password) - positionalLikeness(a, password))
++      .slice(0, twinsCount);
++    const siblingVariant = shuffle(family.variants[1 - variantIndex].words, internal).slice(0, otherCount);
++    const otherGroups = [];
++    for (let i = 0; i < WORD_GROUPS; i += 1) {
++      if (i === groupIndex) continue;
++      for (const variant of groups[i].variants) {
++        const word = shuffle(variant.words, internal)[0];
++        if (word) otherGroups.push(word);
++      }
++    }
++    const used = new Set([password, ...twins, ...siblingVariant, ...otherGroups]);
++    const fragments = new Set(groups.flatMap((f) => f.variants.map((v) => v.fragment)));
++    const noise = shuffle(pool.filter((word) => !used.has(word) && !groups.some((f) => {
++      const fragment = f.position === 'end' ? word.slice(-fragmentLength) : word.slice(0, fragmentLength);
++      return fragments.has(fragment);
++    })), internal);
++    const set = [password, ...twins, ...siblingVariant, ...otherGroups];
++    for (const word of noise) {
++      if (set.length >= wanted) break;
++      if (used.has(word)) continue;
++      set.push(word);
++      used.add(word);
++    }
++    if (set.length !== wanted) continue;
++    if (new Set(set).size !== wanted) continue;
++    const metrics = groupSetMetrics(set, password);
++    // Градиент подсказок: слова СВОЕГО варианта > другой вариант своей
++    // группы > чужие группы и шум. Без этого логика «сначала группа, потом
++    // последовательность» не работает.
++    const variantFragments = family.variants.map((v) => v.fragment);
++    const levelOf = (word) => {
++      if (variantFragments[variantIndex] === (family.position === 'end'
++        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 2;
++      if (variantFragments[1 - variantIndex] === (family.position === 'end'
++        ? word.slice(-fragmentLength) : word.slice(0, fragmentLength))) return 1;
++      return 0;
++    };
++    const levels = [[], [], []];
++    for (const word of set) {
++      if (word === password) continue;
++      levels[levelOf(word)].push(positionalLikeness(word, password));
++    }
++    const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : -1);
++    const gradient = mean(levels[2]) > mean(levels[1]) && mean(levels[1]) > mean(levels[0]);
++    // Пароль не должен выдаваться «самым похожим на всех» словом доски.
++    const score = (gradient ? 10000 : 0) + (metrics.centralityRank > 3 ? 1000 : 0)
++      + metrics.hintKinds * 10 + metrics.minCandidates;
++    if (!best || score > best.score) {
++      best = { set, password, metrics, score, groupIndex, variantIndex, gradient };
++    }
++    if (gradient && metrics.centralityRank > 3 && metrics.hintKinds >= 3) break;
++  }
++  if (!best) return null;
++  const words = shuffle(best.set, internal);
++  const metrics = groupSetMetrics(words, best.password);
++  return {
++    words,
++    password: best.password,
++    // Патч 503: подсказка может быть L−1 из L, но выводить её надо логикой.
++    likenessCap: wordLength - 1,
++    minAmbiguity: metrics.minCandidates,
++    minShared: Math.min(...words.filter((w) => w !== best.password).map(
++      (w) => sharedLetters(w, best.password),
++    )),
++    centralityRank: metrics.centralityRank,
++    hintKinds: metrics.hintKinds,
++    wordCount: words.length,
++    groupCount: WORD_GROUPS,
++    groupVariants: GROUP_VARIANTS,
++    groups: groups.map((family, index) => ({
++      base: family.base,
++      position: family.position,
++      variants: family.variants.map((v) => v.fragment),
++      winner: index === best.groupIndex,
++    })),
++    winnerVariant: groups[best.groupIndex].variants[best.variantIndex].fragment,
++  };
++};
++
++const buildPasswordSet = (options) => {
++  const tier = clamp(Math.floor(Number(options.effectiveDifficulty) || 0), 0, 5);
++  // D0 остаётся особым случаем: анаграммные семьи и пароль-выброс.
++  if (tier === 0) return buildLegacyPasswordSet(options);
++  const grouped = buildGroupedPasswordSet(options);
++  return grouped || buildLegacyPasswordSet(options);
++};
++
++const buildLegacyPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
+   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
+   const likenessCap = MAX_LIKENESS_BY_DIFFICULTY[tier];
+   const floor = MIN_AMBIGUITY_BY_DIFFICULTY[tier];
+@@ -599,9 +791,14 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+   }
+   kinds = shuffle(kinds, rng);
+   const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
++  let fullRestoreAvailable = true; // 503: полное восстановление не более 1 раза на доску
+   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
+     const kind = kinds[groupIndex] || 'word';
+-    const effect = bracketEffectFor(stats.science, stats.luck, rng, kind);
++    const rolled = bracketEffectFor(stats.science, stats.luck, rng, kind);
++    const effect = rolled.full && !fullRestoreAvailable
++      ? { words: kind === 'word' ? 1 : 0, attempts: kind === 'attempt' ? 1 : 0, full: false, kind }
++      : rolled;
++    if (effect.full) fullRestoreAvailable = false;
+     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
+     const length = 3 + randomInt(6, rng);
+     const preferredRow = randomInt(board.length / width, rng);
+@@ -656,6 +853,9 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+     wordLength,
+     wordCount: safeWordRanges.length,
+     likenessCap: selection.likenessCap,
++    groupCount: selection.groupCount || 0,
++    groupVariants: selection.groupVariants || 0,
++    hintKinds: selection.hintKinds || 0,
+     minAmbiguity: selection.minAmbiguity,
+     centralityRank: selection.centralityRank,
+     bracketSplit: bracketSplitFor(stats.science),
+@@ -713,7 +913,9 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
+   if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
+   if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
+   if (action === 'start') {
+-    if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
++    const isSameOperator = game.operatorCharacterId === characterId
++      && game.operatorClientId === clientId;
++    if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
+     const fresh = createGame({
+       config: game,
+       operatorClientId: clientId,
+@@ -762,7 +964,11 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
+     if (!bracket || bracket.used) return { error: 'TERMINAL_INVALID_BRACKET' };
+     let next = { ...game, bracketRanges: game.bracketRanges.map((entry) => entry.id === bracket.id ? { ...entry, used: true } : entry) };
+     // Патч 497: пакет Науки + удача. Попытки НИКОГДА не выше 4.
+-    const effect = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
++    // Патч 503: полное восстановление — не более одного раза на доску.
++    const rolled = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
++    const effect = rolled.full && game.resetUsed
++      ? { ...rolled, full: false, words: 0, attempts: 1 }
++      : rolled;
+     for (let i = 0; i < (effect.words || 0); i += 1) {
+       const duds = next.wordRanges.filter((entry) => !entry.isPassword && !entry.removed);
+       if (duds.length) {
+@@ -819,6 +1025,10 @@ module.exports = {
+   positionalLikeness,
+   sharedLetters,
+   buildPasswordSet,
++  buildGroupedPasswordSet,
++  WORD_GROUPS,
++  GROUP_VARIANTS,
++  MAX_GROUP_FRAGMENT,
+   characterStats,
+   normalizeCharacterSnapshot,
+   createGame,

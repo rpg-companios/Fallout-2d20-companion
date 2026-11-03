@@ -294,6 +294,69 @@ const parseGmContainerCloudPayload = (rawText) => {
   }
 };
 
+// Патч 509: двусторонняя синхронизация снимков «Общего хранилища» Мастера.
+const parseRoomStorageCloudPayload = (rawText) => {
+  try {
+    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+    if (parsed?.type !== 'party_storage') return { error: 'NOT_STORAGE' };
+    const storage = parsed?.storage;
+    if (!storage || !Array.isArray(storage.entries)) return { error: 'INVALID_STORAGE' };
+    return { code: String(parsed.code || ''), storage, exportedAt: Number(parsed.exportedAt) || 0 };
+  } catch {
+    return { error: 'INVALID_JSON' };
+  }
+};
+
+const syncRoomStoragesInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+  const locals = typeof db.getAllRoomStorages === 'function'
+    ? await db.getAllRoomStorages()
+    : [];
+  const existingFolderId = await findGmContainersFolderId(token, moduleFolderId);
+  if (!existingFolderId && locals.length === 0) return { uploaded: 0, downloaded: 0 };
+  const gmFolderId = existingFolderId || await getGmContainersFolderId(token, moduleFolderId);
+  const remoteFiles = (await listRemoteCharacterFiles(token, gmFolderId))
+    .filter((file) => (file.name || '').startsWith('storage__'));
+
+  let downloaded = 0;
+  const seenCodes = new Set();
+  for (const file of remoteFiles) {
+    const raw = await downloadRemoteCharacter(token, file.id);
+    const parsed = parseRoomStorageCloudPayload(raw);
+    if (parsed.error || !parsed.code) continue;
+    seenCodes.add(parsed.code);
+    const local = locals.find((item) => item.code === parsed.code);
+    const remoteUpdated = file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0;
+    if (local && Number(local.updatedAt) >= remoteUpdated - 1000) continue;
+    if (local && typeof confirmDownload === 'function') {
+      const ok = await confirmDownload([{ code: parsed.code, remote: file }]);
+      if (!ok) continue;
+    }
+    await db.saveRoomStorage(parsed.code, parsed.storage);
+    downloaded += 1;
+  }
+
+  let uploaded = 0;
+  for (const local of locals) {
+    if (seenCodes.has(local.code)) continue;
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'party_storage',
+      code: local.code,
+      exportedAt: Date.now(),
+      storage: local.storage,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmFolderId,
+      fileId: null,
+      filename: `storage__${local.code.replace(/[^A-Za-z0-9_-]/g, '_')}__${Date.now()}.json`,
+      payload,
+    });
+    uploaded += 1;
+  }
+  return { uploaded, downloaded };
+};
+
 const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
   if (!isGmLootTradeLicensed()) {
     return { uploaded: 0, downloaded: 0 };
@@ -1014,6 +1077,14 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
     debugLog('sync.gmEnvEntries:failed', { message: e?.message });
   }
 
+  // Патч 509: снимки «Общего хранилища» Мастера — туда и обратно.
+  try {
+    const roomStorageStats = await syncRoomStoragesInSession(token, folderId, { confirmDownload });
+    debugLog('sync.roomStorages:done', roomStorageStats);
+  } catch (e) {
+    debugLog('sync.roomStorages:failed', { message: e?.message });
+  }
+
   // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
   // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
   try {
@@ -1146,6 +1217,42 @@ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
     debugLog('sync.gmContainer.auto:done', { containerId });
   } catch (e) {
     debugLog('sync.gmContainer.auto:failed', { containerId, message: e?.message || String(e) });
+  }
+};
+
+// Патч 508: снимок «Общего хранилища» Мастера уезжает в его же Drive.
+// Это НЕ серверное хранилище: файл принадлежит аккаунту ведущего.
+export const syncRoomStorageToCloudIfEnabled = async (code) => {
+  if (!ensureWeb() || !code) return;
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return;
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmFolderId = await getGmContainersFolderId(token, moduleFolderId);
+    const storage = await db.getRoomStorage(code);
+    if (!storage) return;
+    const prefix = `storage__${code}__`;
+    const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(prefix));
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_room_storage',
+      code,
+      exportedAt: Date.now(),
+      storage,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmFolderId,
+      fileId: remote?.id,
+      filename: `${prefix}${Date.now()}.json`,
+      payload,
+    });
+    debugLog('sync.roomStorage.auto:done', { code });
+  } catch (e) {
+    debugLog('sync.roomStorage.auto:failed', { code, message: e?.message || String(e) });
   }
 };
 

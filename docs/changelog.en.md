@@ -1,5 +1,343 @@
 # Changelog
 ---
+## Keys and notes in shared storage (patch 510)
+
+Step 2 of `docs/key-items-and-gates-design.md`. The owner: "Many such items
+can be created. Each needs a name and some description ... The GM may name an
+item 'warehouse key' and give no description. Or write 'Mercenary note' and
+put a whole mini-story in the description". The owner rejected a counter on
+the bar and an operation log: "Items are either in storage or not. Players
+handle them themselves and can see what is there".
+
+- **GM catalog.** New `gm_key_items` table; `KeyItemCatalogModal` opens from
+  the key icon in the Loot/Trade header. A name is required, the description
+  may be empty. The editor inserts the existing tags (`**bold**`, `*italic*`,
+  list, `{CD}`, `{CAP}`) and previews them through `renderTextWithIcons` —
+  no second markup format.
+- **Arriving in storage.** "Add to storage" sends `storage.addKey` (GM only,
+  online only). If a loot container held a record with `keyItemId`, `lootTake`
+  puts it into shared storage instead of the taker's personal inventory. No
+  duplicates.
+- **Cannot withdraw.** A record stores `kind: 'keyItem'`, `keyItemId`, name
+  and description inside itself. `withdraw` returns `STORAGE_KEY_READ_ONLY`.
+  The storage window lists keys separately; tapping opens a card with the
+  formatted text and a note that the record stays shared.
+- **Handover.** The storage snapshot format keeps keys, so the file and the
+  GM save carry discovered records to a new server along with the items.
+
+Mini-game bypass and gates (`requires`) are steps 3 and 4, not in this patch.
+
+Installation: `docs/patch-510-install.md`.
+
+## Cross-platform save and JSON handover (patch 509)
+
+The owner: "Yes, the save must be cross-platform. And both the GM and players
+should be able to export shared storage to JSON, so if the GM steps down, the
+group changes its GM, or one of the players becomes the GM, the snapshot can be
+imported back. Since storage contents disappear when the server disconnects,
+arriving on a new server the GM can fill storage in one action."
+
+- **Two-way save.** `syncRoomStoragesInSession` in `googleDriveSync.js` now
+  downloads `storage__...` files from the GM Drive into the local database as
+  well as uploading them. It is called from the general cloud sync;
+  `getAllRoomStorages` was added to both database adapters.
+- **JSON export / import.** The pure `domain/partyStorageTransfer.js` defines
+  the format (`type: 'party_storage'`, room code, revision, entries), validates
+  files and also accepts a bare snapshot. Files are written and read through
+  the existing cross-platform `src/utils/characterFileTransfer.js` (Web Share
+  API / browser-fs-access / anchor download on web, expo-document-picker +
+  expo-sharing on native).
+- **Both roles.** The "Shared storage" window now has "Export JSON" and
+  "Import JSON" buttons and also opens for the GM. A GM import immediately
+  sends `storage.restore` to the room — one action fills the new storage. A
+  player import saves the snapshot on the device; once they become GM,
+  `restoreMasterStorage` uploads it.
+- This matters because room state is **ephemeral**: the server keeps it in
+  memory and it disappears on disconnect or server change. The JSON file and
+  the Drive save restore it without any server-side storage.
+
+Installation: `docs/patch-509-install.md`.
+
+## GM storage and player snapshot (patch 508)
+
+The owner simplified the model and rejected the server file from 507: "Shared
+storage is the GM storage plus a snapshot for players. Without the GM online
+they cannot take items from shared storage, but can view it. When a player
+connects to the room, storage updates to the current state. All changes happen
+while the player and the GM are online."
+
+- **The server writes nothing to disk.** `server/partyStorageStore.js`,
+  `.data/`, the `partyStorageStore` parameter and the `server/start.js` wiring
+  are gone. Storage state lives in room memory next to `activeSession` and
+  `terminalStates`.
+- **The GM storage is the canon.** New `gm_room_storage` table in the local
+  database; `src/lootTrade/partyStoragePersistence.js` saves every snapshot and
+  uploads it to the GM Google Drive (`gm_room_storage`) along the same path as
+  loot containers. Players do not persist the snapshot.
+- **Restore on connect.** `storage.restore` is accepted only from the room
+  owner; the GM uploads their save and a joining player receives the current
+  state via `room.state`. An older save cannot roll the room back.
+- **Online only.** `gmOnline` in the snapshot; without the GM, `deposit` /
+  `withdraw` return `STORAGE_GM_OFFLINE` while the item list stays visible.
+  The storage modal disables its buttons and shows a "GM offline" note.
+- No offline commits, queues, `baseRevision`, conflicts or conflict alerts:
+  all changes happen while the GM and player are online.
+
+The 507 skeleton (protocol, atomicity, GM `withdraw` ban, green bar, modal,
+fixed name) is kept.
+
+Installation: `docs/patch-508-install.md`.
+
+## Shared storage for the room (patch 507)
+
+Step one of `docs/key-items-and-gates-design.md`. The owner: "A party stash ...
+a shared container where anyone can put something or take something ... the
+group found a machine gun but needs to give it to a player who is absent
+today". Later: "Storage is better on the server. Connect — receive updates",
+"The name does not need to be customizable. It is simply shared storage",
+"What belongs to the players is theirs".
+
+- **Server canon.** `server/partyStorageStore.js` persists state to
+  `.data/party-storage.json` (excluded from git). A room restores it on
+  creation; `roomSnapshot` delivers the storage with the room state, so
+  "connect — receive updates" needs no extra request. Tests run the registry
+  without the file store, in memory.
+- **Deposit / withdraw.** New messages `storage.deposit`, `storage.withdraw`
+  and `storage.state`; operations are atomic, quantities validated, revision
+  increments, and the fresh snapshot is broadcast to all members. Errors:
+  `STORAGE_BAD_MESSAGE`, `STORAGE_ENTRY_NOT_FOUND`, `STORAGE_FORBIDDEN`.
+- **Party ownership.** The GM can deposit but cannot withdraw: `withdraw` is
+  allowed only for members with the player role. No recall, no removal of
+  others' items.
+- **Interface.** A full-width green area "Shared storage" now sits below the
+  green "Add loot" / "Buy items" cells in the inventory. The modal shows
+  character items and shared items; the local inventory changes only after a
+  successful server reply.
+- Paired RU/EN labels; the name is not customizable.
+
+This is step one only: key records, `requires`, gates and the lock-picking
+mini-game stay in the design document and will ship as separate patches.
+
+Installation: `docs/patch-507-install.md`.
+
+## GM notice, one-time terminal access and leaving a location (patch 506)
+
+The owner tested 505 in two tabs of one browser: "in the GM tab I do not see
+the terminal-hacked notice. As a player I can close the terminal and the
+terminal window remains, but it is actually the location window. And since
+it is an active location window I can hack the terminal again and again and
+again. This looks like an architectural bug. The terminal must not open again.
+Players should be able to disconnect from a location themselves with a
+'leave location' button next to 'minimize' in the modal."
+
+- **GM notice.** The global host selected events only by `role: 'gm'` in the
+  store. But the UI mode of tabs in one browser is shared (localStorage), so
+  the owner easily ended up with `role: 'player'` — both the failure question
+  and the success notice stayed silent. Ownership is now also detected from
+  the room member with `role: 'gm'` and this tab's `clientId` (the server
+  sends the member list regardless of interface mode). Loading `ownerToken`
+  can no longer block display (one-second cap), and `AlertHost` is mounted
+  above the "What's new" window so it cannot be covered.
+- **One-time access.** Whether a terminal is open no longer lives in the
+  modal's local state. The server issues a stable `accessId` per broadcast:
+  it does not change on turns or card edits, but is renewed after `reissue`,
+  re-broadcasting the location, or the GM answering "Yes". The pure
+  `terminalAccess.js` rule disables "Hack" after the first press and both
+  buttons after `won` / `awaitingRetry` / `closed`; the player sees a state
+  badge instead of another opening. The same rule applies to a standalone
+  terminal.
+- **"Leave location".** `playerCloseSession` previously refused to close a
+  `hub` for players, and the outer location window offered only "Minimize".
+  A "Leave location" button now sits next to it: the server adds the
+  `clientId` to `session.closedByClientIds`, that player's overlay stops
+  showing the scene, and the GM session stays active for everyone else.
+  Only the GM can still end the scene for all.
+- Paired RU/EN labels: "Leave location", its hint, "ACCESS USED", and an
+  updated note about ending the scene.
+
+Unchanged: all 504/505 rules, the word-count formula, three groups,
+4 attempts, Science brackets, Luck, the Hacker perk, operator takeover and
+the dictionary.
+
+Installation: `docs/patch-506-install.md`.
+
+## A successful hack no longer disappears (patch 505)
+
+The owner tested the game in two tabs of one browser: "I found a 5/7 match,
+picked the next word. The board reset and I had to start over. I could not tell
+whether I hacked it or not, and the Game Master got no notice."
+
+The next word was the password, so the server returned `ACCESS GRANTED` — but
+the hacking window immediately sent an extra `start`: its guard skipped only
+`playing` and `pendingDigest`. With a different `clientId` (second tab,
+reconnect) the operator-takeover rule from 503 set `entry.game = null` and
+built a fresh board with four attempts. The win was erased before the player
+could read it. Separately, the 504 GM notice was wired only to failure.
+
+- **The win is final.** `applyGameAction()` and the room registry now reject
+  `start` while `status: 'won'` with `TERMINAL_ALREADY_ACTIVE` for any
+  operator; board, revision and result stay unchanged. Only an explicit GM
+  re-broadcast (`reissue`) starts another run after a success.
+- **Window auto-start.** The pure `shouldAutoStart()` rule (new module
+  `components/lootTrade/terminalAutoStart.js`) forbids `start` in the final
+  states `won` / `awaitingRetry` / `closed`. Operator takeover via "Hack"
+  during an active run still works. The expected `TERMINAL_ALREADY_ACTIVE`
+  refusal no longer shows an error dialog.
+- **The GM hears about success.** The global host now also selects `won`
+  events (`findCompleted`) and shows a "Terminal hacked" notice through
+  `AlertHost` with the terminal and operator names. The live card panel shows
+  a "Hacked" state and a "Broadcast again" button.
+- **Hints stay visible.** The `N/M` history remains on both the failure and
+  the success screens, so a discovered "5 of 7" is visible even after all
+  attempts are used. Paired RU/EN labels were added to the dictionaries.
+
+Unchanged: all 504 rules (the "Allow another hack?" prompt only on failure),
+the word-count formula, three groups, 4 attempts, Science brackets, Luck,
+the Hacker perk, operator takeover and the dictionary.
+
+Installation: `docs/patch-505-install.md`.
+
+## Game Master decision instead of lockout after failure (patch 504)
+
+The owner replaced the "lock after failure" checkbox with an explicit decision:
+"the Game Master gets a prompt 'Allow another hack? Yes/No'. If yes — a new
+config. If no, the terminal can no longer be hacked or viewed unless the GM
+broadcasts it again".
+
+- **Failure is visible and no longer ends the run silently.** After the fourth
+  wrong guess the board enters "awaiting the Game Master" with "HACK FAILED"
+  and "All attempts used". Previously, without the checkbox, a player could
+  just press "Hack" again and the board was rebuilt from stale settings.
+- **The GM prompt** "Allow another hack?" with "Yes" / "No" appears over
+  *any* screen, not only the Loot/Trade tab. It never appears after a success,
+  and it cannot be dismissed without an answer. The same buttons are available
+  in the terminal admin panel.
+- **"Yes" immediately builds a fresh board from the current settings:** new
+  name, description and difficulty (even if the GM edited them during access),
+  fresh words, hints and brackets, exactly 4 attempts. The operator sheet is
+  preserved — INT 10 / Science 6 still give 15 words and 4 brackets, not the
+  default 21. Editing the card during an active run no longer wipes the board.
+- **"No" leaves the card visible with a "CLOSED" badge** and disables both
+  buttons — "Hack" and "View" — until the GM broadcasts it again. The server
+  rejects every player action (including viewing) with `TERMINAL_CLOSED`. Only
+  "Broadcast again", re-issuing the terminal, or re-issuing the location
+  reopens it; an ordinary settings edit does not clear the ban.
+- Hacking again without GM approval is impossible: while awaiting a decision
+  the server replies `TERMINAL_AWAITING_RETRY`. Deciding is GM-only.
+- **The checkbox is removed completely** from the form, engine, room registry,
+  location nodes and saved data. The `F2D20-TERM:` marker no longer writes the
+  `f` field but still reads old markers, so earlier saves keep working. Related
+  dictionary strings are gone; paired RU/EN strings for the prompt, "CLOSED",
+  the waiting state and re-broadcast were added.
+- The local fallback (older room server) follows the same model: the Yes/No
+  prompt is shown in the hacking window on the GM device.
+
+Unchanged: the board-size formula, three groups with two variants, 4 attempts,
+Science brackets, Luck, the Hacker perk, operator takeover via "Hack", the
+dictionary, and terminals inside locations opening the hacking window.
+
+Installation: `docs/patch-504-install.md`.
+
+## Three word groups, operator takeover and one full restore (patch 503)
+
+The owner clarified the board design: "Let there be 3 groups of words with
+some shared combinations for the group. Say endings, on/ion, ly/tly, The/tho.
+First you work out which ending group is right, then inside that group you work
+out whether e.g. ion or on is the right sequence. These need not be endings —
+they can be prefixes or suffixes." A hint as high as `L−1 out of L` is fine as
+long as it requires deduction: extra words make blind guessing poor, while
+finding the right sequence almost guarantees a win within the canonical
+4 attempts.
+
+- `buildGroupedPasswordSet()` builds **three groups** around a shared
+  fragment (2–3 letters) at one position — word end or word start. Each group
+  has **two variants** extending the fragment by one letter (`TION`/`SION`,
+  `NESS`/`LESS`, `THE`/`THO`). The password sits in one variant of one group.
+- Boards provide a **hint gradient**: words of the winning variant score high
+  (up to `L−1/L`), the sibling variant of the same group scores medium, and
+  other groups plus noise score low. The gradient is enforced during board
+  selection and holds across all 160 "difficulty × INT × seed" combinations.
+- Remaining slots are neutral noise, lowering blind-guess odds. Measured at
+  D5 (INT 10): blind 25%, careful deduction 97% without bonuses and 100% at
+  Science 6; at D1 careful 97%, blind 56%. The password is still not the most
+  "central" member of the set.
+- **Operator takeover.** Pressing "Hack" as another character rebuilds the
+  board from their INT/Science/Luck and makes them the operator; the previous
+  operator and everyone else only watch. A repeated `start` by the same
+  operator does not reset progress, so all five players can try in turn.
+- **At most one full restore per board.** Only one bracket can carry a full
+  return to 4 attempts, with a `resetUsed` guard for boards created earlier.
+  Other brackets keep their normal effect; attempts never exceed 4.
+- The hacking window shows hints as `N/M` (matching letters out of word
+  length) instead of a bare number. D0 keeps its anagram families and outlier
+  password.
+
+Installation: `docs/patch-503-install.md`.
+
+## Export saves are read at any nesting depth (patch 502)
+
+The owner sent a fragment of a real save (`format: rpg-companion-character`,
+`character.data.attributes`, INT 10, LCK 10, Science 6) and reported that a
+difficulty-5 terminal still showed 21 words.
+
+Patch 501 unwrapped exactly one `data` envelope (the `CHAR_PUBLISH` shape). An
+export file keeps the sheet one level deeper, under `character.data`, so when
+that object (or a JSON string of it) was published to the room, attributes were
+not found and fell back to 4 again: `25 − 4 = 21`.
+
+`normalizeCharacterSnapshot()` now walks the `data`, `character`,
+`characterData`, `payload`, `snapshot` and `save` envelopes up to 12 layers,
+parses JSON strings at any level, picks the deepest layer holding
+`attributes`/`skills`, and preserves service fields from outer envelopes
+(`terminalHacking`, `equipment`). The operator name is set in `createGame()`,
+not only in `applyGameAction()`.
+
+Every delivery shape was tested: the bare sheet, `CHAR_PUBLISH` with the sheet,
+`CHAR_PUBLISH` with the whole export file, a JSON string, a double envelope and
+the `character` node alone. All give INT 10 / LCK 10 / Science 6 → **15 words,
+4 brackets, 20% attempt recovery**. Board sizing is unchanged.
+
+Installation: `docs/patch-502-install.md`.
+
+## Character stats are read from the sheet (patch 501)
+
+Owner: "Why do I see 21 words on a difficulty-5 terminal at INT 10? Isn't
+25-10 = 15?" The `25 − INT` formula was correct; reading the character sheet
+was not.
+
+The published room envelope stores the save under `data`, and a save keeps
+attributes and skills as `[{ name: 'INT', value: 10 }]` arrays. The engine only
+understood a `{ INT: { value } }` dictionary or an array with `id`/`key`, so INT
+and LCK were not found and silently fell back to 4: `25 − 4 = 21`. Science was
+matched by `name`, so four brackets at Science 6 looked correct and hid the bug.
+
+The snapshot is now normalized before the board is built: the `data` wrapper
+(including JSON strings) is unwrapped, and the live store, legacy saves and
+older test shapes all read the same way. INT, LCK, Science, Hacker
+(`[{ perkId, index }]`) and the *Programmer's Digest* inside `equipment.items`
+are covered. The room registry passes the whole envelope so the operator name
+survives too. Board sizing is unchanged: 15 words at INT 10 and 21 at INT 4.
+
+Installation: `docs/patch-501-install.md`.
+
+## The "25 − INT" board (patch 500)
+
+Owner: "with INT 10 + Science 6 I failed the hack three times in a row".
+Every difficulty lost five words:
+
+`N = max(4, 15 + 2·D − INT)`; at difficulty 5 that is **`25 − INT`** — 21
+words at INT 4 and 15 at INT 10 (previously 26 and 20). At difficulty 1 with
+INT 10 it is 7 words, at difficulty 0 — 5.
+
+The bracket guard was relaxed from `N−3` to `N−1` so that Science 6 keeps all
+four brackets even on the shortest board. Board generation got faster
+(≈20–30 ms at difficulty 5) while the ambiguity floor stays at ≥4.
+
+Measured on the real engine, INT 10, LCK 4, difficulty 5, Science 6: blind
+guessing **21% → 39%**, informed deduction **94% → 98%**, best-move play
+**100%**, **100%** after a lucky full restore. At difficulty 1 with Science 6
+informed deduction remains **100%**. Installation: `docs/patch-500-install.md`.
+
 ## Two kinds of brackets, count set by Science (patch 499)
 
 The owner clarified how the bonus table should be read: "2 words + 2 attempts"

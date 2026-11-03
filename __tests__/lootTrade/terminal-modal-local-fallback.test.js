@@ -45,7 +45,6 @@ const terminal = {
   name: 'Vault console',
   description: '',
   difficulty: 2,
-  lockOnFailure: false,
 };
 
 describe('terminal hacking modal on a legacy room server', () => {
