@@ -14,7 +14,12 @@ const {
   applySessionUpdate,
   applyAtomicLootTake,
   applyAtomicTradeCommit,
+  applyKeyAccessToSession,
 } = require('./lootTradeSession');
+const {
+  KEY_ACCESS,
+  resolveKeyAccess,
+} = require('./keyAccess');
 const {
   normalizeTerminalConfig,
   publicGameState,
@@ -55,6 +60,56 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ...cloneStorage(room.partyStorage),
     gmOnline: isGmOnline(room),
   });
+
+  /**
+   * Патч 516: «доступ разрешён ключом» — выигранное состояние терминала без
+   * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
+   * Мастер сам создал ключ, связал его с точкой и выдал.
+   */
+  const keyWonGame = (config, at) => ({
+    status: 'won',
+    result: 'ACCESS GRANTED',
+    scrollUp: true,
+    name: String(config?.name || '').trim() || 'Терминал',
+    description: String(config?.description || '').trim(),
+    attempts: 4,
+    attemptsMax: 4,
+    guesses: [],
+    wordRanges: [],
+    bracketRanges: [],
+    hackedByKey: true,
+    revision: 1,
+    updatedAt: at,
+  });
+
+  const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
+    storage: room.partyStorage,
+    terminalStates: room.terminalStates,
+  });
+
+  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
+  const refreshKeyAccess = (room) => {
+    if (!room) return;
+    const resolve = resolveForRoom(room);
+    if (room.activeSession) {
+      room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+    }
+    for (const [, entry] of room.terminalStates) {
+      const decision = resolve({
+        requiredKeyItemId: entry.config?.requiredKeyItemId,
+        keyRequirement: entry.config?.keyRequirement,
+        linkedCheckId: entry.config?.linkedCheckId,
+      });
+      entry.keyAccessState = decision.state;
+      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+        entry.game = keyWonGame(entry.config, now());
+        entry.closed = false;
+        entry.accessId = newBroadcastId();
+        entry.updatedAt = now();
+      }
+    }
+  };
 
   const touchRateLog = (log, key, windowMs, max) => {
     const cutoff = now() - windowMs;
@@ -330,11 +385,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
+    refreshKeyAccess(room);
     // Патч 504: открытие/повторная выдача локации — это новая трансляция,
     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
     syncTerminalNodes(room, normalized, { reissue: true });
     room.lastClosedSession = null;
-    return { room, session: normalized };
+    return { room, session: room.activeSession || normalized };
   };
 
   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
@@ -364,6 +420,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
     // открыть терминал один раз за трансляцию, даже если закрыл окно.
     accessId: entry.accessId || null,
+    // Патч 516: состояние требования ключа для карточки терминала.
+    keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
+    keyUnlocked: Boolean(entry.keyUnlocked),
     game: publicGameState(entry.game),
     updatedAt: entry.updatedAt,
   });
@@ -433,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const previous = room.terminalStates.get(config.containerId);
     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
     room.terminalStates.set(config.containerId, entry);
+    refreshKeyAccess(room);
     return { room, terminal: terminalPublic(config.containerId, entry) };
   };
 
@@ -496,6 +556,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       entry.accessId = newBroadcastId();
       entry.updatedAt = now();
       return { room, terminal: terminalPublic(id, entry) };
+    }
+    // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+    // не запускается вообще — игрок получает понятный отказ.
+    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
+      || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
+      return { error: ERROR_CODE.KEY_REQUIRED };
     }
     const member = room.members.get(clientId);
     if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
@@ -565,6 +631,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       });
     }
     entry.updatedAt = now();
+    // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+    // для которых ключ был необязательным.
+    refreshKeyAccess(room);
     return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
   };
 
@@ -935,6 +1004,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     storage.entries = [...storage.entries, entry];
     storage.revision += 1;
     room.partyStorage = storage;
+    refreshKeyAccess(room);
     return entry;
   };
 
@@ -998,6 +1068,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       return { room, storage: storageSnapshot(room), applied: false };
     }
     room.partyStorage = incoming;
+    refreshKeyAccess(room);
     return { room, storage: storageSnapshot(room), applied: true };
   };
 
@@ -1041,6 +1112,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     addKeyItemToStorage,
     restorePartyStorage,
     sweep,
+    // Патч 516: явный пересчёт доступа перед рассылкой (ключ могли найти
+    // в том же самом взятии добычи, когда сессия ещё перезаписывалась).
+    recomputeKeyAccess: (code) => {
+      const room = rooms.get(code);
+      if (room) refreshKeyAccess(room);
+      return room || null;
+    },
     _rooms: rooms, // диагностика/тесты
   };
 };

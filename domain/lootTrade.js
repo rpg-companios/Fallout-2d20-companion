@@ -157,6 +157,9 @@ export const buildStandaloneTerminalSessionNode = (container, { locked = false, 
   locked,
   lockLabel,
   difficulty: container?.difficulty || 0,
+  requiredKeyItemId: String(container?.requiredKeyItemId || '').trim(),
+  keyRequirement: String(container?.keyRequirement || 'none'),
+  linkedCheckId: String(container?.linkedCheckId || '').trim(),
   items: [],
 });
 
@@ -530,6 +533,10 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
       difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+      // Патч 516: требование ключа у вложенной точки доступа.
+      requiredKeyItemId: String(child.requiredKeyItemId || '').trim(),
+      keyRequirement: String(child.keyRequirement || 'none'),
+      linkedCheckId: String(child.linkedCheckId || '').trim(),
       characterOverrides: {},
       items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
         ? child.items.map((entry) => ({

@@ -15,7 +15,8 @@ describe('513: вложенность ключей, перетаскивание
     expect(design).toContain('Обновление 7 (патч 513');
     expect(design).toContain('только документы и номер версии');
     expect(design).toContain('7.6 Патч 514: что из этого уже в коде');
-    expect(design).toContain('серверная проверка ключа ещё не начата');
+    // Патч 516 закрыл вторую половину шага 3 — документ это отражает.
+    expect(design).toContain('Патч 516 закрыл тезис 8');
     expect(design).toContain('docs/roadmap.md');
   });
 

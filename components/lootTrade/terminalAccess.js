@@ -38,6 +38,8 @@ export const canHackTerminal = ({ used, key, game, terminalClosed, terminalAwait
 export const terminalBlockedReason = ({ game, terminalClosed, terminalAwaiting, used, key }) => {
   if (terminalClosed) return 'closed';
   if (terminalAwaiting) return 'awaiting';
+  // Патч 516: успех без мини-игры, точка открыта ключевой записью.
+  if (game?.hackedByKey) return 'keyUnlocked';
   if (game?.status === 'won') return 'won';
   if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return 'finished';
   if (used?.[key]) return 'used';

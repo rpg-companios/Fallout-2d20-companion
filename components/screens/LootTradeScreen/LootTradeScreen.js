@@ -641,6 +641,9 @@ export default function LootTradeScreen() {
                 name: saved.name,
                 description: saved.description,
                 difficulty: saved.difficulty,
+                requiredKeyItemId: saved.requiredKeyItemId || '',
+                keyRequirement: saved.keyRequirement || 'none',
+                linkedCheckId: saved.linkedCheckId || '',
               },
             });
           } else if (terminalNode) {
@@ -777,12 +780,10 @@ export default function LootTradeScreen() {
     }
 
     setFormModal(null);
-    if (!activeContainerId && !draft.id) {
-      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
-        setReturnHubId(selectedHubIds[0]);
-      }
-      setActiveContainerId(saved.id);
-    }
+    // Патч 516: после создания точки остаёмся на экране карточек. Раньше
+    // только что сохранённая карточка сразу открывалась в детальный экран.
+    // Привязка к локациям всё равно записана выше, так что скрытого
+    // перехода в локацию не требуется.
     if (capsRollInfo?.rolled) {
       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
         dice: capsRollInfo.diceCount,
@@ -1166,6 +1167,9 @@ export default function LootTradeScreen() {
             name: freshSource.name,
             description: freshSource.description,
             difficulty: freshSource.difficulty,
+            requiredKeyItemId: freshSource.requiredKeyItemId || '',
+            keyRequirement: freshSource.keyRequirement || 'none',
+            linkedCheckId: freshSource.linkedCheckId || '',
           },
         });
       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {

@@ -183,6 +183,7 @@ ${tLootTrade('terminal.retryMessage')}`,
       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
       else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
       else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
+      else if (code === 'KEY_REQUIRED') showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
       else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
         showRawAlert({ title: tLootTrade('terminal.actionFailed') });
       }

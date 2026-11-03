@@ -1,0 +1,2918 @@
+diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
+new file mode 100644
+index 0000000..ccff3f6
+--- /dev/null
++++ b/__tests__/room/key-access-516.test.js
+@@ -0,0 +1,185 @@
++// Приёмочный тест 516: серверная проверка ключа (тезис 8 плана) и возврат
++// на экран карточек после создания точки.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { applyKeyAccessToSession, normalizeActiveSession } from '../../server/lootTradeSession.js';
++import { KEY_ACCESS, resolveKeyAccess, hasKeyInStorage, isCheckPassed } from '../../server/keyAccess.js';
++import { findCompleted } from '../../components/lootTrade/terminalRetryPrompt.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++import { ROOM_ERROR } from '../../src/room/roomProtocol.ts';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
++  registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  return { registry, room };
++};
++
++const storageWithKey = (id) => ({
++  revision: 1,
++  entries: [{ entryId: 'e1', kind: 'keyItem', keyItemId: id, name: 'Ключ', quantity: 1 }],
++});
++
++describe('516: чистое правило доступа', () => {
++  it('пять состояний: нет требования / ключ найден / обязательный / нужна проверка / проверка пройдена', () => {
++    const empty = { revision: 0, entries: [] };
++    expect(resolveKeyAccess({}, { storage: empty }).state).toBe(KEY_ACCESS.NONE);
++    expect(resolveKeyAccess(
++      { requiredKeyItemId: 'k1', keyRequirement: 'required' },
++      { storage: storageWithKey('k1') },
++    ).state).toBe(KEY_ACCESS.OPEN_BY_KEY);
++    expect(resolveKeyAccess(
++      { requiredKeyItemId: 'k1', keyRequirement: 'required' },
++      { storage: empty },
++    ).state).toBe(KEY_ACCESS.DENIED);
++    expect(resolveKeyAccess(
++      { requiredKeyItemId: 'k1', keyRequirement: 'optional', linkedCheckId: 't2' },
++      { storage: empty },
++    ).state).toBe(KEY_ACCESS.NEEDS_CHECK);
++    expect(resolveKeyAccess(
++      { requiredKeyItemId: 'k1', keyRequirement: 'optional', linkedCheckId: 't2' },
++      { storage: empty, terminalStates: { t2: { game: { status: 'won' } } } },
++    ).state).toBe(KEY_ACCESS.OPEN);
++    expect(hasKeyInStorage(storageWithKey('k1'), 'k1')).toBe(true);
++    expect(hasKeyInStorage(storageWithKey('k1'), 'k2')).toBe(false);
++    expect(isCheckPassed({ t2: { game: { status: 'won' } } }, 't2')).toBe(true);
++    expect(isCheckPassed(new Map([['t2', { game: { status: 'won' } }]]), 't2')).toBe(true);
++  });
++
++  it('applyKeyAccessToSession помечает корень и вложенные узлы', () => {
++    const session = normalizeActiveSession({
++      name: 'Локация', kind: 'hub', targetType: 'room',
++      requiredKeyItemId: 'k1', keyRequirement: 'required',
++      nodes: [{
++        containerId: 'c1', kind: 'loot', name: 'Сейф',
++        requiredKeyItemId: 'k1', keyRequirement: 'required',
++        items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
++      }],
++    });
++    const denied = applyKeyAccessToSession(session, () => ({ state: KEY_ACCESS.DENIED }));
++    expect(denied.locked).toBe(true);
++    expect(denied.keyAccessState).toBe('denied');
++    expect(denied.nodes[0].locked).toBe(true);
++
++    const opened = applyKeyAccessToSession(session, () => ({ state: KEY_ACCESS.OPEN_BY_KEY }));
++    expect(opened.locked).toBe(false);
++    expect(opened.keyUnlocked).toBe(true);
++    expect(opened.nodes[0].keyUnlocked).toBe(true);
++  });
++
++  it('зеркало протокола и код ошибки', () => {
++    expect(ERROR_CODE.KEY_REQUIRED).toBe('KEY_REQUIRED');
++    expect(ROOM_ERROR.KEY_REQUIRED).toBe('KEY_REQUIRED');
++  });
++});
++
++describe('516: сервер применяет правило к выданной точке', () => {
++  const openChest = (registry, room, requirement) => registry.openSession({
++    code: room.code,
++    clientId: 'gm',
++    session: {
++      name: 'Сейф', kind: 'loot', targetType: 'room',
++      items: [{ entryId: 'e1', itemId: 'ammo', itemType: 'ammo', name: 'Патроны', quantity: 1 }],
++      ...requirement,
++    },
++  });
++
++  it('обязательный ключ: без ключа отказано, после находки — открыто', () => {
++    const { registry, room } = setup();
++    openChest(registry, room, { requiredKeyItemId: 'k1', keyRequirement: 'required' });
++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('denied');
++    const denied = registry.lootTake({
++      code: room.code, clientId: 'p1',
++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
++    });
++    expect(denied.error).toBe(ERROR_CODE.KEY_REQUIRED);
++
++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ' });
++    const state = registry.getRoom(room.code).activeSession;
++    expect(state.keyAccessState).toBe('open-by-key');
++    expect(state.keyUnlocked).toBe(true);
++    expect(state.locked).toBe(false);
++    const taken = registry.lootTake({
++      code: room.code, clientId: 'p1',
++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
++    });
++    expect(taken.error).toBeUndefined();
++  });
++
++  it('необязательный ключ: без проверки закрыто, после взлома связанного терминала — открыто', () => {
++    const { registry, room } = setup();
++    openChest(registry, room, {
++      requiredKeyItemId: 'k2', keyRequirement: 'optional', linkedCheckId: 't2',
++    });
++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('needs-check');
++    expect(registry.lootTake({
++      code: room.code, clientId: 'p1',
++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
++    }).error).toBe(ERROR_CODE.KEY_REQUIRED);
++
++    // Привязанный терминал взломан: состояние комнаты общее, ключ не нужен.
++    const rawRoom = registry._rooms.get(room.code);
++    rawRoom.terminalStates.set('t2', { config: { containerId: 't2' }, game: { status: 'won' } });
++    registry.recomputeKeyAccess(room.code);
++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('open');
++    expect(registry.getRoom(room.code).activeSession.locked).toBe(false);
++  });
++
++  it('терминал с ключом: мини-игра не запускается и Мастеру нет уведомления', () => {
++    const { registry, room } = setup();
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm',
++      config: {
++        containerId: 't1', name: 'Терминал', difficulty: 1,
++        requiredKeyItemId: 'k1', keyRequirement: 'required',
++      },
++    });
++    expect(registry.terminalAction({
++      code: room.code, clientId: 'p1', containerId: 't1', action: 'start',
++    }).error).toBe(ERROR_CODE.KEY_REQUIRED);
++
++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ' });
++    const terminal = registry.getState(room.code).terminalStates.t1;
++    expect(terminal.game.status).toBe('won');
++    expect(terminal.game.hackedByKey).toBe(true);
++    expect(terminal.keyAccessState).toBe('open-by-key');
++    expect(terminal.game.wordRanges).toHaveLength(0);
++    expect(findCompleted({ [room.code]: { role: 'gm', terminalStates: { t1: terminal } } }, 'gm')).toHaveLength(0);
++  });
++});
++
++describe('516: экран карточек и документация', () => {
++  it('после создания точки детальный экран не открывается', () => {
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(screen).not.toContain('setActiveContainerId(saved.id)');
++    expect(screen).toContain('после создания точки остаёмся на экране карточек');
++  });
++
++  it('подписи ошибок и бейджи парные RU/EN', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    for (const [section, key] of [
++      ['player', 'keyRequiredError'], ['player', 'hubNodeKeyUnlockedBadge'],
++      ['terminal', 'keyRequiredError'], ['terminal', 'keyUnlockedBadge'],
++    ]) {
++      expect(ru[section][key]).toBeTruthy();
++      expect(en[section][key]).toBeTruthy();
++    }
++  });
++
++  it('roadmap обновлён до 516 и список оставшихся актуален', () => {
++    const plan = read('docs/roadmap.md');
++    expect(plan).toContain('516');
++    expect(plan).toContain('Осталось после патча 516');
++    expect(plan).not.toContain('| 8 | ⏳');
++    expect(plan).toContain('Ворота между контейнерами');
++    expect(plan).toContain('две панели');
++  });
++});
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 91685d7..7e34e18 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -162,7 +162,7 @@ describe('514: словари и живой план', () => {
+   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 515');
++    expect(plan).toContain('Осталось после патча 516');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('Ворота между контейнерами');
+     expect(plan).toContain('две панели');
+diff --git a/__tests__/room/key-items-placement-513.test.js b/__tests__/room/key-items-placement-513.test.js
+index 95a6c6d..ef21419 100644
+--- a/__tests__/room/key-items-placement-513.test.js
++++ b/__tests__/room/key-items-placement-513.test.js
+@@ -15,7 +15,8 @@ describe('513: вложенность ключей, перетаскивание
+     expect(design).toContain('Обновление 7 (патч 513');
+     expect(design).toContain('только документы и номер версии');
+     expect(design).toContain('7.6 Патч 514: что из этого уже в коде');
+-    expect(design).toContain('серверная проверка ключа ещё не начата');
++    // Патч 516 закрыл вторую половину шага 3 — документ это отражает.
++    expect(design).toContain('Патч 516 закрыл тезис 8');
+     expect(design).toContain('docs/roadmap.md');
+   });
+ 
+diff --git a/__tests__/room/terminal-gm-retry-504.test.js b/__tests__/room/terminal-gm-retry-504.test.js
+index a9b43ca..e0c91a0 100644
+--- a/__tests__/room/terminal-gm-retry-504.test.js
++++ b/__tests__/room/terminal-gm-retry-504.test.js
+@@ -332,7 +332,11 @@ describe('504: lockOnFailure удалён полностью', () => {
+   it('движок не читает и не пишет поле; старые сохранения с ним игнорируются', () => {
+     const config = normalizeTerminalConfig({ ...BASE_CONFIG, lockOnFailure: true });
+     expect(config).not.toHaveProperty('lockOnFailure');
+-    expect(Object.keys(config).sort()).toEqual(['containerId', 'description', 'difficulty', 'name']);
++    // Патч 516: конфигурация терминала несёт ещё и требование ключа.
++    expect(Object.keys(config).sort()).toEqual([
++      'containerId', 'description', 'difficulty', 'keyRequirement',
++      'linkedCheckId', 'name', 'requiredKeyItemId',
++    ]);
+     const game = createGame({
+       config, operatorClientId: 'p', operatorCharacterId: 'c',
+       characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,
+diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
+index d8a6888..cba08ae 100644
+--- a/__tests__/ui/form-checkbox-515.test.js
++++ b/__tests__/ui/form-checkbox-515.test.js
+@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
+   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 515');
++    expect(plan).toContain('Осталось после патча 516');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('две панели');
+     expect(plan).toContain('Мини-игра взлома замков');
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 5da8acd..d54e7f2 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -517,6 +517,7 @@ export default function PlayerLootTradeOverlay() {
+                       closed: 'terminal.closedBadge',
+                       awaiting: 'terminal.retryWaiting',
+                       won: 'terminal.stateWon',
++                      keyUnlocked: 'terminal.keyUnlockedBadge',
+                       finished: 'terminal.accessUsed',
+                       used: 'terminal.accessUsed',
+                     }[accessBlockedReason] || null;
+@@ -549,7 +550,11 @@ export default function PlayerLootTradeOverlay() {
+                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
+                           )}
+ 
+-                          {nodeLocked ? (
++                          {node.keyUnlocked ? (
++                            <Text style={styles.hubUnlockedMetaText}>
++                              {tLootTrade('player.hubNodeKeyUnlockedBadge')}
++                            </Text>
++                          ) : nodeLocked ? (
+                             <Text style={styles.hubLockedHintText}>
+                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                             </Text>
+@@ -727,6 +732,9 @@ export default function PlayerLootTradeOverlay() {
+       if (code === 'CONTAINER_LOCKED') {
+         showRawAlert({ title: tLootTrade('player.containerLockedError') });
+         if (isInsideHub) returnToHubList();
++      } else if (code === 'KEY_REQUIRED') {
++        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
++        if (isInsideHub) returnToHubList();
+       } else {
+         debugLog('playerOverlay.lootTake:failed', { message: error?.message });
+       }
+@@ -907,6 +915,9 @@ export default function PlayerLootTradeOverlay() {
+       if (code === 'CONTAINER_LOCKED') {
+         showRawAlert({ title: tLootTrade('player.containerLockedError') });
+         if (isInsideHub) returnToHubList();
++      } else if (code === 'KEY_REQUIRED') {
++        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
++        if (isInsideHub) returnToHubList();
+       } else if (code === 'TRADE_STOCK_CHANGED') {
+         showRawAlert({ title: tLootTrade('player.stockChangedError') });
+       } else if (code === 'TRADE_NOT_ENOUGH_MERCHANT_CAPS') {
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index a8537f6..8ffa724 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -183,6 +183,7 @@ ${tLootTrade('terminal.retryMessage')}`,
+       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
+       else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
+       else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
++      else if (code === 'KEY_REQUIRED') showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
+       else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
+         showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+       }
+diff --git a/components/lootTrade/terminalAccess.js b/components/lootTrade/terminalAccess.js
+index 19cb10f..84bb356 100644
+--- a/components/lootTrade/terminalAccess.js
++++ b/components/lootTrade/terminalAccess.js
+@@ -38,6 +38,8 @@ export const canHackTerminal = ({ used, key, game, terminalClosed, terminalAwait
+ export const terminalBlockedReason = ({ game, terminalClosed, terminalAwaiting, used, key }) => {
+   if (terminalClosed) return 'closed';
+   if (terminalAwaiting) return 'awaiting';
++  // Патч 516: успех без мини-игры, точка открыта ключевой записью.
++  if (game?.hackedByKey) return 'keyUnlocked';
+   if (game?.status === 'won') return 'won';
+   if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return 'finished';
+   if (used?.[key]) return 'used';
+diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
+index 8ce9962..974a9f1 100644
+--- a/components/lootTrade/terminalRetryPrompt.js
++++ b/components/lootTrade/terminalRetryPrompt.js
+@@ -62,6 +62,9 @@ export const findCompleted = (rooms, clientId = null) => {
+     if (!isGmRoom(room, clientId)) continue;
+     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
+       if (terminal?.game?.status !== 'won') continue;
++      // Патч 516: терминал, открытый ключом, не считается «взломанным
++      // игроком» — Мастер сам создал и выдал ключ, уведомление не нужно.
++      if (terminal?.game?.hackedByKey) continue;
+       if (terminal?.closed) continue;
+       completed.push({
+         code,
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index b4677d3..a37583b 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -641,6 +641,9 @@ export default function LootTradeScreen() {
+                 name: saved.name,
+                 description: saved.description,
+                 difficulty: saved.difficulty,
++                requiredKeyItemId: saved.requiredKeyItemId || '',
++                keyRequirement: saved.keyRequirement || 'none',
++                linkedCheckId: saved.linkedCheckId || '',
+               },
+             });
+           } else if (terminalNode) {
+@@ -777,12 +780,10 @@ export default function LootTradeScreen() {
+     }
+ 
+     setFormModal(null);
+-    if (!activeContainerId && !draft.id) {
+-      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
+-        setReturnHubId(selectedHubIds[0]);
+-      }
+-      setActiveContainerId(saved.id);
+-    }
++    // Патч 516: после создания точки остаёмся на экране карточек. Раньше
++    // только что сохранённая карточка сразу открывалась в детальный экран.
++    // Привязка к локациям всё равно записана выше, так что скрытого
++    // перехода в локацию не требуется.
+     if (capsRollInfo?.rolled) {
+       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
+         dice: capsRollInfo.diceCount,
+@@ -1166,6 +1167,9 @@ export default function LootTradeScreen() {
+             name: freshSource.name,
+             description: freshSource.description,
+             difficulty: freshSource.difficulty,
++            requiredKeyItemId: freshSource.requiredKeyItemId || '',
++            keyRequirement: freshSource.keyRequirement || 'none',
++            linkedCheckId: freshSource.linkedCheckId || '',
+           },
+         });
+       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c21bbbe..e1a1bce 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,29 @@
+ # Changelog
+ ---
++## Server-side key checking and staying on the card grid (patch 516)
++
++Plan item 8. Access is now decided by the **server from the room state**, not
++by the player's window (lesson 506): the client never decides whether a point
++is open.
++
++- **Key present in shared storage** — the mini-game never starts: the terminal
++  gets "access granted" with no board and no attempts, containers and
++  merchants open. The GM gets no "Terminal hacked" notice: they created the
++  record, linked it and issued it. The location list shows "Opened by key".
++- **Key missing and mandatory** — the point stays locked; taking loot, trading
++  or starting a hack returns a "Key required" refusal.
++- **Key missing and optional** — access waits for the linked check: once the
++  chosen terminal is hacked, the point opens. Until then a key is needed or
++  the GM opens it manually.
++- **Key found later** — issuing a record, finding one in loot, restoring a
++  storage snapshot and hacking the linked terminal all recompute access and
++  broadcast fresh states to the room. The requirement reaches the server both
++  for a standalone terminal and for location nodes.
++- **New error code** `KEY_REQUIRED` in both protocols with paired RU/EN labels.
++
++Also, as requested: **creating a point no longer opens its detail screen** —
++the GM stays on the card grid and sees the newly saved card there.
++
+ ## "Mandatory" checkbox and field order (patch 515)
+ 
+ The owner: "When creating a container, the 'Mandatory' requirement should
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 61f9a9a..ab94c61 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,33 @@
+ # История изменений
+ 
+ ---
++## Серверная проверка ключа и возврат на карточки (патч 516)
++
++Тезис 8 плана. Теперь решение о доступе принимает **сервер по состоянию
++комнаты**, а не окно игрока (урок 506): клиент не решает, открыта точка или
++нет.
++
++- **Есть ключ на общем складе** — мини-игра не запускается вообще: терминал
++  получает состояние «доступ разрешён» без доски и попыток, контейнер и
++  торговец открываются. Уведомления «Терминал взломан» Мастеру нет: он сам
++  создал запись, связал её с точкой и выдал. В списке локации стоит пометка
++  «Открыт ключом».
++- **Ключа нет и он обязателен** — точка заперта, попытка забрать добычу,
++  торговать или начать взлом возвращает отказ «Нужен ключ».
++- **Ключа нет и он необязателен** — доступ ждёт привязанную проверку: после
++  взлома указанного терминала точка открывается. Пока проверка не пройдена,
++  нужен ключ или решение Мастера вручную.
++- **Ключ найден позже** — выдача записи Мастером, находка в добыче, загрузка
++  снимка хранилища и взлом привязанного терминала пересчитывают доступ и
++  рассылают свежие состояния всем в комнате. Требование доходит до сервера и
++  в одиночном терминале, и в узлах локации.
++- **Новый код ошибки** `KEY_REQUIRED` в обоих протоколах и парные подписи
++  RU/EN.
++
++Отдельно по просьбе владельца: **после создания точки детальный экран больше
++не открывается** — Мастер остаётся на экране карточек и видит только что
++сохранённую карточку на сетке.
++
+ ## Чекбокс «Обязателен» и порядок полей (патч 515)
+ 
+ Владелец: «При создании контейнера, требование "Обязателен" лучше пусть будет
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 0d24eec..8ad7726 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -13,10 +13,11 @@
+ атомарность, плашка и модалка 507 сохранены. Патч **513** (только документ,
+ без кода) зафиксировал уточнение владельца о вложенности ключей,
+ перетаскивании карточек и двух строках требования — **Обновление 7** ниже.
+-Шаг 3 разбит: патч **514** реализовал **поля, формы и вложенность**
+-(две строки требования, привязка ключа к родителю, перетаскивание всех четырёх
+-карточек), но **серверная проверка ключа ещё не начата**. Шаги 4–5 (ворота,
+-мини-игра замков) не реализованы. Живой порядок — `docs/roadmap.md`.
++Шаг 3 **завершён**: патч **514** дал поля, формы и вложенность, патч **515** —
++чекбокс и порядок полей, патч **516** — серверную проверку ключа (пропуск
++мини-игры, отказ по обязательному ключу, ожидание привязанной проверки).
++Шаги 4–5 (ворота, мини-игра замков) не реализованы. Живой порядок —
++`docs/roadmap.md`.
+ 
+ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
+ «Я полагал ключ будет, как карточка контейнера/торговца/терминала и с модалкой
+@@ -143,8 +144,8 @@
+ **Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
+ кнопок, а поле описания перенесено в конец формы — после настроек доступа.
+ 
+-**Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
+-обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
++**Патч 516 закрыл тезис 8:** проверка склада сервером, пропуск мини-игры и
++отказ по обязательному ключу реализованы; ворота остаются тезисом 9.
+ 
+ ### 7.7 Границы патча 513
+ 
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index 0f2edd4..a954080 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index b216aff..607446c 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 290d9af..5c9cf01 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 5d7b5b2..1a020c9 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 21c44f6..5fc2c4e 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 8e38cf6..ae8ebdb 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 5a89eb0..3c695eb 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 8007e7c..7251946 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index a28683d..160de05 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 46341c4..16a5370 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 5a674b6..ed06a1b 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index dc224d8..2b6d0c2 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index ad5b4f9..5399342 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 1a0c5bc..77d75cb 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index ecf7069..7d24147 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 2ac91ec..b303b8b 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 7967163..516d003 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index 76cebcd..7f5c1b7 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index 8c41ca5..bc87cc1 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+index da2a321..73c28d1 100644
+--- a/docs/patch-513-install.md
++++ b/docs/patch-513-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 513: уточнение правил ключей (только документ)
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
+index 5399c5b..7f4f666 100644
+--- a/docs/patch-514-install.md
++++ b/docs/patch-514-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 514: поля и требования в карточках
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
+diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
+index e207054..e36aed7 100644
+--- a/docs/patch-515-install.md
++++ b/docs/patch-515-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 515: чекбокс «Обязателен» и порядок полей
+ 
++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++
+ Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–515
+diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
+new file mode 100644
+index 0000000..cbbf06f
+--- /dev/null
++++ b/docs/patch-516-install.md
+@@ -0,0 +1,109 @@
++# Установка патча 516: серверная проверка ключа и возврат на карточки
++
++Патч подготовлен от состояния **версии 515** (коммит `8f1eb0f`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–516
++цепочкой.
++
++> Владелец: «Продолжаем. И давай после создания точки, не открывать её сразу
++> же. Возвращайся на экран карточек».
++
++## Что изменилось
++
++### 1. Решение о доступе — на сервере
++
++Новый `server/keyAccess.js` (чистое правило, без сети):
++
++| Состояние | Условие | Поведение |
++| --- | --- | --- |
++| `none` | требования нет | обычный доступ |
++| `open-by-key` | запись есть на общем складе | мини-игра не запускается, точка открыта |
++| `denied` | обязательный ключ не найден | отказ `KEY_REQUIRED` |
++| `needs-check` | необязательный ключ не найден, проверка не пройдена | отказ `KEY_REQUIRED` |
++| `open` | привязанный терминал взломан | доступ открыт без ключа |
++
++Проверка идёт по идентификатору записи на складе; текст описания записки не
++разбирается. Клиент не решает, открыта точка или нет.
++
++### 2. Где применяется
++
++- `server/lootTradeSession.js` — поля требования в сессии и узлах локации,
++  `applyKeyAccessToSession`, отказ `KEY_REQUIRED` при взятии добычи и торговле.
++- `server/roomRegistry.js` — пересчёт при выдаче точки, выдаче терминала,
++  появлении ключа, восстановлении снимка хранилища, взломе терминала и
++  действиях игрока. Терминал с найденным ключом получает выигранное состояние
++  без доски, попыток и уведомления Мастеру.
++- `server/roomServer.js` — свежие состояния сессии и терминалов рассылаются
++  всем в комнате после каждого пересчёта.
++- `server/terminalHacking.js`, `domain/lootTrade.js`, клиент `LootTradeScreen` —
++  требование доезжает до сервера и в одиночном терминале, и в узлах локации.
++- `KEY_REQUIRED` добавлен в `server/protocol.js` и `src/room/roomProtocol.ts`.
++- `findCompleted` больше не шлёт Мастеру «Терминал взломан» для точек,
++  открытых ключом; в интерфейсе игрока появились пометки «Открыт ключом» и
++  понятный текст отказа.
++
++### 3. Возврат на экран карточек
++
++Из `handleSaveContainerForm` убран переход в детальный экран только что
++сохранённой точки. Привязка к локациям по-прежнему записывается, карточка
++сразу видна на сетке.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/keyAccess.js` | новое чистое правило доступа |
++| `server/lootTradeSession.js`, `server/roomRegistry.js`, `server/roomServer.js` | проверка и рассылка |
++| `server/terminalHacking.js`, `server/protocol.js` | конфигурация и код ошибки |
++| `domain/lootTrade.js`, `components/screens/LootTradeScreen/LootTradeScreen.js` | поля в выданных точках, возврат на сетку |
++| `components/lootTrade/PlayerLootTradeOverlay.js`, `TerminalHackingModal.js`, `terminalAccess.js`, `terminalRetryPrompt.js` | пометки и отказы |
++| `src/room/roomProtocol.ts` | зеркало `KEY_REQUIRED` |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
++| `__tests__/room/key-access-516.test.js` | 9 приёмочных проверок |
++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 516, 82/82 заметок |
++| `patchs/516-server-key-access.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 515:
++
++```bash
++./apply-patch.sh 516
++# ✓ Установлен патч: №516 (версия 515 → 516)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 516
++```
++
++`patchs/baseline.json` в источнике равен `516`. После установки
++`public/version.json` → `516`; закоммитьте изменения, **перезапустите сервис
++Node.js** (серверный код менялся) и пересоберите веб-сборку.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/key-access-516.test.js
++npx vitest run __tests__/room/terminal-gm-retry-504.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "516"'
++```
++
++Тесты покрывают все пять состояний доступа, отказ по обязательному ключу,
++открытие после находки, ожидание привязанного терминала, «доступ разрешён» без
++мини-игры и без уведомления Мастеру, зеркало протокола, парные словари и
++возврат на экран карточек.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/516-server-key-access.patch
++cp /path/to/516-server-key-access.patch patchs/
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index df74a36..1f1b936 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-03. Текущая версия: **515**.
++Дата ревизии: 2026-11-03. Текущая версия: **516**.
+ 
+ ## Тезисы
+ 
+@@ -18,19 +18,21 @@
+ | 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
+ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
+ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
+-| 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
++| 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
+ | 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
+ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
+ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
+ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+ 
+-## Осталось после патча 515
++## Осталось после патча 516
+ 
+-1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
+-2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
+-3. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
+-4. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
+-5. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
++1. **Ворота между контейнерами** — общие на комнату, по событию другой точки (частично заложено привязанной проверкой из патча 516).
++2. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
++3. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
++4. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
++
++Плюс открытая развилка: вторая строка «проверка» пока ссылается на уже
++созданный терминал в той же комнате, а не создаёт новый из формы.
+ 
+ ## Описание склада со стороны пользователя (для тезиса 10)
+ 
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 0c7d9b0..0cc8575 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -157,6 +157,9 @@ export const buildStandaloneTerminalSessionNode = (container, { locked = false,
+   locked,
+   lockLabel,
+   difficulty: container?.difficulty || 0,
++  requiredKeyItemId: String(container?.requiredKeyItemId || '').trim(),
++  keyRequirement: String(container?.keyRequirement || 'none'),
++  linkedCheckId: String(container?.linkedCheckId || '').trim(),
+   items: [],
+ });
+ 
+@@ -530,6 +533,10 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+       difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
++      // Патч 516: требование ключа у вложенной точки доступа.
++      requiredKeyItemId: String(child.requiredKeyItemId || '').trim(),
++      keyRequirement: String(child.keyRequirement || 'none'),
++      linkedCheckId: String(child.linkedCheckId || '').trim(),
+       characterOverrides: {},
+       items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
+         ? child.items.map((entry) => ({
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 810d897..a1f0afd 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -250,7 +250,9 @@
+     "shortfallConfirmMessage": "The merchant owes you {need} {CAP}, but only has {have} {CAP} in the register (short by {shortfall} {CAP}).\n\nCancel to pick more goods, or accept all available {have} {CAP}.",
+     "shortfallAccept": "Accept {have} {CAP}",
+     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
+-    "tradeSuccess": "Trade completed!"
++    "tradeSuccess": "Trade completed!",
++    "keyRequiredError": "A key is required: the point stays closed without it",
++    "hubNodeKeyUnlockedBadge": "Opened by key"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+@@ -323,6 +325,8 @@
+     "accessUsed": "ACCESS USED",
+     "hackedTitle": "Terminal hacked",
+     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
+-    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
++    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
++    "keyUnlockedBadge": "OPENED BY KEY",
++    "keyRequiredError": "A key or the linked check is required"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 2d49da7..906552e 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -250,7 +250,9 @@
+     "shortfallConfirmMessage": "Торговец должен вам {need} {CAP}, но в его кассе есть только {have} {CAP} (не хватает {shortfall} {CAP}).\n\nВы можете отменить и добрать разницу товаром, либо согласиться получить все доступные {have} {CAP}.",
+     "shortfallAccept": "Согласиться на {have} {CAP}",
+     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
+-    "tradeSuccess": "Сделка успешно завершена!"
++    "tradeSuccess": "Сделка успешно завершена!",
++    "keyRequiredError": "Нужен ключ: без него точка закрыта",
++    "hubNodeKeyUnlockedBadge": "Открыт ключом"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+@@ -323,6 +325,8 @@
+     "accessUsed": "ДОСТУП ИСПОЛЬЗОВАН",
+     "hackedTitle": "Терминал взломан",
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
+-    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера."
++    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера.",
++    "keyUnlockedBadge": "ОТКРЫТ КЛЮЧОМ",
++    "keyRequiredError": "Нужен ключ или привязанная проверка"
+   }
+ }
+diff --git a/patchs/516-server-key-access.patch b/patchs/516-server-key-access.patch
+new file mode 100644
+index 0000000..da56ce8
+--- /dev/null
++++ b/patchs/516-server-key-access.patch
+@@ -0,0 +1,1449 @@
++diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
++new file mode 100644
++index 0000000..ccff3f6
++--- /dev/null
+++++ b/__tests__/room/key-access-516.test.js
++@@ -0,0 +1,185 @@
+++// Приёмочный тест 516: серверная проверка ключа (тезис 8 плана) и возврат
+++// на экран карточек после создания точки.
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++import { createRoomRegistry } from '../../server/roomRegistry.js';
+++import { applyKeyAccessToSession, normalizeActiveSession } from '../../server/lootTradeSession.js';
+++import { KEY_ACCESS, resolveKeyAccess, hasKeyInStorage, isCheckPassed } from '../../server/keyAccess.js';
+++import { findCompleted } from '../../components/lootTrade/terminalRetryPrompt.js';
+++import { ERROR_CODE } from '../../server/protocol.js';
+++import { ROOM_ERROR } from '../../src/room/roomProtocol.ts';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++
+++const setup = () => {
+++  const registry = createRoomRegistry({ now: () => 1000 });
+++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
+++  registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
+++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
+++  return { registry, room };
+++};
+++
+++const storageWithKey = (id) => ({
+++  revision: 1,
+++  entries: [{ entryId: 'e1', kind: 'keyItem', keyItemId: id, name: 'Ключ', quantity: 1 }],
+++});
+++
+++describe('516: чистое правило доступа', () => {
+++  it('пять состояний: нет требования / ключ найден / обязательный / нужна проверка / проверка пройдена', () => {
+++    const empty = { revision: 0, entries: [] };
+++    expect(resolveKeyAccess({}, { storage: empty }).state).toBe(KEY_ACCESS.NONE);
+++    expect(resolveKeyAccess(
+++      { requiredKeyItemId: 'k1', keyRequirement: 'required' },
+++      { storage: storageWithKey('k1') },
+++    ).state).toBe(KEY_ACCESS.OPEN_BY_KEY);
+++    expect(resolveKeyAccess(
+++      { requiredKeyItemId: 'k1', keyRequirement: 'required' },
+++      { storage: empty },
+++    ).state).toBe(KEY_ACCESS.DENIED);
+++    expect(resolveKeyAccess(
+++      { requiredKeyItemId: 'k1', keyRequirement: 'optional', linkedCheckId: 't2' },
+++      { storage: empty },
+++    ).state).toBe(KEY_ACCESS.NEEDS_CHECK);
+++    expect(resolveKeyAccess(
+++      { requiredKeyItemId: 'k1', keyRequirement: 'optional', linkedCheckId: 't2' },
+++      { storage: empty, terminalStates: { t2: { game: { status: 'won' } } } },
+++    ).state).toBe(KEY_ACCESS.OPEN);
+++    expect(hasKeyInStorage(storageWithKey('k1'), 'k1')).toBe(true);
+++    expect(hasKeyInStorage(storageWithKey('k1'), 'k2')).toBe(false);
+++    expect(isCheckPassed({ t2: { game: { status: 'won' } } }, 't2')).toBe(true);
+++    expect(isCheckPassed(new Map([['t2', { game: { status: 'won' } }]]), 't2')).toBe(true);
+++  });
+++
+++  it('applyKeyAccessToSession помечает корень и вложенные узлы', () => {
+++    const session = normalizeActiveSession({
+++      name: 'Локация', kind: 'hub', targetType: 'room',
+++      requiredKeyItemId: 'k1', keyRequirement: 'required',
+++      nodes: [{
+++        containerId: 'c1', kind: 'loot', name: 'Сейф',
+++        requiredKeyItemId: 'k1', keyRequirement: 'required',
+++        items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
+++      }],
+++    });
+++    const denied = applyKeyAccessToSession(session, () => ({ state: KEY_ACCESS.DENIED }));
+++    expect(denied.locked).toBe(true);
+++    expect(denied.keyAccessState).toBe('denied');
+++    expect(denied.nodes[0].locked).toBe(true);
+++
+++    const opened = applyKeyAccessToSession(session, () => ({ state: KEY_ACCESS.OPEN_BY_KEY }));
+++    expect(opened.locked).toBe(false);
+++    expect(opened.keyUnlocked).toBe(true);
+++    expect(opened.nodes[0].keyUnlocked).toBe(true);
+++  });
+++
+++  it('зеркало протокола и код ошибки', () => {
+++    expect(ERROR_CODE.KEY_REQUIRED).toBe('KEY_REQUIRED');
+++    expect(ROOM_ERROR.KEY_REQUIRED).toBe('KEY_REQUIRED');
+++  });
+++});
+++
+++describe('516: сервер применяет правило к выданной точке', () => {
+++  const openChest = (registry, room, requirement) => registry.openSession({
+++    code: room.code,
+++    clientId: 'gm',
+++    session: {
+++      name: 'Сейф', kind: 'loot', targetType: 'room',
+++      items: [{ entryId: 'e1', itemId: 'ammo', itemType: 'ammo', name: 'Патроны', quantity: 1 }],
+++      ...requirement,
+++    },
+++  });
+++
+++  it('обязательный ключ: без ключа отказано, после находки — открыто', () => {
+++    const { registry, room } = setup();
+++    openChest(registry, room, { requiredKeyItemId: 'k1', keyRequirement: 'required' });
+++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('denied');
+++    const denied = registry.lootTake({
+++      code: room.code, clientId: 'p1',
+++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
+++    });
+++    expect(denied.error).toBe(ERROR_CODE.KEY_REQUIRED);
+++
+++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ' });
+++    const state = registry.getRoom(room.code).activeSession;
+++    expect(state.keyAccessState).toBe('open-by-key');
+++    expect(state.keyUnlocked).toBe(true);
+++    expect(state.locked).toBe(false);
+++    const taken = registry.lootTake({
+++      code: room.code, clientId: 'p1',
+++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
+++    });
+++    expect(taken.error).toBeUndefined();
+++  });
+++
+++  it('необязательный ключ: без проверки закрыто, после взлома связанного терминала — открыто', () => {
+++    const { registry, room } = setup();
+++    openChest(registry, room, {
+++      requiredKeyItemId: 'k2', keyRequirement: 'optional', linkedCheckId: 't2',
+++    });
+++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('needs-check');
+++    expect(registry.lootTake({
+++      code: room.code, clientId: 'p1',
+++      payload: { characterId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
+++    }).error).toBe(ERROR_CODE.KEY_REQUIRED);
+++
+++    // Привязанный терминал взломан: состояние комнаты общее, ключ не нужен.
+++    const rawRoom = registry._rooms.get(room.code);
+++    rawRoom.terminalStates.set('t2', { config: { containerId: 't2' }, game: { status: 'won' } });
+++    registry.recomputeKeyAccess(room.code);
+++    expect(registry.getRoom(room.code).activeSession.keyAccessState).toBe('open');
+++    expect(registry.getRoom(room.code).activeSession.locked).toBe(false);
+++  });
+++
+++  it('терминал с ключом: мини-игра не запускается и Мастеру нет уведомления', () => {
+++    const { registry, room } = setup();
+++    registry.issueTerminal({
+++      code: room.code, clientId: 'gm',
+++      config: {
+++        containerId: 't1', name: 'Терминал', difficulty: 1,
+++        requiredKeyItemId: 'k1', keyRequirement: 'required',
+++      },
+++    });
+++    expect(registry.terminalAction({
+++      code: room.code, clientId: 'p1', containerId: 't1', action: 'start',
+++    }).error).toBe(ERROR_CODE.KEY_REQUIRED);
+++
+++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ' });
+++    const terminal = registry.getState(room.code).terminalStates.t1;
+++    expect(terminal.game.status).toBe('won');
+++    expect(terminal.game.hackedByKey).toBe(true);
+++    expect(terminal.keyAccessState).toBe('open-by-key');
+++    expect(terminal.game.wordRanges).toHaveLength(0);
+++    expect(findCompleted({ [room.code]: { role: 'gm', terminalStates: { t1: terminal } } }, 'gm')).toHaveLength(0);
+++  });
+++});
+++
+++describe('516: экран карточек и документация', () => {
+++  it('после создания точки детальный экран не открывается', () => {
+++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+++    expect(screen).not.toContain('setActiveContainerId(saved.id)');
+++    expect(screen).toContain('после создания точки остаёмся на экране карточек');
+++  });
+++
+++  it('подписи ошибок и бейджи парные RU/EN', () => {
+++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
+++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
+++    for (const [section, key] of [
+++      ['player', 'keyRequiredError'], ['player', 'hubNodeKeyUnlockedBadge'],
+++      ['terminal', 'keyRequiredError'], ['terminal', 'keyUnlockedBadge'],
+++    ]) {
+++      expect(ru[section][key]).toBeTruthy();
+++      expect(en[section][key]).toBeTruthy();
+++    }
+++  });
+++
+++  it('roadmap обновлён до 516 и список оставшихся актуален', () => {
+++    const plan = read('docs/roadmap.md');
+++    expect(plan).toContain('516');
+++    expect(plan).toContain('Осталось после патча 516');
+++    expect(plan).not.toContain('| 8 | ⏳');
+++    expect(plan).toContain('Ворота между контейнерами');
+++    expect(plan).toContain('две панели');
+++  });
+++});
++diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
++index 91685d7..7e34e18 100644
++--- a/__tests__/room/key-items-fields-514.test.js
+++++ b/__tests__/room/key-items-fields-514.test.js
++@@ -162,7 +162,7 @@ describe('514: словари и живой план', () => {
++   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 515');
+++    expect(plan).toContain('Осталось после патча 516');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('Ворота между контейнерами');
++     expect(plan).toContain('две панели');
++diff --git a/__tests__/room/terminal-gm-retry-504.test.js b/__tests__/room/terminal-gm-retry-504.test.js
++index a9b43ca..e0c91a0 100644
++--- a/__tests__/room/terminal-gm-retry-504.test.js
+++++ b/__tests__/room/terminal-gm-retry-504.test.js
++@@ -332,7 +332,11 @@ describe('504: lockOnFailure удалён полностью', () => {
++   it('движок не читает и не пишет поле; старые сохранения с ним игнорируются', () => {
++     const config = normalizeTerminalConfig({ ...BASE_CONFIG, lockOnFailure: true });
++     expect(config).not.toHaveProperty('lockOnFailure');
++-    expect(Object.keys(config).sort()).toEqual(['containerId', 'description', 'difficulty', 'name']);
+++    // Патч 516: конфигурация терминала несёт ещё и требование ключа.
+++    expect(Object.keys(config).sort()).toEqual([
+++      'containerId', 'description', 'difficulty', 'keyRequirement',
+++      'linkedCheckId', 'name', 'requiredKeyItemId',
+++    ]);
++     const game = createGame({
++       config, operatorClientId: 'p', operatorCharacterId: 'c',
++       characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,
++diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
++index d8a6888..cba08ae 100644
++--- a/__tests__/ui/form-checkbox-515.test.js
+++++ b/__tests__/ui/form-checkbox-515.test.js
++@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
++   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 515');
+++    expect(plan).toContain('Осталось после патча 516');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('две панели');
++     expect(plan).toContain('Мини-игра взлома замков');
++diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
++index 5da8acd..d54e7f2 100644
++--- a/components/lootTrade/PlayerLootTradeOverlay.js
+++++ b/components/lootTrade/PlayerLootTradeOverlay.js
++@@ -517,6 +517,7 @@ export default function PlayerLootTradeOverlay() {
++                       closed: 'terminal.closedBadge',
++                       awaiting: 'terminal.retryWaiting',
++                       won: 'terminal.stateWon',
+++                      keyUnlocked: 'terminal.keyUnlockedBadge',
++                       finished: 'terminal.accessUsed',
++                       used: 'terminal.accessUsed',
++                     }[accessBlockedReason] || null;
++@@ -549,7 +550,11 @@ export default function PlayerLootTradeOverlay() {
++                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
++                           )}
++ 
++-                          {nodeLocked ? (
+++                          {node.keyUnlocked ? (
+++                            <Text style={styles.hubUnlockedMetaText}>
+++                              {tLootTrade('player.hubNodeKeyUnlockedBadge')}
+++                            </Text>
+++                          ) : nodeLocked ? (
++                             <Text style={styles.hubLockedHintText}>
++                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
++                             </Text>
++@@ -727,6 +732,9 @@ export default function PlayerLootTradeOverlay() {
++       if (code === 'CONTAINER_LOCKED') {
++         showRawAlert({ title: tLootTrade('player.containerLockedError') });
++         if (isInsideHub) returnToHubList();
+++      } else if (code === 'KEY_REQUIRED') {
+++        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
+++        if (isInsideHub) returnToHubList();
++       } else {
++         debugLog('playerOverlay.lootTake:failed', { message: error?.message });
++       }
++@@ -907,6 +915,9 @@ export default function PlayerLootTradeOverlay() {
++       if (code === 'CONTAINER_LOCKED') {
++         showRawAlert({ title: tLootTrade('player.containerLockedError') });
++         if (isInsideHub) returnToHubList();
+++      } else if (code === 'KEY_REQUIRED') {
+++        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
+++        if (isInsideHub) returnToHubList();
++       } else if (code === 'TRADE_STOCK_CHANGED') {
++         showRawAlert({ title: tLootTrade('player.stockChangedError') });
++       } else if (code === 'TRADE_NOT_ENOUGH_MERCHANT_CAPS') {
++diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
++index a8537f6..8ffa724 100644
++--- a/components/lootTrade/TerminalHackingModal.js
+++++ b/components/lootTrade/TerminalHackingModal.js
++@@ -183,6 +183,7 @@ ${tLootTrade('terminal.retryMessage')}`,
++       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
++       else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
++       else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
+++      else if (code === 'KEY_REQUIRED') showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
++       else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
++         showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++       }
++diff --git a/components/lootTrade/terminalAccess.js b/components/lootTrade/terminalAccess.js
++index 19cb10f..84bb356 100644
++--- a/components/lootTrade/terminalAccess.js
+++++ b/components/lootTrade/terminalAccess.js
++@@ -38,6 +38,8 @@ export const canHackTerminal = ({ used, key, game, terminalClosed, terminalAwait
++ export const terminalBlockedReason = ({ game, terminalClosed, terminalAwaiting, used, key }) => {
++   if (terminalClosed) return 'closed';
++   if (terminalAwaiting) return 'awaiting';
+++  // Патч 516: успех без мини-игры, точка открыта ключевой записью.
+++  if (game?.hackedByKey) return 'keyUnlocked';
++   if (game?.status === 'won') return 'won';
++   if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return 'finished';
++   if (used?.[key]) return 'used';
++diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
++index 8ce9962..974a9f1 100644
++--- a/components/lootTrade/terminalRetryPrompt.js
+++++ b/components/lootTrade/terminalRetryPrompt.js
++@@ -62,6 +62,9 @@ export const findCompleted = (rooms, clientId = null) => {
++     if (!isGmRoom(room, clientId)) continue;
++     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
++       if (terminal?.game?.status !== 'won') continue;
+++      // Патч 516: терминал, открытый ключом, не считается «взломанным
+++      // игроком» — Мастер сам создал и выдал ключ, уведомление не нужно.
+++      if (terminal?.game?.hackedByKey) continue;
++       if (terminal?.closed) continue;
++       completed.push({
++         code,
++diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
++index b4677d3..a37583b 100644
++--- a/components/screens/LootTradeScreen/LootTradeScreen.js
+++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
++@@ -641,6 +641,9 @@ export default function LootTradeScreen() {
++                 name: saved.name,
++                 description: saved.description,
++                 difficulty: saved.difficulty,
+++                requiredKeyItemId: saved.requiredKeyItemId || '',
+++                keyRequirement: saved.keyRequirement || 'none',
+++                linkedCheckId: saved.linkedCheckId || '',
++               },
++             });
++           } else if (terminalNode) {
++@@ -777,12 +780,10 @@ export default function LootTradeScreen() {
++     }
++ 
++     setFormModal(null);
++-    if (!activeContainerId && !draft.id) {
++-      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
++-        setReturnHubId(selectedHubIds[0]);
++-      }
++-      setActiveContainerId(saved.id);
++-    }
+++    // Патч 516: после создания точки остаёмся на экране карточек. Раньше
+++    // только что сохранённая карточка сразу открывалась в детальный экран.
+++    // Привязка к локациям всё равно записана выше, так что скрытого
+++    // перехода в локацию не требуется.
++     if (capsRollInfo?.rolled) {
++       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
++         dice: capsRollInfo.diceCount,
++@@ -1166,6 +1167,9 @@ export default function LootTradeScreen() {
++             name: freshSource.name,
++             description: freshSource.description,
++             difficulty: freshSource.difficulty,
+++            requiredKeyItemId: freshSource.requiredKeyItemId || '',
+++            keyRequirement: freshSource.keyRequirement || 'none',
+++            linkedCheckId: freshSource.linkedCheckId || '',
++           },
++         });
++       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index c21bbbe..e1a1bce 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,29 @@
++ # Changelog
++ ---
+++## Server-side key checking and staying on the card grid (patch 516)
+++
+++Plan item 8. Access is now decided by the **server from the room state**, not
+++by the player's window (lesson 506): the client never decides whether a point
+++is open.
+++
+++- **Key present in shared storage** — the mini-game never starts: the terminal
+++  gets "access granted" with no board and no attempts, containers and
+++  merchants open. The GM gets no "Terminal hacked" notice: they created the
+++  record, linked it and issued it. The location list shows "Opened by key".
+++- **Key missing and mandatory** — the point stays locked; taking loot, trading
+++  or starting a hack returns a "Key required" refusal.
+++- **Key missing and optional** — access waits for the linked check: once the
+++  chosen terminal is hacked, the point opens. Until then a key is needed or
+++  the GM opens it manually.
+++- **Key found later** — issuing a record, finding one in loot, restoring a
+++  storage snapshot and hacking the linked terminal all recompute access and
+++  broadcast fresh states to the room. The requirement reaches the server both
+++  for a standalone terminal and for location nodes.
+++- **New error code** `KEY_REQUIRED` in both protocols with paired RU/EN labels.
+++
+++Also, as requested: **creating a point no longer opens its detail screen** —
+++the GM stays on the card grid and sees the newly saved card there.
+++
++ ## "Mandatory" checkbox and field order (patch 515)
++ 
++ The owner: "When creating a container, the 'Mandatory' requirement should
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 61f9a9a..ab94c61 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,33 @@
++ # История изменений
++ 
++ ---
+++## Серверная проверка ключа и возврат на карточки (патч 516)
+++
+++Тезис 8 плана. Теперь решение о доступе принимает **сервер по состоянию
+++комнаты**, а не окно игрока (урок 506): клиент не решает, открыта точка или
+++нет.
+++
+++- **Есть ключ на общем складе** — мини-игра не запускается вообще: терминал
+++  получает состояние «доступ разрешён» без доски и попыток, контейнер и
+++  торговец открываются. Уведомления «Терминал взломан» Мастеру нет: он сам
+++  создал запись, связал её с точкой и выдал. В списке локации стоит пометка
+++  «Открыт ключом».
+++- **Ключа нет и он обязателен** — точка заперта, попытка забрать добычу,
+++  торговать или начать взлом возвращает отказ «Нужен ключ».
+++- **Ключа нет и он необязателен** — доступ ждёт привязанную проверку: после
+++  взлома указанного терминала точка открывается. Пока проверка не пройдена,
+++  нужен ключ или решение Мастера вручную.
+++- **Ключ найден позже** — выдача записи Мастером, находка в добыче, загрузка
+++  снимка хранилища и взлом привязанного терминала пересчитывают доступ и
+++  рассылают свежие состояния всем в комнате. Требование доходит до сервера и
+++  в одиночном терминале, и в узлах локации.
+++- **Новый код ошибки** `KEY_REQUIRED` в обоих протоколах и парные подписи
+++  RU/EN.
+++
+++Отдельно по просьбе владельца: **после создания точки детальный экран больше
+++не открывается** — Мастер остаётся на экране карточек и видит только что
+++сохранённую карточку на сетке.
+++
++ ## Чекбокс «Обязателен» и порядок полей (патч 515)
++ 
++ Владелец: «При создании контейнера, требование "Обязателен" лучше пусть будет
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index 0d24eec..8ad7726 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -13,10 +13,11 @@
++ атомарность, плашка и модалка 507 сохранены. Патч **513** (только документ,
++ без кода) зафиксировал уточнение владельца о вложенности ключей,
++ перетаскивании карточек и двух строках требования — **Обновление 7** ниже.
++-Шаг 3 разбит: патч **514** реализовал **поля, формы и вложенность**
++-(две строки требования, привязка ключа к родителю, перетаскивание всех четырёх
++-карточек), но **серверная проверка ключа ещё не начата**. Шаги 4–5 (ворота,
++-мини-игра замков) не реализованы. Живой порядок — `docs/roadmap.md`.
+++Шаг 3 **завершён**: патч **514** дал поля, формы и вложенность, патч **515** —
+++чекбокс и порядок полей, патч **516** — серверную проверку ключа (пропуск
+++мини-игры, отказ по обязательному ключу, ожидание привязанной проверки).
+++Шаги 4–5 (ворота, мини-игра замков) не реализованы. Живой порядок —
+++`docs/roadmap.md`.
++ 
++ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
++ «Я полагал ключ будет, как карточка контейнера/торговца/терминала и с модалкой
++@@ -143,8 +144,8 @@
++ **Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
++ кнопок, а поле описания перенесено в конец формы — после настроек доступа.
++ 
++-**Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
++-обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
+++**Патч 516 закрыл тезис 8:** проверка склада сервером, пропуск мини-игры и
+++отказ по обязательному ключу реализованы; ворота остаются тезисом 9.
++ 
++ ### 7.7 Границы патча 513
++ 
++diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
++index 0f2edd4..a954080 100644
++--- a/docs/patch-493-install.md
+++++ b/docs/patch-493-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 493: терминал в локации открывает мини-игру
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
++index b216aff..607446c 100644
++--- a/docs/patch-495-install.md
+++++ b/docs/patch-495-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
++index 290d9af..5c9cf01 100644
++--- a/docs/patch-496-install.md
+++++ b/docs/patch-496-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 496: «Саммари v2» взлома терминалов
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
++index 5d7b5b2..1a020c9 100644
++--- a/docs/patch-497-install.md
+++++ b/docs/patch-497-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 497: канонические 4 попытки и доска «последовательности»
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
++index 21c44f6..5fc2c4e 100644
++--- a/docs/patch-498-install.md
+++++ b/docs/patch-498-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 498: чистый интерфейс терминала
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
++index 8e38cf6..ae8ebdb 100644
++--- a/docs/patch-499-install.md
+++++ b/docs/patch-499-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 499: скобки двух сортов, число задаёт Наука
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
++index 5a89eb0..3c695eb 100644
++--- a/docs/patch-500-install.md
+++++ b/docs/patch-500-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 500: доска «25 − ИНТ»
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
++index 8007e7c..7251946 100644
++--- a/docs/patch-501-install.md
+++++ b/docs/patch-501-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 501: характеристики берутся из листа персонажа
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
++index a28683d..160de05 100644
++--- a/docs/patch-502-install.md
+++++ b/docs/patch-502-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 502: сейв из файла экспорта читается на любой глубине
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
++index 46341c4..16a5370 100644
++--- a/docs/patch-503-install.md
+++++ b/docs/patch-503-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 503: три группы слов, смена оператора, один полный возврат
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
++index 5a674b6..ed06a1b 100644
++--- a/docs/patch-504-install.md
+++++ b/docs/patch-504-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 504: решение Мастера вместо блокировки после провала
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
++index dc224d8..2b6d0c2 100644
++--- a/docs/patch-505-install.md
+++++ b/docs/patch-505-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 505: успешный взлом больше не пропадает
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
++index ad5b4f9..5399342 100644
++--- a/docs/patch-506-install.md
+++++ b/docs/patch-506-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
++index 1a0c5bc..77d75cb 100644
++--- a/docs/patch-507-install.md
+++++ b/docs/patch-507-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
++index ecf7069..7d24147 100644
++--- a/docs/patch-508-install.md
+++++ b/docs/patch-508-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 508: хранилище Мастера + снапшот игрокам
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
++index 2ac91ec..b303b8b 100644
++--- a/docs/patch-509-install.md
+++++ b/docs/patch-509-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
++index 7967163..516d003 100644
++--- a/docs/patch-510-install.md
+++++ b/docs/patch-510-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 510: ключи и записки на общем складе (шаг 2)
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
++index 76cebcd..7f5c1b7 100644
++--- a/docs/patch-511-install.md
+++++ b/docs/patch-511-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
++index 8c41ca5..bc87cc1 100644
++--- a/docs/patch-512-install.md
+++++ b/docs/patch-512-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 512: модалки берут дизайн у соседних окон
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
++index da2a321..73c28d1 100644
++--- a/docs/patch-513-install.md
+++++ b/docs/patch-513-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 513: уточнение правил ключей (только документ)
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ > **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
++index 5399c5b..7f4f666 100644
++--- a/docs/patch-514-install.md
+++++ b/docs/patch-514-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 514: поля и требования в карточках
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++ 
++ Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
++diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
++index e207054..e36aed7 100644
++--- a/docs/patch-515-install.md
+++++ b/docs/patch-515-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 515: чекбокс «Обязателен» и порядок полей
++ 
+++> **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+++
++ Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
++ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–515
++diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
++new file mode 100644
++index 0000000..cbbf06f
++--- /dev/null
+++++ b/docs/patch-516-install.md
++@@ -0,0 +1,109 @@
+++# Установка патча 516: серверная проверка ключа и возврат на карточки
+++
+++Патч подготовлен от состояния **версии 515** (коммит `8f1eb0f`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–516
+++цепочкой.
+++
+++> Владелец: «Продолжаем. И давай после создания точки, не открывать её сразу
+++> же. Возвращайся на экран карточек».
+++
+++## Что изменилось
+++
+++### 1. Решение о доступе — на сервере
+++
+++Новый `server/keyAccess.js` (чистое правило, без сети):
+++
+++| Состояние | Условие | Поведение |
+++| --- | --- | --- |
+++| `none` | требования нет | обычный доступ |
+++| `open-by-key` | запись есть на общем складе | мини-игра не запускается, точка открыта |
+++| `denied` | обязательный ключ не найден | отказ `KEY_REQUIRED` |
+++| `needs-check` | необязательный ключ не найден, проверка не пройдена | отказ `KEY_REQUIRED` |
+++| `open` | привязанный терминал взломан | доступ открыт без ключа |
+++
+++Проверка идёт по идентификатору записи на складе; текст описания записки не
+++разбирается. Клиент не решает, открыта точка или нет.
+++
+++### 2. Где применяется
+++
+++- `server/lootTradeSession.js` — поля требования в сессии и узлах локации,
+++  `applyKeyAccessToSession`, отказ `KEY_REQUIRED` при взятии добычи и торговле.
+++- `server/roomRegistry.js` — пересчёт при выдаче точки, выдаче терминала,
+++  появлении ключа, восстановлении снимка хранилища, взломе терминала и
+++  действиях игрока. Терминал с найденным ключом получает выигранное состояние
+++  без доски, попыток и уведомления Мастеру.
+++- `server/roomServer.js` — свежие состояния сессии и терминалов рассылаются
+++  всем в комнате после каждого пересчёта.
+++- `server/terminalHacking.js`, `domain/lootTrade.js`, клиент `LootTradeScreen` —
+++  требование доезжает до сервера и в одиночном терминале, и в узлах локации.
+++- `KEY_REQUIRED` добавлен в `server/protocol.js` и `src/room/roomProtocol.ts`.
+++- `findCompleted` больше не шлёт Мастеру «Терминал взломан» для точек,
+++  открытых ключом; в интерфейсе игрока появились пометки «Открыт ключом» и
+++  понятный текст отказа.
+++
+++### 3. Возврат на экран карточек
+++
+++Из `handleSaveContainerForm` убран переход в детальный экран только что
+++сохранённой точки. Привязка к локациям по-прежнему записывается, карточка
+++сразу видна на сетке.
+++
+++## Файлы
+++
+++| Файл | Изменение |
+++| --- | --- |
+++| `server/keyAccess.js` | новое чистое правило доступа |
+++| `server/lootTradeSession.js`, `server/roomRegistry.js`, `server/roomServer.js` | проверка и рассылка |
+++| `server/terminalHacking.js`, `server/protocol.js` | конфигурация и код ошибки |
+++| `domain/lootTrade.js`, `components/screens/LootTradeScreen/LootTradeScreen.js` | поля в выданных точках, возврат на сетку |
+++| `components/lootTrade/PlayerLootTradeOverlay.js`, `TerminalHackingModal.js`, `terminalAccess.js`, `terminalRetryPrompt.js` | пометки и отказы |
+++| `src/room/roomProtocol.ts` | зеркало `KEY_REQUIRED` |
+++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
+++| `__tests__/room/key-access-516.test.js` | 9 приёмочных проверок |
+++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
+++| `public/version.json`, `patchs/baseline.json` | версия 516, 82/82 заметок |
+++| `patchs/516-server-key-access.patch` | сам патч для установщика |
+++
+++## Установка
+++
+++С действующей версии 515:
+++
+++```bash
+++./apply-patch.sh 516
+++# ✓ Установлен патч: №516 (версия 515 → 516)
+++```
+++
+++С чистого `main` со старым установщиком:
+++
+++```bash
+++git fetch origin arena/054e6676-fallout-2d20-companion
+++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
+++./apply-patch.sh 516
+++```
+++
+++`patchs/baseline.json` в источнике равен `516`. После установки
+++`public/version.json` → `516`; закоммитьте изменения, **перезапустите сервис
+++Node.js** (серверный код менялся) и пересоберите веб-сборку.
+++
+++## Проверка
+++
+++```bash
+++npm run typecheck
+++npx vitest run __tests__/room/key-access-516.test.js
+++npx vitest run __tests__/room/terminal-gm-retry-504.test.js
+++npx vitest run
+++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
+++curl -s http://localhost:5000/version.json | grep '"version": "516"'
+++```
+++
+++Тесты покрывают все пять состояний доступа, отказ по обязательному ключу,
+++открытие после находки, ожидание привязанного терминала, «доступ разрешён» без
+++мини-игры и без уведомления Мастеру, зеркало протокола, парные словари и
+++возврат на экран карточек.
+++
+++### Прямой `git apply` без установщика
+++
+++```bash
+++git apply patchs/516-server-key-access.patch
+++cp /path/to/516-server-key-access.patch patchs/
+++```
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++index df74a36..1f1b936 100644
++--- a/docs/roadmap.md
+++++ b/docs/roadmap.md
++@@ -5,7 +5,7 @@
++ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++ > ответе владельцу. Этот файл — источник истины для порядка шагов.
++ 
++-Дата ревизии: 2026-11-03. Текущая версия: **515**.
+++Дата ревизии: 2026-11-03. Текущая версия: **516**.
++ 
++ ## Тезисы
++ 
++@@ -18,19 +18,21 @@
++ | 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
++ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
++ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
++-| 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
+++| 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
++ | 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
++ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
++ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
++ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++ 
++-## Осталось после патча 515
+++## Осталось после патча 516
++ 
++-1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
++-2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
++-3. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
++-4. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
++-5. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
+++1. **Ворота между контейнерами** — общие на комнату, по событию другой точки (частично заложено привязанной проверкой из патча 516).
+++2. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
+++3. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
+++4. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
+++
+++Плюс открытая развилка: вторая строка «проверка» пока ссылается на уже
+++созданный терминал в той же комнате, а не создаёт новый из формы.
++ 
++ ## Описание склада со стороны пользователя (для тезиса 10)
++ 
++diff --git a/domain/lootTrade.js b/domain/lootTrade.js
++index 0c7d9b0..0cc8575 100644
++--- a/domain/lootTrade.js
+++++ b/domain/lootTrade.js
++@@ -157,6 +157,9 @@ export const buildStandaloneTerminalSessionNode = (container, { locked = false,
++   locked,
++   lockLabel,
++   difficulty: container?.difficulty || 0,
+++  requiredKeyItemId: String(container?.requiredKeyItemId || '').trim(),
+++  keyRequirement: String(container?.keyRequirement || 'none'),
+++  linkedCheckId: String(container?.linkedCheckId || '').trim(),
++   items: [],
++ });
++ 
++@@ -530,6 +533,10 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
++         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
++         : DEFAULT_BUY_DEPRECIATION_PERCENT,
++       difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+++      // Патч 516: требование ключа у вложенной точки доступа.
+++      requiredKeyItemId: String(child.requiredKeyItemId || '').trim(),
+++      keyRequirement: String(child.keyRequirement || 'none'),
+++      linkedCheckId: String(child.linkedCheckId || '').trim(),
++       characterOverrides: {},
++       items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
++         ? child.items.map((entry) => ({
++diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
++index 810d897..a1f0afd 100644
++--- a/i18n/en-EN/screens/lootTrade/screen.json
+++++ b/i18n/en-EN/screens/lootTrade/screen.json
++@@ -250,7 +250,9 @@
++     "shortfallConfirmMessage": "The merchant owes you {need} {CAP}, but only has {have} {CAP} in the register (short by {shortfall} {CAP}).\n\nCancel to pick more goods, or accept all available {have} {CAP}.",
++     "shortfallAccept": "Accept {have} {CAP}",
++     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
++-    "tradeSuccess": "Trade completed!"
+++    "tradeSuccess": "Trade completed!",
+++    "keyRequiredError": "A key is required: the point stays closed without it",
+++    "hubNodeKeyUnlockedBadge": "Opened by key"
++   },
++   "keyItems": {
++     "title": "Keys and notes",
++@@ -323,6 +325,8 @@
++     "accessUsed": "ACCESS USED",
++     "hackedTitle": "Terminal hacked",
++     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
++-    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
+++    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
+++    "keyUnlockedBadge": "OPENED BY KEY",
+++    "keyRequiredError": "A key or the linked check is required"
++   }
++ }
++diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
++index 2d49da7..906552e 100644
++--- a/i18n/ru-RU/screens/lootTrade/screen.json
+++++ b/i18n/ru-RU/screens/lootTrade/screen.json
++@@ -250,7 +250,9 @@
++     "shortfallConfirmMessage": "Торговец должен вам {need} {CAP}, но в его кассе есть только {have} {CAP} (не хватает {shortfall} {CAP}).\n\nВы можете отменить и добрать разницу товаром, либо согласиться получить все доступные {have} {CAP}.",
++     "shortfallAccept": "Согласиться на {have} {CAP}",
++     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
++-    "tradeSuccess": "Сделка успешно завершена!"
+++    "tradeSuccess": "Сделка успешно завершена!",
+++    "keyRequiredError": "Нужен ключ: без него точка закрыта",
+++    "hubNodeKeyUnlockedBadge": "Открыт ключом"
++   },
++   "keyItems": {
++     "title": "Ключи и записки",
++@@ -323,6 +325,8 @@
++     "accessUsed": "ДОСТУП ИСПОЛЬЗОВАН",
++     "hackedTitle": "Терминал взломан",
++     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
++-    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера."
+++    "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера.",
+++    "keyUnlockedBadge": "ОТКРЫТ КЛЮЧОМ",
+++    "keyRequiredError": "Нужен ключ или привязанная проверка"
++   }
++ }
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index 3239451..e6dcad7 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "515"
+++  "baseline": "516"
++ }
++diff --git a/public/version.json b/public/version.json
++index 143e5c0..8072818 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "515",
+++  "version": "516",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
++       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
++       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
++       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
++@@ -86,6 +87,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
++       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
++       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
++       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
++diff --git a/server/keyAccess.js b/server/keyAccess.js
++new file mode 100644
++index 0000000..a2deba4
++--- /dev/null
+++++ b/server/keyAccess.js
++@@ -0,0 +1,78 @@
+++'use strict';
+++
+++/**
+++ * Патч 516: серверная проверка ключевой записи для точек доступа.
+++ *
+++ * Чистая функция без серверного состояния: решение принимается по снимку
+++ * общего хранилища комнаты и по состояниям терминалов. Клиент НЕ решает,
+++ * открыта точка или нет (урок 506). Контракт — разделы 7.3–7.4
+++ * `docs/key-items-and-gates-design.md`.
+++ */
+++
+++const KEY_ACCESS = Object.freeze({
+++  NONE: 'none',                 // требования нет
+++  OPEN_BY_KEY: 'open-by-key',   // ключ добыт: мини-игра не запускается
+++  DENIED: 'denied',             // обязательный ключ не добыт
+++  NEEDS_CHECK: 'needs-check',   // необязательный ключ не добыт, нужна проверка
+++  OPEN: 'open',                 // привязанная проверка пройдена
+++});
+++
+++const hasKeyInStorage = (storage, keyItemId) => {
+++  const id = String(keyItemId || '').trim();
+++  if (!id) return false;
+++  return (Array.isArray(storage?.entries) ? storage.entries : []).some(
+++    (entry) => entry?.kind === 'keyItem' && String(entry?.keyItemId || '').trim() === id,
+++  );
+++};
+++
+++/** Проверка считается пройденной, если привязанный терминал взломан. */
+++const isCheckPassed = (terminalStates, linkedCheckId) => {
+++  const id = String(linkedCheckId || '').trim();
+++  if (!id) return false;
+++  const states = terminalStates instanceof Map
+++    ? Object.fromEntries(terminalStates.entries())
+++    : (terminalStates || {});
+++  return states[id]?.game?.status === 'won';
+++};
+++
+++/**
+++ * @param {object} requirement  { requiredKeyItemId, keyRequirement, linkedCheckId }
+++ * @param {object} options      { storage, terminalStates }
+++ * @returns {{ state: string, keyItemId: string, reason: string }}
+++ */
+++const resolveKeyAccess = (requirement = {}, options = {}) => {
+++  const keyItemId = String(requirement.requiredKeyItemId || '').trim();
+++  if (!keyItemId) {
+++    return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+++  }
+++  if (hasKeyInStorage(options.storage, keyItemId)) {
+++    return { state: KEY_ACCESS.OPEN_BY_KEY, keyItemId, reason: 'key-found' };
+++  }
+++  if (requirement.keyRequirement === 'required') {
+++    return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
+++  }
+++  const linkedCheckId = String(requirement.linkedCheckId || '').trim();
+++  if (linkedCheckId && isCheckPassed(options.terminalStates, linkedCheckId)) {
+++    return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
+++  }
+++  return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
+++};
+++
+++/** Можно ли пользоваться точкой без ручного решения Мастера. */
+++const isKeyAccessOpen = (state) => (
+++  state === KEY_ACCESS.NONE
+++  || state === KEY_ACCESS.OPEN_BY_KEY
+++  || state === KEY_ACCESS.OPEN
+++);
+++
+++/** Нужно ли показывать точку как «открытую ключом». */
+++const isUnlockedByKey = (state) => state === KEY_ACCESS.OPEN_BY_KEY;
+++
+++module.exports = {
+++  KEY_ACCESS,
+++  hasKeyInStorage,
+++  isCheckPassed,
+++  resolveKeyAccess,
+++  isKeyAccessOpen,
+++  isUnlockedByKey,
+++};
++diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
++index 8a87344..39be851 100644
++--- a/server/lootTradeSession.js
+++++ b/server/lootTradeSession.js
++@@ -160,6 +160,12 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
++           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
++       : 0,
++     items,
+++    // Патч 516: требование ключа у вложенной точки доступа.
+++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+++    keyRequirement: String(raw.keyRequirement || 'none'),
+++    linkedCheckId: String(raw.linkedCheckId || '').trim(),
+++    keyAccessState: String(raw.keyAccessState || 'none'),
+++    keyUnlocked: Boolean(raw.keyUnlocked),
++   };
++ };
++ 
++@@ -199,6 +205,35 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
++   };
++ };
++ 
+++/**
+++ * Патч 516: пересчитать доступ по текущему складу и состояниям терминалов.
+++ * `resolve` приходит из реестра (там живёт снимок комнаты), поэтому этот
+++ * модуль остаётся чистой нормализацией без сетевого состояния.
+++ */
+++const applyKeyAccessToSession = (session, resolve) => {
+++  if (!session || typeof resolve !== 'function') return session;
+++  const decorate = (target) => {
+++    const decision = resolve({
+++      requiredKeyItemId: target.requiredKeyItemId,
+++      keyRequirement: target.keyRequirement,
+++      linkedCheckId: target.linkedCheckId,
+++    });
+++    const state = decision?.state || 'none';
+++    const restricted = state === 'denied' || state === 'needs-check';
+++    return {
+++      ...target,
+++      keyAccessState: state,
+++      keyUnlocked: state === 'open-by-key',
+++      locked: state === 'none' ? Boolean(target.locked) : restricted,
+++    };
+++  };
+++  const next = decorate(session);
+++  return {
+++    ...next,
+++    nodes: Array.isArray(session.nodes) ? session.nodes.map(decorate) : [],
+++  };
+++};
+++
++ const normalizeActiveSession = (raw, now = Date.now()) => {
++   if (!raw || typeof raw !== 'object') return null;
++   let kind = 'loot';
++@@ -243,6 +278,12 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
++     difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
++     items,
++     nodes,
+++    // Патч 516: требование ключа у самой выданной точки.
+++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+++    keyRequirement: String(raw.keyRequirement || 'none'),
+++    linkedCheckId: String(raw.linkedCheckId || '').trim(),
+++    keyAccessState: String(raw.keyAccessState || 'none'),
+++    keyUnlocked: Boolean(raw.keyUnlocked),
++     closedByClientIds,
++     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
++     openedAt: Number(raw.openedAt) || now,
++@@ -504,6 +545,10 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
++   if (!session || (session.kind !== 'loot' && session.kind !== 'hub')) {
++     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++   }
+++  // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
+++  if (session.locked && session.keyAccessState !== 'none') {
+++    return { error: ERROR_CODE.KEY_REQUIRED, session };
+++  }
++   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
++     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++   }
++@@ -578,6 +623,11 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
++   if (!session || (session.kind !== 'merchant' && session.kind !== 'hub')) {
++     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++   }
+++  // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
+++  // пройдена привязанная проверка.
+++  if (session.locked && session.keyAccessState !== 'none') {
+++    return { error: ERROR_CODE.KEY_REQUIRED, session };
+++  }
++   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
++     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++   }
++@@ -753,4 +803,5 @@ module.exports = {
++   applySessionUpdate,
++   applyAtomicLootTake,
++   applyAtomicTradeCommit,
+++  applyKeyAccessToSession,
++ };
++diff --git a/server/protocol.js b/server/protocol.js
++index cbe89f4..d8b8a0b 100644
++--- a/server/protocol.js
+++++ b/server/protocol.js
++@@ -56,6 +56,8 @@ const ERROR_CODE = Object.freeze({
++   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
++   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
++   CONTAINER_LOCKED: 'CONTAINER_LOCKED',
+++  // Патч 516: точка требует ключевую запись, которой нет на складе.
+++  KEY_REQUIRED: 'KEY_REQUIRED',
++   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
++   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
++   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
++diff --git a/server/roomRegistry.js b/server/roomRegistry.js
++index 087b0a9..2574f7a 100644
++--- a/server/roomRegistry.js
+++++ b/server/roomRegistry.js
++@@ -14,7 +14,12 @@ const {
++   applySessionUpdate,
++   applyAtomicLootTake,
++   applyAtomicTradeCommit,
+++  applyKeyAccessToSession,
++ } = require('./lootTradeSession');
+++const {
+++  KEY_ACCESS,
+++  resolveKeyAccess,
+++} = require('./keyAccess');
++ const {
++   normalizeTerminalConfig,
++   publicGameState,
++@@ -56,6 +61,56 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     gmOnline: isGmOnline(room),
++   });
++ 
+++  /**
+++   * Патч 516: «доступ разрешён ключом» — выигранное состояние терминала без
+++   * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
+++   * Мастер сам создал ключ, связал его с точкой и выдал.
+++   */
+++  const keyWonGame = (config, at) => ({
+++    status: 'won',
+++    result: 'ACCESS GRANTED',
+++    scrollUp: true,
+++    name: String(config?.name || '').trim() || 'Терминал',
+++    description: String(config?.description || '').trim(),
+++    attempts: 4,
+++    attemptsMax: 4,
+++    guesses: [],
+++    wordRanges: [],
+++    bracketRanges: [],
+++    hackedByKey: true,
+++    revision: 1,
+++    updatedAt: at,
+++  });
+++
+++  const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
+++    storage: room.partyStorage,
+++    terminalStates: room.terminalStates,
+++  });
+++
+++  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
+++  const refreshKeyAccess = (room) => {
+++    if (!room) return;
+++    const resolve = resolveForRoom(room);
+++    if (room.activeSession) {
+++      room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+++    }
+++    for (const [, entry] of room.terminalStates) {
+++      const decision = resolve({
+++        requiredKeyItemId: entry.config?.requiredKeyItemId,
+++        keyRequirement: entry.config?.keyRequirement,
+++        linkedCheckId: entry.config?.linkedCheckId,
+++      });
+++      entry.keyAccessState = decision.state;
+++      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+++      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+++        entry.game = keyWonGame(entry.config, now());
+++        entry.closed = false;
+++        entry.accessId = newBroadcastId();
+++        entry.updatedAt = now();
+++      }
+++    }
+++  };
+++
++   const touchRateLog = (log, key, windowMs, max) => {
++     const cutoff = now() - windowMs;
++     const list = (log.get(key) || []).filter((ts) => ts > cutoff);
++@@ -330,11 +385,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
++     ensureOwnerMemberWs(room, clientId, ws);
++     room.activeSession = normalized;
+++    refreshKeyAccess(room);
++     // Патч 504: открытие/повторная выдача локации — это новая трансляция,
++     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
++     syncTerminalNodes(room, normalized, { reissue: true });
++     room.lastClosedSession = null;
++-    return { room, session: normalized };
+++    return { room, session: room.activeSession || normalized };
++   };
++ 
++   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
++@@ -364,6 +420,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
++     // открыть терминал один раз за трансляцию, даже если закрыл окно.
++     accessId: entry.accessId || null,
+++    // Патч 516: состояние требования ключа для карточки терминала.
+++    keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
+++    keyUnlocked: Boolean(entry.keyUnlocked),
++     game: publicGameState(entry.game),
++     updatedAt: entry.updatedAt,
++   });
++@@ -433,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     const previous = room.terminalStates.get(config.containerId);
++     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
++     room.terminalStates.set(config.containerId, entry);
+++    refreshKeyAccess(room);
++     return { room, terminal: terminalPublic(config.containerId, entry) };
++   };
++ 
++@@ -497,6 +557,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       entry.updatedAt = now();
++       return { room, terminal: terminalPublic(id, entry) };
++     }
+++    // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+++    // не запускается вообще — игрок получает понятный отказ.
+++    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
+++      || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
+++      return { error: ERROR_CODE.KEY_REQUIRED };
+++    }
++     const member = room.members.get(clientId);
++     if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
++     const charId = String(characterId || '').trim();
++@@ -565,6 +631,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       });
++     }
++     entry.updatedAt = now();
+++    // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+++    // для которых ключ был необязательным.
+++    refreshKeyAccess(room);
++     return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
++   };
++ 
++@@ -935,6 +1004,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     storage.entries = [...storage.entries, entry];
++     storage.revision += 1;
++     room.partyStorage = storage;
+++    refreshKeyAccess(room);
++     return entry;
++   };
++ 
++@@ -998,6 +1068,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       return { room, storage: storageSnapshot(room), applied: false };
++     }
++     room.partyStorage = incoming;
+++    refreshKeyAccess(room);
++     return { room, storage: storageSnapshot(room), applied: true };
++   };
++ 
++@@ -1041,6 +1112,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     addKeyItemToStorage,
++     restorePartyStorage,
++     sweep,
+++    // Патч 516: явный пересчёт доступа перед рассылкой (ключ могли найти
+++    // в том же самом взятии добычи, когда сессия ещё перезаписывалась).
+++    recomputeKeyAccess: (code) => {
+++      const room = rooms.get(code);
+++      if (room) refreshKeyAccess(room);
+++      return room || null;
+++    },
++     _rooms: rooms, // диагностика/тесты
++   };
++ };
++diff --git a/server/roomServer.js b/server/roomServer.js
++index 9f8ae1d..db2e2b6 100644
++--- a/server/roomServer.js
+++++ b/server/roomServer.js
++@@ -337,6 +337,20 @@ const attachRoomWebSocketServer = (httpServer, {
++     }
++   };
++ 
+++  /**
+++   * Патч 516: ключ мог появиться на складе одновременно с перезаписью
+++   * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
+++   * по текущему состоянию комнаты и шлём свежие состояния точек.
+++   */
+++  const broadcastKeyAccessState = (room, exceptClientId = null) => {
+++    const fresh = registry.recomputeKeyAccess(room?.code) || room;
+++    if (!fresh) return;
+++    if (fresh.activeSession) {
+++      broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
+++    }
+++    broadcastTerminalStates(fresh, exceptClientId);
+++  };
+++
++   const handleUpgrade = (req, socket, head) => {
++     wss.handleUpgrade(req, socket, head, (ws) => {
++       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
++@@ -668,6 +682,7 @@ const attachRoomWebSocketServer = (httpServer, {
++           const statePayload = { terminal: result.terminal, requestId: payload.requestId || null };
++           sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
++           broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
+++          broadcastKeyAccessState(result.room, clientId);
++           break;
++         }
++ 
++@@ -702,6 +717,9 @@ const attachRoomWebSocketServer = (httpServer, {
++             terminal: result.terminal,
++             usedDigest: result.usedDigest || false,
++           });
+++          // Патч 516: взлом привязанного терминала открывает точки с
+++          // необязательным ключом.
+++          broadcastKeyAccessState(result.room, clientId);
++           break;
++         }
++ 
++@@ -759,6 +777,7 @@ const attachRoomWebSocketServer = (httpServer, {
++           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
++           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
++           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+++          broadcastKeyAccessState(result.room, clientId);
++           break;
++         }
++ 
++@@ -777,6 +796,7 @@ const attachRoomWebSocketServer = (httpServer, {
++           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
++           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
++           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+++          broadcastKeyAccessState(result.room, clientId);
++           break;
++         }
++ 
++@@ -808,10 +828,7 @@ const attachRoomWebSocketServer = (httpServer, {
++             canonical,
++             clientId,
++           );
++-          broadcastSessionState(result.room, clientId, {
++-            session: result.session,
++-          });
++-          broadcastTerminalStates(result.room);
+++          broadcastKeyAccessState(result.room, clientId);
++           break;
++         }
++ 
++@@ -988,6 +1005,8 @@ const attachRoomWebSocketServer = (httpServer, {
++             sendEnvelope(ws, MESSAGE.STORAGE_STATE, { storage }, canonical, clientId);
++             broadcastToRoom(result.room, null, MESSAGE.STORAGE_STATE, { storage });
++           }
+++          // Патч 516: найденный ключ сразу открывает точки, которые его ждут.
+++          broadcastKeyAccessState(result.room, null);
++           break;
++         }
++ 
++diff --git a/server/terminalHacking.js b/server/terminalHacking.js
++index 6c98ae4..dd9e9e2 100644
++--- a/server/terminalHacking.js
+++++ b/server/terminalHacking.js
++@@ -65,6 +65,10 @@ const normalizeTerminalConfig = (raw = {}) => ({
++   name: String(raw.name || '').trim(),
++   description: String(raw.description || '').trim(),
++   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
+++  // Патч 516: требование ключа доходит до сервера вместе с конфигурацией.
+++  requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+++  keyRequirement: String(raw.keyRequirement || 'none'),
+++  linkedCheckId: String(raw.linkedCheckId || '').trim(),
++ });
++ 
++ // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
++diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
++index 49bc1d7..128e846 100644
++--- a/src/room/roomProtocol.ts
+++++ b/src/room/roomProtocol.ts
++@@ -51,6 +51,8 @@ export const ROOM_ERROR = {
++   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
++   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
++   CONTAINER_LOCKED: 'CONTAINER_LOCKED',
+++  // Патч 516: точка требует ключевую запись, которой нет на складе.
+++  KEY_REQUIRED: 'KEY_REQUIRED',
++   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
++   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
++   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 3239451..e6dcad7 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "515"
++  "baseline": "516"
+ }
+diff --git a/public/version.json b/public/version.json
+index 143e5c0..8072818 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "515",
++  "version": "516",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
+       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
+       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
+       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
+@@ -86,6 +87,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
+       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
+       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
+       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
+diff --git a/server/keyAccess.js b/server/keyAccess.js
+new file mode 100644
+index 0000000..a2deba4
+--- /dev/null
++++ b/server/keyAccess.js
+@@ -0,0 +1,78 @@
++'use strict';
++
++/**
++ * Патч 516: серверная проверка ключевой записи для точек доступа.
++ *
++ * Чистая функция без серверного состояния: решение принимается по снимку
++ * общего хранилища комнаты и по состояниям терминалов. Клиент НЕ решает,
++ * открыта точка или нет (урок 506). Контракт — разделы 7.3–7.4
++ * `docs/key-items-and-gates-design.md`.
++ */
++
++const KEY_ACCESS = Object.freeze({
++  NONE: 'none',                 // требования нет
++  OPEN_BY_KEY: 'open-by-key',   // ключ добыт: мини-игра не запускается
++  DENIED: 'denied',             // обязательный ключ не добыт
++  NEEDS_CHECK: 'needs-check',   // необязательный ключ не добыт, нужна проверка
++  OPEN: 'open',                 // привязанная проверка пройдена
++});
++
++const hasKeyInStorage = (storage, keyItemId) => {
++  const id = String(keyItemId || '').trim();
++  if (!id) return false;
++  return (Array.isArray(storage?.entries) ? storage.entries : []).some(
++    (entry) => entry?.kind === 'keyItem' && String(entry?.keyItemId || '').trim() === id,
++  );
++};
++
++/** Проверка считается пройденной, если привязанный терминал взломан. */
++const isCheckPassed = (terminalStates, linkedCheckId) => {
++  const id = String(linkedCheckId || '').trim();
++  if (!id) return false;
++  const states = terminalStates instanceof Map
++    ? Object.fromEntries(terminalStates.entries())
++    : (terminalStates || {});
++  return states[id]?.game?.status === 'won';
++};
++
++/**
++ * @param {object} requirement  { requiredKeyItemId, keyRequirement, linkedCheckId }
++ * @param {object} options      { storage, terminalStates }
++ * @returns {{ state: string, keyItemId: string, reason: string }}
++ */
++const resolveKeyAccess = (requirement = {}, options = {}) => {
++  const keyItemId = String(requirement.requiredKeyItemId || '').trim();
++  if (!keyItemId) {
++    return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
++  }
++  if (hasKeyInStorage(options.storage, keyItemId)) {
++    return { state: KEY_ACCESS.OPEN_BY_KEY, keyItemId, reason: 'key-found' };
++  }
++  if (requirement.keyRequirement === 'required') {
++    return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
++  }
++  const linkedCheckId = String(requirement.linkedCheckId || '').trim();
++  if (linkedCheckId && isCheckPassed(options.terminalStates, linkedCheckId)) {
++    return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
++  }
++  return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
++};
++
++/** Можно ли пользоваться точкой без ручного решения Мастера. */
++const isKeyAccessOpen = (state) => (
++  state === KEY_ACCESS.NONE
++  || state === KEY_ACCESS.OPEN_BY_KEY
++  || state === KEY_ACCESS.OPEN
++);
++
++/** Нужно ли показывать точку как «открытую ключом». */
++const isUnlockedByKey = (state) => state === KEY_ACCESS.OPEN_BY_KEY;
++
++module.exports = {
++  KEY_ACCESS,
++  hasKeyInStorage,
++  isCheckPassed,
++  resolveKeyAccess,
++  isKeyAccessOpen,
++  isUnlockedByKey,
++};
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 8a87344..39be851 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -160,6 +160,12 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+       : 0,
+     items,
++    // Патч 516: требование ключа у вложенной точки доступа.
++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
++    keyRequirement: String(raw.keyRequirement || 'none'),
++    linkedCheckId: String(raw.linkedCheckId || '').trim(),
++    keyAccessState: String(raw.keyAccessState || 'none'),
++    keyUnlocked: Boolean(raw.keyUnlocked),
+   };
+ };
+ 
+@@ -199,6 +205,35 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   };
+ };
+ 
++/**
++ * Патч 516: пересчитать доступ по текущему складу и состояниям терминалов.
++ * `resolve` приходит из реестра (там живёт снимок комнаты), поэтому этот
++ * модуль остаётся чистой нормализацией без сетевого состояния.
++ */
++const applyKeyAccessToSession = (session, resolve) => {
++  if (!session || typeof resolve !== 'function') return session;
++  const decorate = (target) => {
++    const decision = resolve({
++      requiredKeyItemId: target.requiredKeyItemId,
++      keyRequirement: target.keyRequirement,
++      linkedCheckId: target.linkedCheckId,
++    });
++    const state = decision?.state || 'none';
++    const restricted = state === 'denied' || state === 'needs-check';
++    return {
++      ...target,
++      keyAccessState: state,
++      keyUnlocked: state === 'open-by-key',
++      locked: state === 'none' ? Boolean(target.locked) : restricted,
++    };
++  };
++  const next = decorate(session);
++  return {
++    ...next,
++    nodes: Array.isArray(session.nodes) ? session.nodes.map(decorate) : [],
++  };
++};
++
+ const normalizeActiveSession = (raw, now = Date.now()) => {
+   if (!raw || typeof raw !== 'object') return null;
+   let kind = 'loot';
+@@ -243,6 +278,12 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+     difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
+     items,
+     nodes,
++    // Патч 516: требование ключа у самой выданной точки.
++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
++    keyRequirement: String(raw.keyRequirement || 'none'),
++    linkedCheckId: String(raw.linkedCheckId || '').trim(),
++    keyAccessState: String(raw.keyAccessState || 'none'),
++    keyUnlocked: Boolean(raw.keyUnlocked),
+     closedByClientIds,
+     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
+     openedAt: Number(raw.openedAt) || now,
+@@ -504,6 +545,10 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+   if (!session || (session.kind !== 'loot' && session.kind !== 'hub')) {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
++  // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
++  if (session.locked && session.keyAccessState !== 'none') {
++    return { error: ERROR_CODE.KEY_REQUIRED, session };
++  }
+   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
+@@ -578,6 +623,11 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+   if (!session || (session.kind !== 'merchant' && session.kind !== 'hub')) {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
++  // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
++  // пройдена привязанная проверка.
++  if (session.locked && session.keyAccessState !== 'none') {
++    return { error: ERROR_CODE.KEY_REQUIRED, session };
++  }
+   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
+@@ -753,4 +803,5 @@ module.exports = {
+   applySessionUpdate,
+   applyAtomicLootTake,
+   applyAtomicTradeCommit,
++  applyKeyAccessToSession,
+ };
+diff --git a/server/protocol.js b/server/protocol.js
+index cbe89f4..d8b8a0b 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -56,6 +56,8 @@ const ERROR_CODE = Object.freeze({
+   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
+   CONTAINER_LOCKED: 'CONTAINER_LOCKED',
++  // Патч 516: точка требует ключевую запись, которой нет на складе.
++  KEY_REQUIRED: 'KEY_REQUIRED',
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 087b0a9..2574f7a 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -14,7 +14,12 @@ const {
+   applySessionUpdate,
+   applyAtomicLootTake,
+   applyAtomicTradeCommit,
++  applyKeyAccessToSession,
+ } = require('./lootTradeSession');
++const {
++  KEY_ACCESS,
++  resolveKeyAccess,
++} = require('./keyAccess');
+ const {
+   normalizeTerminalConfig,
+   publicGameState,
+@@ -56,6 +61,56 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     gmOnline: isGmOnline(room),
+   });
+ 
++  /**
++   * Патч 516: «доступ разрешён ключом» — выигранное состояние терминала без
++   * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
++   * Мастер сам создал ключ, связал его с точкой и выдал.
++   */
++  const keyWonGame = (config, at) => ({
++    status: 'won',
++    result: 'ACCESS GRANTED',
++    scrollUp: true,
++    name: String(config?.name || '').trim() || 'Терминал',
++    description: String(config?.description || '').trim(),
++    attempts: 4,
++    attemptsMax: 4,
++    guesses: [],
++    wordRanges: [],
++    bracketRanges: [],
++    hackedByKey: true,
++    revision: 1,
++    updatedAt: at,
++  });
++
++  const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
++    storage: room.partyStorage,
++    terminalStates: room.terminalStates,
++  });
++
++  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
++  const refreshKeyAccess = (room) => {
++    if (!room) return;
++    const resolve = resolveForRoom(room);
++    if (room.activeSession) {
++      room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
++    }
++    for (const [, entry] of room.terminalStates) {
++      const decision = resolve({
++        requiredKeyItemId: entry.config?.requiredKeyItemId,
++        keyRequirement: entry.config?.keyRequirement,
++        linkedCheckId: entry.config?.linkedCheckId,
++      });
++      entry.keyAccessState = decision.state;
++      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
++      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
++        entry.game = keyWonGame(entry.config, now());
++        entry.closed = false;
++        entry.accessId = newBroadcastId();
++        entry.updatedAt = now();
++      }
++    }
++  };
++
+   const touchRateLog = (log, key, windowMs, max) => {
+     const cutoff = now() - windowMs;
+     const list = (log.get(key) || []).filter((ts) => ts > cutoff);
+@@ -330,11 +385,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = normalized;
++    refreshKeyAccess(room);
+     // Патч 504: открытие/повторная выдача локации — это новая трансляция,
+     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
+     syncTerminalNodes(room, normalized, { reissue: true });
+     room.lastClosedSession = null;
+-    return { room, session: normalized };
++    return { room, session: room.activeSession || normalized };
+   };
+ 
+   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
+@@ -364,6 +420,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
+     // открыть терминал один раз за трансляцию, даже если закрыл окно.
+     accessId: entry.accessId || null,
++    // Патч 516: состояние требования ключа для карточки терминала.
++    keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
++    keyUnlocked: Boolean(entry.keyUnlocked),
+     game: publicGameState(entry.game),
+     updatedAt: entry.updatedAt,
+   });
+@@ -433,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const previous = room.terminalStates.get(config.containerId);
+     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
+     room.terminalStates.set(config.containerId, entry);
++    refreshKeyAccess(room);
+     return { room, terminal: terminalPublic(config.containerId, entry) };
+   };
+ 
+@@ -497,6 +557,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       entry.updatedAt = now();
+       return { room, terminal: terminalPublic(id, entry) };
+     }
++    // Патч 516: без обязательного ключа или привязанной проверки мини-игра
++    // не запускается вообще — игрок получает понятный отказ.
++    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
++      || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
++      return { error: ERROR_CODE.KEY_REQUIRED };
++    }
+     const member = room.members.get(clientId);
+     if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
+     const charId = String(characterId || '').trim();
+@@ -565,6 +631,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       });
+     }
+     entry.updatedAt = now();
++    // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
++    // для которых ключ был необязательным.
++    refreshKeyAccess(room);
+     return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
+   };
+ 
+@@ -935,6 +1004,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     storage.entries = [...storage.entries, entry];
+     storage.revision += 1;
+     room.partyStorage = storage;
++    refreshKeyAccess(room);
+     return entry;
+   };
+ 
+@@ -998,6 +1068,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       return { room, storage: storageSnapshot(room), applied: false };
+     }
+     room.partyStorage = incoming;
++    refreshKeyAccess(room);
+     return { room, storage: storageSnapshot(room), applied: true };
+   };
+ 
+@@ -1041,6 +1112,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     addKeyItemToStorage,
+     restorePartyStorage,
+     sweep,
++    // Патч 516: явный пересчёт доступа перед рассылкой (ключ могли найти
++    // в том же самом взятии добычи, когда сессия ещё перезаписывалась).
++    recomputeKeyAccess: (code) => {
++      const room = rooms.get(code);
++      if (room) refreshKeyAccess(room);
++      return room || null;
++    },
+     _rooms: rooms, // диагностика/тесты
+   };
+ };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 9f8ae1d..db2e2b6 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -337,6 +337,20 @@ const attachRoomWebSocketServer = (httpServer, {
+     }
+   };
+ 
++  /**
++   * Патч 516: ключ мог появиться на складе одновременно с перезаписью
++   * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
++   * по текущему состоянию комнаты и шлём свежие состояния точек.
++   */
++  const broadcastKeyAccessState = (room, exceptClientId = null) => {
++    const fresh = registry.recomputeKeyAccess(room?.code) || room;
++    if (!fresh) return;
++    if (fresh.activeSession) {
++      broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
++    }
++    broadcastTerminalStates(fresh, exceptClientId);
++  };
++
+   const handleUpgrade = (req, socket, head) => {
+     wss.handleUpgrade(req, socket, head, (ws) => {
+       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+@@ -668,6 +682,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           const statePayload = { terminal: result.terminal, requestId: payload.requestId || null };
+           sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
+           broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
++          broadcastKeyAccessState(result.room, clientId);
+           break;
+         }
+ 
+@@ -702,6 +717,9 @@ const attachRoomWebSocketServer = (httpServer, {
+             terminal: result.terminal,
+             usedDigest: result.usedDigest || false,
+           });
++          // Патч 516: взлом привязанного терминала открывает точки с
++          // необязательным ключом.
++          broadcastKeyAccessState(result.room, clientId);
+           break;
+         }
+ 
+@@ -759,6 +777,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
++          broadcastKeyAccessState(result.room, clientId);
+           break;
+         }
+ 
+@@ -777,6 +796,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+           sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+           broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
++          broadcastKeyAccessState(result.room, clientId);
+           break;
+         }
+ 
+@@ -808,10 +828,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, clientId, {
+-            session: result.session,
+-          });
+-          broadcastTerminalStates(result.room);
++          broadcastKeyAccessState(result.room, clientId);
+           break;
+         }
+ 
+@@ -988,6 +1005,8 @@ const attachRoomWebSocketServer = (httpServer, {
+             sendEnvelope(ws, MESSAGE.STORAGE_STATE, { storage }, canonical, clientId);
+             broadcastToRoom(result.room, null, MESSAGE.STORAGE_STATE, { storage });
+           }
++          // Патч 516: найденный ключ сразу открывает точки, которые его ждут.
++          broadcastKeyAccessState(result.room, null);
+           break;
+         }
+ 
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index 6c98ae4..dd9e9e2 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -65,6 +65,10 @@ const normalizeTerminalConfig = (raw = {}) => ({
+   name: String(raw.name || '').trim(),
+   description: String(raw.description || '').trim(),
+   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
++  // Патч 516: требование ключа доходит до сервера вместе с конфигурацией.
++  requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
++  keyRequirement: String(raw.keyRequirement || 'none'),
++  linkedCheckId: String(raw.linkedCheckId || '').trim(),
+ });
+ 
+ // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 49bc1d7..128e846 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -51,6 +51,8 @@ export const ROOM_ERROR = {
+   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
+   CONTAINER_LOCKED: 'CONTAINER_LOCKED',
++  // Патч 516: точка требует ключевую запись, которой нет на складе.
++  KEY_REQUIRED: 'KEY_REQUIRED',
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',

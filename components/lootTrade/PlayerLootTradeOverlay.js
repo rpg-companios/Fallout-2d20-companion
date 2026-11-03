@@ -517,6 +517,7 @@ export default function PlayerLootTradeOverlay() {
                       closed: 'terminal.closedBadge',
                       awaiting: 'terminal.retryWaiting',
                       won: 'terminal.stateWon',
+                      keyUnlocked: 'terminal.keyUnlockedBadge',
                       finished: 'terminal.accessUsed',
                       used: 'terminal.accessUsed',
                     }[accessBlockedReason] || null;
@@ -549,7 +550,11 @@ export default function PlayerLootTradeOverlay() {
                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
                           )}
 
-                          {nodeLocked ? (
+                          {node.keyUnlocked ? (
+                            <Text style={styles.hubUnlockedMetaText}>
+                              {tLootTrade('player.hubNodeKeyUnlockedBadge')}
+                            </Text>
+                          ) : nodeLocked ? (
                             <Text style={styles.hubLockedHintText}>
                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
                             </Text>
@@ -726,6 +731,9 @@ export default function PlayerLootTradeOverlay() {
       const code = error?.code || error?.message;
       if (code === 'CONTAINER_LOCKED') {
         showRawAlert({ title: tLootTrade('player.containerLockedError') });
+        if (isInsideHub) returnToHubList();
+      } else if (code === 'KEY_REQUIRED') {
+        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
         if (isInsideHub) returnToHubList();
       } else {
         debugLog('playerOverlay.lootTake:failed', { message: error?.message });
@@ -906,6 +914,9 @@ export default function PlayerLootTradeOverlay() {
       const code = error?.code || error?.message;
       if (code === 'CONTAINER_LOCKED') {
         showRawAlert({ title: tLootTrade('player.containerLockedError') });
+        if (isInsideHub) returnToHubList();
+      } else if (code === 'KEY_REQUIRED') {
+        showRawAlert({ title: tLootTrade('player.keyRequiredError') });
         if (isInsideHub) returnToHubList();
       } else if (code === 'TRADE_STOCK_CHANGED') {
         showRawAlert({ title: tLootTrade('player.stockChangedError') });

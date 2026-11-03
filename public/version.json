@@ -1,8 +1,9 @@
 {
-  "version": "515",
+  "version": "516",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
@@ -86,6 +87,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",

@@ -250,7 +250,9 @@
     "shortfallConfirmMessage": "The merchant owes you {need} {CAP}, but only has {have} {CAP} in the register (short by {shortfall} {CAP}).\n\nCancel to pick more goods, or accept all available {have} {CAP}.",
     "shortfallAccept": "Accept {have} {CAP}",
     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
-    "tradeSuccess": "Trade completed!"
+    "tradeSuccess": "Trade completed!",
+    "keyRequiredError": "A key is required: the point stays closed without it",
+    "hubNodeKeyUnlockedBadge": "Opened by key"
   },
   "keyItems": {
     "title": "Keys and notes",
@@ -323,6 +325,8 @@
     "accessUsed": "ACCESS USED",
     "hackedTitle": "Terminal hacked",
     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
-    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
+    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
+    "keyUnlockedBadge": "OPENED BY KEY",
+    "keyRequiredError": "A key or the linked check is required"
   }
 }

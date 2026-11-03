@@ -160,6 +160,12 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
       : 0,
     items,
+    // Патч 516: требование ключа у вложенной точки доступа.
+    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+    keyRequirement: String(raw.keyRequirement || 'none'),
+    linkedCheckId: String(raw.linkedCheckId || '').trim(),
+    keyAccessState: String(raw.keyAccessState || 'none'),
+    keyUnlocked: Boolean(raw.keyUnlocked),
   };
 };
 
@@ -196,6 +202,35 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
         hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
       };
     }),
+  };
+};
+
+/**
+ * Патч 516: пересчитать доступ по текущему складу и состояниям терминалов.
+ * `resolve` приходит из реестра (там живёт снимок комнаты), поэтому этот
+ * модуль остаётся чистой нормализацией без сетевого состояния.
+ */
+const applyKeyAccessToSession = (session, resolve) => {
+  if (!session || typeof resolve !== 'function') return session;
+  const decorate = (target) => {
+    const decision = resolve({
+      requiredKeyItemId: target.requiredKeyItemId,
+      keyRequirement: target.keyRequirement,
+      linkedCheckId: target.linkedCheckId,
+    });
+    const state = decision?.state || 'none';
+    const restricted = state === 'denied' || state === 'needs-check';
+    return {
+      ...target,
+      keyAccessState: state,
+      keyUnlocked: state === 'open-by-key',
+      locked: state === 'none' ? Boolean(target.locked) : restricted,
+    };
+  };
+  const next = decorate(session);
+  return {
+    ...next,
+    nodes: Array.isArray(session.nodes) ? session.nodes.map(decorate) : [],
   };
 };
 
@@ -243,6 +278,12 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
     difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
     items,
     nodes,
+    // Патч 516: требование ключа у самой выданной точки.
+    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+    keyRequirement: String(raw.keyRequirement || 'none'),
+    linkedCheckId: String(raw.linkedCheckId || '').trim(),
+    keyAccessState: String(raw.keyAccessState || 'none'),
+    keyUnlocked: Boolean(raw.keyUnlocked),
     closedByClientIds,
     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
     openedAt: Number(raw.openedAt) || now,
@@ -504,6 +545,10 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
   if (!session || (session.kind !== 'loot' && session.kind !== 'hub')) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
   }
+  // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
+  if (session.locked && session.keyAccessState !== 'none') {
+    return { error: ERROR_CODE.KEY_REQUIRED, session };
+  }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
   }
@@ -577,6 +622,11 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
 const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
   if (!session || (session.kind !== 'merchant' && session.kind !== 'hub')) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  }
+  // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
+  // пройдена привязанная проверка.
+  if (session.locked && session.keyAccessState !== 'none') {
+    return { error: ERROR_CODE.KEY_REQUIRED, session };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
@@ -753,4 +803,5 @@ module.exports = {
   applySessionUpdate,
   applyAtomicLootTake,
   applyAtomicTradeCommit,
+  applyKeyAccessToSession,
 };

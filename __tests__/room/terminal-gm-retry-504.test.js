@@ -332,7 +332,11 @@ describe('504: lockOnFailure удалён полностью', () => {
   it('движок не читает и не пишет поле; старые сохранения с ним игнорируются', () => {
     const config = normalizeTerminalConfig({ ...BASE_CONFIG, lockOnFailure: true });
     expect(config).not.toHaveProperty('lockOnFailure');
-    expect(Object.keys(config).sort()).toEqual(['containerId', 'description', 'difficulty', 'name']);
+    // Патч 516: конфигурация терминала несёт ещё и требование ключа.
+    expect(Object.keys(config).sort()).toEqual([
+      'containerId', 'description', 'difficulty', 'keyRequirement',
+      'linkedCheckId', 'name', 'requiredKeyItemId',
+    ]);
     const game = createGame({
       config, operatorClientId: 'p', operatorCharacterId: 'c',
       characterSnapshot: SNAPSHOT, now: 100, rng: () => 0.42,

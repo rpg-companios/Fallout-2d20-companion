@@ -1,5 +1,29 @@
 # Changelog
 ---
+## Server-side key checking and staying on the card grid (patch 516)
+
+Plan item 8. Access is now decided by the **server from the room state**, not
+by the player's window (lesson 506): the client never decides whether a point
+is open.
+
+- **Key present in shared storage** — the mini-game never starts: the terminal
+  gets "access granted" with no board and no attempts, containers and
+  merchants open. The GM gets no "Terminal hacked" notice: they created the
+  record, linked it and issued it. The location list shows "Opened by key".
+- **Key missing and mandatory** — the point stays locked; taking loot, trading
+  or starting a hack returns a "Key required" refusal.
+- **Key missing and optional** — access waits for the linked check: once the
+  chosen terminal is hacked, the point opens. Until then a key is needed or
+  the GM opens it manually.
+- **Key found later** — issuing a record, finding one in loot, restoring a
+  storage snapshot and hacking the linked terminal all recompute access and
+  broadcast fresh states to the room. The requirement reaches the server both
+  for a standalone terminal and for location nodes.
+- **New error code** `KEY_REQUIRED` in both protocols with paired RU/EN labels.
+
+Also, as requested: **creating a point no longer opens its detail screen** —
+the GM stays on the card grid and sees the newly saved card there.
+
 ## "Mandatory" checkbox and field order (patch 515)
 
 The owner: "When creating a container, the 'Mandatory' requirement should
