@@ -177,7 +177,7 @@ describe('516: экран карточек и документация', () => {
   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('516');
-    expect(plan).toContain('Осталось после патча 517');
+    expect(plan).toContain('Осталось после патча 518');
     expect(plan).not.toContain('| 8 | ⏳');
     expect(plan).toContain('Ворота между точками');
     expect(plan).toContain('две панели');

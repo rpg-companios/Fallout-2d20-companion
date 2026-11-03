@@ -747,6 +747,29 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        // Патч 518: двухпанельное окно склада. Буфер применяется одной
+        // атомарной операцией только после нажатия «Перенести».
+        case MESSAGE.STORAGE_TRANSFER: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.transferPartyStorage({
+            code: canonical,
+            clientId,
+            deposits: payload.deposits,
+            withdrawals: payload.withdrawals,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = {
+            storage: result.storage,
+            withdrawn: result.withdrawn,
+            deposited: result.deposited,
+            requestId: payload.requestId || null,
+          };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
         case MESSAGE.STORAGE_WITHDRAW: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }

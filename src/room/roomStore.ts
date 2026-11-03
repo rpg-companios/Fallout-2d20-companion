@@ -112,6 +112,11 @@ interface RoomStoreState {
   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
+  transferPartyStorage: (input: { code: string; deposits: any[]; withdrawals: any[] }) => Promise<{
+    storage: PartyStorageState | null;
+    withdrawn: any[];
+    deposited: any[];
+  }>;
   restorePartyStorage: (input: { code: string; storage: PartyStorageState }) => Promise<PartyStorageState | null>;
   addKeyItemToStorage: (input: { code: string; keyItemId: string; name: string; description: string }) => Promise<PartyStorageState | null>;
   openRoomSession: (input: {
@@ -823,6 +828,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         code, item, quantity, name,
       }, code);
       return (response.payload?.storage as PartyStorageState | null) ?? null;
+    },
+
+    // Патч 518: одна кнопка «Перенести» = один атомарный запрос с буфером.
+    transferPartyStorage: async ({ code, deposits, withdrawals }) => {
+      const response = await sendRequest(ROOM_MESSAGE.STORAGE_TRANSFER, {
+        code, deposits, withdrawals,
+      }, code);
+      return {
+        storage: (response.payload?.storage as PartyStorageState | null) ?? null,
+        withdrawn: (response.payload?.withdrawn as any[]) ?? [],
+        deposited: (response.payload?.deposited as any[]) ?? [],
+      };
     },
 
     withdrawFromPartyStorage: async ({ code, entryId, quantity }) => {

@@ -1010,6 +1010,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     let plain;
     try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
     const member = room.members.get(clientId);
+    // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
+    // Он только смотрит список и транслирует ключи.
+    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
     const entry = {
       entryId: `st_${now()}_${++storageEntryCounter}`,
       item: plain,
@@ -1025,6 +1028,82 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     storage.revision += 1;
     room.partyStorage = storage;
     return { room, storage: storageSnapshot(room), entry: { ...entry } };
+  };
+
+  /**
+   * Патч 518: одна кнопка «Перенести» применяет ВСЕ отложенные операции
+   * буфера атомарно. Пока кнопка не нажата, сервер ничего не меняет.
+   */
+  const transferPartyStorage = ({ code, clientId, deposits = [], withdrawals = [] }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+    const member = room.members.get(clientId);
+    // Мастер не вносит и не забирает предметы — только смотрит и выдаёт ключи.
+    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+    const putList = Array.isArray(deposits) ? deposits : [];
+    const takeList = Array.isArray(withdrawals) ? withdrawals : [];
+    if (putList.length === 0 && takeList.length === 0) {
+      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    }
+    if (putList.length + takeList.length > 50) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+
+    const storage = room.partyStorage || emptyStorage();
+    const original = storage.entries;
+    // 1) Проверяем ВСЁ до единого изменения.
+    const plannedTakes = [];
+    for (const req of takeList) {
+      const entryId = String(req?.entryId || '').trim();
+      const qty = Math.floor(Number(req?.quantity));
+      const entry = original.find((e) => e.entryId === entryId);
+      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+        return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
+      }
+      if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      plannedTakes.push({ entry, qty });
+    }
+    const plannedPuts = [];
+    for (const req of putList) {
+      const qty = Math.floor(Number(req?.quantity));
+      const item = req?.item;
+      if (!item || typeof item !== 'object' || Array.isArray(item)
+        || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+        return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      }
+      let plain;
+      try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
+      if (plain.kind === 'keyItem') return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      plannedPuts.push({ plain, qty, name: String(req?.name || plain.name || '').trim() || 'Предмет' });
+    }
+    // 2) Применяем целиком: сначала списания, затем поступления.
+    let entries = [...original];
+    const withdrawn = [];
+    for (const { entry, qty } of plannedTakes) {
+      const rest = Number(entry.quantity) - qty;
+      withdrawn.push({ item: entry.item, name: entry.name, quantity: qty });
+      entries = rest > 0
+        ? entries.map((e) => (e.entryId === entry.entryId ? { ...e, quantity: rest } : e))
+        : entries.filter((e) => e.entryId !== entry.entryId);
+    }
+    const deposited = [];
+    for (const { plain, qty, name } of plannedPuts) {
+      const entry = {
+        entryId: `st_${now()}_${++storageEntryCounter}`,
+        item: plain,
+        name,
+        itemType: String(plain.itemType || 'misc'),
+        quantity: qty,
+        depositedBy: clientId,
+        depositedByName: String(member?.name || '').trim(),
+        at: now(),
+      };
+      entries = [...entries, entry];
+      deposited.push({ ...entry });
+    }
+    storage.entries = entries;
+    storage.revision += 1;
+    room.partyStorage = storage;
+    return { room, storage: storageSnapshot(room), withdrawn, deposited };
   };
 
   /** Патч 510: ключевая запись попадает на склад, но не уходит в инвентарь. */
@@ -1152,6 +1231,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ackDirective,
     depositToPartyStorage,
     withdrawFromPartyStorage,
+    transferPartyStorage,
     getPartyStorage,
     getAccessEvents: (code) => Object.fromEntries(
       (rooms.get(code)?.accessEvents || new Map()).entries(),

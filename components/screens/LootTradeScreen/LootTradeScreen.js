@@ -78,6 +78,8 @@ import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
 import KeyItemCardCell from '../../lootTrade/KeyItemCardCell';
+import StorageCardCell from '../../lootTrade/StorageCardCell';
+import PartyStorageModal from '../../lootTrade/PartyStorageModal';
 import KeyItemFormModal from './modals/KeyItemFormModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
@@ -397,6 +399,7 @@ export default function LootTradeScreen() {
   // Патч 511: ключевые записи — такие же карточки на сетке, как контейнеры.
   const [keyItems, setKeyItems] = useState([]);
   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
+  const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
@@ -1607,6 +1610,7 @@ export default function LootTradeScreen() {
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
     { type: 'createKeyItem', id: '__create_key_item__' },
+    { type: 'storage', id: '__storage_card__' },
     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
     // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
     // Патч 514: вложенные в локацию/контейнер/торговца уходят с корня.
@@ -1773,6 +1777,19 @@ export default function LootTradeScreen() {
                           label={tLootTrade('actions.createKeyItem')}
                           testID="create-key-item-cell"
                           onPress={() => setKeyItemForm({ initialKeyItem: null })}
+                        />
+                      );
+                    }
+                    if (cell.type === 'storage') {
+                      const storageEntry = Object.entries(roomRooms || {})
+                        .find(([, value]) => value?.role === 'gm');
+                      const storageItems = (storageEntry?.[1]?.partyStorage?.entries || [])
+                        .filter((entry) => entry?.kind !== 'keyItem').length;
+                      return (
+                        <StorageCardCell
+                          key={cell.id}
+                          itemCount={storageItems}
+                          onOpen={() => setStorageModalVisible(true)}
                         />
                       );
                     }
@@ -2493,6 +2510,11 @@ export default function LootTradeScreen() {
       )}
 
       {/* Модалки создания/правки, ключевых записей, локации и выдачи */}
+      <PartyStorageModal
+        visible={storageModalVisible}
+        gmView
+        onClose={() => setStorageModalVisible(false)}
+      />
       <KeyItemFormModal
         visible={Boolean(keyItemForm)}
         initialKeyItem={keyItemForm?.initialKeyItem || null}

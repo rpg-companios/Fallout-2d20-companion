@@ -163,7 +163,7 @@ describe('514: словари и живой план', () => {
   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('515');
-    expect(plan).toContain('Осталось после патча 517');
+    expect(plan).toContain('Осталось после патча 518');
     expect(plan).toContain('Серверная проверка ключа');
     expect(plan).toContain('Ворота между точками');
     expect(plan).toContain('две панели');

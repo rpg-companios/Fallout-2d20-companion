@@ -300,9 +300,11 @@ describe('Патч 469 — доработки «Добычи/Торговли» 
     expect(itemConfigSrc).toContain('itemConfig.packFormulaBadge');
 
     // У модалки лута игрока просторные внешние отступы по краям и внутренний воздух
+    // Патч 518: общий каркас стилей живёт рядом (см. docs/ui-modals-rules.md).
     const overlaySrc = fs.readFileSync(
-      path.join(repoRoot, 'components/lootTrade/PlayerLootTradeOverlay.js'),
-      'utf8',
+      path.join(repoRoot, 'components/lootTrade/PlayerLootTradeOverlay.js'), 'utf8',
+    ) + fs.readFileSync(
+      path.join(repoRoot, 'components/lootTrade/tradeOverlayStyles.js'), 'utf8',
     );
     expect(overlaySrc).toContain('lootModalBackdrop');
     expect(overlaySrc).toContain('paddingHorizontal: 28');

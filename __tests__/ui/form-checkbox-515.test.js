@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой �
   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('515');
-    expect(plan).toContain('Осталось после патча 517');
+    expect(plan).toContain('Осталось после патча 518');
     expect(plan).toContain('Серверная проверка ключа');
     expect(plan).toContain('две панели');
     expect(plan).toContain('Мини-игра взлома замков');

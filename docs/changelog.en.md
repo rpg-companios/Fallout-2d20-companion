@@ -1,5 +1,32 @@
 # Changelog
 ---
+## Shared storage: two panels and transfer on button press (patch 518)
+
+The owner's full description arrived, replacing the short one from patch 514:
+
+> "The GM has a separate card, players have a button in the inventory. The GM
+> can broadcast keys to shared storage and view it as an inventory-style list,
+> but with no action buttons and no parameters. They cannot withdraw or deposit
+> items. A player opening shared storage sees a two-panel modal styled like the
+> merchant ... until the button is pressed, nothing is transferred".
+
+- **GM.** A separate "Shared storage" card on the Loot / Trade grid. The
+  window lists items with no buttons and no parameters, shows issued keys and
+  offers a record catalog with "Add to storage". Depositing and withdrawing
+  are now blocked on the server for both messages.
+- **Player.** The inventory button opens a **two-panel window styled like the
+  merchant**: personal inventory on the left, storage on the right. No prices,
+  markups, caps or settings — rows, buffer and commit button styles are
+  imported from the merchant overlay (rule in `docs/ui-modals-rules.md`).
+- **Buffer.** Tapping an item adds it to a pending list; tapping a buffer row
+  returns it. Until "Transfer" is pressed neither the server nor the local
+  inventory changes. The button sends one atomic request with all deposits and
+  withdrawals; any invalid line cancels the whole operation. The local
+  inventory updates only after the server replies.
+
+Keys still cannot be withdrawn into a personal inventory; snapshot
+export/import is preserved.
+
 ## Gates between points (patch 517)
 
 Plan item 9. Previously the linked check could only look at a win in the

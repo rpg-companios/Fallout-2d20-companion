@@ -91,7 +91,17 @@
     "importPlayerHint": "The file is saved on this device. Once you become the room GM, import it again to fill the storage.",
     "readKey": "Read",
     "keyStays": "The record stays shared: it cannot be withdrawn.",
-    "hint": "Items are shared by the whole party. The name is not customizable."
+    "hint": "Items are shared by the whole party. The name is not customizable.",
+    "bufferGive": "To storage",
+    "bufferTake": "To my inventory",
+    "commit": "Transfer",
+    "clearBuffer": "Clear",
+    "pendingHint": "Items move only after you press \"Transfer\"",
+    "gmTitle": "Shared storage · view only",
+    "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
+    "issueKey": "Add to storage",
+    "issuedKey": "Record added to shared storage",
+    "noKeyItems": "No keys yet"
   },
   "labels": {
     "leftArm": "Left bracer",

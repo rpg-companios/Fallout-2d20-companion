@@ -63,7 +63,10 @@ describe('Патч 471 — поля и воздух модалок, borderRadius
   });
 
   it('все модалки добычи и торговли используют View вместо SafeAreaView, отступы от краёв и borderRadius: 5', () => {
-    const overlaySrc = readSource('components/lootTrade/PlayerLootTradeOverlay.js');
+    // Патч 518: стили оверлея вынесены в общий файл, чтобы окно склада могло
+    // переиспользовать каркас без импорта всего компонента с иконками.
+    const overlaySrc = readSource('components/lootTrade/PlayerLootTradeOverlay.js')
+      + readSource('components/lootTrade/tradeOverlayStyles.js');
     const catalogSrc = readSource('components/screens/LootTradeScreen/modals/ContainerCatalogModal.js');
     const formSrc = readSource('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
     const configSrc = readSource('components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js');

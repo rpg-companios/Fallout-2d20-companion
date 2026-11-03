@@ -36,6 +36,8 @@ export const ROOM_MESSAGE = {
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
   STORAGE_ADD_KEY: 'storage.addKey',
+  // Патч 518: атомарный перенос по кнопке «Перенести» в двухпанельном складе.
+  STORAGE_TRANSFER: 'storage.transfer',
   // Патч 517: общие на комнату события доступа (ворота).
   ACCESS_STATE: 'access.state',
   ERROR: 'error',
