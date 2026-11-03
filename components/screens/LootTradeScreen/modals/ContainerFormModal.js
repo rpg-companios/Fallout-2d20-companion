@@ -611,7 +611,9 @@ const ContainerFormModal = ({
   );
 };
 
-const styles = StyleSheet.create({
+// Патч 512: каркас формы переиспользуется соседними модалками, чтобы они
+// не рисовали «похожий, но другой» дизайн. Экспорт не меняет саму форму.
+export const lootTradeFormStyles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -977,5 +979,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+const styles = lootTradeFormStyles;
 
 export default ContainerFormModal;

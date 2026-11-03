@@ -1,5 +1,31 @@
 # Changelog
 ---
+## Modals now follow the design of nearby windows (patch 512)
+
+The owner: "If you create modal windows, at least follow the design of other
+modals nearby or doing something similar. If possible, write it down in the
+app's working rules". Patch 511 built the key form "in the style of" its
+neighbour but with its own height, radius, padding, heading, labels and button
+order — it looked out of place.
+
+- **Form.** `KeyItemFormModal` no longer defines base styles: it imports
+  `lootTradeFormStyles` from `ContainerFormModal`. Both windows now share the
+  backdrop, card, centered heading, field labels, inputs, room chips, hints and
+  footer with "Save" on the left and "Cancel" on the right. Only the tag bar
+  and text preview remain local, because the container form has neither.
+- **Card.** Instead of two separate round buttons, the key card now has one
+  `⋮` button and the same dropdown menu ("Edit", "Add to storage") as
+  container, merchant and terminal cards, using the same menu styles.
+- **Rule written down.** New `docs/ui-modals-rules.md` lists the mandatory
+  reference, nearby modals by layer, what exactly to reuse, a pre-release
+  checklist and the patch 511 lesson. Links added to `docs/agents/README.md`,
+  `docs/architecture/engine-charter.md` (a dedicated safeguard) and `replit.md`.
+- **Safeguard.** `__tests__/ui/modal-design-reuse-512.test.js` checks the actual
+  style import rather than a visual resemblance: no local `StyleSheet.create`
+  with base keys, matching button order, and the rule present in the docs.
+
+Key behaviour, shared storage and the protocol are unchanged.
+
 ## Keys as cards on the screen (patch 511)
 
 The owner clarified after 510: "I expected a key to be like a container /

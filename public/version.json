@@ -1,8 +1,9 @@
 {
-  "version": "511",
+  "version": "512",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
       "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
       "Мастер может создавать ключи и записки: имя, описание с жирным текстом, курсивом и списками, предпросмотр перед сохранением.",
       "Найденная в контейнере запись или выданная Мастером карточка доступа попадает в общее хранилище и остаётся общей для всей группы.",
@@ -82,6 +83,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
       "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
       "The GM can create keys and notes: a name, a description with bold, italics and lists, and a live preview before saving.",
       "A record found in a container or issued by the GM goes to shared storage and stays common to the whole group.",

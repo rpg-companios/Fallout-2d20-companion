@@ -11,7 +11,10 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
 - `docs/architecture/engine-dna.md` — the authoritative engine/setting boundary,
   source-of-truth rules, TypeScript migration strategy, and AI working protocol;
 - `setting-contract.md` — the setting package and `.trpg` contract;
-- the relevant document under `docs/architecture/`.
+- the relevant document under `docs/architecture/`;
+- `docs/ui-modals-rules.md` before adding or restyling ANY modal window —
+  reuse the nearest existing modal's layout and styles instead of inventing
+  a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
 
 This project is evolving from a Fallout-only application into a universal
 TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform

@@ -35,10 +35,15 @@ describe('511: ключи как карточки на экране «Добыч
   it('форма сделана в стиле ContainerFormModal: тема, поля, комнаты, предпросмотр, футер', () => {
     const form = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
     const containerForm = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
-    for (const marker of ['ADMIN_MODAL_PALETTE', 'KeyboardAvoidingView', 'ScrollView', 'form.cancel']) {
+    // Патч 512: каркас не копируется, а импортируется из соседней формы.
+    expect(form).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
+    expect(containerForm).toContain('export const lootTradeFormStyles');
+    for (const marker of ['KeyboardAvoidingView', 'ScrollView', 'form.cancel', 'styles.overlay', 'styles.card', 'styles.title', 'styles.footer']) {
       expect(form).toContain(marker);
-      expect(containerForm).toContain(marker);
+      expect(containerForm).toContain(marker === 'styles.overlay' ? 'styles.overlay' : marker);
     }
+    expect(form).toContain('styles.roomChips');
+    expect(form).toContain('styles.multilineInput');
     expect(form).toContain("tLootTrade('form.nameLabel')");
     expect(form).toContain("tLootTrade('form.roomsMultiLabel')");
     expect(form).toContain("'form.createKeyItemTitle'");
@@ -61,6 +66,10 @@ describe('511: ключи как карточки на экране «Добыч
     expect(card).toContain('testID={`key-item-card-${keyItem.id}`}');
     expect(card).toContain('key-item-edit-');
     expect(card).toContain('key-item-issue-');
+    expect(card).toContain('cardStyles.cardActionButton');
+    expect(card).toContain('cardStyles.actionMenu');
+    expect(card).toContain('cardStyles.actionMenuItem');
+    expect(card).toContain('dots-vertical');
   });
 
   it('сохранение остаётся в экране, выдача идёт в общее хранилище', () => {

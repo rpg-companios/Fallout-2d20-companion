@@ -1,10 +1,13 @@
 /**
- * Патч 511: форма ключевой записи в стиле ContainerFormModal.
+ * Патч 512: форма ключевой записи буквально использует каркас
+ * `ContainerFormModal` (`lootTradeFormStyles`), а не «похожий» набор стилей.
  *
- * Владелец: «я полагал ключ будет, как карточка контейнера/торговца/терминала
- * и с модалкой в стиле создания контейнера и потом сохранением в экран».
- * Поэтому здесь те же тема ADMIN_MODAL_PALETTE, карточка, подписи полей,
- * выбор комнаты и футер «Отмена / Сохранить», что и у формы контейнера.
+ * Владелец (патч 511): ключ должен быть «как карточка контейнера/торговца/
+ * терминала и с модалкой в стиле создания контейнера». Владелец (патч 512):
+ * «если создаёшь модалки, то хотя бы ориентируйся на дизайн других модалок,
+ * которые рядом или делают что-то похожее». Поэтому общие стили (карточка,
+ * заголовок, подписи, поля, чипсы комнат, футер) импортируются из соседней
+ * формы; локально описаны только элементы, которых там нет (теги и превью).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -19,13 +22,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade } from '../logic/lootTradeI18n';
 import { renderTextWithIcons } from '../../../../modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
 import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
 import { showRawAlert } from '../../../alerts/alertService';
+import { lootTradeFormStyles as styles } from './ContainerFormModal';
 
 const TAG_BUTTONS = [
   { label: '**Ж**', insert: '**жирный**' },
@@ -73,12 +75,9 @@ const KeyItemFormModal = ({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
         <View style={styles.card}>
-          <View style={styles.titleRow}>
-            <MaterialCommunityIcons name="key-variant" size={24} color={ADMIN_MODAL_PALETTE.accent} />
-            <Text style={styles.title}>
-              {tLootTrade(isEditing ? 'form.editKeyItemTitle' : 'form.createKeyItemTitle')}
-            </Text>
-          </View>
+          <Text style={styles.title}>
+            {tLootTrade(isEditing ? 'form.editKeyItemTitle' : 'form.createKeyItemTitle')}
+          </Text>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>{tLootTrade('form.nameLabel')}</Text>
@@ -95,63 +94,75 @@ const KeyItemFormModal = ({
             {availableRooms.length === 0 ? (
               <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
             ) : (
-              <View style={styles.chipsRow}>
-                {availableRooms.map((room) => {
-                  const active = room.code === roomCode;
-                  return (
-                    <TouchableOpacity
-                      key={room.code}
-                      testID={`key-item-room-${room.code}`}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setRoomCode(active ? '' : room.code)}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
-                        {room.name || formatRoomCodeForDisplay(room.code)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <>
+                <View style={styles.roomChips}>
+                  {availableRooms.map((room) => {
+                    const selected = room.code === roomCode;
+                    return (
+                      <TouchableOpacity
+                        key={room.code}
+                        testID={`key-item-room-${room.code}`}
+                        style={[styles.roomChip, selected && styles.roomChipActive]}
+                        onPress={() => setRoomCode(selected ? '' : room.code)}
+                      >
+                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
+                          {room.name || formatRoomCodeForDisplay(room.code)}
+                        </Text>
+                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+                          {formatRoomCodeForDisplay(room.code)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.hintText}>{tLootTrade('form.roomsMultiHint')}</Text>
+              </>
             )}
 
             <Text style={styles.label}>{tLootTrade('keyItems.descriptionLabel')}</Text>
-            <View style={styles.tagRow}>
+            <View style={extraStyles.tagRow}>
               {TAG_BUTTONS.map((tag) => (
                 <TouchableOpacity
                   key={tag.label}
-                  style={styles.tagButton}
+                  style={extraStyles.tagButton}
                   onPress={() => setDescription((prev) => prev + tag.insert)}
                 >
-                  <Text style={styles.tagButtonText}>{tag.label}</Text>
+                  <Text style={extraStyles.tagButtonText}>{tag.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput
               testID="key-item-form-description"
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.multilineInput]}
               value={description}
               onChangeText={setDescription}
               placeholder={tLootTrade('keyItems.descriptionPlaceholder')}
               placeholderTextColor="#8c8c8c"
               multiline
             />
-            <View style={styles.preview}>
+            <View style={extraStyles.preview}>
               {renderTextWithIcons(
                 description || tLootTrade('keyItems.previewEmpty'),
-                styles.previewText,
+                extraStyles.previewText,
               )}
             </View>
-            <Text style={styles.hint}>
-              {tLootTrade('keyItems.hint')}
-            </Text>
+            <Text style={styles.hintText}>{tLootTrade('keyItems.hint')}</Text>
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity testID="key-item-form-cancel" style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
+            <TouchableOpacity
+              testID="key-item-form-save"
+              style={[styles.btn, styles.saveBtn]}
+              onPress={handleSave}
+            >
+              <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="key-item-form-save" style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{tLootTrade('keyItems.save')}</Text>
+            <TouchableOpacity
+              testID="key-item-form-cancel"
+              style={[styles.btn, styles.cancelBtn]}
+              onPress={onClose}
+            >
+              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -160,59 +171,34 @@ const KeyItemFormModal = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 36,
+// Только то, чего нет в форме контейнера: панель тегов и поле предпросмотра.
+const extraStyles = StyleSheet.create({
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginBottom: 6,
   },
-  card: {
-    width: '90%',
-    maxWidth: 520,
-    maxHeight: '92%',
-    backgroundColor: ADMIN_MODAL_PALETTE.surface,
-    borderWidth: 1.5,
-    borderColor: ADMIN_MODAL_PALETTE.accent,
-    borderRadius: 8,
-    padding: 16,
-  },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderColor: ADMIN_MODAL_PALETTE.accent, paddingBottom: 10, marginBottom: 8 },
-  title: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800', flex: 1 },
-  scroll: { flexGrow: 0 },
-  scrollContent: { paddingBottom: 4 },
-  label: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 10, marginBottom: 5 },
-  input: {
+  tagButton: {
     borderWidth: 1,
-    borderColor: ADMIN_MODAL_PALETTE.border,
+    borderColor: '#5a5a5a',
     borderRadius: 5,
-    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
-    color: ADMIN_MODAL_PALETTE.text,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    fontSize: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    backgroundColor: '#ffffff',
   },
-  textArea: { minHeight: 92, textAlignVertical: 'top' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 4, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised },
-  chipActive: { backgroundColor: ADMIN_MODAL_PALETTE.selected, borderColor: ADMIN_MODAL_PALETTE.accent },
-  chipText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12 },
-  chipTextActive: { color: ADMIN_MODAL_PALETTE.text, fontWeight: '700' },
-  warnText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, fontStyle: 'italic' },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 6 },
-  tagButton: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 3, paddingHorizontal: 7, paddingVertical: 3 },
-  tagButtonText: { color: ADMIN_MODAL_PALETTE.accent, fontSize: 10 },
-  preview: { borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.border, borderRadius: 5, padding: 9, marginTop: 8, minHeight: 42 },
-  previewText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 13 },
-  hint: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 8 },
-  footer: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  btn: { flex: 1, paddingVertical: 12, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
-  saveBtn: { backgroundColor: ADMIN_MODAL_PALETTE.selected, borderColor: ADMIN_MODAL_PALETTE.accent },
-  saveBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15, fontWeight: '700' },
-  cancelBtn: { backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised, borderColor: ADMIN_MODAL_PALETTE.border },
-  cancelBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15 },
+  tagButtonText: { color: '#111111', fontSize: 12, fontWeight: '700' },
+  preview: {
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    minHeight: 64,
+    backgroundColor: '#ffffff',
+  },
+  previewText: { color: '#111111', fontSize: 13 },
 });
 
 export default KeyItemFormModal;
