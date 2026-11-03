@@ -1,5 +1,41 @@
 # Changelog
 ---
+## A successful hack no longer disappears (patch 505)
+
+The owner tested the game in two tabs of one browser: "I found a 5/7 match,
+picked the next word. The board reset and I had to start over. I could not tell
+whether I hacked it or not, and the Game Master got no notice."
+
+The next word was the password, so the server returned `ACCESS GRANTED` — but
+the hacking window immediately sent an extra `start`: its guard skipped only
+`playing` and `pendingDigest`. With a different `clientId` (second tab,
+reconnect) the operator-takeover rule from 503 set `entry.game = null` and
+built a fresh board with four attempts. The win was erased before the player
+could read it. Separately, the 504 GM notice was wired only to failure.
+
+- **The win is final.** `applyGameAction()` and the room registry now reject
+  `start` while `status: 'won'` with `TERMINAL_ALREADY_ACTIVE` for any
+  operator; board, revision and result stay unchanged. Only an explicit GM
+  re-broadcast (`reissue`) starts another run after a success.
+- **Window auto-start.** The pure `shouldAutoStart()` rule (new module
+  `components/lootTrade/terminalAutoStart.js`) forbids `start` in the final
+  states `won` / `awaitingRetry` / `closed`. Operator takeover via "Hack"
+  during an active run still works. The expected `TERMINAL_ALREADY_ACTIVE`
+  refusal no longer shows an error dialog.
+- **The GM hears about success.** The global host now also selects `won`
+  events (`findCompleted`) and shows a "Terminal hacked" notice through
+  `AlertHost` with the terminal and operator names. The live card panel shows
+  a "Hacked" state and a "Broadcast again" button.
+- **Hints stay visible.** The `N/M` history remains on both the failure and
+  the success screens, so a discovered "5 of 7" is visible even after all
+  attempts are used. Paired RU/EN labels were added to the dictionaries.
+
+Unchanged: all 504 rules (the "Allow another hack?" prompt only on failure),
+the word-count formula, three groups, 4 attempts, Science brackets, Luck,
+the Hacker perk, operator takeover and the dictionary.
+
+Installation: `docs/patch-505-install.md`.
+
 ## Game Master decision instead of lockout after failure (patch 504)
 
 The owner replaced the "lock after failure" checkbox with an explicit decision:

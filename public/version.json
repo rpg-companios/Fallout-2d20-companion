@@ -1,8 +1,12 @@
 {
-  "version": "504",
+  "version": "505",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Теперь после удачного взлома доска не сбрасывается: надпись «ДОСТУП РАЗРЕШЁН» и все подсказки остаются на экране, пока ведущий не транслирует терминал заново.",
+      "Ведущий получает уведомление «Терминал взломан» с именем оператора, даже если в этот момент открыт другой раздел приложения.",
+      "Если попытки закончились, найденные подсказки вроде «5 из 7» больше не пропадают: они видны рядом с сообщением о провале.",
+      "В карточке терминала у ведущего появилось состояние «Взломан» и кнопка повторной трансляции для новой партии.",
       "Доска взлома теперь собрана из трёх групп слов с общими окончаниями или приставками: сначала нужно понять верную группу, а затем верный вариант сочетания внутри неё. Логический разбор почти гарантирует победу, а слепой перебор остаётся ненадёжным.",
       "Если терминал открывает другой игрок, доска, число слов и скобки считаются по его листу персонажа; одновременно взламывает только один, остальные наблюдают.",
       "Полное восстановление попыток теперь может выпасть не более одного раза на доску. Подсказка в окне взлома показывает совпавшие буквы как «N из M».",
@@ -57,6 +61,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "After a successful hack the board no longer resets: «ACCESS GRANTED» and every hint stay on screen until the Game Master broadcasts the terminal again.",
+      "The Game Master now receives a «Terminal hacked» notice with the operator name, even while viewing a different part of the app.",
+      "When all attempts are used, discovered hints such as «5 of 7» remain visible next to the failure message.",
+      "The terminal card for the Game Master now shows a «Hacked» state and a broadcast-again button for a new run.",
       "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
       "When another player opens a terminal, the board, word count and brackets are rebuilt from their character sheet; only one player hacks at a time and everyone else watches.",
       "A full attempt restore can now appear at most once per board. The hacking window shows matching letters as N out of M.",

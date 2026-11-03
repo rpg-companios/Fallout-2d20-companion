@@ -21,6 +21,7 @@ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacter
 import { useLocale } from '../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { showRawAlert } from '../alerts/alertService';
+import { shouldAutoStart, autoStartKey } from './terminalAutoStart';
 
 const COLUMN_WIDTH = 12;
 const ATTEMPTS_MAX = 4;
@@ -93,17 +94,36 @@ ${tLootTrade('terminal.retryMessage')}`,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, localMode, awaitingGm, game?.revision, terminal?.containerId]);
 
+  // Патч 505: после ACCESS GRANTED окно больше не шлёт лишний `start`.
+  // Раньше статус `won` не входил в guard, и доска пересобиралась заново,
+  // стоило clientId вкладки разойтись с оператором (две вкладки одного
+  // браузера, переподключение). Правило вынесено в чистый модуль и покрыто
+  // тестами отдельно от React Native.
   useEffect(() => {
-    if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
-    if (isClosed || awaitingGm) return;
-    if (['playing', 'pendingDigest'].includes(game?.status) && !boardOfAnotherOperator) return;
-    const key = `${roomCode}:${terminal.containerId}:${characterId}:${game?.operatorCharacterId || ''}`;
+    const allowed = shouldAutoStart({
+      visible,
+      autoStart,
+      hasTerminal: Boolean(terminal?.containerId),
+      hasRoom: Boolean(roomCode || localMode),
+      characterId,
+      isClosed,
+      awaitingGm,
+      game,
+      boardOfAnotherOperator,
+    });
+    if (!allowed) return;
+    const key = autoStartKey({
+      roomCode,
+      containerId: terminal.containerId,
+      characterId,
+      game,
+    });
     if (lastAutoStartKey.current === key) return;
     lastAutoStartKey.current = key;
     void doAction('start');
-  // State intentionally tracks the terminal's latest game revision.
+  // State intentionally tracks the terminal's latest game status.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
+  }, [visible, autoStart, terminal?.containerId, roomCode, localMode, characterId, game?.status, game?.operatorCharacterId, boardOfAnotherOperator, isClosed, awaitingGm]);
 
   useEffect(() => {
     if (game?.status === 'won' && game.scrollUp) {
@@ -163,7 +183,9 @@ ${tLootTrade('terminal.retryMessage')}`,
       if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
       else if (code === 'TERMINAL_CLOSED') showRawAlert({ title: tLootTrade('terminal.closedBadge'), message: tLootTrade('terminal.closedHint') });
       else if (code === 'TERMINAL_AWAITING_RETRY') showRawAlert({ title: tLootTrade('terminal.retryWaiting'), message: tLootTrade('terminal.retryWaitingHint') });
-      else if (code !== 'ROOM_TIMEOUT' && code !== 'TERMINAL_NOT_ACTIVE') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+      else if (!['ROOM_TIMEOUT', 'TERMINAL_NOT_ACTIVE', 'TERMINAL_ALREADY_ACTIVE'].includes(code)) {
+        showRawAlert({ title: tLootTrade('terminal.actionFailed') });
+      }
     } finally {
       setBusy(false);
     }
@@ -248,6 +270,21 @@ ${tLootTrade('terminal.retryMessage')}`,
       : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset')
         : game?.result === 'ATTEMPTS EXHAUSTED' ? tLootTrade('terminal.attemptsExhausted') : null;
   const shownAttempts = Math.max(game?.attempts || 0, game?.maxAttempts || ATTEMPTS_MAX);
+  // Патч 505: история подсказок остаётся на экране и при провале, и при
+  // успехе. Раньше панель «ВЗЛОМ ПРОВАЛЕН» полностью заменяла доску, и
+  // игрок терял только что найденную комбинацию вроде «5 из 7».
+  const guessesPanel = game?.guesses?.length > 0 ? (
+    <View style={styles.guessesPanel}>
+      <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
+      <View style={styles.guessesRow}>
+        {game.guesses.map((guess, index) => (
+          <Text key={`${guess.word}-${index}`} style={styles.guessText}>
+            {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
+          </Text>
+        ))}
+      </View>
+    </View>
+  ) : null;
 
   return (
     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
@@ -278,6 +315,7 @@ ${tLootTrade('terminal.retryMessage')}`,
               <Text style={styles.statusHint}>{tLootTrade('terminal.attemptsExhausted')}</Text>
               <Text style={styles.retryWaiting}>{tLootTrade('terminal.retryWaiting')}</Text>
               <Text style={styles.statusHint}>{tLootTrade('terminal.retryWaitingHint')}</Text>
+              {guessesPanel}
             </View>
           ) : game?.status === 'won' ? (
             <View style={styles.successPanel}>
@@ -288,6 +326,8 @@ ${tLootTrade('terminal.retryMessage')}`,
                 </View>
               </Animated.View>
               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.wonHint')}</Text>
+              {guessesPanel}
             </View>
           ) : !game ? (
             <View style={styles.idlePanel}>
@@ -351,18 +391,7 @@ ${tLootTrade('terminal.retryMessage')}`,
                 {renderColumn(1)}
               </ScrollView>
 
-              {game.guesses?.length > 0 && (
-                <View style={styles.guessesPanel}>
-                  <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
-                  <View style={styles.guessesRow}>
-                    {game.guesses.map((guess, index) => (
-                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>
-                        {`${guess.word}: ${guess.likeness}/${game?.wordLength || ''}`}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
-              )}
+              {guessesPanel}
               {statusLabel ? <Text style={styles.statusLabel}>{statusLabel}</Text> : null}
               {resultLabel ? <Text style={styles.resultLabel}>{resultLabel}</Text> : null}
             </>

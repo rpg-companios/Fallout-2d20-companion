@@ -1,14 +1,17 @@
 /**
  * Патч 504 — вопрос Мастеру «Разрешить повторный взлом? Да/Нет».
+ * Патч 505 — уведомление Мастеру «Терминал взломан» после ACCESS GRANTED.
  *
  * Монтируется один раз в App.js поверх ЛЮБОГО экрана: Мастер может в этот
- * момент править лист, смотреть карту или быть в админке, а вопрос всё равно
- * всплывёт. Источник правды — terminalStates комнат из roomStore: сервер
- * выставляет `awaitingGm`, когда у партии закончились все попытки. Решение
- * уходит на сервер действием `retry` со значением `yes` / `no`.
+ * момент править лист, смотреть карту или быть в админке, а сообщение всё
+ * равно всплывёт. Источник правды — terminalStates комнат из roomStore:
+ * сервер выставляет `awaitingGm` при исчерпании попыток и присылает `won`
+ * при победе. Диалоги рисует AlertHost через showRawAlert; этот компонент
+ * ничего не рендерит (return null), он только слушает сеть и решает, какой
+ * запрос отправить.
  *
  * Диалоги показываются по очереди: AlertHost держит один запрос, поэтому
- * несколько провалившихся терминалов обрабатываются последовательной очередью.
+ * несколько событий обрабатываются последовательной очередью.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -21,7 +24,7 @@ import {
   formatLootTrade,
 } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { debugLog } from '../../src/debug/falloutDebug';
-import { findPending } from './terminalRetryPrompt';
+import { findPending, findCompleted } from './terminalRetryPrompt';
 
 const TerminalRetryPromptHost = () => {
   useLocale();
@@ -48,6 +51,23 @@ const TerminalRetryPromptHost = () => {
         }
         while (queueRef.current.length > 0) {
           const item = queueRef.current.shift();
+
+          // Патч 505: успех — просто видимое уведомление Мастеру. Никакого
+          // действия на сервер: доска после победы не пересобирается, новую
+          // партию Мастер начинает явной повторной трансляцией.
+          if (item.kind === 'won') {
+            // eslint-disable-next-line no-await-in-loop
+            await showRawAlert({
+              title: tLootTrade('terminal.hackedTitle'),
+              message: formatLootTrade(tLootTrade('terminal.hackedMessage'), {
+                name: item.name,
+                operator: item.operatorName || '—',
+              }),
+              kind: 'info',
+            });
+            continue;
+          }
+
           const message = [
             tLootTrade('terminal.attemptsExhausted'),
             `${item.name} · ${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty })}`,
@@ -65,12 +85,13 @@ const TerminalRetryPromptHost = () => {
           });
           if (index !== 0 && index !== 1) {
             // Диалог закрыли без ответа — вопрос остаётся обязательным.
-            handledRef.current.delete(item.key);
-            timerRef.current = setTimeout(() => {
+            const requeue = () => {
               queueRef.current.push(item);
               busyRef.current = false;
               void drain();
-            }, 1500);
+            };
+            handledRef.current.delete(item.key);
+            timerRef.current = setTimeout(requeue, 1500);
             return;
           }
           const value = index === 0 ? 'yes' : 'no';
@@ -102,7 +123,11 @@ const TerminalRetryPromptHost = () => {
     };
 
     const collect = (state) => {
-      for (const item of findPending(state?.rooms)) {
+      const events = [
+        ...findPending(state?.rooms).map((item) => ({ ...item, kind: 'retry' })),
+        ...findCompleted(state?.rooms),
+      ];
+      for (const item of events) {
         if (handledRef.current.has(item.key)) continue;
         handledRef.current.add(item.key);
         queueRef.current.push(item);

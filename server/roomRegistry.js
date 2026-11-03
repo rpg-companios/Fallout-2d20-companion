@@ -472,6 +472,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
+    // Патч 505: взломанный терминал не переходит к другому оператору и не
+    // собирает новую доску. Иначе лишний start после ACCESS GRANTED (в том
+    // числе от переподключившейся вкладки) стирал победу. Сбросить партию
+    // может только Мастер явной повторной трансляцией (reissue).
+    if (action === 'start' && entry.game?.status === 'won') {
+      return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+    }
     // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
     // Партия всё равно одна на всех: прежний оператор становится зрителем,
     // а повторный start от того же оператора не сбрасывает его прогресс.

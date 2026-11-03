@@ -1732,9 +1732,14 @@ export default function LootTradeScreen() {
                   const awaiting = !closed && Boolean(
                     terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
                   );
+                  // Патч 505: успех виден и в админ-панели. Повторная
+                  // трансляция — единственный способ начать новую партию
+                  // после ACCESS GRANTED (доска сама больше не пересобирается).
+                  const won = !closed && !awaiting && terminal.game?.status === 'won';
                   const stateLabel = closed
                     ? tLootTrade('terminal.stateClosed')
-                    : (awaiting ? tLootTrade('terminal.stateAwaiting') : tLootTrade('terminal.stateReady'));
+                    : (awaiting ? tLootTrade('terminal.stateAwaiting')
+                      : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')));
                   const decide = (value) => useRoomStore.getState().actOnTerminal({
                     code,
                     containerId: activeContainer.id,
@@ -1763,7 +1768,7 @@ export default function LootTradeScreen() {
                           </TouchableOpacity>
                         </View>
                       )}
-                      {closed && (
+                      {(closed || won) && (
                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
                         </TouchableOpacity>

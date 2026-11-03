@@ -270,6 +270,10 @@
     "stateReady": "Available",
     "stateAwaiting": "Awaiting decision",
     "stateClosed": "Closed",
-    "retryFailed": "Could not apply the Game Master decision"
+    "stateWon": "Hacked",
+    "retryFailed": "Could not apply the Game Master decision",
+    "hackedTitle": "Terminal hacked",
+    "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
+    "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run."
   }
 }

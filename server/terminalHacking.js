@@ -941,9 +941,12 @@ const applyGameAction = ({ game, config = null, action, clientId, characterId, c
   if (game.status === 'closed') return { error: 'TERMINAL_CLOSED' };
   if (game.status === 'awaitingRetry') return { error: 'TERMINAL_AWAITING_RETRY' };
   if (action === 'start') {
-    const isSameOperator = game.operatorCharacterId === characterId
-      && game.operatorClientId === clientId;
-    if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
+    // Патч 505: «ДОСТУП РАЗРЕШЁН» не стирается. Раньше повторный start от
+    // другого clientId (переподключение вкладки, второй вход в комнату)
+    // пересобирал доску по механике передачи хода из патча 503, и игрок
+    // видел новую партию вместо сообщения об успехе. Новая доска после
+    // победы — только по явной повторной трансляции Мастера (reissue).
+    if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
     // Новая партия всегда собирается по ТЕКУЩИМ настройкам карточки, а не
     // по полям предыдущей доски.
     const fresh = createGame({
