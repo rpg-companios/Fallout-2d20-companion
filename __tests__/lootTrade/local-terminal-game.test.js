@@ -10,7 +10,6 @@ const terminal = {
   name: 'Vault console',
   description: '',
   difficulty: 2,
-  lockOnFailure: true,
 };
 const characterSnapshot = buildLocalCharacterSnapshot({
   characterName: 'Оператор',

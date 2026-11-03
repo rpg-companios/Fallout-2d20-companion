@@ -1,5 +1,5 @@
 {
-  "version": "503",
+  "version": "504",
   "release": 4,
   "notes": {
     "ru-RU": [
@@ -18,7 +18,7 @@
       "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
       "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
       "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
-      "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
+      "Когда на терминале заканчиваются все попытки, ведущему сразу приходит вопрос «Разрешить повторный взлом?» с кнопками «Да» и «Нет» — он появляется поверх любого экрана, а после удачного взлома не задаётся.",
       "Четыре попытки на терминале снова канонические на всех шести сложностях. Скобки возвращают попытки, но никогда не поднимают их выше четырёх.",
       "Доска стала больше: число слов считается как 20 + 2·сложность − ИНТ. На пятой сложности это 26 слов при ИНТ 4 и 20 при ИНТ 10 — бонусы скобок больше не съедают доску.",
       "Слова на доске теперь почти одинаковые: те же буквы в другом порядке, отличаются парой букв. Пароль выбирается внутри набора, поэтому его нельзя найти простым «похоже на все остальные».",
@@ -50,7 +50,11 @@
       "Подключение к комнате через пункт «Сервер» в меню персонажа: привязанный персонаж переподключается к своей комнате автоматически без повторного ввода кода, а перенос по личным папкам не сбрасывает привязку.",
       "Значок сети на карточке привязанного персонажа показывает статус связи (зелёный — мастер в сети и комната доступна, бледный — не в сети); личные персонажи и комнаты мастера строго разделены между режимами «Пользователь» и «Админ».",
       "Быстрый запуск веб-приложения: готовая сжатая сборка открывается за секунды, а во время обновления на экране сразу отображается живой индикатор запуска вместо пустого тёмного окна.",
-      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша.",
+      "Ответ «Да» мгновенно собирает новую доску по текущим настройкам терминала: новые слова, подсказки и скобки, снова четыре попытки, а характеристики выбравшего персонажа сохраняются.",
+      "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
+      "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
+      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
       "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
@@ -68,7 +72,7 @@
       "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
       "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
       "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
-      "The terminal lockout label is now dark grey and readable on the light form background.",
+      "When all attempts on a terminal are used, the Game Master immediately gets an «Allow another hack?» prompt with «Yes» and «No» buttons — it appears over any screen and never shows after a successful hack.",
       "Four attempts are canonical again at every difficulty. Brackets restore attempts but never raise them above four.",
       "Boards are larger: word count is 20 + 2·difficulty − INT. At difficulty 5 that is 26 words at INT 4 and 20 at INT 10, so bracket bonuses no longer eat the board.",
       "Board words are now near-identical: the same letters in a different order, differing by a couple of letters. The password is picked inside the set, so it cannot be found by simply looking for the word similar to all others.",
@@ -100,7 +104,11 @@
       "Connecting to a room via «Server» in the character menu: a bound character reconnects to its room automatically without re-entering the code, and moving it between personal folders keeps the binding intact.",
       "A network badge on a bound character card shows connection status (green when the GM is online and the room is active, dim when offline); personal characters and GM rooms stay strictly separated between «User» and «Admin» modes.",
       "Fast web app startup: the compressed build opens in seconds, and during an update a live startup indicator appears right away instead of a blank dark screen.",
-      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing."
+      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing.",
+      "Answering «Yes» instantly builds a fresh board from the current terminal settings: new words, hints and brackets, four attempts again, and the chosen character stats are preserved.",
+      "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
+      "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
+      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away."
     ]
   }
 }

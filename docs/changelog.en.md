@@ -1,5 +1,46 @@
 # Changelog
 ---
+## Game Master decision instead of lockout after failure (patch 504)
+
+The owner replaced the "lock after failure" checkbox with an explicit decision:
+"the Game Master gets a prompt 'Allow another hack? Yes/No'. If yes — a new
+config. If no, the terminal can no longer be hacked or viewed unless the GM
+broadcasts it again".
+
+- **Failure is visible and no longer ends the run silently.** After the fourth
+  wrong guess the board enters "awaiting the Game Master" with "HACK FAILED"
+  and "All attempts used". Previously, without the checkbox, a player could
+  just press "Hack" again and the board was rebuilt from stale settings.
+- **The GM prompt** "Allow another hack?" with "Yes" / "No" appears over
+  *any* screen, not only the Loot/Trade tab. It never appears after a success,
+  and it cannot be dismissed without an answer. The same buttons are available
+  in the terminal admin panel.
+- **"Yes" immediately builds a fresh board from the current settings:** new
+  name, description and difficulty (even if the GM edited them during access),
+  fresh words, hints and brackets, exactly 4 attempts. The operator sheet is
+  preserved — INT 10 / Science 6 still give 15 words and 4 brackets, not the
+  default 21. Editing the card during an active run no longer wipes the board.
+- **"No" leaves the card visible with a "CLOSED" badge** and disables both
+  buttons — "Hack" and "View" — until the GM broadcasts it again. The server
+  rejects every player action (including viewing) with `TERMINAL_CLOSED`. Only
+  "Broadcast again", re-issuing the terminal, or re-issuing the location
+  reopens it; an ordinary settings edit does not clear the ban.
+- Hacking again without GM approval is impossible: while awaiting a decision
+  the server replies `TERMINAL_AWAITING_RETRY`. Deciding is GM-only.
+- **The checkbox is removed completely** from the form, engine, room registry,
+  location nodes and saved data. The `F2D20-TERM:` marker no longer writes the
+  `f` field but still reads old markers, so earlier saves keep working. Related
+  dictionary strings are gone; paired RU/EN strings for the prompt, "CLOSED",
+  the waiting state and re-broadcast were added.
+- The local fallback (older room server) follows the same model: the Yes/No
+  prompt is shown in the hacking window on the GM device.
+
+Unchanged: the board-size formula, three groups with two variants, 4 attempts,
+Science brackets, Luck, the Hacker perk, operator takeover via "Hack", the
+dictionary, and terminals inside locations opening the hacking window.
+
+Installation: `docs/patch-504-install.md`.
+
 ## Three word groups, operator takeover and one full restore (patch 503)
 
 The owner clarified the board design: "Let there be 3 groups of words with

@@ -86,7 +86,7 @@ interface RoomStoreState {
     code: string;
     characterId: string;
   }) => Promise<void>;
-  issueTerminal: (input: { code: string; config: Record<string, unknown>; ownerToken?: string }) => Promise<any>;
+  issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
   openRoomSession: (input: {
     code: string;
@@ -112,7 +112,6 @@ interface RoomStoreState {
     nodeDescription?: string;
     nodeItems?: unknown[];
     nodeDifficulty?: number;
-    nodeLockOnFailure?: boolean;
     locked?: boolean;
     lockLabel?: string;
   }) => Promise<ActiveLootTradeSession>;
@@ -735,9 +734,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       }
     },
 
-    issueTerminal: async ({ code, config, ownerToken }) => {
+    issueTerminal: async ({ code, config, reissue, ownerToken }) => {
       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
       const payload: Record<string, unknown> = { code, config };
+      if (reissue) payload.reissue = true;
       if (ownerToken) payload.ownerToken = ownerToken;
       const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ISSUE, payload, code);
       return response.payload?.terminal;

@@ -37,7 +37,7 @@ const snapshot = (int = 4, science = 0, luck = 4, name = 'Оператор') => 
   skills: [{ name: 'SCIENCE', value: science }],
 });
 const gameFor = (int, science, difficulty = 5, luck = 4, seed = 0.42) => createGame({
-  config: { containerId: 't', name: 'T', difficulty, lockOnFailure: false },
+  config: { containerId: 't', name: 'T', difficulty },
   operatorClientId: 'p', operatorCharacterId: 'c',
   characterSnapshot: snapshot(int, science, luck), now: 100, rng: () => seed,
 });

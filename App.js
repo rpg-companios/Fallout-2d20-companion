@@ -15,6 +15,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
+import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
 // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
 // /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
@@ -346,6 +347,8 @@ function App() {
           <PlayerLootTradeOverlay />
           <PlayerDirectiveOverlay />
           <AlertHost />
+          {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
+          <TerminalRetryPromptHost />
           <UpdateNoticeModal />
           <SurvivalClock />
       </SafeAreaProvider>

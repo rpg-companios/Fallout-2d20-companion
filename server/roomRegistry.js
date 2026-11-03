@@ -18,6 +18,9 @@ const {
 const {
   normalizeTerminalConfig,
   publicGameState,
+  syncGameConfig,
+  closeGame,
+  createGame,
   applyGameAction,
 } = require('./terminalHacking');
 
@@ -91,14 +94,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
-    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [id, {
-      containerId: id,
-      config: entry.config,
-      locked: Boolean(entry.locked),
-      standaloneIssued: Boolean(entry.standaloneIssued),
-      game: publicGameState(entry.game),
-      updatedAt: entry.updatedAt,
-    }])),
+    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
+      id,
+      terminalPublic(id, entry),
+    ])),
     lastClosedSession: room.lastClosedSession || null,
     directives: cloneDirectives(room.directives),
     // Признак обновлённого сервера: клиент включает синхронизированную игру,
@@ -307,7 +306,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
-    syncTerminalNodes(room, normalized);
+    // Патч 504: открытие/повторная выдача локации — это новая трансляция,
+    // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
+    syncTerminalNodes(room, normalized, { reissue: true });
     room.lastClosedSession = null;
     return { room, session: normalized };
   };
@@ -326,7 +327,52 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, session: result.session };
   };
 
-  const syncTerminalNodes = (room, session) => {
+  const terminalPublic = (terminalId, entry) => ({
+    containerId: terminalId,
+    config: entry.config,
+    // Патч 504: «Закрыт» — решение Мастера «Нет». Поле `locked` оставлено как
+    // алиас для клиентов предыдущих версий: они просто не дают нажать кнопки.
+    closed: Boolean(entry.closed),
+    locked: Boolean(entry.closed),
+    // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
+    awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
+    standaloneIssued: Boolean(entry.standaloneIssued),
+    game: publicGameState(entry.game),
+    updatedAt: entry.updatedAt,
+  });
+
+  /**
+   * Патч 504: правка карточки во время доступа больше не стирает состояние
+   * партии и не «запекает» старые настройки в доску. `config` всегда свежий,
+   * «Да» Мастера собирает по нему новую доску. `reissue` — явная повторная
+   * трансляция терминала/локации, она снимает «Закрыт».
+   */
+  const mergeTerminalConfig = (previous, config, { reissue = false, standaloneIssued = false } = {}) => {
+    if (!previous) {
+      return {
+        config,
+        closed: false,
+        standaloneIssued,
+        game: null,
+        updatedAt: now(),
+      };
+    }
+    // Активную доску не пересобираем на ходу: игрок не теряет прогресс из-за
+    // того, что Мастер поправил карточку. Новая сложность вступит в силу при
+    // следующей новой партии — «Да» Мастера или «Взломать» другого игрока.
+    let game = previous.game ? syncGameConfig(previous.game, config) : null;
+    if (reissue && game?.status === 'closed') game = null;
+    return {
+      ...previous,
+      config,
+      closed: reissue ? false : Boolean(previous.closed),
+      standaloneIssued: standaloneIssued || Boolean(previous.standaloneIssued),
+      game,
+      updatedAt: now(),
+    };
+  };
+
+  const syncTerminalNodes = (room, session, options = {}) => {
     if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
     for (const node of session.nodes) {
       if (node?.kind !== 'terminal') continue;
@@ -335,28 +381,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         name: node.name,
         description: node.description,
         difficulty: node.difficulty,
-        lockOnFailure: node.lockOnFailure,
       });
       if (!config.containerId || !config.name) continue;
       const previous = room.terminalStates.get(config.containerId);
-      const changed = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
-      room.terminalStates.set(config.containerId, previous
-        ? { ...previous, config, game: changed ? null : previous.game, updatedAt: now() }
-        : { config, locked: false, standaloneIssued: false, game: null, updatedAt: now() });
+      room.terminalStates.set(
+        config.containerId,
+        mergeTerminalConfig(previous, config, options),
+      );
     }
   };
 
-  const terminalPublic = (terminalId, entry) => ({
-    containerId: terminalId,
-    config: entry.config,
-    locked: Boolean(entry.locked),
-    standaloneIssued: Boolean(entry.standaloneIssued),
-    game: publicGameState(entry.game),
-    updatedAt: entry.updatedAt,
-  });
-
   /** Зарегистрировать доступный терминал в комнате (только владелец комнаты). */
-  const issueTerminal = ({ code, clientId, config: rawConfig, ownerToken = null, ws = null }) => {
+  const issueTerminal = ({ code, clientId, config: rawConfig, reissue = false, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
@@ -365,10 +401,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!config.containerId || !config.name) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     const previous = room.terminalStates.get(config.containerId);
-    const configChanged = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
-    const entry = previous
-      ? { ...previous, config, standaloneIssued: true, game: configChanged ? null : previous.game, updatedAt: now() }
-      : { config, locked: false, standaloneIssued: true, game: null, updatedAt: now() };
+    const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
     room.terminalStates.set(config.containerId, entry);
     return { room, terminal: terminalPublic(config.containerId, entry) };
   };
@@ -380,10 +413,54 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const id = String(containerId || '').trim();
     const entry = room.terminalStates.get(id);
     if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
-    if (action === 'unlock' || action === 'reset') {
+    // Патч 504: решение о повторном взломе и повторная трансляция — действия
+    // Мастера. Игрок не может ни обойти отказ, ни сам «открыть» терминал.
+    if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) {
       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
-      entry.locked = false;
+      if (action === 'retry') {
+        if (entry.game?.status !== 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+        const decision = value === 'yes' || value === true ? 'yes'
+          : (value === 'no' || value === false ? 'no' : null);
+        if (!decision) return { error: ERROR_CODE.BAD_MESSAGE };
+        if (decision === 'no') {
+          // «Нет» — карточка остаётся visible, но ни взломать, ни посмотреть
+          // её нельзя до новой трансляции Мастером.
+          entry.game = closeGame(entry.game, { now: now() });
+          entry.closed = true;
+          entry.updatedAt = now();
+          return { room, terminal: terminalPublic(id, entry) };
+        }
+        // «Да» — СРАЗУ новая доска по ТЕКУЩИМ настройкам карточки. Оператор
+        // сохраняется, но другой игрок может нажать «Взломать» и собрать
+        // доску уже под свой лист (механика передачи хода из патча 503).
+        const operatorCharacterId = entry.game.operatorCharacterId || null;
+        const operatorClientId = entry.game.operatorClientId || null;
+        const operatorName = entry.game.operatorName || '';
+        const published = operatorCharacterId ? room.lastSnapshots.get(operatorCharacterId) : null;
+        // Сохраняем лист оператора: иначе новая доска собралась бы под
+        // дефолтные ИНТ/Науку/Удачу и «Да» незаметно поменяло бы условия.
+        const operatorSnapshot = entry.operatorSnapshot || published?.snapshot || {};
+        const fresh = createGame({
+          config: entry.config,
+          operatorClientId,
+          operatorCharacterId,
+          characterSnapshot: operatorSnapshot,
+          now: now(),
+          excludeWords: room.recentTerminalWords || [],
+        });
+        fresh.operatorName = operatorName;
+        entry.game = fresh;
+        entry.closed = false;
+        if (Array.isArray(fresh.wordRanges)) {
+          const words = fresh.wordRanges.map((range) => range.word);
+          room.recentTerminalWords = [...words, ...(room.recentTerminalWords || [])].slice(0, 60);
+        }
+        entry.updatedAt = now();
+        return { room, terminal: terminalPublic(id, entry) };
+      }
+      // unlock/reset/reissue — повторная трансляция терминала.
+      entry.closed = false;
       entry.game = null;
       entry.updatedAt = now();
       return { room, terminal: terminalPublic(id, entry) };
@@ -393,7 +470,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const charId = String(characterId || '').trim();
     const published = room.lastSnapshots.get(charId);
     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
-    if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
+    if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
+    if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
     // Патч 503: «Взломать» от ДРУГОГО персонажа собирает доску под его лист.
     // Партия всё равно одна на всех: прежний оператор становится зрителем,
     // а повторный start от того же оператора не сбрасывает его прогресс.
@@ -414,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const snapshot = published.snapshot || {};
     const result = applyGameAction({
       game: entry.game || entry.config,
+      config: entry.config,
       action,
       clientId,
       characterId: charId,
@@ -423,13 +502,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       excludeWords: room.recentTerminalWords || [],
     });
     if (result.error) return { error: ERROR_CODE[result.error] || result.error };
+    if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
     entry.game = result.game;
     if (action === 'start' && Array.isArray(entry.game?.wordRanges)) {
       // Держим слова последних трёх досок (по 12–20 слов каждая).
       const fresh = entry.game.wordRanges.map((range) => range.word);
       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
     }
-    if (entry.game?.status === 'locked') entry.locked = true;
     if (result.usedDigest) {
       const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
       const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'

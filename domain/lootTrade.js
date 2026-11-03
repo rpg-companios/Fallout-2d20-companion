@@ -34,7 +34,7 @@ export const CONTAINER_KIND = Object.freeze({
  *
  * `normalizeHubSessionNode()` на сервере (особенно на ещё не обновлённом)
  * собирает узел заново и выбрасывает все неизвестные поля: `kind: 'terminal'`
- * превращается в `'loot'`, а `difficulty`/`lockOnFailure` теряются. Из-за этого
+ * превращается в `'loot'`, а `difficulty` теряется. Из-за этого
  * игрок видел терминал как обычный сундук. `lockLabel` — единственное поле,
  * которое сервер сохраняет как есть и которое не показывается для незапертых
  * узлов, поэтому конфигурация терминала едет в нём. Клиент и обновлённый
@@ -43,11 +43,13 @@ export const CONTAINER_KIND = Object.freeze({
  */
 export const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
 
-export const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
+// Патч 504: поле `f` («блокировать после провала») больше не пишется —
+// решение о повторном взломе принимает Мастер. Старые маркеры с `f`
+// читаются как прежде, но это поле игнорируется.
+export const encodeTerminalNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
   `${TERMINAL_NODE_MARKER}${JSON.stringify({
     v: 1,
     d: Math.max(0, Math.min(5, Math.floor(Number(difficulty) || 0))),
-    f: lockOnFailure ? 1 : 0,
     l: String(label || ''),
   })}`
 );
@@ -60,7 +62,6 @@ export const decodeTerminalNodeMarker = (value) => {
     if (!parsed || parsed.v !== 1) return null;
     return {
       difficulty: Math.max(0, Math.min(5, Math.floor(Number(parsed.d) || 0))),
-      lockOnFailure: Boolean(parsed.f),
       label: String(parsed.l || ''),
     };
   } catch {
@@ -72,7 +73,6 @@ export const withTerminalNodeMarker = (node) => ({
   ...node,
   lockLabel: encodeTerminalNodeMarker({
     difficulty: node?.difficulty,
-    lockOnFailure: node?.lockOnFailure,
     label: node?.lockLabel,
   }),
 });
@@ -94,7 +94,6 @@ export const resolveTerminalSessionNode = (node) => {
       ...node,
       kind: CONTAINER_KIND.TERMINAL,
       difficulty: marker.difficulty,
-      lockOnFailure: marker.lockOnFailure,
       lockLabel: marker.label,
     },
     isTerminal: true,
@@ -111,7 +110,6 @@ export const buildStandaloneTerminalSessionNode = (container, { locked = false, 
   locked,
   lockLabel,
   difficulty: container?.difficulty || 0,
-  lockOnFailure: Boolean(container?.lockOnFailure),
   items: [],
 });
 
@@ -485,7 +483,6 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
       difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
-      lockOnFailure: child.kind === CONTAINER_KIND.TERMINAL ? Boolean(child.lockOnFailure) : false,
       characterOverrides: {},
       items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
         ? child.items.map((entry) => ({
@@ -550,7 +547,6 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     difficulty: kind === CONTAINER_KIND.TERMINAL
       ? clampNumber(raw.difficulty, 0, 5, 0)
       : 0,
-    lockOnFailure: kind === CONTAINER_KIND.TERMINAL && Boolean(raw.lockOnFailure),
     caps: kind === CONTAINER_KIND.MERCHANT
       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
       : 0,

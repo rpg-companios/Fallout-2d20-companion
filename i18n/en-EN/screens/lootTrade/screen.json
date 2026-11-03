@@ -62,8 +62,7 @@
     "validationRoom": "Please select a room.",
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
-    "terminalDifficultyLabel": "Difficulty",
-    "terminalLockLabel": "Lock the terminal after all attempts are failed"
+    "terminalDifficultyLabel": "Difficulty"
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -236,7 +235,6 @@
     "failed": "ATTEMPTS EXHAUSTED",
     "accessDenied": "ACCESS DENIED",
     "accessGranted": "ACCESS GRANTED",
-    "terminalLockedHint": "This terminal is locked for the whole room. The GM can unlock it in the card settings.",
     "selectCharacter": "Select a character and connect it to the room first.",
     "viewOnly": "Another player is already hacking. You can only watch.",
     "actionFailed": "The terminal action could not be completed.",
@@ -253,13 +251,25 @@
     "waitingOperator": "The terminal operator must choose.",
     "likeness": "Letters in the same position (out of the word length)",
     "view": "View",
-    "locked": "LOCKED",
-    "available": "AVAILABLE",
-    "unlock": "Unlock",
     "openTerminal": "Open terminal",
     "hackerReduced": "Hacker: difficulty {difficulty} → {effective}",
     "dudRemoved": "Dud removed",
     "attemptRestored": "Restored +1 attempt",
-    "attemptsReset": "All attempts restored"
+    "attemptsReset": "All attempts restored",
+    "retryTitle": "Allow another hack?",
+    "retryMessage": "All attempts are used. Build a fresh board from the current terminal settings?",
+    "retryYes": "Yes",
+    "retryNo": "No",
+    "retryWaiting": "Waiting for the Game Master",
+    "retryWaitingHint": "Hacking again is unavailable until the Game Master approves it.",
+    "closedBadge": "CLOSED",
+    "closedHint": "The Game Master closed this terminal. Access returns when it is broadcast again.",
+    "reissue": "Broadcast again",
+    "hackFailed": "HACK FAILED",
+    "attemptsExhausted": "All attempts used",
+    "stateReady": "Available",
+    "stateAwaiting": "Awaiting decision",
+    "stateClosed": "Closed",
+    "retryFailed": "Could not apply the Game Master decision"
   }
 }

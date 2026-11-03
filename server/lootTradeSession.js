@@ -155,9 +155,6 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
           ? marker.difficulty
           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
       : 0,
-    lockOnFailure: kind === 'terminal' && (marker && !explicitTerminal
-      ? marker.lockOnFailure
-      : Boolean(raw.lockOnFailure)),
     items,
   };
 };
@@ -240,7 +237,6 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
     difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
-    lockOnFailure: kind === 'terminal' && Boolean(raw.lockOnFailure),
     items,
     nodes,
     closedByClientIds,
@@ -426,9 +422,6 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
           if (payload.nodeDifficulty !== undefined) {
             targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
           }
-          if (payload.nodeLockOnFailure !== undefined) {
-            targetNode.lockOnFailure = Boolean(payload.nodeLockOnFailure);
-          }
         }
         if (payload.locked !== undefined) {
           targetNode.locked = Boolean(payload.locked);
@@ -440,7 +433,6 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
           const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
           targetNode.lockLabel = encodeTerminalNodeMarker({
             difficulty: targetNode.difficulty,
-            lockOnFailure: targetNode.lockOnFailure,
             label: previousMarker ? previousMarker.label : targetNode.lockLabel,
           });
         }

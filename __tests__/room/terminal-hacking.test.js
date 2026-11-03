@@ -9,7 +9,7 @@ import {
   luckRestoreChance,
 } from '../../server/terminalHacking.js';
 
-const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true };
+const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2 };
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
@@ -40,7 +40,7 @@ describe('shared Fallout terminal hacking rules', () => {
     [0, 4, 11], [1, 5, 13], [2, 6, 15], [3, 7, 17], [4, 8, 19], [5, 9, 21],
   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
-      config: { ...config, difficulty, lockOnFailure: false },
+      config: { ...config, difficulty },
       operatorClientId: 'player-1',
       operatorCharacterId: 'char-1',
       characterSnapshot: { attributes: { INT: { value: 4 } }, skills: [] },
@@ -193,7 +193,7 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(nextBoard.digestEligible).toBe(false);
   });
 
-  it('sets Access Granted on success, and locks with Access Denied after the last failure', () => {
+  it('sets Access Granted on success, and asks the GM after the last failure', () => {
     const base = createGame({
       config,
       operatorClientId: 'player-1',
@@ -228,8 +228,19 @@ describe('shared Fallout terminal hacking rules', () => {
       now: 102,
       rng: noRandomness,
     }).game;
-    expect(failed.status).toBe('locked');
-    expect(failed.result).toBe('ACCESS DENIED');
+    // Патч 504: провал виден игроку и ждёт решения Мастера — автоматической
+    // блокировки по галочке больше нет.
+    expect(failed.status).toBe('awaitingRetry');
+    expect(failed.result).toBe('ATTEMPTS EXHAUSTED');
+    expect(applyGameAction({
+      game: failed,
+      action: 'start',
+      clientId: 'player-1',
+      characterId: 'char-1',
+      characterSnapshot: {},
+      now: 103,
+      rng: noRandomness,
+    }).error).toBe('TERMINAL_AWAITING_RETRY');
   });
 
   it('registers location terminals as room-wide games without replacing the active location session', () => {
@@ -249,16 +260,15 @@ describe('shared Fallout terminal hacking rules', () => {
           kind: 'terminal',
           name: 'Control terminal',
           difficulty: 4,
-          lockOnFailure: true,
           items: [],
         }],
       },
     });
     expect(opened.session.targetType).toBe('room');
-    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4, lockOnFailure: true });
+    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4 });
     expect(registry.getState(room.code).terminalStates['terminal-in-vault']).toMatchObject({
       standaloneIssued: false,
-      config: { difficulty: 4, lockOnFailure: true },
+      config: { difficulty: 4 },
       game: null,
     });
     expect(registry.getState(room.code).activeSession.kind).toBe('hub');

@@ -65,20 +65,19 @@ const normalizeTerminalConfig = (raw = {}) => ({
   name: String(raw.name || '').trim(),
   description: String(raw.description || '').trim(),
   difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
-  lockOnFailure: Boolean(raw.lockOnFailure),
 });
 
 // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
 // Старые серверы комнат понижали `kind: 'terminal'` узла локации до 'loot' и
-// теряли difficulty/lockOnFailure; lockLabel при этом сохранялся. Обновлённый
-// сервер восстанавливает терминал из маркера, а клиент — даже если сервер
-// вообще не обновлялся (локальная мини-игра).
+// теряли difficulty; lockLabel при этом сохранялся. Обновлённый сервер
+// восстанавливает терминал из маркера, а клиент — даже если сервер вообще
+// не обновлялся (локальная мини-игра). Патч 504: поле `f` («блокировать после
+// провала») убрано из записи; при чтении старых маркеров оно игнорируется.
 const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
-const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
+const encodeTerminalNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
   `${TERMINAL_NODE_MARKER}${JSON.stringify({
     v: 1,
     d: clamp(Math.floor(Number(difficulty) || 0), 0, 5),
-    f: lockOnFailure ? 1 : 0,
     l: String(label || ''),
   })}`
 );
@@ -90,7 +89,6 @@ const decodeTerminalNodeMarker = (value) => {
     if (!parsed || parsed.v !== 1) return null;
     return {
       difficulty: clamp(Math.floor(Number(parsed.d) || 0), 0, 5),
-      lockOnFailure: Boolean(parsed.f),
       label: String(parsed.l || ''),
     };
   } catch {
@@ -839,7 +837,8 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     name: config.name,
     description: config.description,
     difficulty,
-    lockOnFailure: config.lockOnFailure,
+    // Патч 504: блокировки по галочке больше нет. Исход партии решает Мастер
+    // в диалоге «Разрешить повторный взлом?», когда попытки исчерпаны.
     status: 'playing',
     operatorClientId,
     operatorCharacterId,
@@ -897,27 +896,58 @@ const publicGameState = (game) => {
   };
 };
 
-const failGame = (game, { now }) => {
-  if (game.attempts > 0) return game;
-  if (game.lockOnFailure && game.digestEligible && !game.digestUsed) {
-    return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+// Патч 504: «живые» поля карточки применяются к уже открытой доске без
+// пересборки. Сложность меняется только при следующей новой партии: доска
+// собрана под конкретную длину слова и не может поменяться на ходу.
+const syncGameConfig = (game, config) => {
+  if (!game || !config) return game;
+  let next = game;
+  for (const field of ['name', 'description']) {
+    if (config[field] === undefined || next[field] === config[field]) continue;
+    if (next === game) next = { ...game };
+    next[field] = config[field];
   }
-  if (game.lockOnFailure) {
-    return { ...game, status: 'locked', result: 'ACCESS DENIED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
-  }
-  return { ...game, status: 'failed', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+  return next;
 };
 
-const applyGameAction = ({ game, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
+const failGame = (game, { now }) => {
+  if (game.attempts > 0) return game;
+  // «Дайджест программиста» по-прежнему даёт последнюю попытку до решения
+  // Мастера, но теперь предлагается на любом терминале.
+  if (game.digestEligible && !game.digestUsed) {
+    return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+  }
+  // Патч 504: попытки исчерпаны — партия НЕ завершается молча и НЕ
+  // блокируется автоматически. Сервер ждёт ответа Мастера на вопрос
+  // «Разрешить повторный взлом?», а игрок видит явное сообщение о провале.
+  return { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
+};
+
+const closeGame = (game, { now }) => ({
+  ...game,
+  status: 'closed',
+  result: 'TERMINAL CLOSED',
+  scrollUp: false,
+  updatedAt: now,
+  revision: game.revision + 1,
+});
+
+const applyGameAction = ({ game, config = null, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
   if (!game) return { error: 'TERMINAL_NOT_ISSUED' };
-  if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
-  if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
+  // Патч 504: настройки карточки читаются на каждом ходу, а не «запекаются»
+  // в доску при первом «Взломать».
+  game = syncGameConfig(game, config);
+  if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) return { error: 'TERMINAL_GM_ONLY' };
+  if (game.status === 'closed') return { error: 'TERMINAL_CLOSED' };
+  if (game.status === 'awaitingRetry') return { error: 'TERMINAL_AWAITING_RETRY' };
   if (action === 'start') {
     const isSameOperator = game.operatorCharacterId === characterId
       && game.operatorClientId === clientId;
     if (game.status === 'won' && isSameOperator) return { error: 'TERMINAL_ALREADY_ACTIVE' };
+    // Новая партия всегда собирается по ТЕКУЩИМ настройкам карточки, а не
+    // по полям предыдущей доски.
     const fresh = createGame({
-      config: game,
+      config: config || game,
       operatorClientId: clientId,
       operatorCharacterId: characterId,
       characterSnapshot,
@@ -935,8 +965,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
       return { game: { ...game, status: 'playing', attempts: 1, digestEligible: false, digestUsed: true, result: 'DIGEST USED', updatedAt: now, revision: game.revision + 1 }, usedDigest: true };
     }
     if (action === 'declineDigest') {
-      const status = game.lockOnFailure ? 'locked' : 'failed';
-      return { game: { ...game, status, digestEligible: false, result: status === 'locked' ? 'ACCESS DENIED' : '', updatedAt: now, revision: game.revision + 1 } };
+      return { game: { ...game, status: 'awaitingRetry', result: 'ATTEMPTS EXHAUSTED', digestEligible: false, scrollUp: false, updatedAt: now, revision: game.revision + 1 } };
     }
     return { error: 'TERMINAL_DIGEST_DECISION_REQUIRED' };
   }
@@ -1033,5 +1062,7 @@ module.exports = {
   normalizeCharacterSnapshot,
   createGame,
   publicGameState,
+  syncGameConfig,
+  closeGame,
   applyGameAction,
 };

@@ -613,7 +613,6 @@ export default function LootTradeScreen() {
                 name: saved.name,
                 description: saved.description,
                 difficulty: saved.difficulty,
-                lockOnFailure: saved.lockOnFailure,
               },
             });
           } else if (terminalNode) {
@@ -686,7 +685,6 @@ export default function LootTradeScreen() {
               nodeItems: saved.items,
               ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
                 nodeDifficulty: saved.difficulty,
-                nodeLockOnFailure: saved.lockOnFailure,
               } : {}),
               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
                 caps: saved.caps,
@@ -1045,13 +1043,13 @@ export default function LootTradeScreen() {
       if (freshSource.kind === CONTAINER_KIND.TERMINAL && terminalProtocol) {
         await useRoomStore.getState().issueTerminal({
           code: effectiveRoomCode,
+          reissue: true,
           ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
           config: {
             containerId: freshSource.id,
             name: freshSource.name,
             description: freshSource.description,
             difficulty: freshSource.difficulty,
-            lockOnFailure: freshSource.lockOnFailure,
           },
         });
       } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
@@ -1728,28 +1726,51 @@ export default function LootTradeScreen() {
                   {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
                     difficulty: activeContainer.difficulty,
                   })}
-                  {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
                 </Text>
-                {activeTerminalStates.map(({ code, terminal }) => (
-                  <View key={code} style={styles.terminalAdminStateRow}>
-                    <Text style={styles.terminalAdminText}>
-                      {`${formatSingleRoomName(code)} · ${terminal.locked ? tLootTrade('terminal.locked') : tLootTrade('terminal.available')}`}
-                    </Text>
-                    {terminal.locked && (
-                      <TouchableOpacity
-                        style={styles.terminalUnlockButton}
-                        onPress={() => useRoomStore.getState().actOnTerminal({
-                          code,
-                          containerId: activeContainer.id,
-                          action: 'unlock',
-                          ownerToken: roomByCode[code]?.ownerToken,
-                        }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }))}
-                      >
-                        <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.unlock')}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
+                {activeTerminalStates.map(({ code, terminal }) => {
+                  const closed = Boolean(terminal.closed || terminal.locked);
+                  const awaiting = !closed && Boolean(
+                    terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
+                  );
+                  const stateLabel = closed
+                    ? tLootTrade('terminal.stateClosed')
+                    : (awaiting ? tLootTrade('terminal.stateAwaiting') : tLootTrade('terminal.stateReady'));
+                  const decide = (value) => useRoomStore.getState().actOnTerminal({
+                    code,
+                    containerId: activeContainer.id,
+                    action: 'retry',
+                    value,
+                    ownerToken: roomByCode[code]?.ownerToken,
+                  }).catch(() => showRawAlert({ title: tLootTrade('terminal.retryFailed') }));
+                  const reissue = () => useRoomStore.getState().actOnTerminal({
+                    code,
+                    containerId: activeContainer.id,
+                    action: 'reissue',
+                    ownerToken: roomByCode[code]?.ownerToken,
+                  }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }));
+                  return (
+                    <View key={code} style={styles.terminalAdminStateRow}>
+                      <Text style={styles.terminalAdminText}>
+                        {`${formatSingleRoomName(code)} · ${stateLabel}`}
+                      </Text>
+                      {awaiting && (
+                        <View style={styles.terminalAdminActions}>
+                          <TouchableOpacity style={styles.terminalUnlockButton} onPress={() => decide('yes')}>
+                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.retryYes')}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.terminalUnlockButton} onPress={() => decide('no')}>
+                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.retryNo')}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {closed && (
+                        <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
+                          <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             )}
 

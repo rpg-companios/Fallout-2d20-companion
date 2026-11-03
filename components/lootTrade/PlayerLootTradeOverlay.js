@@ -280,6 +280,24 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
+    // Патч 504: «Нет» Мастера запрещает и взлом, и просмотр до новой
+    // трансляции. Карточка остаётся на экране с отметкой «Закрыт».
+    const directClosed = Boolean(
+      directTerminalContext.terminalState.closed
+      || directTerminalContext.terminalState.locked
+      || directTerminalContext.terminalState.game?.status === 'closed',
+    );
+    if (directClosed) {
+      return (
+        <View style={styles.floatingBar} pointerEvents="box-none">
+          <View style={styles.floatingPill}>
+            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
+            <Text style={styles.floatingClosedLabel}>{tLootTrade('terminal.closedBadge')}</Text>
+            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.closedHint')}</Text>
+          </View>
+        </View>
+      );
+    }
     if (dismissedTerminalId === config.containerId) {
       return (
         <View style={styles.floatingBar} pointerEvents="box-none">
@@ -404,6 +422,15 @@ export default function PlayerLootTradeOverlay() {
                       kind: CONTAINER_KIND.TERMINAL,
                     };
                     const nodeLocked = Boolean(node.locked);
+                    // Патч 504: «Нет» Мастера оставляет карточку visible, но
+                    // запрещает И взлом, И просмотр до новой трансляции.
+                    const terminalClosed = Boolean(
+                      terminalState?.closed || terminalState?.locked
+                      || terminalState?.game?.status === 'closed',
+                    );
+                    const terminalAwaiting = !terminalClosed && Boolean(
+                      terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
+                    );
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -438,12 +465,14 @@ export default function PlayerLootTradeOverlay() {
                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
                             </Text>
                           ) : nodeIsTerminal ? (
-                            <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
-                              {terminalState?.locked
-                                ? tLootTrade('terminal.accessDenied')
-                                : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
-                                    difficulty: terminalForSelection.difficulty || 0,
-                                  })}
+                            <Text style={[styles.hubUnlockedMetaText, (terminalClosed || terminalAwaiting) && styles.terminalDeniedMeta]}>
+                              {terminalClosed
+                                ? tLootTrade('terminal.closedBadge')
+                                : (terminalAwaiting
+                                  ? tLootTrade('terminal.retryWaiting')
+                                  : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                      difficulty: terminalForSelection.difficulty || 0,
+                                    }))}
                             </Text>
                           ) : nodeIsMerch ? (
                             <IconText style={styles.hubUnlockedMetaText}>
@@ -467,20 +496,38 @@ export default function PlayerLootTradeOverlay() {
                             </View>
                           ) : nodeIsTerminal ? (
                             <View style={styles.terminalButtons}>
+                              {terminalClosed && (
+                                <View testID="terminal-closed-badge" style={styles.terminalClosedBadge}>
+                                  <Text style={styles.terminalClosedBadgeText}>{tLootTrade('terminal.closedBadge')}</Text>
+                                </View>
+                              )}
                               <TouchableOpacity
                                 accessibilityRole="button"
+                                accessibilityState={{ disabled: terminalClosed }}
+                                disabled={terminalClosed}
                                 testID="terminal-view-button"
-                                style={styles.terminalViewButton}
+                                style={[styles.terminalViewButton, terminalClosed && styles.terminalButtonDisabled]}
                                 onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
                               >
                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
-                              {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
+                              {!terminalClosed && !terminalAwaiting
+                                && !['playing', 'pendingDigest', 'won', 'awaitingRetry'].includes(terminalState?.game?.status) ? (
                                 <TouchableOpacity
                                   accessibilityRole="button"
                                   testID="terminal-hack-button"
                                   style={styles.terminalHackButton}
                                   onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
+                                >
+                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                </TouchableOpacity>
+                              ) : (terminalClosed || terminalAwaiting) && (
+                                <TouchableOpacity
+                                  accessibilityRole="button"
+                                  accessibilityState={{ disabled: true }}
+                                  disabled
+                                  testID="terminal-hack-button"
+                                  style={[styles.terminalHackButton, styles.terminalButtonDisabled]}
                                 >
                                   <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
                                 </TouchableOpacity>
@@ -1522,6 +1569,10 @@ const styles = StyleSheet.create({
   terminalHackButton: { backgroundColor: '#315331', borderWidth: 1, borderColor: '#a4cb77', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
   terminalHackButtonText: { color: '#e1f5ca', fontSize: 11, fontWeight: '800' },
   terminalDeniedMeta: { color: '#ff6969', fontWeight: '800' },
+  terminalClosedBadge: { backgroundColor: '#2b2222', borderWidth: 1, borderColor: '#8a5555', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center' },
+  terminalClosedBadgeText: { color: '#e2a3a3', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  terminalButtonDisabled: { opacity: 0.38 },
+  floatingClosedLabel: { color: '#e2a3a3', fontSize: 12, fontWeight: '900', letterSpacing: 1, marginTop: 3 },
   lootFooter: {
     marginTop: 18,
     paddingTop: 4,

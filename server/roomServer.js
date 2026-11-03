@@ -656,6 +656,7 @@ const attachRoomWebSocketServer = (httpServer, {
             code: canonical,
             clientId,
             config: payload.config,
+            reissue: Boolean(payload.reissue),
             ownerToken: payload.ownerToken || null,
             ws,
           });

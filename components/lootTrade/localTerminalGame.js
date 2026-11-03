@@ -8,6 +8,11 @@ import engine from '../../server/terminalHacking';
  * Это нужно, когда сервер ещё не обновлён: он не знает terminal.issue/action,
  * поэтому клиент ведёт партию сам, но терминал всё равно открывается модалкой,
  * а не превращается в сундук с добычей.
+ *
+ * Патч 504: галочки «блокировать после провала» больше нет. Когда попытки
+ * кончились, партия переходит в `awaitingRetry`; Мастер (на этом же устройстве)
+ * отвечает «Да» — fresh-доска по текущим настройкам, или «Нет» — терминал
+ * закрыт до новой трансляции.
  */
 export const LOCAL_TERMINAL_OPERATOR = 'local-terminal-player';
 
@@ -41,13 +46,39 @@ export const applyLocalTerminalAction = (state, action, value, ctx = {}) => {
     rng = Math.random,
   } = ctx;
   let game = state?.game || null;
+  // Патч 504: настройки читаются на каждом действии, а не «запекаются» в
+  // доску при первом «Взломать». Так «Да» строит доску по свежей сложности.
   const config = engine.normalizeTerminalConfig({
     containerId: terminal?.containerId || terminal?.id,
     name: terminal?.name,
     description: terminal?.description,
     difficulty: terminal?.difficulty,
-    lockOnFailure: terminal?.lockOnFailure,
   });
+
+  if (game) game = engine.syncGameConfig(game, config);
+
+  // Решение Мастера в локальной партии (сервер комнат недоступен).
+  if (action === 'retryYes' || action === 'retryNo') {
+    if (!game || game.status !== 'awaitingRetry') {
+      return pack(game, { error: 'TERMINAL_NOT_ACTIVE' });
+    }
+    if (action === 'retryNo') {
+      return pack(engine.closeGame(game, { now }));
+    }
+    const fresh = engine.createGame({
+      config,
+      operatorClientId: LOCAL_TERMINAL_OPERATOR,
+      operatorCharacterId: characterId || 'local',
+      characterSnapshot,
+      now,
+      rng,
+    });
+    fresh.operatorName = characterSnapshot?.characterName || game.operatorName || '';
+    return pack(fresh);
+  }
+
+  if (game?.status === 'closed') return pack(game, { error: 'TERMINAL_CLOSED' });
+  if (game?.status === 'awaitingRetry') return pack(game, { error: 'TERMINAL_AWAITING_RETRY' });
 
   if (action === 'start' || (!game && ['guess', 'bracket'].includes(action))) {
     game = engine.createGame({
@@ -65,6 +96,7 @@ export const applyLocalTerminalAction = (state, action, value, ctx = {}) => {
 
   const result = engine.applyGameAction({
     game,
+    config,
     action,
     clientId: LOCAL_TERMINAL_OPERATOR,
     characterId: characterId || 'local',

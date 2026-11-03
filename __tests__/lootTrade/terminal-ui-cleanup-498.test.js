@@ -62,11 +62,14 @@ describe('патч 498: служебные тексты и читаемый цв
     expect(MODAL).toContain('const localMode = !roomHasTerminalProtocol');
   });
 
-  it('фразы про блокировку больше не жёлтые/кремовые', () => {
-    expect(FORM).toContain("terminalLockText: { color: '#222222'");
-    expect(FORM).not.toContain("terminalLockText: { color: '#e6e0c6'");
-    expect(FORM).toContain("color={lockOnFailure ? '#222222' : '#757575'}");
-    expect(FORM).not.toContain("color={lockOnFailure ? '#e8c04b'");
+  it('патч 504: галочка «блокировать после провала» удалена из формы', () => {
+    expect(FORM).not.toContain('lockOnFailure');
+    expect(FORM).not.toContain('terminalLockLabel');
+    expect(FORM).not.toContain('terminalLockRow');
+    expect(RU.form.terminalLockLabel).toBeUndefined();
+    expect(EN.form.terminalLockLabel).toBeUndefined();
+    // Вместо неё — диалог Мастера на любом экране.
+    expect(read('App.js')).toContain('<TerminalRetryPromptHost />');
   });
 });
 
