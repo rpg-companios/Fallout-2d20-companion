@@ -36,6 +36,8 @@ export const ROOM_MESSAGE = {
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
   STORAGE_ADD_KEY: 'storage.addKey',
+  // Патч 517: общие на комнату события доступа (ворота).
+  ACCESS_STATE: 'access.state',
   ERROR: 'error',
 } as const;
 

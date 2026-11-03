@@ -1,0 +1,2528 @@
+diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
+new file mode 100644
+index 0000000..f639292
+--- /dev/null
++++ b/__tests__/room/container-gates-517.test.js
+@@ -0,0 +1,156 @@
++// Приёмочный тест 517: ворота между точками. Событие доступа общее на комнату,
++// а не на вкладку игрока; Мастер видит связи в админке.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { KEY_ACCESS, resolveKeyAccess, isCheckPassed } from '../../server/keyAccess.js';
++import { MESSAGE } from '../../server/protocol.js';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol.ts';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
++  registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  return { registry, room };
++};
++
++describe('517: нейтральное событие как ворота', () => {
++  it('без требования ключа ворота всё равно закрывают/открывают точку', () => {
++    const empty = { revision: 0, entries: [] };
++    expect(resolveKeyAccess(
++      { linkedCheckId: 't9' }, { storage: empty, accessEvents: {} },
++    ).state).toBe(KEY_ACCESS.NEEDS_CHECK);
++    expect(resolveKeyAccess(
++      { linkedCheckId: 't9' }, { storage: empty, accessEvents: { t9: { kind: 'hacked' } } },
++    ).state).toBe(KEY_ACCESS.OPEN);
++    expect(resolveKeyAccess({}, { storage: empty }).state).toBe(KEY_ACCESS.NONE);
++  });
++
++  it('событие на комнате и победа терминала — равные источники', () => {
++    expect(isCheckPassed({ accessEvents: { t9: { kind: 'hacked' } } }, 't9')).toBe(true);
++    expect(isCheckPassed({ terminalStates: { t9: { game: { status: 'won' } } } }, 't9')).toBe(true);
++    expect(isCheckPassed({ accessEvents: {} }, 't9')).toBe(false);
++  });
++
++  it('протокол несёт состояние ворот', () => {
++    expect(MESSAGE.ACCESS_STATE).toBe('access.state');
++    expect(ROOM_MESSAGE.ACCESS_STATE).toBe(MESSAGE.ACCESS_STATE);
++  });
++});
++
++describe('517: сервер ведёт общий журнал событий', () => {
++  it('открытие ключом порождает событие и снимает ворота у второй точки', () => {
++    const { registry, room } = setup();
++    // Точка A требует ключ; точка B — ворота на A.
++    registry.openSession({
++      code: room.code, clientId: 'gm',
++      session: {
++        name: 'Бункер', kind: 'hub', targetType: 'room',
++        nodes: [
++          {
++            containerId: 'a', kind: 'loot', name: 'Сейф',
++            requiredKeyItemId: 'k1', keyRequirement: 'required',
++            items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
++          },
++          {
++            containerId: 'b', kind: 'loot', name: 'Дверь',
++            linkedCheckId: 'a',
++            items: [{ entryId: 'e2', name: 'Аптечка', quantity: 1 }],
++          },
++        ],
++      },
++    });
++    let session = registry.getRoom(room.code).activeSession;
++    expect(session.nodes.find((n) => n.containerId === 'a').keyAccessState).toBe('denied');
++    expect(session.nodes.find((n) => n.containerId === 'b').keyAccessState).toBe('needs-check');
++    expect(registry.getAccessEvents(room.code)).toEqual({});
++
++    registry.addKeyItemToStorage({
++      code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ', description: '',
++    });
++    session = registry.getRoom(room.code).activeSession;
++    expect(session.nodes.find((n) => n.containerId === 'a').keyAccessState).toBe('open-by-key');
++    expect(session.nodes.find((n) => n.containerId === 'b').keyAccessState).toBe('open');
++    expect(session.nodes.find((n) => n.containerId === 'b').locked).toBe(false);
++
++    const events = registry.getAccessEvents(room.code);
++    expect(events.a).toMatchObject({ containerId: 'a', kind: 'hacked' });
++    expect(events.b).toMatchObject({ containerId: 'b', kind: 'hacked' });
++    expect(registry.getState(room.code).accessEvents.a).toBeTruthy();
++  });
++
++  it('настоящий взлом терминала тоже даёт событие для ворот', () => {
++    const { registry, room } = setup();
++    registry.issueTerminal({
++      code: room.code, clientId: 'gm',
++      config: { containerId: 't1', name: 'Терминал', difficulty: 1 },
++    });
++    const raw = registry._rooms.get(room.code);
++    raw.terminalStates.get('t1').game = { status: 'won', operatorName: 'Игрок' };
++    registry.recomputeKeyAccess(room.code);
++    expect(registry.getAccessEvents(room.code).t1).toMatchObject({ kind: 'hacked' });
++  });
++
++  it('событие не дублируется (идентификатор точки уникален)', () => {
++    const { registry, room } = setup();
++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k', name: 'K' });
++    const raw = registry._rooms.get(room.code);
++    raw.accessEvents.set('x', { containerId: 'x', kind: 'hacked', at: 1 });
++    registry.recomputeKeyAccess(room.code);
++    expect(registry.getAccessEvents(room.code).x.at).toBe(1);
++  });
++});
++
++describe('517: связи видны Мастеру и план обновлён', () => {
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  const store = read('src/room/roomStore.ts');
++
++  it('вторая строка формы выбирает любые точки, а не только терминалы', () => {
++    expect(screen).toContain('availableCheckContainers={gateSources}');
++    expect(screen).toContain('gateSources');
++    expect(read('components/screens/LootTradeScreen/modals/ContainerFormModal.js'))
++      .toContain('check.kindLabel');
++  });
++
++  it('карточка и локация показывают ворота и состояние события', () => {
++    expect(screen).toContain('card-gate-');
++    expect(screen).toContain("tLootTrade('card.gateAfter')");
++    expect(screen).toContain('hub-gate-');
++    expect(screen).toContain("tLootTrade('detail.hubGatesTitle')");
++    expect(screen).toContain('gateEvents');
++  });
++
++  it('клиентский стор хранит общие события комнаты', () => {
++    expect(store).toContain('accessEvents?:');
++    expect(store).toContain('ROOM_MESSAGE.ACCESS_STATE');
++    expect(read('server/roomServer.js')).toContain('MESSAGE.ACCESS_STATE');
++  });
++
++  it('подписи парные RU/EN', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    for (const [section, key] of [
++      ['card', 'gateAfter'], ['card', 'gateOpen'], ['card', 'gatePending'],
++      ['detail', 'hubGatesTitle'], ['detail', 'hubGatesEmpty'],
++      ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
++    ]) {
++      expect(ru[section][key]).toBeTruthy();
++      expect(en[section][key]).toBeTruthy();
++    }
++  });
++
++  it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
++    const plan = read('docs/roadmap.md');
++    expect(plan).toContain('517');
++    expect(plan).toContain('Осталось после патча 517');
++    expect(plan).not.toContain('| 9 | ⏳');
++    expect(plan).toContain('две панели');
++    expect(plan).toContain('Мини-игра взлома замков');
++  });
++});
+diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
+index ccff3f6..5608c75 100644
+--- a/__tests__/room/key-access-516.test.js
++++ b/__tests__/room/key-access-516.test.js
+@@ -49,8 +49,8 @@ describe('516: чистое правило доступа', () => {
+     ).state).toBe(KEY_ACCESS.OPEN);
+     expect(hasKeyInStorage(storageWithKey('k1'), 'k1')).toBe(true);
+     expect(hasKeyInStorage(storageWithKey('k1'), 'k2')).toBe(false);
+-    expect(isCheckPassed({ t2: { game: { status: 'won' } } }, 't2')).toBe(true);
+-    expect(isCheckPassed(new Map([['t2', { game: { status: 'won' } }]]), 't2')).toBe(true);
++    expect(isCheckPassed({ terminalStates: { t2: { game: { status: 'won' } } } }, 't2')).toBe(true);
++    expect(isCheckPassed({ terminalStates: new Map([['t2', { game: { status: 'won' } }]]) }, 't2')).toBe(true);
+   });
+ 
+   it('applyKeyAccessToSession помечает корень и вложенные узлы', () => {
+@@ -177,9 +177,9 @@ describe('516: экран карточек и документация', () => {
+   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('516');
+-    expect(plan).toContain('Осталось после патча 516');
++    expect(plan).toContain('Осталось после патча 517');
+     expect(plan).not.toContain('| 8 | ⏳');
+-    expect(plan).toContain('Ворота между контейнерами');
++    expect(plan).toContain('Ворота между точками');
+     expect(plan).toContain('две панели');
+   });
+ });
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 7e34e18..6accd05 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -96,7 +96,8 @@ describe('514: две строки настройки в форме точки',
+     expect(form).toContain('availableCheckContainers');
+     expect(form).toContain('testID="container-form-check-search"');
+     expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
+-    expect(screen).toContain('availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}');
++    // Патч 517: ворота ссылаются на любую точку, а не только терминал.
++    expect(screen).toContain('availableCheckContainers={gateSources}');
+   });
+ 
+   it('поля уезжают в сохранение и показываются на карточке', () => {
+@@ -162,9 +163,9 @@ describe('514: словари и живой план', () => {
+   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 516');
++    expect(plan).toContain('Осталось после патча 517');
+     expect(plan).toContain('Серверная проверка ключа');
+-    expect(plan).toContain('Ворота между контейнерами');
++    expect(plan).toContain('Ворота между точками');
+     expect(plan).toContain('две панели');
+     expect(plan).toContain('нет проверок на стоимость');
+     expect(plan).toContain('Мини-игра взлома замков');
+diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
+index cba08ae..5928e60 100644
+--- a/__tests__/ui/form-checkbox-515.test.js
++++ b/__tests__/ui/form-checkbox-515.test.js
+@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
+   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 516');
++    expect(plan).toContain('Осталось после патча 517');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('две панели');
+     expect(plan).toContain('Мини-игра взлома замков');
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index a37583b..dd8c10e 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -124,6 +124,8 @@ const ContainerCardCell = ({
+   onEdit,
+   onDelete,
+   keyItemNames = {},
++  gateSourceNames = {},
++  gateEvents = {},
+   onDragStart,
+   onDragMove,
+   onDragEnd,
+@@ -270,6 +272,20 @@ const ContainerCardCell = ({
+         )}
+       </View>
+ 
++      {Boolean(container.linkedCheckId) && (
++        <Text
++          testID={`card-gate-${container.id}`}
++          style={styles.cardMeta}
++          numberOfLines={1}
++        >
++          {formatLootTrade(tLootTrade('card.gateAfter'), {
++            name: gateSourceNames[container.linkedCheckId] || container.linkedCheckId,
++          })}
++          {' · '}
++          {tLootTrade(gateEvents[container.linkedCheckId] ? 'card.gateOpen' : 'card.gatePending')}
++        </Text>
++      )}
++
+       {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
+         <Text
+           testID={`card-requires-key-${container.id}`}
+@@ -1537,6 +1553,29 @@ export default function LootTradeScreen() {
+     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
+   }, [formatSingleRoomName]);
+ 
++  const gateSourceNames = useMemo(
++    () => Object.fromEntries(containers.map((c) => [c.id, c.name])),
++    [containers],
++  );
++  const gateEvents = useMemo(
++    () => roomRooms[activeLiveRoomCode]?.accessEvents || {},
++    [roomRooms, activeLiveRoomCode],
++  );
++
++  // Патч 517: ворота могут ссылаться на любую точку, а не только терминал.
++  const gateSources = useMemo(
++    () => containers
++      .filter((c) => c.id !== formModal?.initialContainer?.id)
++      .map((c) => ({
++        id: c.id,
++        name: c.name,
++        kindLabel: c.kind === CONTAINER_KIND.HUB
++          ? tLootTrade('card.hubKind')
++          : (c.kind === CONTAINER_KIND.TERMINAL ? tLootTrade('form.linkedCheckTerminal') : ''),
++      })),
++    [containers, formModal?.initialContainer?.id],
++  );
++
+   const keyItemNames = useMemo(
+     () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
+     [keyItems],
+@@ -1765,6 +1804,8 @@ export default function LootTradeScreen() {
+                         container={cell}
+                         roomLabel={roomLabel}
+                         keyItemNames={keyItemNames}
++                        gateSourceNames={gateSourceNames}
++                        gateEvents={gateEvents}
+                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
+                         isDropTarget={Boolean(isHubCell && movingContainerId)}
+                         canMoveToHub={!isHubCell && availableHubs.length > 0}
+@@ -2204,6 +2245,32 @@ export default function LootTradeScreen() {
+                 })}
+               </View>
+ 
++              {/* Патч 517: видимые Мастеру связи между точками локации. */}
++              <View style={styles.hubKeysSection}>
++                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
++                {(() => {
++                  const linked = (activeContainer.links || [])
++                    .map((link) => containers.find((c) => c.id === link.containerId))
++                    .filter((child) => child?.linkedCheckId);
++                  if (linked.length === 0) {
++                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
++                  }
++                  return linked.map((child) => (
++                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
++                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
++                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
++                        {`${child.name} ← ${gateSourceNames[child.linkedCheckId] || child.linkedCheckId}`}
++                      </Text>
++                      <Text style={styles.hubKeyDetachText}>
++                        {tLootTrade(gateEvents[child.linkedCheckId]
++                          ? 'detail.hubGatePassed'
++                          : 'detail.hubGatePending')}
++                      </Text>
++                    </View>
++                  ));
++                })()}
++              </View>
++
+               <ScrollView style={styles.itemsListContainer}>
+                 {(activeContainer.links || []).length === 0 ? (
+                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+@@ -2441,7 +2508,7 @@ export default function LootTradeScreen() {
+         availableRooms={availableRooms}
+         availableHubs={availableHubs}
+         availableKeyItems={keyItems}
+-        availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}
++        availableCheckContainers={gateSources}
+         initialLinkedHubIds={
+           formModal?.initialContainer?.id
+             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 2539cb0..2e28303 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -698,7 +698,7 @@ const ContainerFormModal = ({
+                           {check.name}
+                         </Text>
+                         <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+-                          {tLootTrade('form.linkedCheckTerminal')}
++                          {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
+                         </Text>
+                       </TouchableOpacity>
+                     );
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e1a1bce..ccbe182 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,27 @@
+ # Changelog
+ ---
++## Gates between points (patch 517)
++
++Plan item 9. Previously the linked check could only look at a win in the
++terminal mini-game. Now **any point** can be the source of a neutral access
++event, and that event lives **on the room**, not in a player's tab.
++
++- **Shared event journal.** Hacking a terminal, opening a point with a key or
++  a linked check, and a manual GM decision all produce the same event. It is
++  idempotent, arrives on join and is broadcast to every member on each
++  recompute.
++- **Gates without a key.** The second setup row now works even when no key is
++  required: until the chosen point produces an event, access stays closed;
++  after the event it opens. Sources are no longer limited to terminals —
++  locations, containers, merchants and terminals are all selectable.
++- **Gate chains.** If A opens B and B is the source for C, the server resolves
++  the whole chain in a few passes; cyclic links are bounded.
++- **Links visible to the GM.** The card shows "After: <point name>" with a
++  "gate passed / closed" badge; the location has a separate section listing
++  links and their state.
++- **Manual opening.** The GM can still unlock a location node by hand; gates
++  and keys do not override that decision.
++
+ ## Server-side key checking and staying on the card grid (patch 516)
+ 
+ Plan item 8. Access is now decided by the **server from the room state**, not
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ab94c61..ddfbcbc 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,28 @@
+ # История изменений
+ 
+ ---
++## Ворота между точками (патч 517)
++
++Тезис 9 плана. Раньше привязанная проверка умела смотреть только на победу в
++мини-игре терминала. Теперь **любая точка** может быть источником нейтрального
++события доступа, и это событие живёт **на комнате**, а не во вкладке игрока.
++
++- **Общий журнал событий.** Взлом терминала, открытие точки ключом или
++  привязанной проверкой и решение Мастера вручную дают одно и то же событие.
++  Оно идемпотентно, приходит при подключении к комнате и рассылается всем
++  участникам при каждом пересчёте.
++- **Ворота без ключа.** Вторая строка настройки теперь работает и когда
++ требуемого ключа нет: пока выбранная точка не дала событие, доступ закрыт; после
++  события — открыт. Список источников больше не ограничен терминалами: в него
++  входят локации, контейнеры, торговцы и терминалы.
++- **Цепочки ворот.** Если A открыла B, а B была источником для C, сервер
++  раскрывает всю цепочку за несколько проходов; циклические ссылки ограничены.
++- **Связи видны Мастеру.** На карточке точки — строка «После: <имя точки>» с
++  пометкой «ворота пройдены / закрыты»; в локации — отдельный раздел со
++  списком связей и их состоянием.
++- **Ручное открытие.** Мастер по-прежнему может снять блокировку узла локации
++  вручную; ворота и ключ не отменяют это решение.
++
+ ## Серверная проверка ключа и возврат на карточки (патч 516)
+ 
+ Тезис 8 плана. Теперь решение о доступе принимает **сервер по состоянию
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 8ad7726..8c39fa2 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -16,7 +16,9 @@
+ Шаг 3 **завершён**: патч **514** дал поля, формы и вложенность, патч **515** —
+ чекбокс и порядок полей, патч **516** — серверную проверку ключа (пропуск
+ мини-игры, отказ по обязательному ключу, ожидание привязанной проверки).
+-Шаги 4–5 (ворота, мини-игра замков) не реализованы. Живой порядок —
++Патч **517** реализовал шаг 4 (ворота): нейтральное событие `hacked` на
++комнате, любые точки как источники, цепочки связей и отображение связей в
++админке. Шаг 5 (мини-игра взлома замков) не реализован. Живой порядок —
+ `docs/roadmap.md`.
+ 
+ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index a954080..090d0d1 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index 607446c..c721f42 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 5c9cf01..6851738 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 1a020c9..8803235 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 5fc2c4e..80d53c8 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index ae8ebdb..5ca5e73 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 3c695eb..b60567d 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 7251946..8bcb037 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 160de05..1bf26b5 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 16a5370..810b3c8 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index ed06a1b..d42ab6f 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 2b6d0c2..c8b1739 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 5399342..ab8fd7e 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 77d75cb..239ab63 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 7d24147..da3c194 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index b303b8b..5f56614 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 516d003..4c8224f 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index 7f5c1b7..f13913a 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index bc87cc1..47bded5 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+index 73c28d1..18372ec 100644
+--- a/docs/patch-513-install.md
++++ b/docs/patch-513-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 513: уточнение правил ключей (только документ)
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
+index 7f4f666..1ae54dd 100644
+--- a/docs/patch-514-install.md
++++ b/docs/patch-514-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 514: поля и требования в карточках
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
+diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
+index e36aed7..db29d3b 100644
+--- a/docs/patch-515-install.md
++++ b/docs/patch-515-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 515: чекбокс «Обязателен» и порядок полей
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
+diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
+index cbbf06f..3bd41f1 100644
+--- a/docs/patch-516-install.md
++++ b/docs/patch-516-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 516: серверная проверка ключа и возврат на карточки
+ 
++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++
+ Патч подготовлен от состояния **версии 515** (коммит `8f1eb0f`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–516
+diff --git a/docs/patch-517-install.md b/docs/patch-517-install.md
+new file mode 100644
+index 0000000..50fd761
+--- /dev/null
++++ b/docs/patch-517-install.md
+@@ -0,0 +1,103 @@
++# Установка патча 517: ворота между точками
++
++Патч подготовлен от состояния **версии 516** (коммит `d84aa70`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–517
++цепочкой.
++
++> Вопросов к владельцу перед патчем не было: контракт ворот уже зафиксирован
++в разделах 3.3–3.4 и 8 `docs/key-items-and-gates-design.md`, а открытая
++развилка про «вторую строку» оставлена как есть.
++
++## Что изменилось
++
++### 1. Нейтральное событие на комнате
++
++`server/roomRegistry.js` — `room.accessEvents: Map<containerId, event>`.
++Событие `hacked` дают: взлом терминала (`game.status === 'won'`), открытие
++точки ключом, открытие по привязанной проверке и ручное решение Мастера
++(снятие блокировки узла локации). Запись идемпотентна.
++
++`server/keyAccess.js` — `isCheckPassed` теперь смотрит и на журнал событий, и
++на состояния терминалов. Ворота работают **даже без требования ключа**: нет
++ключа и нет события → `needs-check`, событие есть → `open`.
++
++### 2. Цепочки ворот
++
++`refreshKeyAccess` повторяет пересчёт до четырёх раз: если A открыла B, а B —
++источник для C, вся цепочка раскрывается. Ограничение защищает от циклов.
++
++### 3. Протокол и клиент
++
++- `ACCESS_STATE: 'access.state'` в `server/protocol.js` и
++  `src/room/roomProtocol.ts`; события входят в `room.state` при подключении и
++  рассылаются всем участникам при каждом пересчёте доступа.
++- `src/room/roomStore.ts` хранит `accessEvents` в состоянии комнаты.
++
++### 4. Интерфейс Мастера
++
++- Вторая строка формы «Ворота: событие другой точки» выбирает из **всех**
++  точек (локации, контейнеры, торговцы, терминалы), а не только терминалов;
++  себя в качестве источника выбрать нельзя.
++- На карточке точки — строка «После: <имя точки>» с пометкой «ворота
++  пройдены / закрыты».
++- В локации — раздел «Ворота между точками» со списком связей и их состоянием.
++- Парные RU/EN подписи, включая обновлённую подсказку второй строки.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/keyAccess.js` | ворота без ключа, журнал событий как источник |
++| `server/roomRegistry.js` | `accessEvents`, запись событий, цепочки, `getAccessEvents` |
++| `server/roomServer.js`, `server/protocol.js` | рассылка `access.state` |
++| `src/room/roomProtocol.ts`, `src/room/roomStore.ts` | зеркало и состояние клиента |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | подпись источника |
++| `components/screens/LootTradeScreen/LootTradeScreen.js`, `i18n/*` | все точки как источники, бейджи, раздел ворот |
++| `__tests__/room/container-gates-517.test.js` | 11 приёмочных проверок |
++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 517, 83/83 заметок |
++| `patchs/517-container-gates.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 516:
++
++```bash
++./apply-patch.sh 517
++# ✓ Установлен патч: №517 (версия 516 → 517)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 517
++```
++
++`patchs/baseline.json` в источнике равен `517`. После установки
++`public/version.json` → `517`; закоммитьте изменения, **перезапустите сервис
++Node.js** (серверный код менялся) и пересоберите веб-сборку.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/container-gates-517.test.js
++npx vitest run __tests__/room/key-access-516.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "517"'
++```
++
++Тесты покрывают ворота без ключа, равенство источников события, общий журнал
++комнаты, раскрытие цепочки A → B, взлом терминала как источник,
++идентификацию событий, протокол, отображение связей и парность словарей.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/517-container-gates.patch
++cp /path/to/517-container-gates.patch patchs/
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 1f1b936..be3e25e 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-03. Текущая версия: **516**.
++Дата ревизии: 2026-11-03. Текущая версия: **517**.
+ 
+ ## Тезисы
+ 
+@@ -19,20 +19,20 @@
+ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
+ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
+ | 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
+-| 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
++| 9 | **Ворота между точками:** нейтральное событие `hacked` живёт на комнате, любая точка может быть источником, цепочка связей раскрывается за несколько проходов, Мастер видит связи на карточке и в локации | ✅ сделано | **517** |
+ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
+ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
+ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+ 
+-## Осталось после патча 516
++## Осталось после патча 517
+ 
+-1. **Ворота между контейнерами** — общие на комнату, по событию другой точки (частично заложено привязанной проверкой из патча 516).
+-2. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
+-3. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
+-4. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
++1. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
++2. **Мини-игра взлома замков** — будущий вид точки `lock` и нейтральное событие `hacked` (контракт события уже готов).
++3. **Мелочи склада** — лимиты и стаканье, удаление шаблона, тихое срабатывание.
+ 
+-Плюс открытая развилка: вторая строка «проверка» пока ссылается на уже
+-созданный терминал в той же комнате, а не создаёт новый из формы.
++Открытая развилка: вторая строка «проверка» ссылается на уже созданную точку
++в той же комнате, а не создаёт новую из формы. Мастер по-прежнему может
++открыть доступ вручную, сняв блокировку узла локации.
+ 
+ ## Описание склада со стороны пользователя (для тезиса 10)
+ 
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index a1f0afd..df7c89d 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -34,7 +34,10 @@
+     "keyOptionalBadge": "optional",
+     "hubKind": "location",
+     "merchantKind": "merchant",
+-    "lootKind": "container"
++    "lootKind": "container",
++    "gateAfter": "After: {name}",
++    "gateOpen": "gate passed",
++    "gatePending": "gate closed"
+   },
+   "form": {
+     "createLootTitle": "New Loot Container",
+@@ -77,11 +80,11 @@
+     "keyEmpty": "No keys yet — create a card on the grid",
+     "keyNoDescription": "no description",
+     "keyRequiredLabel": "Mandatory",
+-    "linkedCheckLabel": "Check (terminal / lock)",
+-    "linkedCheckSearchPlaceholder": "Search terminals",
+-    "linkedCheckEmpty": "No terminals yet",
+-    "linkedCheckTerminal": "terminal",
+-    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
++    "linkedCheckLabel": "Gate: event from another point",
++    "linkedCheckSearchPlaceholder": "Search points",
++    "linkedCheckEmpty": "No other points yet",
++    "linkedCheckTerminal": "event source",
++    "linkedCheckHint": "Until the chosen point produces an event (hack, key or the GM's decision), access stays closed. The event is shared by the whole room."
+   },
+   "detail": {
+     "backToList": "← Back to containers",
+@@ -134,7 +137,11 @@
+     "emptyLootKeep": "Keep",
+     "hubKeysTitle": "Keys and notes in this location",
+     "hubKeysEmpty": "Drag a key card onto the location",
+-    "hubKeyDetach": "Move back to grid"
++    "hubKeyDetach": "Move back to grid",
++    "hubGatesTitle": "Gates between points",
++    "hubGatesEmpty": "No links between points yet",
++    "hubGatePassed": "passed",
++    "hubGatePending": "pending"
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 906552e..85a292d 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -34,7 +34,10 @@
+     "keyOptionalBadge": "необязателен",
+     "hubKind": "локация",
+     "merchantKind": "торговец",
+-    "lootKind": "контейнер"
++    "lootKind": "контейнер",
++    "gateAfter": "После: {name}",
++    "gateOpen": "ворота пройдены",
++    "gatePending": "ворота закрыты"
+   },
+   "form": {
+     "createLootTitle": "Новый контейнер добычи",
+@@ -77,11 +80,11 @@
+     "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
+     "keyNoDescription": "без описания",
+     "keyRequiredLabel": "Обязателен",
+-    "linkedCheckLabel": "Проверка (терминал / замок)",
+-    "linkedCheckSearchPlaceholder": "Поиск терминала",
+-    "linkedCheckEmpty": "Терминалов пока нет",
+-    "linkedCheckTerminal": "терминал",
+-    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
++    "linkedCheckLabel": "Ворота: событие другой точки",
++    "linkedCheckSearchPlaceholder": "Поиск точки",
++    "linkedCheckEmpty": "Других точек пока нет",
++    "linkedCheckTerminal": "источник события",
++    "linkedCheckHint": "Пока выбранная точка не дала событие (взлом, ключ или решение Мастера), доступ закрыт. Событие общее на всю комнату."
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
+@@ -134,7 +137,11 @@
+     "emptyLootKeep": "Оставить",
+     "hubKeysTitle": "Ключи и записки в локации",
+     "hubKeysEmpty": "Перетащите карточку ключа на локацию",
+-    "hubKeyDetach": "Вернуть на сетку"
++    "hubKeyDetach": "Вернуть на сетку",
++    "hubGatesTitle": "Ворота между точками",
++    "hubGatesEmpty": "Связей между точками пока нет",
++    "hubGatePassed": "пройдено",
++    "hubGatePending": "ожидает"
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+diff --git a/patchs/517-container-gates.patch b/patchs/517-container-gates.patch
+new file mode 100644
+index 0000000..c3f3aa8
+--- /dev/null
++++ b/patchs/517-container-gates.patch
+@@ -0,0 +1,1253 @@
++diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
++new file mode 100644
++index 0000000..f639292
++--- /dev/null
+++++ b/__tests__/room/container-gates-517.test.js
++@@ -0,0 +1,156 @@
+++// Приёмочный тест 517: ворота между точками. Событие доступа общее на комнату,
+++// а не на вкладку игрока; Мастер видит связи в админке.
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++import { createRoomRegistry } from '../../server/roomRegistry.js';
+++import { KEY_ACCESS, resolveKeyAccess, isCheckPassed } from '../../server/keyAccess.js';
+++import { MESSAGE } from '../../server/protocol.js';
+++import { ROOM_MESSAGE } from '../../src/room/roomProtocol.ts';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++
+++const setup = () => {
+++  const registry = createRoomRegistry({ now: () => 1000 });
+++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
+++  registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
+++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
+++  return { registry, room };
+++};
+++
+++describe('517: нейтральное событие как ворота', () => {
+++  it('без требования ключа ворота всё равно закрывают/открывают точку', () => {
+++    const empty = { revision: 0, entries: [] };
+++    expect(resolveKeyAccess(
+++      { linkedCheckId: 't9' }, { storage: empty, accessEvents: {} },
+++    ).state).toBe(KEY_ACCESS.NEEDS_CHECK);
+++    expect(resolveKeyAccess(
+++      { linkedCheckId: 't9' }, { storage: empty, accessEvents: { t9: { kind: 'hacked' } } },
+++    ).state).toBe(KEY_ACCESS.OPEN);
+++    expect(resolveKeyAccess({}, { storage: empty }).state).toBe(KEY_ACCESS.NONE);
+++  });
+++
+++  it('событие на комнате и победа терминала — равные источники', () => {
+++    expect(isCheckPassed({ accessEvents: { t9: { kind: 'hacked' } } }, 't9')).toBe(true);
+++    expect(isCheckPassed({ terminalStates: { t9: { game: { status: 'won' } } } }, 't9')).toBe(true);
+++    expect(isCheckPassed({ accessEvents: {} }, 't9')).toBe(false);
+++  });
+++
+++  it('протокол несёт состояние ворот', () => {
+++    expect(MESSAGE.ACCESS_STATE).toBe('access.state');
+++    expect(ROOM_MESSAGE.ACCESS_STATE).toBe(MESSAGE.ACCESS_STATE);
+++  });
+++});
+++
+++describe('517: сервер ведёт общий журнал событий', () => {
+++  it('открытие ключом порождает событие и снимает ворота у второй точки', () => {
+++    const { registry, room } = setup();
+++    // Точка A требует ключ; точка B — ворота на A.
+++    registry.openSession({
+++      code: room.code, clientId: 'gm',
+++      session: {
+++        name: 'Бункер', kind: 'hub', targetType: 'room',
+++        nodes: [
+++          {
+++            containerId: 'a', kind: 'loot', name: 'Сейф',
+++            requiredKeyItemId: 'k1', keyRequirement: 'required',
+++            items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
+++          },
+++          {
+++            containerId: 'b', kind: 'loot', name: 'Дверь',
+++            linkedCheckId: 'a',
+++            items: [{ entryId: 'e2', name: 'Аптечка', quantity: 1 }],
+++          },
+++        ],
+++      },
+++    });
+++    let session = registry.getRoom(room.code).activeSession;
+++    expect(session.nodes.find((n) => n.containerId === 'a').keyAccessState).toBe('denied');
+++    expect(session.nodes.find((n) => n.containerId === 'b').keyAccessState).toBe('needs-check');
+++    expect(registry.getAccessEvents(room.code)).toEqual({});
+++
+++    registry.addKeyItemToStorage({
+++      code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ', description: '',
+++    });
+++    session = registry.getRoom(room.code).activeSession;
+++    expect(session.nodes.find((n) => n.containerId === 'a').keyAccessState).toBe('open-by-key');
+++    expect(session.nodes.find((n) => n.containerId === 'b').keyAccessState).toBe('open');
+++    expect(session.nodes.find((n) => n.containerId === 'b').locked).toBe(false);
+++
+++    const events = registry.getAccessEvents(room.code);
+++    expect(events.a).toMatchObject({ containerId: 'a', kind: 'hacked' });
+++    expect(events.b).toMatchObject({ containerId: 'b', kind: 'hacked' });
+++    expect(registry.getState(room.code).accessEvents.a).toBeTruthy();
+++  });
+++
+++  it('настоящий взлом терминала тоже даёт событие для ворот', () => {
+++    const { registry, room } = setup();
+++    registry.issueTerminal({
+++      code: room.code, clientId: 'gm',
+++      config: { containerId: 't1', name: 'Терминал', difficulty: 1 },
+++    });
+++    const raw = registry._rooms.get(room.code);
+++    raw.terminalStates.get('t1').game = { status: 'won', operatorName: 'Игрок' };
+++    registry.recomputeKeyAccess(room.code);
+++    expect(registry.getAccessEvents(room.code).t1).toMatchObject({ kind: 'hacked' });
+++  });
+++
+++  it('событие не дублируется (идентификатор точки уникален)', () => {
+++    const { registry, room } = setup();
+++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k', name: 'K' });
+++    const raw = registry._rooms.get(room.code);
+++    raw.accessEvents.set('x', { containerId: 'x', kind: 'hacked', at: 1 });
+++    registry.recomputeKeyAccess(room.code);
+++    expect(registry.getAccessEvents(room.code).x.at).toBe(1);
+++  });
+++});
+++
+++describe('517: связи видны Мастеру и план обновлён', () => {
+++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+++  const store = read('src/room/roomStore.ts');
+++
+++  it('вторая строка формы выбирает любые точки, а не только терминалы', () => {
+++    expect(screen).toContain('availableCheckContainers={gateSources}');
+++    expect(screen).toContain('gateSources');
+++    expect(read('components/screens/LootTradeScreen/modals/ContainerFormModal.js'))
+++      .toContain('check.kindLabel');
+++  });
+++
+++  it('карточка и локация показывают ворота и состояние события', () => {
+++    expect(screen).toContain('card-gate-');
+++    expect(screen).toContain("tLootTrade('card.gateAfter')");
+++    expect(screen).toContain('hub-gate-');
+++    expect(screen).toContain("tLootTrade('detail.hubGatesTitle')");
+++    expect(screen).toContain('gateEvents');
+++  });
+++
+++  it('клиентский стор хранит общие события комнаты', () => {
+++    expect(store).toContain('accessEvents?:');
+++    expect(store).toContain('ROOM_MESSAGE.ACCESS_STATE');
+++    expect(read('server/roomServer.js')).toContain('MESSAGE.ACCESS_STATE');
+++  });
+++
+++  it('подписи парные RU/EN', () => {
+++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
+++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
+++    for (const [section, key] of [
+++      ['card', 'gateAfter'], ['card', 'gateOpen'], ['card', 'gatePending'],
+++      ['detail', 'hubGatesTitle'], ['detail', 'hubGatesEmpty'],
+++      ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
+++    ]) {
+++      expect(ru[section][key]).toBeTruthy();
+++      expect(en[section][key]).toBeTruthy();
+++    }
+++  });
+++
+++  it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
+++    const plan = read('docs/roadmap.md');
+++    expect(plan).toContain('517');
+++    expect(plan).toContain('Осталось после патча 517');
+++    expect(plan).not.toContain('| 9 | ⏳');
+++    expect(plan).toContain('две панели');
+++    expect(plan).toContain('Мини-игра взлома замков');
+++  });
+++});
++diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
++index ccff3f6..4db17be 100644
++--- a/__tests__/room/key-access-516.test.js
+++++ b/__tests__/room/key-access-516.test.js
++@@ -49,8 +49,8 @@ describe('516: чистое правило доступа', () => {
++     ).state).toBe(KEY_ACCESS.OPEN);
++     expect(hasKeyInStorage(storageWithKey('k1'), 'k1')).toBe(true);
++     expect(hasKeyInStorage(storageWithKey('k1'), 'k2')).toBe(false);
++-    expect(isCheckPassed({ t2: { game: { status: 'won' } } }, 't2')).toBe(true);
++-    expect(isCheckPassed(new Map([['t2', { game: { status: 'won' } }]]), 't2')).toBe(true);
+++    expect(isCheckPassed({ terminalStates: { t2: { game: { status: 'won' } } } }, 't2')).toBe(true);
+++    expect(isCheckPassed({ terminalStates: new Map([['t2', { game: { status: 'won' } }]]) }, 't2')).toBe(true);
++   });
++ 
++   it('applyKeyAccessToSession помечает корень и вложенные узлы', () => {
++@@ -177,7 +177,7 @@ describe('516: экран карточек и документация', () => {
++   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('516');
++-    expect(plan).toContain('Осталось после патча 516');
+++    expect(plan).toContain('Осталось после патча 517');
++     expect(plan).not.toContain('| 8 | ⏳');
++     expect(plan).toContain('Ворота между контейнерами');
++     expect(plan).toContain('две панели');
++diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
++index 7e34e18..22f496d 100644
++--- a/__tests__/room/key-items-fields-514.test.js
+++++ b/__tests__/room/key-items-fields-514.test.js
++@@ -162,7 +162,7 @@ describe('514: словари и живой план', () => {
++   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 516');
+++    expect(plan).toContain('Осталось после патча 517');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('Ворота между контейнерами');
++     expect(plan).toContain('две панели');
++diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
++index cba08ae..5928e60 100644
++--- a/__tests__/ui/form-checkbox-515.test.js
+++++ b/__tests__/ui/form-checkbox-515.test.js
++@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
++   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 516');
+++    expect(plan).toContain('Осталось после патча 517');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('две панели');
++     expect(plan).toContain('Мини-игра взлома замков');
++diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
++index a37583b..dd8c10e 100644
++--- a/components/screens/LootTradeScreen/LootTradeScreen.js
+++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
++@@ -124,6 +124,8 @@ const ContainerCardCell = ({
++   onEdit,
++   onDelete,
++   keyItemNames = {},
+++  gateSourceNames = {},
+++  gateEvents = {},
++   onDragStart,
++   onDragMove,
++   onDragEnd,
++@@ -270,6 +272,20 @@ const ContainerCardCell = ({
++         )}
++       </View>
++ 
+++      {Boolean(container.linkedCheckId) && (
+++        <Text
+++          testID={`card-gate-${container.id}`}
+++          style={styles.cardMeta}
+++          numberOfLines={1}
+++        >
+++          {formatLootTrade(tLootTrade('card.gateAfter'), {
+++            name: gateSourceNames[container.linkedCheckId] || container.linkedCheckId,
+++          })}
+++          {' · '}
+++          {tLootTrade(gateEvents[container.linkedCheckId] ? 'card.gateOpen' : 'card.gatePending')}
+++        </Text>
+++      )}
+++
++       {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
++         <Text
++           testID={`card-requires-key-${container.id}`}
++@@ -1537,6 +1553,29 @@ export default function LootTradeScreen() {
++     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
++   }, [formatSingleRoomName]);
++ 
+++  const gateSourceNames = useMemo(
+++    () => Object.fromEntries(containers.map((c) => [c.id, c.name])),
+++    [containers],
+++  );
+++  const gateEvents = useMemo(
+++    () => roomRooms[activeLiveRoomCode]?.accessEvents || {},
+++    [roomRooms, activeLiveRoomCode],
+++  );
+++
+++  // Патч 517: ворота могут ссылаться на любую точку, а не только терминал.
+++  const gateSources = useMemo(
+++    () => containers
+++      .filter((c) => c.id !== formModal?.initialContainer?.id)
+++      .map((c) => ({
+++        id: c.id,
+++        name: c.name,
+++        kindLabel: c.kind === CONTAINER_KIND.HUB
+++          ? tLootTrade('card.hubKind')
+++          : (c.kind === CONTAINER_KIND.TERMINAL ? tLootTrade('form.linkedCheckTerminal') : ''),
+++      })),
+++    [containers, formModal?.initialContainer?.id],
+++  );
+++
++   const keyItemNames = useMemo(
++     () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
++     [keyItems],
++@@ -1765,6 +1804,8 @@ export default function LootTradeScreen() {
++                         container={cell}
++                         roomLabel={roomLabel}
++                         keyItemNames={keyItemNames}
+++                        gateSourceNames={gateSourceNames}
+++                        gateEvents={gateEvents}
++                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
++                         isDropTarget={Boolean(isHubCell && movingContainerId)}
++                         canMoveToHub={!isHubCell && availableHubs.length > 0}
++@@ -2204,6 +2245,32 @@ export default function LootTradeScreen() {
++                 })}
++               </View>
++ 
+++              {/* Патч 517: видимые Мастеру связи между точками локации. */}
+++              <View style={styles.hubKeysSection}>
+++                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
+++                {(() => {
+++                  const linked = (activeContainer.links || [])
+++                    .map((link) => containers.find((c) => c.id === link.containerId))
+++                    .filter((child) => child?.linkedCheckId);
+++                  if (linked.length === 0) {
+++                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
+++                  }
+++                  return linked.map((child) => (
+++                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
+++                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
+++                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
+++                        {`${child.name} ← ${gateSourceNames[child.linkedCheckId] || child.linkedCheckId}`}
+++                      </Text>
+++                      <Text style={styles.hubKeyDetachText}>
+++                        {tLootTrade(gateEvents[child.linkedCheckId]
+++                          ? 'detail.hubGatePassed'
+++                          : 'detail.hubGatePending')}
+++                      </Text>
+++                    </View>
+++                  ));
+++                })()}
+++              </View>
+++
++               <ScrollView style={styles.itemsListContainer}>
++                 {(activeContainer.links || []).length === 0 ? (
++                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
++@@ -2441,7 +2508,7 @@ export default function LootTradeScreen() {
++         availableRooms={availableRooms}
++         availableHubs={availableHubs}
++         availableKeyItems={keyItems}
++-        availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}
+++        availableCheckContainers={gateSources}
++         initialLinkedHubIds={
++           formModal?.initialContainer?.id
++             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
++diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++index 2539cb0..2e28303 100644
++--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++@@ -698,7 +698,7 @@ const ContainerFormModal = ({
++                           {check.name}
++                         </Text>
++                         <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
++-                          {tLootTrade('form.linkedCheckTerminal')}
+++                          {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
++                         </Text>
++                       </TouchableOpacity>
++                     );
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index e1a1bce..ccbe182 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,27 @@
++ # Changelog
++ ---
+++## Gates between points (patch 517)
+++
+++Plan item 9. Previously the linked check could only look at a win in the
+++terminal mini-game. Now **any point** can be the source of a neutral access
+++event, and that event lives **on the room**, not in a player's tab.
+++
+++- **Shared event journal.** Hacking a terminal, opening a point with a key or
+++  a linked check, and a manual GM decision all produce the same event. It is
+++  idempotent, arrives on join and is broadcast to every member on each
+++  recompute.
+++- **Gates without a key.** The second setup row now works even when no key is
+++  required: until the chosen point produces an event, access stays closed;
+++  after the event it opens. Sources are no longer limited to terminals —
+++  locations, containers, merchants and terminals are all selectable.
+++- **Gate chains.** If A opens B and B is the source for C, the server resolves
+++  the whole chain in a few passes; cyclic links are bounded.
+++- **Links visible to the GM.** The card shows "After: <point name>" with a
+++  "gate passed / closed" badge; the location has a separate section listing
+++  links and their state.
+++- **Manual opening.** The GM can still unlock a location node by hand; gates
+++  and keys do not override that decision.
+++
++ ## Server-side key checking and staying on the card grid (patch 516)
++ 
++ Plan item 8. Access is now decided by the **server from the room state**, not
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index ab94c61..ddfbcbc 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,28 @@
++ # История изменений
++ 
++ ---
+++## Ворота между точками (патч 517)
+++
+++Тезис 9 плана. Раньше привязанная проверка умела смотреть только на победу в
+++мини-игре терминала. Теперь **любая точка** может быть источником нейтрального
+++события доступа, и это событие живёт **на комнате**, а не во вкладке игрока.
+++
+++- **Общий журнал событий.** Взлом терминала, открытие точки ключом или
+++  привязанной проверкой и решение Мастера вручную дают одно и то же событие.
+++  Оно идемпотентно, приходит при подключении к комнате и рассылается всем
+++  участникам при каждом пересчёте.
+++- **Ворота без ключа.** Вторая строка настройки теперь работает и когда
+++ требуемого ключа нет: пока выбранная точка не дала событие, доступ закрыт; после
+++  события — открыт. Список источников больше не ограничен терминалами: в него
+++  входят локации, контейнеры, торговцы и терминалы.
+++- **Цепочки ворот.** Если A открыла B, а B была источником для C, сервер
+++  раскрывает всю цепочку за несколько проходов; циклические ссылки ограничены.
+++- **Связи видны Мастеру.** На карточке точки — строка «После: <имя точки>» с
+++  пометкой «ворота пройдены / закрыты»; в локации — отдельный раздел со
+++  списком связей и их состоянием.
+++- **Ручное открытие.** Мастер по-прежнему может снять блокировку узла локации
+++  вручную; ворота и ключ не отменяют это решение.
+++
++ ## Серверная проверка ключа и возврат на карточки (патч 516)
++ 
++ Тезис 8 плана. Теперь решение о доступе принимает **сервер по состоянию
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index 8ad7726..8c39fa2 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -16,7 +16,9 @@
++ Шаг 3 **завершён**: патч **514** дал поля, формы и вложенность, патч **515** —
++ чекбокс и порядок полей, патч **516** — серверную проверку ключа (пропуск
++ мини-игры, отказ по обязательному ключу, ожидание привязанной проверки).
++-Шаги 4–5 (ворота, мини-игра замков) не реализованы. Живой порядок —
+++Патч **517** реализовал шаг 4 (ворота): нейтральное событие `hacked` на
+++комнате, любые точки как источники, цепочки связей и отображение связей в
+++админке. Шаг 5 (мини-игра взлома замков) не реализован. Живой порядок —
++ `docs/roadmap.md`.
++ 
++ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
++diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
++index a954080..090d0d1 100644
++--- a/docs/patch-493-install.md
+++++ b/docs/patch-493-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 493: терминал в локации открывает мини-игру
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
++index 607446c..c721f42 100644
++--- a/docs/patch-495-install.md
+++++ b/docs/patch-495-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
++index 5c9cf01..6851738 100644
++--- a/docs/patch-496-install.md
+++++ b/docs/patch-496-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 496: «Саммари v2» взлома терминалов
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
++index 1a020c9..8803235 100644
++--- a/docs/patch-497-install.md
+++++ b/docs/patch-497-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 497: канонические 4 попытки и доска «последовательности»
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
++index 5fc2c4e..80d53c8 100644
++--- a/docs/patch-498-install.md
+++++ b/docs/patch-498-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 498: чистый интерфейс терминала
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
++index ae8ebdb..5ca5e73 100644
++--- a/docs/patch-499-install.md
+++++ b/docs/patch-499-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 499: скобки двух сортов, число задаёт Наука
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
++index 3c695eb..b60567d 100644
++--- a/docs/patch-500-install.md
+++++ b/docs/patch-500-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 500: доска «25 − ИНТ»
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
++index 7251946..8bcb037 100644
++--- a/docs/patch-501-install.md
+++++ b/docs/patch-501-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 501: характеристики берутся из листа персонажа
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
++index 160de05..1bf26b5 100644
++--- a/docs/patch-502-install.md
+++++ b/docs/patch-502-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 502: сейв из файла экспорта читается на любой глубине
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
++index 16a5370..810b3c8 100644
++--- a/docs/patch-503-install.md
+++++ b/docs/patch-503-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 503: три группы слов, смена оператора, один полный возврат
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
++index ed06a1b..d42ab6f 100644
++--- a/docs/patch-504-install.md
+++++ b/docs/patch-504-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 504: решение Мастера вместо блокировки после провала
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
++index 2b6d0c2..c8b1739 100644
++--- a/docs/patch-505-install.md
+++++ b/docs/patch-505-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 505: успешный взлом больше не пропадает
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
++index 5399342..ab8fd7e 100644
++--- a/docs/patch-506-install.md
+++++ b/docs/patch-506-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
++index 77d75cb..239ab63 100644
++--- a/docs/patch-507-install.md
+++++ b/docs/patch-507-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
++index 7d24147..da3c194 100644
++--- a/docs/patch-508-install.md
+++++ b/docs/patch-508-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 508: хранилище Мастера + снапшот игрокам
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
++index b303b8b..5f56614 100644
++--- a/docs/patch-509-install.md
+++++ b/docs/patch-509-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
++index 516d003..4c8224f 100644
++--- a/docs/patch-510-install.md
+++++ b/docs/patch-510-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 510: ключи и записки на общем складе (шаг 2)
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
++index 7f5c1b7..f13913a 100644
++--- a/docs/patch-511-install.md
+++++ b/docs/patch-511-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
++index bc87cc1..47bded5 100644
++--- a/docs/patch-512-install.md
+++++ b/docs/patch-512-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 512: модалки берут дизайн у соседних окон
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
++index 73c28d1..18372ec 100644
++--- a/docs/patch-513-install.md
+++++ b/docs/patch-513-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 513: уточнение правил ключей (только документ)
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
++index 7f4f666..1ae54dd 100644
++--- a/docs/patch-514-install.md
+++++ b/docs/patch-514-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 514: поля и требования в карточках
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ > **Чекбокс «Обязателен» и описание в конце формы — патч 515. План: `docs/roadmap.md`, установка: `docs/patch-515-install.md`.**
++diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
++index e36aed7..db29d3b 100644
++--- a/docs/patch-515-install.md
+++++ b/docs/patch-515-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 515: чекбокс «Обязателен» и порядок полей
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ > **Серверная проверка ключа и возврат на карточки — патч 516. План: `docs/roadmap.md`, установка: `docs/patch-516-install.md`.**
++ 
++ Патч подготовлен от состояния **версии 514** (коммит `5f642d7`, ветка
++diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
++index cbbf06f..3bd41f1 100644
++--- a/docs/patch-516-install.md
+++++ b/docs/patch-516-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 516: серверная проверка ключа и возврат на карточки
++ 
+++> **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+++
++ Патч подготовлен от состояния **версии 515** (коммит `8f1eb0f`, ветка
++ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–516
++diff --git a/docs/patch-517-install.md b/docs/patch-517-install.md
++new file mode 100644
++index 0000000..50fd761
++--- /dev/null
+++++ b/docs/patch-517-install.md
++@@ -0,0 +1,103 @@
+++# Установка патча 517: ворота между точками
+++
+++Патч подготовлен от состояния **версии 516** (коммит `d84aa70`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–517
+++цепочкой.
+++
+++> Вопросов к владельцу перед патчем не было: контракт ворот уже зафиксирован
+++в разделах 3.3–3.4 и 8 `docs/key-items-and-gates-design.md`, а открытая
+++развилка про «вторую строку» оставлена как есть.
+++
+++## Что изменилось
+++
+++### 1. Нейтральное событие на комнате
+++
+++`server/roomRegistry.js` — `room.accessEvents: Map<containerId, event>`.
+++Событие `hacked` дают: взлом терминала (`game.status === 'won'`), открытие
+++точки ключом, открытие по привязанной проверке и ручное решение Мастера
+++(снятие блокировки узла локации). Запись идемпотентна.
+++
+++`server/keyAccess.js` — `isCheckPassed` теперь смотрит и на журнал событий, и
+++на состояния терминалов. Ворота работают **даже без требования ключа**: нет
+++ключа и нет события → `needs-check`, событие есть → `open`.
+++
+++### 2. Цепочки ворот
+++
+++`refreshKeyAccess` повторяет пересчёт до четырёх раз: если A открыла B, а B —
+++источник для C, вся цепочка раскрывается. Ограничение защищает от циклов.
+++
+++### 3. Протокол и клиент
+++
+++- `ACCESS_STATE: 'access.state'` в `server/protocol.js` и
+++  `src/room/roomProtocol.ts`; события входят в `room.state` при подключении и
+++  рассылаются всем участникам при каждом пересчёте доступа.
+++- `src/room/roomStore.ts` хранит `accessEvents` в состоянии комнаты.
+++
+++### 4. Интерфейс Мастера
+++
+++- Вторая строка формы «Ворота: событие другой точки» выбирает из **всех**
+++  точек (локации, контейнеры, торговцы, терминалы), а не только терминалов;
+++  себя в качестве источника выбрать нельзя.
+++- На карточке точки — строка «После: <имя точки>» с пометкой «ворота
+++  пройдены / закрыты».
+++- В локации — раздел «Ворота между точками» со списком связей и их состоянием.
+++- Парные RU/EN подписи, включая обновлённую подсказку второй строки.
+++
+++## Файлы
+++
+++| Файл | Изменение |
+++| --- | --- |
+++| `server/keyAccess.js` | ворота без ключа, журнал событий как источник |
+++| `server/roomRegistry.js` | `accessEvents`, запись событий, цепочки, `getAccessEvents` |
+++| `server/roomServer.js`, `server/protocol.js` | рассылка `access.state` |
+++| `src/room/roomProtocol.ts`, `src/room/roomStore.ts` | зеркало и состояние клиента |
+++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | подпись источника |
+++| `components/screens/LootTradeScreen/LootTradeScreen.js`, `i18n/*` | все точки как источники, бейджи, раздел ворот |
+++| `__tests__/room/container-gates-517.test.js` | 11 приёмочных проверок |
+++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
+++| `public/version.json`, `patchs/baseline.json` | версия 517, 83/83 заметок |
+++| `patchs/517-container-gates.patch` | сам патч для установщика |
+++
+++## Установка
+++
+++С действующей версии 516:
+++
+++```bash
+++./apply-patch.sh 517
+++# ✓ Установлен патч: №517 (версия 516 → 517)
+++```
+++
+++С чистого `main` со старым установщиком:
+++
+++```bash
+++git fetch origin arena/054e6676-fallout-2d20-companion
+++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
+++./apply-patch.sh 517
+++```
+++
+++`patchs/baseline.json` в источнике равен `517`. После установки
+++`public/version.json` → `517`; закоммитьте изменения, **перезапустите сервис
+++Node.js** (серверный код менялся) и пересоберите веб-сборку.
+++
+++## Проверка
+++
+++```bash
+++npm run typecheck
+++npx vitest run __tests__/room/container-gates-517.test.js
+++npx vitest run __tests__/room/key-access-516.test.js
+++npx vitest run
+++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
+++curl -s http://localhost:5000/version.json | grep '"version": "517"'
+++```
+++
+++Тесты покрывают ворота без ключа, равенство источников события, общий журнал
+++комнаты, раскрытие цепочки A → B, взлом терминала как источник,
+++идентификацию событий, протокол, отображение связей и парность словарей.
+++
+++### Прямой `git apply` без установщика
+++
+++```bash
+++git apply patchs/517-container-gates.patch
+++cp /path/to/517-container-gates.patch patchs/
+++```
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++index 1f1b936..be3e25e 100644
++--- a/docs/roadmap.md
+++++ b/docs/roadmap.md
++@@ -5,7 +5,7 @@
++ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++ > ответе владельцу. Этот файл — источник истины для порядка шагов.
++ 
++-Дата ревизии: 2026-11-03. Текущая версия: **516**.
+++Дата ревизии: 2026-11-03. Текущая версия: **517**.
++ 
++ ## Тезисы
++ 
++@@ -19,20 +19,20 @@
++ | 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
++ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
++ | 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
++-| 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
+++| 9 | **Ворота между точками:** нейтральное событие `hacked` живёт на комнате, любая точка может быть источником, цепочка связей раскрывается за несколько проходов, Мастер видит связи на карточке и в локации | ✅ сделано | **517** |
++ | 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
++ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
++ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++ 
++-## Осталось после патча 516
+++## Осталось после патча 517
++ 
++-1. **Ворота между контейнерами** — общие на комнату, по событию другой точки (частично заложено привязанной проверкой из патча 516).
++-2. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
++-3. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
++-4. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
+++1. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
+++2. **Мини-игра взлома замков** — будущий вид точки `lock` и нейтральное событие `hacked` (контракт события уже готов).
+++3. **Мелочи склада** — лимиты и стаканье, удаление шаблона, тихое срабатывание.
++ 
++-Плюс открытая развилка: вторая строка «проверка» пока ссылается на уже
++-созданный терминал в той же комнате, а не создаёт новый из формы.
+++Открытая развилка: вторая строка «проверка» ссылается на уже созданную точку
+++в той же комнате, а не создаёт новую из формы. Мастер по-прежнему может
+++открыть доступ вручную, сняв блокировку узла локации.
++ 
++ ## Описание склада со стороны пользователя (для тезиса 10)
++ 
++diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
++index a1f0afd..df7c89d 100644
++--- a/i18n/en-EN/screens/lootTrade/screen.json
+++++ b/i18n/en-EN/screens/lootTrade/screen.json
++@@ -34,7 +34,10 @@
++     "keyOptionalBadge": "optional",
++     "hubKind": "location",
++     "merchantKind": "merchant",
++-    "lootKind": "container"
+++    "lootKind": "container",
+++    "gateAfter": "After: {name}",
+++    "gateOpen": "gate passed",
+++    "gatePending": "gate closed"
++   },
++   "form": {
++     "createLootTitle": "New Loot Container",
++@@ -77,11 +80,11 @@
++     "keyEmpty": "No keys yet — create a card on the grid",
++     "keyNoDescription": "no description",
++     "keyRequiredLabel": "Mandatory",
++-    "linkedCheckLabel": "Check (terminal / lock)",
++-    "linkedCheckSearchPlaceholder": "Search terminals",
++-    "linkedCheckEmpty": "No terminals yet",
++-    "linkedCheckTerminal": "terminal",
++-    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
+++    "linkedCheckLabel": "Gate: event from another point",
+++    "linkedCheckSearchPlaceholder": "Search points",
+++    "linkedCheckEmpty": "No other points yet",
+++    "linkedCheckTerminal": "event source",
+++    "linkedCheckHint": "Until the chosen point produces an event (hack, key or the GM's decision), access stays closed. The event is shared by the whole room."
++   },
++   "detail": {
++     "backToList": "← Back to containers",
++@@ -134,7 +137,11 @@
++     "emptyLootKeep": "Keep",
++     "hubKeysTitle": "Keys and notes in this location",
++     "hubKeysEmpty": "Drag a key card onto the location",
++-    "hubKeyDetach": "Move back to grid"
+++    "hubKeyDetach": "Move back to grid",
+++    "hubGatesTitle": "Gates between points",
+++    "hubGatesEmpty": "No links between points yet",
+++    "hubGatePassed": "passed",
+++    "hubGatePending": "pending"
++   },
++   "catalog": {
++     "titleLoot": "Add to Container",
++diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
++index 906552e..85a292d 100644
++--- a/i18n/ru-RU/screens/lootTrade/screen.json
+++++ b/i18n/ru-RU/screens/lootTrade/screen.json
++@@ -34,7 +34,10 @@
++     "keyOptionalBadge": "необязателен",
++     "hubKind": "локация",
++     "merchantKind": "торговец",
++-    "lootKind": "контейнер"
+++    "lootKind": "контейнер",
+++    "gateAfter": "После: {name}",
+++    "gateOpen": "ворота пройдены",
+++    "gatePending": "ворота закрыты"
++   },
++   "form": {
++     "createLootTitle": "Новый контейнер добычи",
++@@ -77,11 +80,11 @@
++     "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
++     "keyNoDescription": "без описания",
++     "keyRequiredLabel": "Обязателен",
++-    "linkedCheckLabel": "Проверка (терминал / замок)",
++-    "linkedCheckSearchPlaceholder": "Поиск терминала",
++-    "linkedCheckEmpty": "Терминалов пока нет",
++-    "linkedCheckTerminal": "терминал",
++-    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
+++    "linkedCheckLabel": "Ворота: событие другой точки",
+++    "linkedCheckSearchPlaceholder": "Поиск точки",
+++    "linkedCheckEmpty": "Других точек пока нет",
+++    "linkedCheckTerminal": "источник события",
+++    "linkedCheckHint": "Пока выбранная точка не дала событие (взлом, ключ или решение Мастера), доступ закрыт. Событие общее на всю комнату."
++   },
++   "detail": {
++     "backToList": "← К списку контейнеров",
++@@ -134,7 +137,11 @@
++     "emptyLootKeep": "Оставить",
++     "hubKeysTitle": "Ключи и записки в локации",
++     "hubKeysEmpty": "Перетащите карточку ключа на локацию",
++-    "hubKeyDetach": "Вернуть на сетку"
+++    "hubKeyDetach": "Вернуть на сетку",
+++    "hubGatesTitle": "Ворота между точками",
+++    "hubGatesEmpty": "Связей между точками пока нет",
+++    "hubGatePassed": "пройдено",
+++    "hubGatePending": "ожидает"
++   },
++   "catalog": {
++     "titleLoot": "Добавить в контейнер",
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index e6dcad7..cbbcadd 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "516"
+++  "baseline": "517"
++ }
++diff --git a/public/version.json b/public/version.json
++index 8072818..4c87951 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "516",
+++  "version": "517",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
++       "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
++       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
++       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
++@@ -87,6 +88,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
++       "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
++       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
++       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
++diff --git a/server/keyAccess.js b/server/keyAccess.js
++index a2deba4..5704afe 100644
++--- a/server/keyAccess.js
+++++ b/server/keyAccess.js
++@@ -2,11 +2,12 @@
++ 
++ /**
++  * Патч 516: серверная проверка ключевой записи для точек доступа.
+++ * Патч 517: ворота — событие другой точки, общее на комнату.
++  *
++- * Чистая функция без серверного состояния: решение принимается по снимку
++- * общего хранилища комнаты и по состояниям терминалов. Клиент НЕ решает,
++- * открыта точка или нет (урок 506). Контракт — разделы 7.3–7.4
++- * `docs/key-items-and-gates-design.md`.
+++ * Чистая функция без сетевого состояния: решение принимается по снимку
+++ * общего хранилища комнаты, состояниям терминалов и журналу событий доступа.
+++ * Клиент НЕ решает, открыта точка или нет (урок 506). Контракт — разделы
+++ * 3.3–3.4 и 7.3–7.4 `docs/key-items-and-gates-design.md`.
++  */
++ 
++ const KEY_ACCESS = Object.freeze({
++@@ -25,25 +26,40 @@ const hasKeyInStorage = (storage, keyItemId) => {
++   );
++ };
++ 
++-/** Проверка считается пройденной, если привязанный терминал взломан. */
++-const isCheckPassed = (terminalStates, linkedCheckId) => {
+++/**
+++ * Проверка считается пройденной, если привязанная точка уже дала событие.
+++ * Патч 517: событие живёт на комнате, а не во вкладке игрока. Раньше ворота
+++ * умели смотреть только на победу в мини-игре терминала.
+++ */
+++const isCheckPassed = (sources, linkedCheckId) => {
++   const id = String(linkedCheckId || '').trim();
++   if (!id) return false;
++-  const states = terminalStates instanceof Map
++-    ? Object.fromEntries(terminalStates.entries())
++-    : (terminalStates || {});
+++  const events = sources?.accessEvents instanceof Map
+++    ? Object.fromEntries(sources.accessEvents.entries())
+++    : (sources?.accessEvents || {});
+++  if (events[id]) return true;
+++  const states = sources?.terminalStates instanceof Map
+++    ? Object.fromEntries(sources.terminalStates.entries())
+++    : (sources?.terminalStates || {});
++   return states[id]?.game?.status === 'won';
++ };
++ 
++ /**
++  * @param {object} requirement  { requiredKeyItemId, keyRequirement, linkedCheckId }
++- * @param {object} options      { storage, terminalStates }
+++ * @param {object} options      { storage, terminalStates, accessEvents }
++  * @returns {{ state: string, keyItemId: string, reason: string }}
++  */
++ const resolveKeyAccess = (requirement = {}, options = {}) => {
++   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
++   if (!keyItemId) {
++-    return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+++    // Патч 517: ворота работают и без требования ключа.
+++    const linkedCheckId = String(requirement.linkedCheckId || '').trim();
+++    if (!linkedCheckId) {
+++      return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+++    }
+++    return isCheckPassed(options, linkedCheckId)
+++      ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
+++      : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
++   }
++   if (hasKeyInStorage(options.storage, keyItemId)) {
++     return { state: KEY_ACCESS.OPEN_BY_KEY, keyItemId, reason: 'key-found' };
++@@ -52,7 +68,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
++     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
++   }
++   const linkedCheckId = String(requirement.linkedCheckId || '').trim();
++-  if (linkedCheckId && isCheckPassed(options.terminalStates, linkedCheckId)) {
+++  if (linkedCheckId && isCheckPassed(options, linkedCheckId)) {
++     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
++   }
++   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
++diff --git a/server/protocol.js b/server/protocol.js
++index d8b8a0b..32a4f80 100644
++--- a/server/protocol.js
+++++ b/server/protocol.js
++@@ -41,6 +41,8 @@ const MESSAGE = Object.freeze({
++   STORAGE_WITHDRAW: 'storage.withdraw',
++   STORAGE_RESTORE: 'storage.restore',
++   STORAGE_ADD_KEY: 'storage.addKey',
+++  // Патч 517: общие на комнату события доступа (ворота).
+++  ACCESS_STATE: 'access.state',
++   ERROR: 'error',
++ });
++ 
++diff --git a/server/roomRegistry.js b/server/roomRegistry.js
++index 2574f7a..6234309 100644
++--- a/server/roomRegistry.js
+++++ b/server/roomRegistry.js
++@@ -82,33 +82,72 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     updatedAt: at,
++   });
++ 
+++  const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
+++    const id = String(containerId || '').trim();
+++    if (!id || room.accessEvents.has(id)) return false;
+++    room.accessEvents.set(id, { containerId: id, kind, by, at: now() });
+++    return true;
+++  };
+++
++   const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
++     storage: room.partyStorage,
++     terminalStates: room.terminalStates,
+++    accessEvents: room.accessEvents,
++   });
++ 
++-  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
+++  /** Пересчитать доступ по текущему складу, терминалам и журналу ворот. */
++   const refreshKeyAccess = (room) => {
++     if (!room) return;
++     const resolve = resolveForRoom(room);
+++
+++    // Патч 517: открытая точка сама становится источником события для
+++    // следующих ворот. Событие идемпотентно и общее на всю комнату.
+++    const recordFromSession = (session) => {
+++      let added = false;
+++      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
+++        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
+++      }
+++      for (const node of session.nodes || []) {
+++        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
+++          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
+++        }
+++      }
+++      return added;
+++    };
+++
+++    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
+++    // появившиеся события открывают следующую точку. Ограничение защищает
+++    // от циклических ссылок, заданных Мастером.
+++    for (let pass = 0; pass < 4; pass += 1) {
+++      let added = false;
+++      if (room.activeSession) {
+++        room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+++        if (recordFromSession(room.activeSession)) added = true;
+++      }
+++      for (const [id, entry] of room.terminalStates) {
+++        const decision = resolve({
+++          requiredKeyItemId: entry.config?.requiredKeyItemId,
+++          keyRequirement: entry.config?.keyRequirement,
+++          linkedCheckId: entry.config?.linkedCheckId,
+++        });
+++        entry.keyAccessState = decision.state;
+++        entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+++        if (entry.game?.status === 'won' || decision.state === KEY_ACCESS.OPEN_BY_KEY) {
+++          if (recordAccessEvent(room, id, 'hacked', entry.game?.operatorName || 'gm')) added = true;
+++        }
+++        if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+++          entry.game = keyWonGame(entry.config, now());
+++          entry.closed = false;
+++          entry.accessId = newBroadcastId();
+++          entry.updatedAt = now();
+++        }
+++      }
+++      if (!added) break;
+++    }
+++    // Финальный пересчёт: событие последнего прохода могло открыть ещё узел.
++     if (room.activeSession) {
++       room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
++     }
++-    for (const [, entry] of room.terminalStates) {
++-      const decision = resolve({
++-        requiredKeyItemId: entry.config?.requiredKeyItemId,
++-        keyRequirement: entry.config?.keyRequirement,
++-        linkedCheckId: entry.config?.linkedCheckId,
++-      });
++-      entry.keyAccessState = decision.state;
++-      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
++-      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
++-        entry.game = keyWonGame(entry.config, now());
++-        entry.closed = false;
++-        entry.accessId = newBroadcastId();
++-        entry.updatedAt = now();
++-      }
++-    }
++   };
++ 
++   const touchRateLog = (log, key, windowMs, max) => {
++@@ -129,6 +168,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
++     activeSession: null, // открытый контейнер добычи или торговец
++     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+++    // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+++    // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+++    accessEvents: new Map(),
++     partyStorage: emptyStorage(),
++     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
++     recentTerminalWords: [],
++@@ -174,6 +216,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       id,
++       terminalPublic(id, entry),
++     ])),
+++    // Патч 517: при подключении игрок сразу видит, какие ворота уже пройдены.
+++    accessEvents: Object.fromEntries(room.accessEvents || new Map()),
++     // Патч 508: игрок при подключении получает текущий снапшот хранилища.
++     // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
++     partyStorage: storageSnapshot(room),
++@@ -1109,6 +1153,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     depositToPartyStorage,
++     withdrawFromPartyStorage,
++     getPartyStorage,
+++    getAccessEvents: (code) => Object.fromEntries(
+++      (rooms.get(code)?.accessEvents || new Map()).entries(),
+++    ),
++     addKeyItemToStorage,
++     restorePartyStorage,
++     sweep,
++diff --git a/server/roomServer.js b/server/roomServer.js
++index db2e2b6..ac9f54e 100644
++--- a/server/roomServer.js
+++++ b/server/roomServer.js
++@@ -349,6 +349,11 @@ const attachRoomWebSocketServer = (httpServer, {
++       broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
++     }
++     broadcastTerminalStates(fresh, exceptClientId);
+++    // Патч 517: ворота — состояние событий доступа общее на всю комнату,
+++    // поэтому рассылаем его ВСЕМ, включая инициатора действия.
+++    broadcastToRoom(fresh, null, MESSAGE.ACCESS_STATE, {
+++      events: registry.getAccessEvents(fresh.code),
+++    });
++   };
++ 
++   const handleUpgrade = (req, socket, head) => {
++diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
++index 128e846..52f12e0 100644
++--- a/src/room/roomProtocol.ts
+++++ b/src/room/roomProtocol.ts
++@@ -36,6 +36,8 @@ export const ROOM_MESSAGE = {
++   STORAGE_WITHDRAW: 'storage.withdraw',
++   STORAGE_RESTORE: 'storage.restore',
++   STORAGE_ADD_KEY: 'storage.addKey',
+++  // Патч 517: общие на комнату события доступа (ворота).
+++  ACCESS_STATE: 'access.state',
++   ERROR: 'error',
++ } as const;
++ 
++diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
++index b416513..8976ef5 100644
++--- a/src/room/roomStore.ts
+++++ b/src/room/roomStore.ts
++@@ -55,6 +55,8 @@ export interface RoomStateEntry {
++   terminalStates?: Record<string, any>;
++   /** Патч 507: «Общее хранилище» комнаты (канон — сервер). */
++   partyStorage?: PartyStorageState;
+++  /** Патч 517: нейтральные события доступа (ворота), общие на комнату. */
+++  accessEvents?: Record<string, { containerId: string; kind: string; by?: string; at: number }>;
++   directives?: RoomDirectiveEntry[];
++   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
++   capabilities?: Record<string, boolean>;
++@@ -417,6 +419,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
++         }
++       });
++     }
+++    // Патч 517: ворота между точками — сервер шлёт общий журнал событий.
+++    if (message.type === ROOM_MESSAGE.ACCESS_STATE) {
+++      const code = message.roomCode;
+++      const events = message.payload?.events;
+++      const current = code ? get().rooms[code] : null;
+++      if (code && current && events && typeof events === 'object') {
+++        set({ rooms: {
+++          ...get().rooms,
+++          [code]: { ...current, accessEvents: events },
+++        } });
+++      }
+++    }
++     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
++       const code = message.roomCode;
++       const terminal = message.payload?.terminal;
++@@ -662,6 +676,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
++               activeSession,
++               terminalStates,
++               partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
+++              accessEvents: (payloadRooms.accessEvents as Record<string, any> | undefined) ?? {},
++               directives,
++               capabilities,
++             },
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index e6dcad7..cbbcadd 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "516"
++  "baseline": "517"
+ }
+diff --git a/public/version.json b/public/version.json
+index 8072818..4c87951 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "516",
++  "version": "517",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
+       "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
+       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
+       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
+@@ -87,6 +88,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
+       "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
+       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
+       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
+diff --git a/server/keyAccess.js b/server/keyAccess.js
+index a2deba4..5704afe 100644
+--- a/server/keyAccess.js
++++ b/server/keyAccess.js
+@@ -2,11 +2,12 @@
+ 
+ /**
+  * Патч 516: серверная проверка ключевой записи для точек доступа.
++ * Патч 517: ворота — событие другой точки, общее на комнату.
+  *
+- * Чистая функция без серверного состояния: решение принимается по снимку
+- * общего хранилища комнаты и по состояниям терминалов. Клиент НЕ решает,
+- * открыта точка или нет (урок 506). Контракт — разделы 7.3–7.4
+- * `docs/key-items-and-gates-design.md`.
++ * Чистая функция без сетевого состояния: решение принимается по снимку
++ * общего хранилища комнаты, состояниям терминалов и журналу событий доступа.
++ * Клиент НЕ решает, открыта точка или нет (урок 506). Контракт — разделы
++ * 3.3–3.4 и 7.3–7.4 `docs/key-items-and-gates-design.md`.
+  */
+ 
+ const KEY_ACCESS = Object.freeze({
+@@ -25,25 +26,40 @@ const hasKeyInStorage = (storage, keyItemId) => {
+   );
+ };
+ 
+-/** Проверка считается пройденной, если привязанный терминал взломан. */
+-const isCheckPassed = (terminalStates, linkedCheckId) => {
++/**
++ * Проверка считается пройденной, если привязанная точка уже дала событие.
++ * Патч 517: событие живёт на комнате, а не во вкладке игрока. Раньше ворота
++ * умели смотреть только на победу в мини-игре терминала.
++ */
++const isCheckPassed = (sources, linkedCheckId) => {
+   const id = String(linkedCheckId || '').trim();
+   if (!id) return false;
+-  const states = terminalStates instanceof Map
+-    ? Object.fromEntries(terminalStates.entries())
+-    : (terminalStates || {});
++  const events = sources?.accessEvents instanceof Map
++    ? Object.fromEntries(sources.accessEvents.entries())
++    : (sources?.accessEvents || {});
++  if (events[id]) return true;
++  const states = sources?.terminalStates instanceof Map
++    ? Object.fromEntries(sources.terminalStates.entries())
++    : (sources?.terminalStates || {});
+   return states[id]?.game?.status === 'won';
+ };
+ 
+ /**
+  * @param {object} requirement  { requiredKeyItemId, keyRequirement, linkedCheckId }
+- * @param {object} options      { storage, terminalStates }
++ * @param {object} options      { storage, terminalStates, accessEvents }
+  * @returns {{ state: string, keyItemId: string, reason: string }}
+  */
+ const resolveKeyAccess = (requirement = {}, options = {}) => {
+   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
+   if (!keyItemId) {
+-    return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
++    // Патч 517: ворота работают и без требования ключа.
++    const linkedCheckId = String(requirement.linkedCheckId || '').trim();
++    if (!linkedCheckId) {
++      return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
++    }
++    return isCheckPassed(options, linkedCheckId)
++      ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
++      : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
+   }
+   if (hasKeyInStorage(options.storage, keyItemId)) {
+     return { state: KEY_ACCESS.OPEN_BY_KEY, keyItemId, reason: 'key-found' };
+@@ -52,7 +68,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
+     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
+   }
+   const linkedCheckId = String(requirement.linkedCheckId || '').trim();
+-  if (linkedCheckId && isCheckPassed(options.terminalStates, linkedCheckId)) {
++  if (linkedCheckId && isCheckPassed(options, linkedCheckId)) {
+     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
+   }
+   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
+diff --git a/server/protocol.js b/server/protocol.js
+index d8b8a0b..32a4f80 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -41,6 +41,8 @@ const MESSAGE = Object.freeze({
+   STORAGE_WITHDRAW: 'storage.withdraw',
+   STORAGE_RESTORE: 'storage.restore',
+   STORAGE_ADD_KEY: 'storage.addKey',
++  // Патч 517: общие на комнату события доступа (ворота).
++  ACCESS_STATE: 'access.state',
+   ERROR: 'error',
+ });
+ 
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 2574f7a..6234309 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -82,33 +82,72 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     updatedAt: at,
+   });
+ 
++  const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
++    const id = String(containerId || '').trim();
++    if (!id || room.accessEvents.has(id)) return false;
++    room.accessEvents.set(id, { containerId: id, kind, by, at: now() });
++    return true;
++  };
++
+   const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
+     storage: room.partyStorage,
+     terminalStates: room.terminalStates,
++    accessEvents: room.accessEvents,
+   });
+ 
+-  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
++  /** Пересчитать доступ по текущему складу, терминалам и журналу ворот. */
+   const refreshKeyAccess = (room) => {
+     if (!room) return;
+     const resolve = resolveForRoom(room);
++
++    // Патч 517: открытая точка сама становится источником события для
++    // следующих ворот. Событие идемпотентно и общее на всю комнату.
++    const recordFromSession = (session) => {
++      let added = false;
++      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
++        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
++      }
++      for (const node of session.nodes || []) {
++        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
++          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
++        }
++      }
++      return added;
++    };
++
++    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
++    // появившиеся события открывают следующую точку. Ограничение защищает
++    // от циклических ссылок, заданных Мастером.
++    for (let pass = 0; pass < 4; pass += 1) {
++      let added = false;
++      if (room.activeSession) {
++        room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
++        if (recordFromSession(room.activeSession)) added = true;
++      }
++      for (const [id, entry] of room.terminalStates) {
++        const decision = resolve({
++          requiredKeyItemId: entry.config?.requiredKeyItemId,
++          keyRequirement: entry.config?.keyRequirement,
++          linkedCheckId: entry.config?.linkedCheckId,
++        });
++        entry.keyAccessState = decision.state;
++        entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
++        if (entry.game?.status === 'won' || decision.state === KEY_ACCESS.OPEN_BY_KEY) {
++          if (recordAccessEvent(room, id, 'hacked', entry.game?.operatorName || 'gm')) added = true;
++        }
++        if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
++          entry.game = keyWonGame(entry.config, now());
++          entry.closed = false;
++          entry.accessId = newBroadcastId();
++          entry.updatedAt = now();
++        }
++      }
++      if (!added) break;
++    }
++    // Финальный пересчёт: событие последнего прохода могло открыть ещё узел.
+     if (room.activeSession) {
+       room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+     }
+-    for (const [, entry] of room.terminalStates) {
+-      const decision = resolve({
+-        requiredKeyItemId: entry.config?.requiredKeyItemId,
+-        keyRequirement: entry.config?.keyRequirement,
+-        linkedCheckId: entry.config?.linkedCheckId,
+-      });
+-      entry.keyAccessState = decision.state;
+-      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+-      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+-        entry.game = keyWonGame(entry.config, now());
+-        entry.closed = false;
+-        entry.accessId = newBroadcastId();
+-        entry.updatedAt = now();
+-      }
+-    }
+   };
+ 
+   const touchRateLog = (log, key, windowMs, max) => {
+@@ -129,6 +168,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
+     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
++    // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
++    // во вкладке игрока; точки ссылаются на него через linkedCheckId.
++    accessEvents: new Map(),
+     partyStorage: emptyStorage(),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+     recentTerminalWords: [],
+@@ -174,6 +216,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       id,
+       terminalPublic(id, entry),
+     ])),
++    // Патч 517: при подключении игрок сразу видит, какие ворота уже пройдены.
++    accessEvents: Object.fromEntries(room.accessEvents || new Map()),
+     // Патч 508: игрок при подключении получает текущий снапшот хранилища.
+     // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
+     partyStorage: storageSnapshot(room),
+@@ -1109,6 +1153,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     depositToPartyStorage,
+     withdrawFromPartyStorage,
+     getPartyStorage,
++    getAccessEvents: (code) => Object.fromEntries(
++      (rooms.get(code)?.accessEvents || new Map()).entries(),
++    ),
+     addKeyItemToStorage,
+     restorePartyStorage,
+     sweep,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index db2e2b6..ac9f54e 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -349,6 +349,11 @@ const attachRoomWebSocketServer = (httpServer, {
+       broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
+     }
+     broadcastTerminalStates(fresh, exceptClientId);
++    // Патч 517: ворота — состояние событий доступа общее на всю комнату,
++    // поэтому рассылаем его ВСЕМ, включая инициатора действия.
++    broadcastToRoom(fresh, null, MESSAGE.ACCESS_STATE, {
++      events: registry.getAccessEvents(fresh.code),
++    });
+   };
+ 
+   const handleUpgrade = (req, socket, head) => {
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 128e846..52f12e0 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -36,6 +36,8 @@ export const ROOM_MESSAGE = {
+   STORAGE_WITHDRAW: 'storage.withdraw',
+   STORAGE_RESTORE: 'storage.restore',
+   STORAGE_ADD_KEY: 'storage.addKey',
++  // Патч 517: общие на комнату события доступа (ворота).
++  ACCESS_STATE: 'access.state',
+   ERROR: 'error',
+ } as const;
+ 
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index b416513..8976ef5 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -55,6 +55,8 @@ export interface RoomStateEntry {
+   terminalStates?: Record<string, any>;
+   /** Патч 507: «Общее хранилище» комнаты (канон — сервер). */
+   partyStorage?: PartyStorageState;
++  /** Патч 517: нейтральные события доступа (ворота), общие на комнату. */
++  accessEvents?: Record<string, { containerId: string; kind: string; by?: string; at: number }>;
+   directives?: RoomDirectiveEntry[];
+   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
+   capabilities?: Record<string, boolean>;
+@@ -417,6 +419,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         }
+       });
+     }
++    // Патч 517: ворота между точками — сервер шлёт общий журнал событий.
++    if (message.type === ROOM_MESSAGE.ACCESS_STATE) {
++      const code = message.roomCode;
++      const events = message.payload?.events;
++      const current = code ? get().rooms[code] : null;
++      if (code && current && events && typeof events === 'object') {
++        set({ rooms: {
++          ...get().rooms,
++          [code]: { ...current, accessEvents: events },
++        } });
++      }
++    }
+     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
+       const code = message.roomCode;
+       const terminal = message.payload?.terminal;
+@@ -662,6 +676,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               activeSession,
+               terminalStates,
+               partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
++              accessEvents: (payloadRooms.accessEvents as Record<string, any> | undefined) ?? {},
+               directives,
+               capabilities,
+             },

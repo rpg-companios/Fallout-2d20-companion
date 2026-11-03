@@ -349,6 +349,11 @@ const attachRoomWebSocketServer = (httpServer, {
       broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
     }
     broadcastTerminalStates(fresh, exceptClientId);
+    // Патч 517: ворота — состояние событий доступа общее на всю комнату,
+    // поэтому рассылаем его ВСЕМ, включая инициатора действия.
+    broadcastToRoom(fresh, null, MESSAGE.ACCESS_STATE, {
+      events: registry.getAccessEvents(fresh.code),
+    });
   };
 
   const handleUpgrade = (req, socket, head) => {

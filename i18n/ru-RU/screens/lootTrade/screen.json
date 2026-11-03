@@ -34,7 +34,10 @@
     "keyOptionalBadge": "необязателен",
     "hubKind": "локация",
     "merchantKind": "торговец",
-    "lootKind": "контейнер"
+    "lootKind": "контейнер",
+    "gateAfter": "После: {name}",
+    "gateOpen": "ворота пройдены",
+    "gatePending": "ворота закрыты"
   },
   "form": {
     "createLootTitle": "Новый контейнер добычи",
@@ -77,11 +80,11 @@
     "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
     "keyNoDescription": "без описания",
     "keyRequiredLabel": "Обязателен",
-    "linkedCheckLabel": "Проверка (терминал / замок)",
-    "linkedCheckSearchPlaceholder": "Поиск терминала",
-    "linkedCheckEmpty": "Терминалов пока нет",
-    "linkedCheckTerminal": "терминал",
-    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
+    "linkedCheckLabel": "Ворота: событие другой точки",
+    "linkedCheckSearchPlaceholder": "Поиск точки",
+    "linkedCheckEmpty": "Других точек пока нет",
+    "linkedCheckTerminal": "источник события",
+    "linkedCheckHint": "Пока выбранная точка не дала событие (взлом, ключ или решение Мастера), доступ закрыт. Событие общее на всю комнату."
   },
   "detail": {
     "backToList": "← К списку контейнеров",
@@ -134,7 +137,11 @@
     "emptyLootKeep": "Оставить",
     "hubKeysTitle": "Ключи и записки в локации",
     "hubKeysEmpty": "Перетащите карточку ключа на локацию",
-    "hubKeyDetach": "Вернуть на сетку"
+    "hubKeyDetach": "Вернуть на сетку",
+    "hubGatesTitle": "Ворота между точками",
+    "hubGatesEmpty": "Связей между точками пока нет",
+    "hubGatePassed": "пройдено",
+    "hubGatePending": "ожидает"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",

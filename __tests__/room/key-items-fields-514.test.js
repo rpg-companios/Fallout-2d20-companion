@@ -96,7 +96,8 @@ describe('514: две строки настройки в форме точки',
     expect(form).toContain('availableCheckContainers');
     expect(form).toContain('testID="container-form-check-search"');
     expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
-    expect(screen).toContain('availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}');
+    // Патч 517: ворота ссылаются на любую точку, а не только терминал.
+    expect(screen).toContain('availableCheckContainers={gateSources}');
   });
 
   it('поля уезжают в сохранение и показываются на карточке', () => {
@@ -162,9 +163,9 @@ describe('514: словари и живой план', () => {
   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('515');
-    expect(plan).toContain('Осталось после патча 516');
+    expect(plan).toContain('Осталось после патча 517');
     expect(plan).toContain('Серверная проверка ключа');
-    expect(plan).toContain('Ворота между контейнерами');
+    expect(plan).toContain('Ворота между точками');
     expect(plan).toContain('две панели');
     expect(plan).toContain('нет проверок на стоимость');
     expect(plan).toContain('Мини-игра взлома замков');

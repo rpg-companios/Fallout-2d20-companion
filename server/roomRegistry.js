@@ -82,32 +82,71 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     updatedAt: at,
   });
 
+  const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
+    const id = String(containerId || '').trim();
+    if (!id || room.accessEvents.has(id)) return false;
+    room.accessEvents.set(id, { containerId: id, kind, by, at: now() });
+    return true;
+  };
+
   const resolveForRoom = (room) => (requirement) => resolveKeyAccess(requirement, {
     storage: room.partyStorage,
     terminalStates: room.terminalStates,
+    accessEvents: room.accessEvents,
   });
 
-  /** Пересчитать доступ по текущему складу и взломанным терминалам. */
+  /** Пересчитать доступ по текущему складу, терминалам и журналу ворот. */
   const refreshKeyAccess = (room) => {
     if (!room) return;
     const resolve = resolveForRoom(room);
+
+    // Патч 517: открытая точка сама становится источником события для
+    // следующих ворот. Событие идемпотентно и общее на всю комнату.
+    const recordFromSession = (session) => {
+      let added = false;
+      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
+        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
+      }
+      for (const node of session.nodes || []) {
+        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
+          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
+        }
+      }
+      return added;
+    };
+
+    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
+    // появившиеся события открывают следующую точку. Ограничение защищает
+    // от циклических ссылок, заданных Мастером.
+    for (let pass = 0; pass < 4; pass += 1) {
+      let added = false;
+      if (room.activeSession) {
+        room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+        if (recordFromSession(room.activeSession)) added = true;
+      }
+      for (const [id, entry] of room.terminalStates) {
+        const decision = resolve({
+          requiredKeyItemId: entry.config?.requiredKeyItemId,
+          keyRequirement: entry.config?.keyRequirement,
+          linkedCheckId: entry.config?.linkedCheckId,
+        });
+        entry.keyAccessState = decision.state;
+        entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+        if (entry.game?.status === 'won' || decision.state === KEY_ACCESS.OPEN_BY_KEY) {
+          if (recordAccessEvent(room, id, 'hacked', entry.game?.operatorName || 'gm')) added = true;
+        }
+        if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
+          entry.game = keyWonGame(entry.config, now());
+          entry.closed = false;
+          entry.accessId = newBroadcastId();
+          entry.updatedAt = now();
+        }
+      }
+      if (!added) break;
+    }
+    // Финальный пересчёт: событие последнего прохода могло открыть ещё узел.
     if (room.activeSession) {
       room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
-    }
-    for (const [, entry] of room.terminalStates) {
-      const decision = resolve({
-        requiredKeyItemId: entry.config?.requiredKeyItemId,
-        keyRequirement: entry.config?.keyRequirement,
-        linkedCheckId: entry.config?.linkedCheckId,
-      });
-      entry.keyAccessState = decision.state;
-      entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
-      if (decision.state === KEY_ACCESS.OPEN_BY_KEY && !entry.game?.hackedByKey) {
-        entry.game = keyWonGame(entry.config, now());
-        entry.closed = false;
-        entry.accessId = newBroadcastId();
-        entry.updatedAt = now();
-      }
     }
   };
 
@@ -129,6 +168,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+    // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+    // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+    accessEvents: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
@@ -174,6 +216,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       id,
       terminalPublic(id, entry),
     ])),
+    // Патч 517: при подключении игрок сразу видит, какие ворота уже пройдены.
+    accessEvents: Object.fromEntries(room.accessEvents || new Map()),
     // Патч 508: игрок при подключении получает текущий снапшот хранилища.
     // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
     partyStorage: storageSnapshot(room),
@@ -1109,6 +1153,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     depositToPartyStorage,
     withdrawFromPartyStorage,
     getPartyStorage,
+    getAccessEvents: (code) => Object.fromEntries(
+      (rooms.get(code)?.accessEvents || new Map()).entries(),
+    ),
     addKeyItemToStorage,
     restorePartyStorage,
     sweep,

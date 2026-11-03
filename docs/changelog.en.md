@@ -1,5 +1,27 @@
 # Changelog
 ---
+## Gates between points (patch 517)
+
+Plan item 9. Previously the linked check could only look at a win in the
+terminal mini-game. Now **any point** can be the source of a neutral access
+event, and that event lives **on the room**, not in a player's tab.
+
+- **Shared event journal.** Hacking a terminal, opening a point with a key or
+  a linked check, and a manual GM decision all produce the same event. It is
+  idempotent, arrives on join and is broadcast to every member on each
+  recompute.
+- **Gates without a key.** The second setup row now works even when no key is
+  required: until the chosen point produces an event, access stays closed;
+  after the event it opens. Sources are no longer limited to terminals —
+  locations, containers, merchants and terminals are all selectable.
+- **Gate chains.** If A opens B and B is the source for C, the server resolves
+  the whole chain in a few passes; cyclic links are bounded.
+- **Links visible to the GM.** The card shows "After: <point name>" with a
+  "gate passed / closed" badge; the location has a separate section listing
+  links and their state.
+- **Manual opening.** The GM can still unlock a location node by hand; gates
+  and keys do not override that decision.
+
 ## Server-side key checking and staying on the card grid (patch 516)
 
 Plan item 8. Access is now decided by the **server from the room state**, not

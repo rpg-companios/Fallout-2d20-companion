@@ -2,11 +2,12 @@
 
 /**
  * Патч 516: серверная проверка ключевой записи для точек доступа.
+ * Патч 517: ворота — событие другой точки, общее на комнату.
  *
- * Чистая функция без серверного состояния: решение принимается по снимку
- * общего хранилища комнаты и по состояниям терминалов. Клиент НЕ решает,
- * открыта точка или нет (урок 506). Контракт — разделы 7.3–7.4
- * `docs/key-items-and-gates-design.md`.
+ * Чистая функция без сетевого состояния: решение принимается по снимку
+ * общего хранилища комнаты, состояниям терминалов и журналу событий доступа.
+ * Клиент НЕ решает, открыта точка или нет (урок 506). Контракт — разделы
+ * 3.3–3.4 и 7.3–7.4 `docs/key-items-and-gates-design.md`.
  */
 
 const KEY_ACCESS = Object.freeze({
@@ -25,25 +26,40 @@ const hasKeyInStorage = (storage, keyItemId) => {
   );
 };
 
-/** Проверка считается пройденной, если привязанный терминал взломан. */
-const isCheckPassed = (terminalStates, linkedCheckId) => {
+/**
+ * Проверка считается пройденной, если привязанная точка уже дала событие.
+ * Патч 517: событие живёт на комнате, а не во вкладке игрока. Раньше ворота
+ * умели смотреть только на победу в мини-игре терминала.
+ */
+const isCheckPassed = (sources, linkedCheckId) => {
   const id = String(linkedCheckId || '').trim();
   if (!id) return false;
-  const states = terminalStates instanceof Map
-    ? Object.fromEntries(terminalStates.entries())
-    : (terminalStates || {});
+  const events = sources?.accessEvents instanceof Map
+    ? Object.fromEntries(sources.accessEvents.entries())
+    : (sources?.accessEvents || {});
+  if (events[id]) return true;
+  const states = sources?.terminalStates instanceof Map
+    ? Object.fromEntries(sources.terminalStates.entries())
+    : (sources?.terminalStates || {});
   return states[id]?.game?.status === 'won';
 };
 
 /**
  * @param {object} requirement  { requiredKeyItemId, keyRequirement, linkedCheckId }
- * @param {object} options      { storage, terminalStates }
+ * @param {object} options      { storage, terminalStates, accessEvents }
  * @returns {{ state: string, keyItemId: string, reason: string }}
  */
 const resolveKeyAccess = (requirement = {}, options = {}) => {
   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
   if (!keyItemId) {
-    return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+    // Патч 517: ворота работают и без требования ключа.
+    const linkedCheckId = String(requirement.linkedCheckId || '').trim();
+    if (!linkedCheckId) {
+      return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+    }
+    return isCheckPassed(options, linkedCheckId)
+      ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
+      : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
   }
   if (hasKeyInStorage(options.storage, keyItemId)) {
     return { state: KEY_ACCESS.OPEN_BY_KEY, keyItemId, reason: 'key-found' };
@@ -52,7 +68,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
   }
   const linkedCheckId = String(requirement.linkedCheckId || '').trim();
-  if (linkedCheckId && isCheckPassed(options.terminalStates, linkedCheckId)) {
+  if (linkedCheckId && isCheckPassed(options, linkedCheckId)) {
     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
   }
   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };

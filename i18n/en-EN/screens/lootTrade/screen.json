@@ -34,7 +34,10 @@
     "keyOptionalBadge": "optional",
     "hubKind": "location",
     "merchantKind": "merchant",
-    "lootKind": "container"
+    "lootKind": "container",
+    "gateAfter": "After: {name}",
+    "gateOpen": "gate passed",
+    "gatePending": "gate closed"
   },
   "form": {
     "createLootTitle": "New Loot Container",
@@ -77,11 +80,11 @@
     "keyEmpty": "No keys yet — create a card on the grid",
     "keyNoDescription": "no description",
     "keyRequiredLabel": "Mandatory",
-    "linkedCheckLabel": "Check (terminal / lock)",
-    "linkedCheckSearchPlaceholder": "Search terminals",
-    "linkedCheckEmpty": "No terminals yet",
-    "linkedCheckTerminal": "terminal",
-    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
+    "linkedCheckLabel": "Gate: event from another point",
+    "linkedCheckSearchPlaceholder": "Search points",
+    "linkedCheckEmpty": "No other points yet",
+    "linkedCheckTerminal": "event source",
+    "linkedCheckHint": "Until the chosen point produces an event (hack, key or the GM's decision), access stays closed. The event is shared by the whole room."
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -134,7 +137,11 @@
     "emptyLootKeep": "Keep",
     "hubKeysTitle": "Keys and notes in this location",
     "hubKeysEmpty": "Drag a key card onto the location",
-    "hubKeyDetach": "Move back to grid"
+    "hubKeyDetach": "Move back to grid",
+    "hubGatesTitle": "Gates between points",
+    "hubGatesEmpty": "No links between points yet",
+    "hubGatePassed": "passed",
+    "hubGatePending": "pending"
   },
   "catalog": {
     "titleLoot": "Add to Container",

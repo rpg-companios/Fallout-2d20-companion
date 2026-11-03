@@ -49,8 +49,8 @@ describe('516: чистое правило доступа', () => {
     ).state).toBe(KEY_ACCESS.OPEN);
     expect(hasKeyInStorage(storageWithKey('k1'), 'k1')).toBe(true);
     expect(hasKeyInStorage(storageWithKey('k1'), 'k2')).toBe(false);
-    expect(isCheckPassed({ t2: { game: { status: 'won' } } }, 't2')).toBe(true);
-    expect(isCheckPassed(new Map([['t2', { game: { status: 'won' } }]]), 't2')).toBe(true);
+    expect(isCheckPassed({ terminalStates: { t2: { game: { status: 'won' } } } }, 't2')).toBe(true);
+    expect(isCheckPassed({ terminalStates: new Map([['t2', { game: { status: 'won' } }]]) }, 't2')).toBe(true);
   });
 
   it('applyKeyAccessToSession помечает корень и вложенные узлы', () => {
@@ -177,9 +177,9 @@ describe('516: экран карточек и документация', () => {
   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('516');
-    expect(plan).toContain('Осталось после патча 516');
+    expect(plan).toContain('Осталось после патча 517');
     expect(plan).not.toContain('| 8 | ⏳');
-    expect(plan).toContain('Ворота между контейнерами');
+    expect(plan).toContain('Ворота между точками');
     expect(plan).toContain('две панели');
   });
 });

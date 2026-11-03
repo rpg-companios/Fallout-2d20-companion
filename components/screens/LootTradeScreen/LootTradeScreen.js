@@ -124,6 +124,8 @@ const ContainerCardCell = ({
   onEdit,
   onDelete,
   keyItemNames = {},
+  gateSourceNames = {},
+  gateEvents = {},
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -269,6 +271,20 @@ const ContainerCardCell = ({
           </>
         )}
       </View>
+
+      {Boolean(container.linkedCheckId) && (
+        <Text
+          testID={`card-gate-${container.id}`}
+          style={styles.cardMeta}
+          numberOfLines={1}
+        >
+          {formatLootTrade(tLootTrade('card.gateAfter'), {
+            name: gateSourceNames[container.linkedCheckId] || container.linkedCheckId,
+          })}
+          {' · '}
+          {tLootTrade(gateEvents[container.linkedCheckId] ? 'card.gateOpen' : 'card.gatePending')}
+        </Text>
+      )}
 
       {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
         <Text
@@ -1537,6 +1553,29 @@ export default function LootTradeScreen() {
     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
   }, [formatSingleRoomName]);
 
+  const gateSourceNames = useMemo(
+    () => Object.fromEntries(containers.map((c) => [c.id, c.name])),
+    [containers],
+  );
+  const gateEvents = useMemo(
+    () => roomRooms[activeLiveRoomCode]?.accessEvents || {},
+    [roomRooms, activeLiveRoomCode],
+  );
+
+  // Патч 517: ворота могут ссылаться на любую точку, а не только терминал.
+  const gateSources = useMemo(
+    () => containers
+      .filter((c) => c.id !== formModal?.initialContainer?.id)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        kindLabel: c.kind === CONTAINER_KIND.HUB
+          ? tLootTrade('card.hubKind')
+          : (c.kind === CONTAINER_KIND.TERMINAL ? tLootTrade('form.linkedCheckTerminal') : ''),
+      })),
+    [containers, formModal?.initialContainer?.id],
+  );
+
   const keyItemNames = useMemo(
     () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
     [keyItems],
@@ -1765,6 +1804,8 @@ export default function LootTradeScreen() {
                         container={cell}
                         roomLabel={roomLabel}
                         keyItemNames={keyItemNames}
+                        gateSourceNames={gateSourceNames}
+                        gateEvents={gateEvents}
                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
                         isDropTarget={Boolean(isHubCell && movingContainerId)}
                         canMoveToHub={!isHubCell && availableHubs.length > 0}
@@ -2204,6 +2245,32 @@ export default function LootTradeScreen() {
                 })}
               </View>
 
+              {/* Патч 517: видимые Мастеру связи между точками локации. */}
+              <View style={styles.hubKeysSection}>
+                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
+                {(() => {
+                  const linked = (activeContainer.links || [])
+                    .map((link) => containers.find((c) => c.id === link.containerId))
+                    .filter((child) => child?.linkedCheckId);
+                  if (linked.length === 0) {
+                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
+                  }
+                  return linked.map((child) => (
+                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
+                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
+                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
+                        {`${child.name} ← ${gateSourceNames[child.linkedCheckId] || child.linkedCheckId}`}
+                      </Text>
+                      <Text style={styles.hubKeyDetachText}>
+                        {tLootTrade(gateEvents[child.linkedCheckId]
+                          ? 'detail.hubGatePassed'
+                          : 'detail.hubGatePending')}
+                      </Text>
+                    </View>
+                  ));
+                })()}
+              </View>
+
               <ScrollView style={styles.itemsListContainer}>
                 {(activeContainer.links || []).length === 0 ? (
                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
@@ -2441,7 +2508,7 @@ export default function LootTradeScreen() {
         availableRooms={availableRooms}
         availableHubs={availableHubs}
         availableKeyItems={keyItems}
-        availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}
+        availableCheckContainers={gateSources}
         initialLinkedHubIds={
           formModal?.initialContainer?.id
             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)

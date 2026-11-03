@@ -698,7 +698,7 @@ const ContainerFormModal = ({
                           {check.name}
                         </Text>
                         <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
-                          {tLootTrade('form.linkedCheckTerminal')}
+                          {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
                         </Text>
                       </TouchableOpacity>
                     );

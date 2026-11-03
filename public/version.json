@@ -1,8 +1,9 @@
 {
-  "version": "516",
+  "version": "517",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
       "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
       "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
       "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
@@ -87,6 +88,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
       "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
       "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
       "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
