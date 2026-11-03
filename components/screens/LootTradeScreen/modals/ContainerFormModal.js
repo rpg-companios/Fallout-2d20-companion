@@ -27,6 +27,9 @@ import {
   normalizeSaleMarkupPercent,
   normalizeBuyDepreciationPercent,
   matchHubSuggestions,
+  KEY_REQUIREMENT,
+  normalizeKeyRequirement,
+  containerCanRequireKey,
 } from '../../../../domain/lootTrade';
 import { showRawAlert } from '../../../alerts/alertService';
 
@@ -39,6 +42,8 @@ const ContainerFormModal = ({
   availableRooms = EMPTY_ARRAY,
   availableHubs = EMPTY_ARRAY,
   initialLinkedHubIds = EMPTY_ARRAY,
+  availableKeyItems = EMPTY_ARRAY,
+  availableCheckContainers = EMPTY_ARRAY,
   onQuickCreateHub = null,
   onSave,
   onClose,
@@ -49,6 +54,7 @@ const ContainerFormModal = ({
   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
   const isHub = effectiveKind === CONTAINER_KIND.HUB;
   const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
+  const canRequireKey = containerCanRequireKey(effectiveKind);
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
   const initSessionKey = visible
     ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
@@ -69,6 +75,12 @@ const ContainerFormModal = ({
   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
+  // Патч 514: две строки требования доступа (ключ + проверка).
+  const [keyQuery, setKeyQuery] = useState('');
+  const [checkQuery, setCheckQuery] = useState('');
+  const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
+  const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
+  const [linkedCheckId, setLinkedCheckId] = useState('');
 
   useEffect(() => {
     if (!initSessionKey) return;
@@ -107,8 +119,25 @@ const ContainerFormModal = ({
         ? initialContainer.buyDepreciationPercent
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
     ));
+    setKeyQuery('');
+    setCheckQuery('');
+    setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
+    setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
+    setLinkedCheckId(String(initialContainer?.linkedCheckId || '').trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initSessionKey]);
+
+  const filteredKeys = useMemo(() => {
+    const q = keyQuery.trim().toLowerCase();
+    return (Array.isArray(availableKeyItems) ? availableKeyItems : [])
+      .filter((k) => !q || String(k?.name || '').toLowerCase().includes(q));
+  }, [availableKeyItems, keyQuery]);
+
+  const filteredChecks = useMemo(() => {
+    const q = checkQuery.trim().toLowerCase();
+    return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
+      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
+  }, [availableCheckContainers, checkQuery]);
 
   const combinedHubs = useMemo(() => {
     const map = new Map();
@@ -258,6 +287,9 @@ const ContainerFormModal = ({
         caps: resolvedCaps,
         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+        requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
+        keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
+        linkedCheckId: canRequireKey ? linkedCheckId : '',
       },
       capsRollInfo,
       isHub ? null : finalSelectedHubIds,
@@ -589,6 +621,103 @@ const ContainerFormModal = ({
                   keyboardType="number-pad"
                 />
                 <Text style={styles.hintText}>{tLootTrade('form.buyDepreciationHint')}</Text>
+              </>
+            )}
+
+            {canRequireKey && (
+              <>
+                <Text style={styles.label}>{tLootTrade('form.keyRequirementLabel')}</Text>
+                <TextInput
+                  testID="container-form-key-search"
+                  style={styles.input}
+                  value={keyQuery}
+                  onChangeText={setKeyQuery}
+                  placeholder={tLootTrade('form.keySearchPlaceholder')}
+                  placeholderTextColor="#8c8c8c"
+                />
+                <View style={styles.roomChips}>
+                  {filteredKeys.length === 0 ? (
+                    <Text style={styles.hintText}>{tLootTrade('form.keyEmpty')}</Text>
+                  ) : filteredKeys.map((key) => {
+                    const selected = key.id === requiredKeyItemId;
+                    return (
+                      <TouchableOpacity
+                        key={key.id}
+                        testID={`container-form-key-${key.id}`}
+                        style={[styles.roomChip, selected && styles.roomChipActive]}
+                        onPress={() => {
+                          setRequiredKeyItemId(selected ? '' : key.id);
+                          setKeyRequirement(selected ? KEY_REQUIREMENT.NONE : KEY_REQUIREMENT.OPTIONAL);
+                        }}
+                      >
+                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+                          {key.name}
+                        </Text>
+                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]} numberOfLines={1}>
+                          {key.description || tLootTrade('form.keyNoDescription')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {Boolean(requiredKeyItemId) && (
+                  <>
+                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
+                    <View style={styles.requirementRow}>
+                      <TouchableOpacity
+                        testID="container-form-key-required"
+                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
+                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
+                      >
+                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
+                          {tLootTrade('form.keyRequiredLabel')}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        testID="container-form-key-optional"
+                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
+                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
+                      >
+                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
+                          {tLootTrade('form.keyOptionalLabel')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+
+                <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
+                <TextInput
+                  testID="container-form-check-search"
+                  style={styles.input}
+                  value={checkQuery}
+                  onChangeText={setCheckQuery}
+                  placeholder={tLootTrade('form.linkedCheckSearchPlaceholder')}
+                  placeholderTextColor="#8c8c8c"
+                />
+                <View style={styles.roomChips}>
+                  {filteredChecks.length === 0 ? (
+                    <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
+                  ) : filteredChecks.map((check) => {
+                    const selected = check.id === linkedCheckId;
+                    return (
+                      <TouchableOpacity
+                        key={check.id}
+                        testID={`container-form-check-${check.id}`}
+                        style={[styles.roomChip, selected && styles.roomChipActive]}
+                        onPress={() => setLinkedCheckId(selected ? '' : check.id)}
+                      >
+                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+                          {check.name}
+                        </Text>
+                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+                          {tLootTrade('form.linkedCheckTerminal')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
               </>
             )}
           </ScrollView>
@@ -947,6 +1076,11 @@ export const lootTradeFormStyles = StyleSheet.create({
   },
   unitSegTextActive: {
     color: ADMIN_MODAL_PALETTE.text,
+  },
+  requirementRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   footer: {
     flexDirection: 'row',

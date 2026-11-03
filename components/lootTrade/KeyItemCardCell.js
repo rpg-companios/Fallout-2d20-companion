@@ -17,6 +17,7 @@ import {
   Modal,
   Dimensions,
   StyleSheet,
+  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
@@ -27,10 +28,42 @@ import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
 const MENU_WIDTH = 224;
 const MENU_HEIGHT = 100;
 
-const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
+const KeyItemCardCell = ({
+  keyItem,
+  roomLabel = '',
+  canMoveToHub = false,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onEdit,
+  onIssue,
+}) => {
   useLocale();
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
+  const dragCallbacks = useRef({});
+  dragCallbacks.current = { onDragStart, onDragMove, onDragEnd };
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+    onPanResponderGrant: (_evt, gesture) => {
+      dragCallbacks.current.onDragStart?.({ pageX: gesture.x0, pageY: gesture.y0 });
+    },
+    onPanResponderMove: (_evt, gesture) => {
+      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+      dragCallbacks.current.onDragMove?.({ pageX: gesture.moveX, pageY: gesture.moveY });
+    },
+    onPanResponderRelease: (_evt, gesture) => {
+      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+    },
+    onPanResponderTerminate: (_evt, gesture) => {
+      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+    },
+  })).current;
 
   const openMenu = (event) => {
     event?.stopPropagation?.();
@@ -56,6 +89,11 @@ const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
       onPress={onEdit}
       activeOpacity={0.82}
     >
+      {canMoveToHub && onDragStart && (
+        <View testID={`key-item-drag-${keyItem.id}`} {...panResponder.panHandlers} style={cardStyles.cardDragHandle}>
+          <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+        </View>
+      )}
       <View style={[cardStyles.cardHero, localStyles.cardHeroKey]}>
         <MaterialCommunityIcons name="key-variant" size={34} color="#f0e68c" />
       </View>

@@ -41,6 +41,7 @@ const KeyItemFormModal = ({
   visible,
   initialKeyItem = null,
   availableRooms = [],
+  availableParents = [],
   onSave,
   onClose,
 }) => {
@@ -49,13 +50,22 @@ const KeyItemFormModal = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [attachedTo, setAttachedTo] = useState('');
+  const [parentQuery, setParentQuery] = useState('');
 
   useEffect(() => {
     if (!visible) return;
     setName(initialKeyItem?.name || '');
     setDescription(initialKeyItem?.description || '');
     setRoomCode(initialKeyItem?.roomCode || '');
-  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode]);
+    setAttachedTo(initialKeyItem?.attachedTo || '');
+    setParentQuery('');
+  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode, initialKeyItem?.attachedTo]);
+
+  const filteredParents = availableParents.filter((parent) => (
+    !parentQuery.trim()
+    || String(parent?.name || '').toLowerCase().includes(parentQuery.trim().toLowerCase())
+  ));
 
   const handleSave = () => {
     const cleanName = name.trim();
@@ -68,6 +78,7 @@ const KeyItemFormModal = ({
       name: cleanName,
       description,
       roomCode,
+      attachedTo,
     });
   };
 
@@ -118,6 +129,46 @@ const KeyItemFormModal = ({
                 <Text style={styles.hintText}>{tLootTrade('form.roomsMultiHint')}</Text>
               </>
             )}
+
+            <Text style={styles.label}>{tLootTrade('keyItems.attachToLabel')}</Text>
+            <TextInput
+              testID="key-item-form-parent-search"
+              style={styles.input}
+              value={parentQuery}
+              onChangeText={setParentQuery}
+              placeholder={tLootTrade('keyItems.attachToSearchPlaceholder')}
+              placeholderTextColor="#8c8c8c"
+            />
+            <View style={styles.roomChips}>
+              <TouchableOpacity
+                testID="key-item-parent-none"
+                style={[styles.roomChip, !attachedTo && styles.roomChipActive]}
+                onPress={() => setAttachedTo('')}
+              >
+                <Text style={[styles.roomChipName, !attachedTo && styles.roomChipTextActive]}>
+                  {tLootTrade('keyItems.attachToNone')}
+                </Text>
+              </TouchableOpacity>
+              {filteredParents.map((parent) => {
+                const selected = parent.id === attachedTo;
+                return (
+                  <TouchableOpacity
+                    key={parent.id}
+                    testID={`key-item-parent-${parent.id}`}
+                    style={[styles.roomChip, selected && styles.roomChipActive]}
+                    onPress={() => setAttachedTo(selected ? '' : parent.id)}
+                  >
+                    <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+                      {parent.name}
+                    </Text>
+                    <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+                      {parent.kindLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.hintText}>{tLootTrade('keyItems.attachToHint')}</Text>
 
             <Text style={styles.label}>{tLootTrade('keyItems.descriptionLabel')}</Text>
             <View style={extraStyles.tagRow}>

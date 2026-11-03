@@ -29,6 +29,53 @@ export const CONTAINER_KIND = Object.freeze({
   TERMINAL: 'terminal',
 });
 
+// Патч 514: «замок» — будущая мини-игра. Вид точки зарезервирован, но пока
+// не создаётся и не нормализуется: серверная проверка ключа (шаг 3.2) и
+// ворота (шаг 4) придут отдельными патчами. Нейтральное событие `hacked`
+// остаётся контрактом из docs/key-items-and-gates-design.md.
+export const RESERVED_LOCK_KIND = 'lock';
+
+/** Обязательность ключа для точки доступа. */
+export const KEY_REQUIREMENT = Object.freeze({
+  NONE: 'none',
+  OPTIONAL: 'optional',
+  REQUIRED: 'required',
+});
+
+/** Ключ можно вложить в локацию, контейнер или торговца, но НЕ в терминал. */
+export const containerCanHoldKey = (kind) => (
+  kind === CONTAINER_KIND.HUB
+  || kind === CONTAINER_KIND.LOOT
+  || kind === CONTAINER_KIND.MERCHANT
+);
+
+/** Точка, которая может требовать ключ: контейнер, торговец, терминал, замок. */
+export const containerCanRequireKey = (kind) => (
+  kind === CONTAINER_KIND.HUB
+  || kind === CONTAINER_KIND.LOOT
+  || kind === CONTAINER_KIND.MERCHANT
+  || kind === CONTAINER_KIND.TERMINAL
+  || kind === RESERVED_LOCK_KIND
+);
+
+export const normalizeKeyItemIds = (raw) => {
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set();
+  return list
+    .map((id) => String(id || '').trim())
+    .filter((id) => {
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+};
+
+export const normalizeKeyRequirement = (raw) => {
+  if (raw === KEY_REQUIREMENT.REQUIRED || raw === true) return KEY_REQUIREMENT.REQUIRED;
+  if (raw === KEY_REQUIREMENT.OPTIONAL) return KEY_REQUIREMENT.OPTIONAL;
+  return KEY_REQUIREMENT.NONE;
+};
+
 /**
  * Маркер терминала внутри узла локации.
  *
@@ -558,6 +605,16 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
       : DEFAULT_BUY_DEPRECIATION_PERCENT,
     items,
     links,
+    // Патч 514: вложенные ключевые записи и две строки требования доступа.
+    // Терминал ключи не содержит ни при создании, ни перетаскиванием.
+    keyItemIds: containerCanHoldKey(kind) ? normalizeKeyItemIds(raw.keyItemIds) : [],
+    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+    keyRequirement: containerCanRequireKey(kind)
+      ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
+      : KEY_REQUIREMENT.NONE,
+    linkedCheckId: containerCanRequireKey(kind)
+      ? String(raw.linkedCheckId || '').trim()
+      : '',
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };

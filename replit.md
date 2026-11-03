@@ -17,6 +17,8 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
   a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
 - `docs/key-items-and-gates-design.md` (sections 7 and 10) before touching key
   records, container/hub placement, drag handles or access requirements.
+- `docs/roadmap.md` — the live plan; update it in EVERY patch and list the
+  remaining items in the reply to the owner.
 
 This project is evolving from a Fallout-only application into a universal
 TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform

@@ -28,7 +28,13 @@
     "edit": "Edit",
     "delete": "Delete",
     "copySuffix": "copy",
-    "terminalDifficulty": "Difficulty {difficulty}"
+    "terminalDifficulty": "Difficulty {difficulty}",
+    "requiresKey": "Key: {name}",
+    "keyRequiredBadge": "mandatory",
+    "keyOptionalBadge": "optional",
+    "hubKind": "location",
+    "merchantKind": "merchant",
+    "lootKind": "container"
   },
   "form": {
     "createLootTitle": "New Loot Container",
@@ -65,7 +71,19 @@
     "editTerminalTitle": "Terminal settings",
     "terminalDifficultyLabel": "Difficulty",
     "createKeyItemTitle": "New key record",
-    "editKeyItemTitle": "Edit key record"
+    "editKeyItemTitle": "Edit key record",
+    "keyRequirementLabel": "Required key",
+    "keySearchPlaceholder": "Search keys and notes",
+    "keyEmpty": "No keys yet — create a card on the grid",
+    "keyNoDescription": "no description",
+    "keyMandatoryLabel": "Is it mandatory?",
+    "keyRequiredLabel": "Mandatory",
+    "keyOptionalLabel": "Optional",
+    "linkedCheckLabel": "Check (terminal / lock)",
+    "linkedCheckSearchPlaceholder": "Search terminals",
+    "linkedCheckEmpty": "No terminals yet",
+    "linkedCheckTerminal": "terminal",
+    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -115,7 +133,10 @@
     "deleteHubWithChildren": "Delete all",
     "emptyLootPromptTitle": "Container is empty. Delete it?",
     "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
-    "emptyLootKeep": "Keep"
+    "emptyLootKeep": "Keep",
+    "hubKeysTitle": "Keys and notes in this location",
+    "hubKeysEmpty": "Drag a key card onto the location",
+    "hubKeyDetach": "Move back to grid"
   },
   "catalog": {
     "titleLoot": "Add to Container",
@@ -251,7 +272,11 @@
     "noRoom": "No connected GM room",
     "failed": "Could not add the key",
     "hint": "A name is required; the description may be empty. The card appears on the screen after saving.",
-    "saved": "Key saved on the Loot / Trade screen"
+    "saved": "Key saved on the Loot / Trade screen",
+    "attachToLabel": "Part of",
+    "attachToSearchPlaceholder": "Search locations, containers or merchants",
+    "attachToNone": "None (on the grid)",
+    "attachToHint": "The key reaches players with the chosen card. It cannot be placed in a terminal."
   },
   "terminal": {
     "title": "Terminal",

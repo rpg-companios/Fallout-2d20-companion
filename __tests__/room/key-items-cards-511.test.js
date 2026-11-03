@@ -13,12 +13,14 @@ describe('511: ключи как карточки на экране «Добыч
   it('на сетке есть плитка создания и карточки сохранённых ключей', () => {
     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
     expect(screen).toContain("{ type: 'createKeyItem', id: '__create_key_item__' }");
-    expect(screen).toContain("...keyItems.map((k) => ({ type: 'keyItem', ...k }))");
+    // Патч 514: вложенные ключи уходят с корня в локацию.
+    expect(screen).toContain("...keyItems");
+    expect(screen).toContain("filter((k) => !attachedKeyItemIds.has(k.id))");
     expect(screen).toContain("if (cell.type === 'createKeyItem')");
     expect(screen).toContain("if (cell.type === 'keyItem')");
     expect(screen).toContain('testID="create-key-item-cell"');
     expect(screen).toContain('<KeyItemCardCell');
-    expect(screen).toContain('onEdit={() => setKeyItemForm({ initialKeyItem: cell })}');
+    expect(screen).toContain('onEdit={() => setKeyItemForm({ initialKeyItem: { ...cell, attachedTo } })}');
     expect(screen).toContain('onIssue={() => void handleIssueKeyItem(cell)}');
     expect(screen).toContain('db.getGmKeyItems()');
     expect(screen).toContain('setKeyItems(freshList || [])');

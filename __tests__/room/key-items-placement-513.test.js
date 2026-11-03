@@ -11,11 +11,12 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 const design = read('docs/key-items-and-gates-design.md');
 
 describe('513: вложенность ключей, перетаскивание и два вида требования', () => {
-  it('статус честно говорит, что код шага 3 ещё не начат', () => {
+  it('статус разделяет документ 513 и первую половину кода 514', () => {
     expect(design).toContain('Обновление 7 (патч 513');
-    expect(design).toContain('не реализованы');
-    expect(design).toContain('код не начат');
     expect(design).toContain('только документы и номер версии');
+    expect(design).toContain('7.6 Патч 514: что из этого уже в коде');
+    expect(design).toContain('серверная проверка ключа ещё не начата');
+    expect(design).toContain('docs/roadmap.md');
   });
 
   it('зафиксирована таблица: кто выдаётся, кто содержит ключ, кто требует', () => {

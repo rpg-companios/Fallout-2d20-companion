@@ -1,0 +1,3441 @@
+diff --git a/__tests__/room/key-items-cards-511.test.js b/__tests__/room/key-items-cards-511.test.js
+index 12234e7..7bea3ec 100644
+--- a/__tests__/room/key-items-cards-511.test.js
++++ b/__tests__/room/key-items-cards-511.test.js
+@@ -13,12 +13,14 @@ describe('511: ключи как карточки на экране «Добыч
+   it('на сетке есть плитка создания и карточки сохранённых ключей', () => {
+     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+     expect(screen).toContain("{ type: 'createKeyItem', id: '__create_key_item__' }");
+-    expect(screen).toContain("...keyItems.map((k) => ({ type: 'keyItem', ...k }))");
++    // Патч 514: вложенные ключи уходят с корня в локацию.
++    expect(screen).toContain("...keyItems");
++    expect(screen).toContain("filter((k) => !attachedKeyItemIds.has(k.id))");
+     expect(screen).toContain("if (cell.type === 'createKeyItem')");
+     expect(screen).toContain("if (cell.type === 'keyItem')");
+     expect(screen).toContain('testID="create-key-item-cell"');
+     expect(screen).toContain('<KeyItemCardCell');
+-    expect(screen).toContain('onEdit={() => setKeyItemForm({ initialKeyItem: cell })}');
++    expect(screen).toContain('onEdit={() => setKeyItemForm({ initialKeyItem: { ...cell, attachedTo } })}');
+     expect(screen).toContain('onIssue={() => void handleIssueKeyItem(cell)}');
+     expect(screen).toContain('db.getGmKeyItems()');
+     expect(screen).toContain('setKeyItems(freshList || [])');
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+new file mode 100644
+index 0000000..a8e5de2
+--- /dev/null
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -0,0 +1,160 @@
++// Приёмочный тест 514: «правим ui карточек и создаём для них поля и
++// требования». Проверяем доменные поля, две строки формы, вложенность ключа,
++// перетаскивание и живой план. Серверная проверка ключа в этот патч НЕ входит
++// (тезис 8 docs/roadmap.md).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  CONTAINER_KIND,
++  KEY_REQUIREMENT,
++  RESERVED_LOCK_KIND,
++  containerCanHoldKey,
++  containerCanRequireKey,
++  normalizeContainerEntity,
++  normalizeKeyItemIds,
++  normalizeKeyRequirement,
++} from '../../domain/lootTrade.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++describe('514: поля требований', () => {
++  it('три режима обязательности и зарезервированный замок', () => {
++    expect(KEY_REQUIREMENT.NONE).toBe('none');
++    expect(KEY_REQUIREMENT.OPTIONAL).toBe('optional');
++    expect(KEY_REQUIREMENT.REQUIRED).toBe('required');
++    expect(RESERVED_LOCK_KIND).toBe('lock');
++    expect(normalizeKeyRequirement('required')).toBe(KEY_REQUIREMENT.REQUIRED);
++    expect(normalizeKeyRequirement(true)).toBe(KEY_REQUIREMENT.REQUIRED);
++    expect(normalizeKeyRequirement('optional')).toBe(KEY_REQUIREMENT.OPTIONAL);
++    expect(normalizeKeyRequirement('мусор')).toBe(KEY_REQUIREMENT.NONE);
++    expect(normalizeKeyItemIds(['a', 'a', '', 'b'])).toEqual(['a', 'b']);
++  });
++
++  it('ключ вкладывается в локацию/контейнер/торговца, но не в терминал', () => {
++    expect(containerCanHoldKey(CONTAINER_KIND.HUB)).toBe(true);
++    expect(containerCanHoldKey(CONTAINER_KIND.LOOT)).toBe(true);
++    expect(containerCanHoldKey(CONTAINER_KIND.MERCHANT)).toBe(true);
++    expect(containerCanHoldKey(CONTAINER_KIND.TERMINAL)).toBe(false);
++    expect(containerCanRequireKey(CONTAINER_KIND.TERMINAL)).toBe(true);
++    expect(containerCanRequireKey(RESERVED_LOCK_KIND)).toBe(true);
++  });
++
++  it('нормализация сохраняет поля у контейнера и чистит их у терминала', () => {
++    const loot = normalizeContainerEntity({
++      id: 'c1', kind: CONTAINER_KIND.LOOT, name: 'Сейф',
++      keyItemIds: ['k1', 'k1', ''], requiredKeyItemId: 'k1',
++      keyRequirement: KEY_REQUIREMENT.OPTIONAL, linkedCheckId: 'term1',
++    });
++    expect(loot.keyItemIds).toEqual(['k1']);
++    expect(loot.requiredKeyItemId).toBe('k1');
++    expect(loot.keyRequirement).toBe(KEY_REQUIREMENT.OPTIONAL);
++    expect(loot.linkedCheckId).toBe('term1');
++
++    const terminal = normalizeContainerEntity({
++      id: 't1', kind: CONTAINER_KIND.TERMINAL, name: 'Терминал',
++      keyItemIds: ['k1'], requiredKeyItemId: 'k2',
++      keyRequirement: KEY_REQUIREMENT.REQUIRED, linkedCheckId: 'term2',
++    });
++    expect(terminal.keyItemIds).toEqual([]);
++    expect(terminal.requiredKeyItemId).toBe('k2');
++    expect(terminal.keyRequirement).toBe(KEY_REQUIREMENT.REQUIRED);
++    expect(terminal.linkedCheckId).toBe('term2');
++  });
++});
++
++describe('514: две строки настройки в форме точки', () => {
++  const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++
++  it('первая строка — поиск и список ключей с полем «Обязателен?»', () => {
++    expect(form).toContain('availableKeyItems');
++    expect(form).toContain('testID="container-form-key-search"');
++    expect(form).toContain('container-form-key-required');
++    expect(form).toContain('container-form-key-optional');
++    expect(form).toContain("tLootTrade('form.keyMandatoryLabel')");
++    expect(form).toContain('styles.roomChips');
++  });
++
++  it('вторая строка — поиск и список терминалов / замков', () => {
++    expect(form).toContain('availableCheckContainers');
++    expect(form).toContain('testID="container-form-check-search"');
++    expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
++    expect(screen).toContain('availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}');
++  });
++
++  it('поля уезжают в сохранение и показываются на карточке', () => {
++    expect(form).toContain('requiredKeyItemId: canRequireKey ? requiredKeyItemId');
++    expect(form).toContain('keyRequirement: canRequireKey && requiredKeyItemId');
++    expect(form).toContain('linkedCheckId: canRequireKey ? linkedCheckId');
++    expect(screen).toContain('card-requires-key-');
++    expect(screen).toContain("'card.keyRequiredBadge'");
++  });
++});
++
++describe('514: вложенность и перетаскивание', () => {
++  const keyForm = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
++  const card = read('components/lootTrade/KeyItemCardCell.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++
++  it('у ключа есть строка «Часть чего» без терминалов', () => {
++    expect(keyForm).toContain('availableParents');
++    expect(keyForm).toContain('testID="key-item-form-parent-search"');
++    expect(keyForm).toContain("tLootTrade('keyItems.attachToLabel')");
++    expect(keyForm).toContain('attachedTo');
++    expect(screen).toContain('containerCanHoldKey(c.kind)');
++  });
++
++  it('у всех четырёх карточек перетаскивание, ключ уходит в локацию', () => {
++    expect(card).toContain('arrow-all');
++    expect(card).toContain('cardStyles.cardDragHandle');
++    expect(card).toContain('PanResponder.create');
++    expect(screen).toContain('const handleMoveKeyItemIntoHub');
++    expect(screen).toContain('setMovingKeyItemId');
++    expect(screen).toContain('const attachedKeyItemIds');
++    expect(screen).toContain('hubKeysSection');
++    expect(screen).toContain('hub-key-detach-');
++  });
++
++  it('пункт выдачи ключа сохранён (исключение совместимости)', () => {
++    expect(card).toContain('key-item-issue-');
++    expect(screen).toContain('const handleIssueKeyItem');
++  });
++
++  it('правило 512 не нарушено: форма ключа берёт каркас соседней формы', () => {
++    expect(keyForm).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
++  });
++});
++
++describe('514: словари и живой план', () => {
++  it('все новые подписи парные RU/EN', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    for (const [section, key] of [
++      ['form', 'keyRequirementLabel'], ['form', 'keyMandatoryLabel'],
++      ['form', 'keyRequiredLabel'], ['form', 'keyOptionalLabel'],
++      ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
++      ['card', 'requiresKey'], ['card', 'hubKind'],
++      ['keyItems', 'attachToLabel'], ['keyItems', 'attachToHint'],
++      ['detail', 'hubKeysTitle'], ['detail', 'hubKeyDetach'],
++    ]) {
++      expect(ru[section][key]).toBeTruthy();
++      expect(en[section][key]).toBeTruthy();
++    }
++  });
++
++  it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
++    const plan = read('docs/roadmap.md');
++    expect(plan).toContain('514');
++    expect(plan).toContain('Осталось после патча 514');
++    expect(plan).toContain('Серверная проверка ключа');
++    expect(plan).toContain('Ворота между контейнерами');
++    expect(plan).toContain('две панели');
++    expect(plan).toContain('нет проверок на стоимость');
++    expect(plan).toContain('Мини-игра взлома замков');
++    expect(read('docs/agents/README.md')).toContain('docs/roadmap.md');
++    expect(read('replit.md')).toContain('docs/roadmap.md');
++  });
++});
+diff --git a/__tests__/room/key-items-placement-513.test.js b/__tests__/room/key-items-placement-513.test.js
+index b40e504..95a6c6d 100644
+--- a/__tests__/room/key-items-placement-513.test.js
++++ b/__tests__/room/key-items-placement-513.test.js
+@@ -11,11 +11,12 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+ const design = read('docs/key-items-and-gates-design.md');
+ 
+ describe('513: вложенность ключей, перетаскивание и два вида требования', () => {
+-  it('статус честно говорит, что код шага 3 ещё не начат', () => {
++  it('статус разделяет документ 513 и первую половину кода 514', () => {
+     expect(design).toContain('Обновление 7 (патч 513');
+-    expect(design).toContain('не реализованы');
+-    expect(design).toContain('код не начат');
+     expect(design).toContain('только документы и номер версии');
++    expect(design).toContain('7.6 Патч 514: что из этого уже в коде');
++    expect(design).toContain('серверная проверка ключа ещё не начата');
++    expect(design).toContain('docs/roadmap.md');
+   });
+ 
+   it('зафиксирована таблица: кто выдаётся, кто содержит ключ, кто требует', () => {
+diff --git a/components/lootTrade/KeyItemCardCell.js b/components/lootTrade/KeyItemCardCell.js
+index af04306..771d014 100644
+--- a/components/lootTrade/KeyItemCardCell.js
++++ b/components/lootTrade/KeyItemCardCell.js
+@@ -17,6 +17,7 @@ import {
+   Modal,
+   Dimensions,
+   StyleSheet,
++  PanResponder,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../i18n/locale';
+@@ -27,10 +28,42 @@ import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
+ const MENU_WIDTH = 224;
+ const MENU_HEIGHT = 100;
+ 
+-const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
++const KeyItemCardCell = ({
++  keyItem,
++  roomLabel = '',
++  canMoveToHub = false,
++  onDragStart,
++  onDragMove,
++  onDragEnd,
++  onEdit,
++  onIssue,
++}) => {
+   useLocale();
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
++  const dragCallbacks = useRef({});
++  dragCallbacks.current = { onDragStart, onDragMove, onDragEnd };
++  const panResponder = useRef(PanResponder.create({
++    onStartShouldSetPanResponderCapture: () => true,
++    onMoveShouldSetPanResponderCapture: () => true,
++    onStartShouldSetPanResponder: () => true,
++    onMoveShouldSetPanResponder: () => true,
++    onPanResponderTerminationRequest: () => false,
++    onShouldBlockNativeResponder: () => true,
++    onPanResponderGrant: (_evt, gesture) => {
++      dragCallbacks.current.onDragStart?.({ pageX: gesture.x0, pageY: gesture.y0 });
++    },
++    onPanResponderMove: (_evt, gesture) => {
++      if (gesture.moveX === 0 && gesture.moveY === 0) return;
++      dragCallbacks.current.onDragMove?.({ pageX: gesture.moveX, pageY: gesture.moveY });
++    },
++    onPanResponderRelease: (_evt, gesture) => {
++      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
++    },
++    onPanResponderTerminate: (_evt, gesture) => {
++      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
++    },
++  })).current;
+ 
+   const openMenu = (event) => {
+     event?.stopPropagation?.();
+@@ -56,6 +89,11 @@ const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
+       onPress={onEdit}
+       activeOpacity={0.82}
+     >
++      {canMoveToHub && onDragStart && (
++        <View testID={`key-item-drag-${keyItem.id}`} {...panResponder.panHandlers} style={cardStyles.cardDragHandle}>
++          <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
++        </View>
++      )}
+       <View style={[cardStyles.cardHero, localStyles.cardHeroKey]}>
+         <MaterialCommunityIcons name="key-variant" size={34} color="#f0e68c" />
+       </View>
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index e654114..b4677d3 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -31,6 +31,9 @@ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
+ import {
+   CONTAINER_KIND,
+   CONTAINER_KIND_SORT_ORDER,
++  containerCanHoldKey,
++  containerCanRequireKey,
++  KEY_REQUIREMENT,
+   addOrMergeContainerItem,
+   analyzeHubDeletion,
+   buildHubSessionNodes,
+@@ -120,6 +123,7 @@ const ContainerCardCell = ({
+   onDuplicate,
+   onEdit,
+   onDelete,
++  keyItemNames = {},
+   onDragStart,
+   onDragMove,
+   onDragEnd,
+@@ -266,6 +270,22 @@ const ContainerCardCell = ({
+         )}
+       </View>
+ 
++      {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
++        <Text
++          testID={`card-requires-key-${container.id}`}
++          style={styles.cardMeta}
++          numberOfLines={1}
++        >
++          {formatLootTrade(tLootTrade('card.requiresKey'), {
++            name: keyItemNames[container.requiredKeyItemId] || container.requiredKeyItemId,
++          })}
++          {' · '}
++          {tLootTrade(container.keyRequirement === KEY_REQUIREMENT.REQUIRED
++            ? 'card.keyRequiredBadge'
++            : 'card.keyOptionalBadge')}
++        </Text>
++      )}
++
+       <TouchableOpacity
+         ref={menuBtnRef}
+         style={styles.cardActionButton}
+@@ -367,6 +387,7 @@ export default function LootTradeScreen() {
+   const [hubPickerOpen, setHubPickerOpen] = useState(false);
+   const [moveToHubTarget, setMoveToHubTarget] = useState(null); // container для переноса через меню ⋮
+   const [movingContainerId, setMovingContainerId] = useState(null);
++  const [movingKeyItemId, setMovingKeyItemId] = useState(null); // патч 514: перетаскивание ключа в локацию
+   const [drag, setDrag] = useState(null); // { container, x, y }
+   const hubRefs = useRef({});
+   const hubDropBounds = useRef({});
+@@ -779,6 +800,23 @@ export default function LootTradeScreen() {
+       ...draft,
+       id: draft.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+     });
++    // Патч 514: «ключ должен быть частью чего-либо». Привязка хранится в
++    // родителе (keyItemIds), поэтому правки шаблона не гасят добытую запись.
++    const attachedTo = String(draft.attachedTo || '').trim();
++    if (saved?.id) {
++      const currentList = await db.getGmContainersList();
++      for (const parent of currentList || []) {
++        const holds = (parent.keyItemIds || []).includes(saved.id);
++        const shouldHold = attachedTo === parent.id;
++        if (holds === shouldHold) continue;
++        await persistAndSyncContainer({
++          ...parent,
++          keyItemIds: shouldHold
++            ? [...(parent.keyItemIds || []), saved.id]
++            : (parent.keyItemIds || []).filter((id) => id !== saved.id),
++        });
++      }
++    }
+     const freshList = await db.getGmKeyItems();
+     setKeyItems(freshList || []);
+     setKeyItemForm(null);
+@@ -808,6 +846,34 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  const handleMoveKeyItemIntoHub = async (keyItemId, hubId) => {
++    if (!keyItemId || !hubId) return;
++    const currentList = await db.getGmContainersList();
++    for (const parent of currentList || []) {
++      const holds = (parent.keyItemIds || []).includes(keyItemId);
++      const shouldHold = parent.id === hubId;
++      if (holds === shouldHold) continue;
++      await persistAndSyncContainer({
++        ...parent,
++        keyItemIds: shouldHold
++          ? [...(parent.keyItemIds || []), keyItemId]
++          : (parent.keyItemIds || []).filter((id) => id !== keyItemId),
++      });
++    }
++    setMovingKeyItemId(null);
++    setMovingContainerId(null);
++    setDrag(null);
++    hubDropBounds.current = {};
++  };
++
++  const handleDetachKeyItem = async (keyItemId) => {
++    if (!activeContainer || !keyItemId) return;
++    await persistAndSyncContainer({
++      ...activeContainer,
++      keyItemIds: (activeContainer.keyItemIds || []).filter((id) => id !== keyItemId),
++    });
++  };
++
+   const handleMoveCardIntoHub = async (cardId, hubId) => {
+     if (!cardId || !hubId) return;
+     const card = containers.find((c) => c.id === cardId);
+@@ -829,6 +895,7 @@ export default function LootTradeScreen() {
+       await loadData();
+     }
+     setMovingContainerId(null);
++    setMovingKeyItemId(null);
+     setDrag(null);
+     hubDropBounds.current = {};
+   };
+@@ -866,7 +933,9 @@ export default function LootTradeScreen() {
+   const handleDragStart = async (point, card) => {
+     if (!card || card.kind === CONTAINER_KIND.HUB) return;
+     hubDropBounds.current = {};
+-    setMovingContainerId(card.id);
++    const isKeyItem = card.type === 'keyItem';
++    setMovingKeyItemId(isKeyItem ? card.id : null);
++    setMovingContainerId(isKeyItem ? null : card.id);
+     setDrag({ container: card, x: point.pageX, y: point.pageY });
+     await measureHubDropTargets();
+   };
+@@ -884,9 +953,12 @@ export default function LootTradeScreen() {
+       && point.pageY >= b.y
+       && point.pageY <= b.y + b.height
+     ));
+-    if (hit && movingContainerId) {
++    if (hit && movingKeyItemId) {
++      await handleMoveKeyItemIntoHub(movingKeyItemId, hit[0]);
++    } else if (hit && movingContainerId) {
+       await handleMoveCardIntoHub(movingContainerId, hit[0]);
+     } else {
++      setMovingKeyItemId(null);
+       setMovingContainerId(null);
+       setDrag(null);
+     }
+@@ -1461,6 +1533,31 @@ export default function LootTradeScreen() {
+     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
+   }, [formatSingleRoomName]);
+ 
++  const keyItemNames = useMemo(
++    () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
++    [keyItems],
++  );
++
++  const availableParents = useMemo(
++    () => containers
++      .filter((c) => containerCanHoldKey(c.kind))
++      .map((c) => ({
++        id: c.id,
++        name: c.name,
++        kindLabel: c.kind === CONTAINER_KIND.HUB
++          ? tLootTrade('card.hubKind')
++          : (c.kind === CONTAINER_KIND.MERCHANT
++            ? tLootTrade('card.merchantKind')
++            : tLootTrade('card.lootKind')),
++      })),
++    [containers],
++  );
++
++  const attachedKeyItemIds = useMemo(
++    () => new Set(containers.flatMap((c) => c.keyItemIds || [])),
++    [containers],
++  );
++
+   const gridItems = [
+     { type: 'createHub', id: '__create_hub__' },
+     { type: 'createLoot', id: '__create_loot__' },
+@@ -1469,7 +1566,10 @@ export default function LootTradeScreen() {
+     { type: 'createKeyItem', id: '__create_key_item__' },
+     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
+     // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
+-    ...keyItems.map((k) => ({ type: 'keyItem', ...k })),
++    // Патч 514: вложенные в локацию/контейнер/торговца уходят с корня.
++    ...keyItems
++      .filter((k) => !attachedKeyItemIds.has(k.id))
++      .map((k) => ({ type: 'keyItem', ...k })),
+   ];
+ 
+   const rows = [];
+@@ -1635,12 +1735,17 @@ export default function LootTradeScreen() {
+                     }
+                     if (cell.type === 'keyItem') {
+                       const roomRecord = roomByCode[cell.roomCode];
++                      const attachedTo = containers.find((c) => (c.keyItemIds || []).includes(cell.id))?.id || '';
+                       return (
+                         <KeyItemCardCell
+                           key={cell.id}
+                           keyItem={cell}
+                           roomLabel={roomRecord?.name || ''}
+-                          onEdit={() => setKeyItemForm({ initialKeyItem: cell })}
++                          canMoveToHub={availableHubs.length > 0}
++                          onDragStart={availableHubs.length > 0 ? (point) => handleDragStart(point, cell) : undefined}
++                          onDragMove={availableHubs.length > 0 ? handleDragMove : undefined}
++                          onDragEnd={availableHubs.length > 0 ? handleDragEnd : undefined}
++                          onEdit={() => setKeyItemForm({ initialKeyItem: { ...cell, attachedTo } })}
+                           onIssue={() => void handleIssueKeyItem(cell)}
+                         />
+                       );
+@@ -1655,6 +1760,7 @@ export default function LootTradeScreen() {
+                         key={cell.id}
+                         container={cell}
+                         roomLabel={roomLabel}
++                        keyItemNames={keyItemNames}
+                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
+                         isDropTarget={Boolean(isHubCell && movingContainerId)}
+                         canMoveToHub={!isHubCell && availableHubs.length > 0}
+@@ -2071,6 +2177,29 @@ export default function LootTradeScreen() {
+                 <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
+               </TouchableOpacity>
+ 
++              <View style={styles.hubKeysSection}>
++                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubKeysTitle')}</Text>
++                {(activeContainer.keyItemIds || []).length === 0 ? (
++                  <Text style={styles.emptyListText}>{tLootTrade('detail.hubKeysEmpty')}</Text>
++                ) : (activeContainer.keyItemIds || []).map((keyId) => {
++                  const record = keyItems.find((k) => k.id === keyId);
++                  if (!record) return null;
++                  return (
++                    <View key={keyId} testID={`hub-key-${keyId}`} style={styles.hubKeyRow}>
++                      <MaterialCommunityIcons name="key-variant" size={18} color="#d4af37" />
++                      <Text style={styles.hubKeyRowName} numberOfLines={1}>{record.name}</Text>
++                      <TouchableOpacity
++                        testID={`hub-key-detach-${keyId}`}
++                        style={styles.hubKeyDetachBtn}
++                        onPress={() => void handleDetachKeyItem(keyId)}
++                      >
++                        <Text style={styles.hubKeyDetachText}>{tLootTrade('detail.hubKeyDetach')}</Text>
++                      </TouchableOpacity>
++                    </View>
++                  );
++                })}
++              </View>
++
+               <ScrollView style={styles.itemsListContainer}>
+                 {(activeContainer.links || []).length === 0 ? (
+                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+@@ -2297,6 +2426,7 @@ export default function LootTradeScreen() {
+         visible={Boolean(keyItemForm)}
+         initialKeyItem={keyItemForm?.initialKeyItem || null}
+         availableRooms={availableRooms}
++        availableParents={availableParents}
+         onSave={handleSaveKeyItem}
+         onClose={() => setKeyItemForm(null)}
+       />
+@@ -2306,6 +2436,8 @@ export default function LootTradeScreen() {
+         initialContainer={formModal?.initialContainer || null}
+         availableRooms={availableRooms}
+         availableHubs={availableHubs}
++        availableKeyItems={keyItems}
++        availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}
+         initialLinkedHubIds={
+           formModal?.initialContainer?.id
+             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 8c440de..8e8b436 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -27,6 +27,9 @@ import {
+   normalizeSaleMarkupPercent,
+   normalizeBuyDepreciationPercent,
+   matchHubSuggestions,
++  KEY_REQUIREMENT,
++  normalizeKeyRequirement,
++  containerCanRequireKey,
+ } from '../../../../domain/lootTrade';
+ import { showRawAlert } from '../../../alerts/alertService';
+ 
+@@ -39,6 +42,8 @@ const ContainerFormModal = ({
+   availableRooms = EMPTY_ARRAY,
+   availableHubs = EMPTY_ARRAY,
+   initialLinkedHubIds = EMPTY_ARRAY,
++  availableKeyItems = EMPTY_ARRAY,
++  availableCheckContainers = EMPTY_ARRAY,
+   onQuickCreateHub = null,
+   onSave,
+   onClose,
+@@ -49,6 +54,7 @@ const ContainerFormModal = ({
+   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
+   const isHub = effectiveKind === CONTAINER_KIND.HUB;
+   const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
++  const canRequireKey = containerCanRequireKey(effectiveKind);
+   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
+   const initSessionKey = visible
+     ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
+@@ -69,6 +75,12 @@ const ContainerFormModal = ({
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
+   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
++  // Патч 514: две строки требования доступа (ключ + проверка).
++  const [keyQuery, setKeyQuery] = useState('');
++  const [checkQuery, setCheckQuery] = useState('');
++  const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
++  const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
++  const [linkedCheckId, setLinkedCheckId] = useState('');
+ 
+   useEffect(() => {
+     if (!initSessionKey) return;
+@@ -107,9 +119,26 @@ const ContainerFormModal = ({
+         ? initialContainer.buyDepreciationPercent
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     ));
++    setKeyQuery('');
++    setCheckQuery('');
++    setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
++    setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
++    setLinkedCheckId(String(initialContainer?.linkedCheckId || '').trim());
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [initSessionKey]);
+ 
++  const filteredKeys = useMemo(() => {
++    const q = keyQuery.trim().toLowerCase();
++    return (Array.isArray(availableKeyItems) ? availableKeyItems : [])
++      .filter((k) => !q || String(k?.name || '').toLowerCase().includes(q));
++  }, [availableKeyItems, keyQuery]);
++
++  const filteredChecks = useMemo(() => {
++    const q = checkQuery.trim().toLowerCase();
++    return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
++      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
++  }, [availableCheckContainers, checkQuery]);
++
+   const combinedHubs = useMemo(() => {
+     const map = new Map();
+     for (const h of Array.isArray(availableHubs) ? availableHubs : []) {
+@@ -258,6 +287,9 @@ const ContainerFormModal = ({
+         caps: resolvedCaps,
+         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
++        requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
++        keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
++        linkedCheckId: canRequireKey ? linkedCheckId : '',
+       },
+       capsRollInfo,
+       isHub ? null : finalSelectedHubIds,
+@@ -591,6 +623,103 @@ const ContainerFormModal = ({
+                 <Text style={styles.hintText}>{tLootTrade('form.buyDepreciationHint')}</Text>
+               </>
+             )}
++
++            {canRequireKey && (
++              <>
++                <Text style={styles.label}>{tLootTrade('form.keyRequirementLabel')}</Text>
++                <TextInput
++                  testID="container-form-key-search"
++                  style={styles.input}
++                  value={keyQuery}
++                  onChangeText={setKeyQuery}
++                  placeholder={tLootTrade('form.keySearchPlaceholder')}
++                  placeholderTextColor="#8c8c8c"
++                />
++                <View style={styles.roomChips}>
++                  {filteredKeys.length === 0 ? (
++                    <Text style={styles.hintText}>{tLootTrade('form.keyEmpty')}</Text>
++                  ) : filteredKeys.map((key) => {
++                    const selected = key.id === requiredKeyItemId;
++                    return (
++                      <TouchableOpacity
++                        key={key.id}
++                        testID={`container-form-key-${key.id}`}
++                        style={[styles.roomChip, selected && styles.roomChipActive]}
++                        onPress={() => {
++                          setRequiredKeyItemId(selected ? '' : key.id);
++                          setKeyRequirement(selected ? KEY_REQUIREMENT.NONE : KEY_REQUIREMENT.OPTIONAL);
++                        }}
++                      >
++                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
++                          {key.name}
++                        </Text>
++                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]} numberOfLines={1}>
++                          {key.description || tLootTrade('form.keyNoDescription')}
++                        </Text>
++                      </TouchableOpacity>
++                    );
++                  })}
++                </View>
++                {Boolean(requiredKeyItemId) && (
++                  <>
++                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
++                    <View style={styles.requirementRow}>
++                      <TouchableOpacity
++                        testID="container-form-key-required"
++                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
++                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
++                      >
++                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
++                          {tLootTrade('form.keyRequiredLabel')}
++                        </Text>
++                      </TouchableOpacity>
++                      <TouchableOpacity
++                        testID="container-form-key-optional"
++                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
++                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
++                      >
++                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
++                          {tLootTrade('form.keyOptionalLabel')}
++                        </Text>
++                      </TouchableOpacity>
++                    </View>
++                  </>
++                )}
++
++                <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
++                <TextInput
++                  testID="container-form-check-search"
++                  style={styles.input}
++                  value={checkQuery}
++                  onChangeText={setCheckQuery}
++                  placeholder={tLootTrade('form.linkedCheckSearchPlaceholder')}
++                  placeholderTextColor="#8c8c8c"
++                />
++                <View style={styles.roomChips}>
++                  {filteredChecks.length === 0 ? (
++                    <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
++                  ) : filteredChecks.map((check) => {
++                    const selected = check.id === linkedCheckId;
++                    return (
++                      <TouchableOpacity
++                        key={check.id}
++                        testID={`container-form-check-${check.id}`}
++                        style={[styles.roomChip, selected && styles.roomChipActive]}
++                        onPress={() => setLinkedCheckId(selected ? '' : check.id)}
++                      >
++                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
++                          {check.name}
++                        </Text>
++                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
++                          {tLootTrade('form.linkedCheckTerminal')}
++                        </Text>
++                      </TouchableOpacity>
++                    );
++                  })}
++                </View>
++                <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
++              </>
++            )}
+           </ScrollView>
+ 
+           <View style={styles.footer}>
+@@ -948,6 +1077,11 @@ export const lootTradeFormStyles = StyleSheet.create({
+   unitSegTextActive: {
+     color: ADMIN_MODAL_PALETTE.text,
+   },
++  requirementRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+diff --git a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
+index c1858a4..8574b69 100644
+--- a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
++++ b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
+@@ -41,6 +41,7 @@ const KeyItemFormModal = ({
+   visible,
+   initialKeyItem = null,
+   availableRooms = [],
++  availableParents = [],
+   onSave,
+   onClose,
+ }) => {
+@@ -49,13 +50,22 @@ const KeyItemFormModal = ({
+   const [name, setName] = useState('');
+   const [description, setDescription] = useState('');
+   const [roomCode, setRoomCode] = useState('');
++  const [attachedTo, setAttachedTo] = useState('');
++  const [parentQuery, setParentQuery] = useState('');
+ 
+   useEffect(() => {
+     if (!visible) return;
+     setName(initialKeyItem?.name || '');
+     setDescription(initialKeyItem?.description || '');
+     setRoomCode(initialKeyItem?.roomCode || '');
+-  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode]);
++    setAttachedTo(initialKeyItem?.attachedTo || '');
++    setParentQuery('');
++  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode, initialKeyItem?.attachedTo]);
++
++  const filteredParents = availableParents.filter((parent) => (
++    !parentQuery.trim()
++    || String(parent?.name || '').toLowerCase().includes(parentQuery.trim().toLowerCase())
++  ));
+ 
+   const handleSave = () => {
+     const cleanName = name.trim();
+@@ -68,6 +78,7 @@ const KeyItemFormModal = ({
+       name: cleanName,
+       description,
+       roomCode,
++      attachedTo,
+     });
+   };
+ 
+@@ -119,6 +130,46 @@ const KeyItemFormModal = ({
+               </>
+             )}
+ 
++            <Text style={styles.label}>{tLootTrade('keyItems.attachToLabel')}</Text>
++            <TextInput
++              testID="key-item-form-parent-search"
++              style={styles.input}
++              value={parentQuery}
++              onChangeText={setParentQuery}
++              placeholder={tLootTrade('keyItems.attachToSearchPlaceholder')}
++              placeholderTextColor="#8c8c8c"
++            />
++            <View style={styles.roomChips}>
++              <TouchableOpacity
++                testID="key-item-parent-none"
++                style={[styles.roomChip, !attachedTo && styles.roomChipActive]}
++                onPress={() => setAttachedTo('')}
++              >
++                <Text style={[styles.roomChipName, !attachedTo && styles.roomChipTextActive]}>
++                  {tLootTrade('keyItems.attachToNone')}
++                </Text>
++              </TouchableOpacity>
++              {filteredParents.map((parent) => {
++                const selected = parent.id === attachedTo;
++                return (
++                  <TouchableOpacity
++                    key={parent.id}
++                    testID={`key-item-parent-${parent.id}`}
++                    style={[styles.roomChip, selected && styles.roomChipActive]}
++                    onPress={() => setAttachedTo(selected ? '' : parent.id)}
++                  >
++                    <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
++                      {parent.name}
++                    </Text>
++                    <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
++                      {parent.kindLabel}
++                    </Text>
++                  </TouchableOpacity>
++                );
++              })}
++            </View>
++            <Text style={styles.hintText}>{tLootTrade('keyItems.attachToHint')}</Text>
++
+             <Text style={styles.label}>{tLootTrade('keyItems.descriptionLabel')}</Text>
+             <View style={extraStyles.tagRow}>
+               {TAG_BUTTONS.map((tag) => (
+diff --git a/docs/agents/README.md b/docs/agents/README.md
+index 47b0a2c..0a3cea2 100644
+--- a/docs/agents/README.md
++++ b/docs/agents/README.md
+@@ -22,6 +22,8 @@
+ 6. `docs/ui-modals-rules.md` — обязателен перед созданием/переделкой любого
+    модального окна: брать каркас ближайшей модалки, не рисовать заново.
+    `docs/ui-alerts-rules.md` — для уведомлений и подтверждений.
++7. `docs/roadmap.md` — живой план: что сделано, что осталось. Обновлять в
++   КАЖДОМ патче и дублировать список оставшихся тезисов в ответе владельцу.
+ 
+ ## Карта репозитория по слоям
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0354005..88e64fe 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,33 @@
+ # Changelog
+ ---
++## Requirement fields in cards (patch 514)
++
++The first half of design step 3: "we are now editing card UI and creating
++fields and requirements for them". **Server-side key checking is NOT in this
++patch** — it stays the next item on the plan.
++
++- **Access-point fields.** Locations, containers, merchants and terminals now
++  store `requiredKeyItemId`, `keyRequirement` (none / optional / mandatory),
++  `linkedCheckId` and `keyItemIds`. Normalization clears nested keys on
++  terminals: a key can be placed there neither by the form nor by dragging.
++- **Two setup rows.** The first is a name search or a list of created keys and
++  notes, with a "Is it mandatory?" toggle next to it; the second is a search
++  or list of terminals as the alternative check. The card shows which key is
++  required and whether it is mandatory.
++- **A key is part of something.** The key form has a "Part of" row: location,
++  container or merchant (no terminals in the list). The link lives on the
++  parent, so editing or deleting the template never extinguishes a found
++  record.
++- **Dragging.** The key card now has the same arrow drag handle as containers.
++  It leaves the root grid for a location, is listed there separately, and can
++  be moved back with a button. "Add to storage" in the `⋮` menu stays as the
++  backward-compatibility exception.
++- **Live roadmap.** New `docs/roadmap.md`: a status table of every item and an
++  "Outstanding after this patch" list. As requested, it is updated in every
++  patch and repeated in the reply. It also records the new storage description:
++  "Like the merchant, two panels ... just no price checks" — the current
++  storage window does not match it yet.
++
+ ## Key and access-point rules clarified (patch 513, docs only)
+ 
+ The owner extended the design and chose "document it for now" — **no code,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 00ce9f4..e3b2b0a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,33 @@
+ # История изменений
+ 
+ ---
++## Поля и требования в карточках (патч 514)
++
++Первая половина шага 3 дизайна: «сейчас правим ui карточек и создаём для них
++поля и требования». **Серверная проверка ключа в этот патч не входит** — она
++осталась следующим тезисом плана.
++
++- **Поля точки доступа.** У локации, контейнера, торговца и терминала в базе
++  появились `requiredKeyItemId`, `keyRequirement` (нет / необязателен /
++  обязателен), `linkedCheckId` и `keyItemIds`. Нормализация чистит вложенные
++  ключи у терминала: туда ключ не кладут ни формой, ни перетаскиванием.
++- **Две строки в форме.** Первая — поиск по названию или список созданных
++  ключей и записок, рядом переключатель «Обязателен?»; вторая — поиск или
++  список терминалов как альтернативная проверка. На карточке точки видно,
++  какой ключ требуется и обязателен ли он.
++- **Ключ — часть чего-то.** В форме ключа строка «Часть чего»: локация,
++  контейнер или торговец (терминала в списке нет). Привязка хранится в
++  родителе, поэтому правка или удаление шаблона не гасит уже добытую запись.
++- **Перетаскивание.** У карточки ключа появилась иконка со стрелками, та же,
++  что у контейнеров. Ключ уходит с корня в локацию, показывается там отдельным
++  списком и возвращается на сетку кнопкой. Пункт «Выдать на склад» в меню `⋮`
++  сохранён как исключение обратной совместимости.
++- **Живой план.** Новый `docs/roadmap.md`: таблица всех тезисов со статусами и
++  список «Осталось после патча». По просьбе владельца файл обновляется в
++  каждом патче, а список дублируется в ответе. Туда же внесено новое описание
++  склада: «Аналогично торговцу, 2 панели ... Просто нет проверок на
++  стоимость» — текущее окно склада ему пока не соответствует.
++
+ ## Уточнение правил ключей и точек доступа (патч 513, только документ)
+ 
+ Владелец дал дополнение к дизайну и выбрал «пока только зафиксировать» —
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index b81d24c..60e040a 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -138,7 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
+ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
+ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
+-- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See `docs/patch-512-install.md`. Key placement, dragging and access requirements are specified in `docs/key-items-and-gates-design.md` (patch 513, no code changes).
++- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See also `docs/patch-514-install.md` and the live plan `docs/roadmap.md`. Key placement, dragging and access requirements are specified in `docs/key-items-and-gates-design.md` (patch 513, no code changes).
+ - **Handover.** Snapshots sync from the GM Google Drive in both directions, so the save arrives on another device. Both the GM and players can export storage to a file and import it back: when the GM changes, the new GM fills storage on the new server in one action. Room state lives only in server memory and disappears on disconnect — the file and Drive are the recovery path. See `docs/patch-509-install.md`.
+ - **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 650a413..72c6f52 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -138,7 +138,7 @@
+ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
+ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
+ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
+-- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). Подробности — `docs/patch-512-install.md`. Порядок вложения ключей, перетаскивания и требования доступа зафиксирован в `docs/key-items-and-gates-design.md` (патче 513, код не менялся).
++- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). См. также `docs/patch-514-install.md` и живой план `docs/roadmap.md`. Порядок вложения ключей, перетаскивания и требования доступа зафиксирован в `docs/key-items-and-gates-design.md` (патче 513, код не менялся).
+ - **Перенос хранилища.** Снимок синхронизируется из Google Drive Мастера в обе стороны, поэтому сейв приезжает на другое устройство. И Мастер, и игрок могут выгрузить хранилище в файл и импортировать его обратно: если ведущий сменился, новый Мастер наполняет хранилище нового сервера одним действием. Состояние комнаты живёт только в памяти сервера и исчезает при отключении — файл и Drive служат для восстановления. Подробности — `docs/patch-509-install.md`.
+ - **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index dba328e..ae1c3fe 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -13,8 +13,10 @@
+ атомарность, плашка и модалка 507 сохранены. Патч **513** (только документ,
+ без кода) зафиксировал уточнение владельца о вложенности ключей,
+ перетаскивании карточек и двух строках требования — **Обновление 7** ниже.
+-Шаги 3–5 (`requires`, ворота, мини-игра замков) **не реализованы**: для шага 3
+-описан контракт, код начнётся отдельной командой владельца.
++Шаг 3 разбит: патч **514** реализовал **поля, формы и вложенность**
++(две строки требования, привязка ключа к родителю, перетаскивание всех четырёх
++карточек), но **серверная проверка ключа ещё не начата**. Шаги 4–5 (ворота,
++мини-игра замков) не реализованы. Живой порядок — `docs/roadmap.md`.
+ 
+ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
+ «Я полагал ключ будет, как карточка контейнера/торговца/терминала и с модалкой
+@@ -123,7 +125,25 @@
+   или «компрометирующая записка». Без записи лавка закрыта (обязательное
+   требование) или открывается после взлома / убеждения (необязательное).
+ 
+-### 7.6 Границы патча 513
++### 7.6 Патч 514: что из этого уже в коде
++
++- у карточек контейнера, торговца, терминала и локации появились поля
++  `requiredKeyItemId`, `keyRequirement`, `linkedCheckId` и `keyItemIds`;
++  нормализация чистит их у терминала (ключи туда не вкладываются);
++- в форме точки — две строки из 7.3: поиск/список ключей с переключателем
++  «Обязателен?» и поиск/список терминалов для второй строки;
++- в форме ключа — строка «Часть чего» (локация, контейнер, торговец; терминала
++  в списке нет); привязка хранится в родителе, поэтому правка шаблона не гасит
++  уже добытую запись;
++- у ключа появилась иконка перетаскивания, ключ уходит с корня в локацию и
++  показывается там отдельным списком; кнопка «Вернуть на сетку» снимает
++  привязку;
++- пункт «Выдать на склад» в меню `⋮` сохранён (исключение 7.1).
++
++**Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
++обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
++
++### 7.7 Границы патча 513
+ 
+ Патч меняет **только документы и номер версии**. Код, протокол, база данных,
+ форма создания, серверная проверка и поведение игры не тронуты: владелец
+@@ -512,9 +532,10 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+    «Забрать». Записи едут в снимке хранилища.
+ 3. **Серверная проверка ключа.** Контейнер объявляет `requires`, сервер
+    проверяет склад и помечает `hacked`, не запуская мини-игру. Без
+-   уведомления Мастеру. ⏳ **Контракт уточнён в 513** (вложенность ключей,
+-   перетаскивание, две строки настройки, обязательный / необязательный ключ),
+-   **код не начат** — ждёт отдельной команды владельца.
++   уведомления Мастеру. 🔶 **Патч 514 сделал первую половину**: поля, формы,
++   вложенность и перетаскивание (раздел 7.6). Сама проверка склада, пропуск
++   мини-игры и отказ по обязательному ключу **остались** — тезис 8
++   `docs/roadmap.md`.
+ 4. **Ворота.** `requires` по событию другого контейнера, снятие `locked`,
+    общее состояние на комнату, отображение связей в админке.
+ 5. **Позже:** мини-игра взлома замков на том же контракте `hacked`.
+@@ -538,9 +559,11 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+   «предметы есть на складе или нет, игроки сами смотрят».
+ - **Осталось:** лимиты и стаканье; поведение при удалении записи-шаблона;
+   тихое срабатывание ключа.
+-- Шаг 2 ✅ реализован в 510–512. Шаги 3–5 в плане: `requires` и проверка
+-  ключа (контракт зафиксирован в 513), ворота между контейнерами, мини-игра
+-  взлома замков. Патч 513 код не менял.
++- Шаг 2 ✅ реализован в 510–512. Патч 513 зафиксировал контракт без кода,
++  патч 514 реализовал поля/формы/вложенность шага 3. Остались: серверная
++  проверка ключа, ворота между контейнерами, мини-игра взлома замков,
++  двухпанельное окно склада и мелочи склада — полный список в
++  `docs/roadmap.md`.
+ 
+ 
+ ---
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index ba85828..f235a87 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index 88cf75c..b20cc52 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 80ea702..dabfffb 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 3527c9a..cb0e44a 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 1bf0013..d126d64 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index d3b022a..33ac668 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 808315c..8d00201 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index 4c6ed92..e3ab331 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index a867055..597ea88 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index e078a69..c2b0558 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 9638925..6c02630 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index 44e9325..2304bd9 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 1b0137a..96f4006 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index cf2e128..60b6678 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 6eaf797..251a734 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 3a91863..5545944 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 883bdab..c57aefa 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index 264f71d..c84c9fa 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index 693e40d..ec14109 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 511** (коммит `860fe82`, ветка
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+index 0b69313..d5af108 100644
+--- a/docs/patch-513-install.md
++++ b/docs/patch-513-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 513: уточнение правил ключей (только документ)
+ 
++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
++
+ Патч подготовлен от состояния **версии 512** (коммит `6da0a37`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–513
+diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
+new file mode 100644
+index 0000000..9a3bace
+--- /dev/null
++++ b/docs/patch-514-install.md
+@@ -0,0 +1,119 @@
++# Установка патча 514: поля и требования в карточках
++
++Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–514
++цепочкой.
++
++Это **первая половина шага 3** дизайна: поля, формы, вложенность и
++перетаскивание. Серверная проверка ключа (пропуск мини-игры, отказ по
++обязательному ключу) и ворота **не входят** — см. `docs/roadmap.md`.
++
++## Что изменилось
++
++### 1. Поля точки доступа
++
++`domain/lootTrade.js` — новые поля в `normalizeContainerEntity`:
++
++| Поле | Смысл |
++| --- | --- |
++| `keyItemIds` | вложенные ключевые записи (только локация, контейнер, торговец; у терминала всегда пусто) |
++| `requiredKeyItemId` | идентификатор требуемой записи |
++| `keyRequirement` | `none` / `optional` / `required` |
++| `linkedCheckId` | терминал (в будущем — замок) как альтернативная проверка |
++
++Добавлены `containerCanHoldKey`, `containerCanRequireKey`,
++`normalizeKeyItemIds`, `normalizeKeyRequirement`, `KEY_REQUIREMENT` и
++зарезервированный `RESERVED_LOCK_KIND = 'lock'`. Изменений схемы БД нет:
++поля едут в уже существующем JSON карточки.
++
++### 2. Две строки в форме точки
++
++`ContainerFormModal` получил `availableKeyItems` и
++`availableCheckContainers`:
++
++- строка 1 — поиск по названию или список ключей/записок, рядом переключатель
++  «Обязателен?» (обязателен / необязателен);
++- строка 2 — поиск или список терминалов;
++- на карточке точки показывается название требуемого ключа и пометка
++  обязательности.
++
++Стили новых строк взяты из того же `lootTradeFormStyles` (правило
++`docs/ui-modals-rules.md` не нарушено).
++
++### 3. Ключ как часть родителя
++
++`KeyItemFormModal` — строка «Часть чего»: локация, контейнер или торговец.
++Терминал в список не входит. Привязка хранится в `keyItemIds` родителя, а не в
++шаблоне ключа, поэтому правка шаблона не влияет на уже добытую запись на
++складе. `handleSaveKeyItem` синхронизирует привязку у всех родителей.
++
++### 4. Перетаскивание всех четырёх карточек
++
++`KeyItemCardCell` получил `arrow-all` и `PanResponder` как у
++`ContainerCardCell`. Ключ уходит с корня в локацию, в локации показывается
++отдельным списком с кнопкой «Вернуть на сетку». Пункт «Выдать на склад» в меню
++`⋮` сохранён (исключение обратной совместимости из патча 513).
++
++### 5. Живой план
++
++`docs/roadmap.md` — таблица тезисов со статусами и раздел «Осталось после
++патча 514». По просьбе владельца обновляется в каждом патче и дублируется в
++ответе. Туда же записано новое описание окна склада: две панели как у
++торговца, без проверок стоимости.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `domain/lootTrade.js` | поля требований, хелперы, резерв `lock` |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | две строки настройки |
++| `components/screens/LootTradeScreen/modals/KeyItemFormModal.js` | «Часть чего» |
++| `components/lootTrade/KeyItemCardCell.js` | иконка перетаскивания |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | привязка, перенос, список в локации, метка на карточке, props |
++| `styles/LootTradeScreen.styles.js` | стили списка ключей в локации |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
++| `__tests__/room/key-items-fields-514.test.js` | 12 приёмочных проверок |
++| `docs/roadmap.md` | новый живой план |
++| `docs/key-items-and-gates-design.md` | раздел 7.6, статус шага 3 |
++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 514, 80/80 заметок |
++| `patchs/514-key-card-fields.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 513:
++
++```bash
++./apply-patch.sh 514
++# ✓ Установлен патч: №514 (версия 513 → 514)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 514
++```
++
++`patchs/baseline.json` в источнике равен `514`. После установки
++`public/version.json` → `514`; закоммитьте изменения и пересоберите
++веб-сборку. Серверный код не менялся, перезапуск сервиса не обязателен.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/key-items-fields-514.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "514"'
++```
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/514-key-card-fields.patch
++cp /path/to/514-key-card-fields.patch patchs/
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+new file mode 100644
+index 0000000..6b8e882
+--- /dev/null
++++ b/docs/roadmap.md
+@@ -0,0 +1,58 @@
++# Живой план работ
++
++> Просьба владельца (патч 514): «мне было бы полезно после каждого патча ещё
++> видеть, какие тезисы плана остались». **Правило:** каждый патч обновляет
++> таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++> ответе владельцу. Этот файл — источник истины для порядка шагов.
++
++Дата ревизии: 2026-11-03. Текущая версия: **514**.
++
++## Тезисы
++
++| # | Тезис | Статус | Патч |
++| --- | --- | --- | --- |
++| 1 | Терминал внутри локации открывает мини-игру взлома, а не сундук | ✅ сделано | 493 |
++| 2 | Баланс мини-игры: свой словарь, ИНТ / Наука / Удача, группы слов, четыре попытки | ✅ сделано | 494–503 |
++| 3 | Решение Мастера после провала, фиксация победы, одноразовый доступ, «Покинуть локацию» | ✅ сделано | 504–506 |
++| 4 | Общий склад: каркас, канон Мастера, сейв в Drive и перенос файлом | ✅ сделано | 507–509 |
++| 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
++| 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
++| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + «Обязателен?» / проверка), вложенные ключи в локации | ✅ сделано | **514** |
++| 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
++| 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
++| 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
++| 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
++| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++
++## Осталось после патча 514
++
++1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
++2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
++3. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
++4. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
++5. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
++
++## Описание склада со стороны пользователя (для тезиса 10)
++
++Слово владельца (патч 514):
++
++> «Аналогично торговцу, 2 панели, что в инвентаре юзера, что в инвентаре
++> склада. Просто нет проверок на стоимость».
++
++То есть окно склада повторяет двухпанельное окно торговца: слева личный
++инвентарь игрока, справа общее хранилище, между ними кнопки «положить» и
++«взять». Никаких цен, наценок, крышек и проверок стоимости — предмет просто
++переезжает с одной панели на другую. Ключи и записки по-прежнему идут
++отдельным списком и не забираются в личный инвентарь
++(`docs/key-items-and-gates-design.md`, Обновление 3).
++
++Владелец предупредил, что даст развёрнутое описание работы склада со стороны
++пользователя; когда оно придёт, этот раздел заменяется целиком, а тезис 10
++уточняется **до начала кода**.
++
++## Связанные документы
++
++- `docs/key-items-and-gates-design.md` — полный контракт ключей, требований и ворот (Обновление 7, раздел 10).
++- `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
++- `docs/ui-alerts-rules.md` — уведомления и подтверждения.
++- `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 0e6fab1..0c7d9b0 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -29,6 +29,53 @@ export const CONTAINER_KIND = Object.freeze({
+   TERMINAL: 'terminal',
+ });
+ 
++// Патч 514: «замок» — будущая мини-игра. Вид точки зарезервирован, но пока
++// не создаётся и не нормализуется: серверная проверка ключа (шаг 3.2) и
++// ворота (шаг 4) придут отдельными патчами. Нейтральное событие `hacked`
++// остаётся контрактом из docs/key-items-and-gates-design.md.
++export const RESERVED_LOCK_KIND = 'lock';
++
++/** Обязательность ключа для точки доступа. */
++export const KEY_REQUIREMENT = Object.freeze({
++  NONE: 'none',
++  OPTIONAL: 'optional',
++  REQUIRED: 'required',
++});
++
++/** Ключ можно вложить в локацию, контейнер или торговца, но НЕ в терминал. */
++export const containerCanHoldKey = (kind) => (
++  kind === CONTAINER_KIND.HUB
++  || kind === CONTAINER_KIND.LOOT
++  || kind === CONTAINER_KIND.MERCHANT
++);
++
++/** Точка, которая может требовать ключ: контейнер, торговец, терминал, замок. */
++export const containerCanRequireKey = (kind) => (
++  kind === CONTAINER_KIND.HUB
++  || kind === CONTAINER_KIND.LOOT
++  || kind === CONTAINER_KIND.MERCHANT
++  || kind === CONTAINER_KIND.TERMINAL
++  || kind === RESERVED_LOCK_KIND
++);
++
++export const normalizeKeyItemIds = (raw) => {
++  const list = Array.isArray(raw) ? raw : [];
++  const seen = new Set();
++  return list
++    .map((id) => String(id || '').trim())
++    .filter((id) => {
++      if (!id || seen.has(id)) return false;
++      seen.add(id);
++      return true;
++    });
++};
++
++export const normalizeKeyRequirement = (raw) => {
++  if (raw === KEY_REQUIREMENT.REQUIRED || raw === true) return KEY_REQUIREMENT.REQUIRED;
++  if (raw === KEY_REQUIREMENT.OPTIONAL) return KEY_REQUIREMENT.OPTIONAL;
++  return KEY_REQUIREMENT.NONE;
++};
++
+ /**
+  * Маркер терминала внутри узла локации.
+  *
+@@ -558,6 +605,16 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+       : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     items,
+     links,
++    // Патч 514: вложенные ключевые записи и две строки требования доступа.
++    // Терминал ключи не содержит ни при создании, ни перетаскиванием.
++    keyItemIds: containerCanHoldKey(kind) ? normalizeKeyItemIds(raw.keyItemIds) : [],
++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
++    keyRequirement: containerCanRequireKey(kind)
++      ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
++      : KEY_REQUIREMENT.NONE,
++    linkedCheckId: containerCanRequireKey(kind)
++      ? String(raw.linkedCheckId || '').trim()
++      : '',
+     createdAt: Number(raw.createdAt) || now,
+     updatedAt: Number(raw.updatedAt) || now,
+   };
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index ae78df1..440cf9a 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -28,7 +28,13 @@
+     "edit": "Edit",
+     "delete": "Delete",
+     "copySuffix": "copy",
+-    "terminalDifficulty": "Difficulty {difficulty}"
++    "terminalDifficulty": "Difficulty {difficulty}",
++    "requiresKey": "Key: {name}",
++    "keyRequiredBadge": "mandatory",
++    "keyOptionalBadge": "optional",
++    "hubKind": "location",
++    "merchantKind": "merchant",
++    "lootKind": "container"
+   },
+   "form": {
+     "createLootTitle": "New Loot Container",
+@@ -65,7 +71,19 @@
+     "editTerminalTitle": "Terminal settings",
+     "terminalDifficultyLabel": "Difficulty",
+     "createKeyItemTitle": "New key record",
+-    "editKeyItemTitle": "Edit key record"
++    "editKeyItemTitle": "Edit key record",
++    "keyRequirementLabel": "Required key",
++    "keySearchPlaceholder": "Search keys and notes",
++    "keyEmpty": "No keys yet — create a card on the grid",
++    "keyNoDescription": "no description",
++    "keyMandatoryLabel": "Is it mandatory?",
++    "keyRequiredLabel": "Mandatory",
++    "keyOptionalLabel": "Optional",
++    "linkedCheckLabel": "Check (terminal / lock)",
++    "linkedCheckSearchPlaceholder": "Search terminals",
++    "linkedCheckEmpty": "No terminals yet",
++    "linkedCheckTerminal": "terminal",
++    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
+   },
+   "detail": {
+     "backToList": "← Back to containers",
+@@ -115,7 +133,10 @@
+     "deleteHubWithChildren": "Delete all",
+     "emptyLootPromptTitle": "Container is empty. Delete it?",
+     "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
+-    "emptyLootKeep": "Keep"
++    "emptyLootKeep": "Keep",
++    "hubKeysTitle": "Keys and notes in this location",
++    "hubKeysEmpty": "Drag a key card onto the location",
++    "hubKeyDetach": "Move back to grid"
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+@@ -251,7 +272,11 @@
+     "noRoom": "No connected GM room",
+     "failed": "Could not add the key",
+     "hint": "A name is required; the description may be empty. The card appears on the screen after saving.",
+-    "saved": "Key saved on the Loot / Trade screen"
++    "saved": "Key saved on the Loot / Trade screen",
++    "attachToLabel": "Part of",
++    "attachToSearchPlaceholder": "Search locations, containers or merchants",
++    "attachToNone": "None (on the grid)",
++    "attachToHint": "The key reaches players with the chosen card. It cannot be placed in a terminal."
+   },
+   "terminal": {
+     "title": "Terminal",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 360932d..590e2e8 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -28,7 +28,13 @@
+     "edit": "Изменить",
+     "delete": "Удалить",
+     "copySuffix": "копия",
+-    "terminalDifficulty": "Сложность {difficulty}"
++    "terminalDifficulty": "Сложность {difficulty}",
++    "requiresKey": "Ключ: {name}",
++    "keyRequiredBadge": "обязателен",
++    "keyOptionalBadge": "необязателен",
++    "hubKind": "локация",
++    "merchantKind": "торговец",
++    "lootKind": "контейнер"
+   },
+   "form": {
+     "createLootTitle": "Новый контейнер добычи",
+@@ -65,7 +71,19 @@
+     "editTerminalTitle": "Настройки терминала",
+     "terminalDifficultyLabel": "Сложность",
+     "createKeyItemTitle": "Новая ключевая запись",
+-    "editKeyItemTitle": "Изменить ключевую запись"
++    "editKeyItemTitle": "Изменить ключевую запись",
++    "keyRequirementLabel": "Требуемый ключ",
++    "keySearchPlaceholder": "Поиск ключа или записки",
++    "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
++    "keyNoDescription": "без описания",
++    "keyMandatoryLabel": "Обязателен?",
++    "keyRequiredLabel": "Обязателен",
++    "keyOptionalLabel": "Необязателен",
++    "linkedCheckLabel": "Проверка (терминал / замок)",
++    "linkedCheckSearchPlaceholder": "Поиск терминала",
++    "linkedCheckEmpty": "Терминалов пока нет",
++    "linkedCheckTerminal": "терминал",
++    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
+@@ -115,7 +133,10 @@
+     "deleteHubWithChildren": "Удалить всё",
+     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
+     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
+-    "emptyLootKeep": "Оставить"
++    "emptyLootKeep": "Оставить",
++    "hubKeysTitle": "Ключи и записки в локации",
++    "hubKeysEmpty": "Перетащите карточку ключа на локацию",
++    "hubKeyDetach": "Вернуть на сетку"
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+@@ -251,7 +272,11 @@
+     "noRoom": "Нет подключённой комнаты Мастера",
+     "failed": "Не удалось выдать ключ",
+     "hint": "Название обязательно, описание можно оставить пустым. После сохранения карточка появится на экране.",
+-    "saved": "Ключ сохранён на экране «Добыча / Торговля»"
++    "saved": "Ключ сохранён на экране «Добыча / Торговля»",
++    "attachToLabel": "Часть чего",
++    "attachToSearchPlaceholder": "Поиск локации, контейнера или торговца",
++    "attachToNone": "Никуда (на сетке)",
++    "attachToHint": "Ключ попадает к игрокам вместе с выбранной карточкой. В терминал вложить нельзя."
+   },
+   "terminal": {
+     "title": "Терминал",
+diff --git a/patchs/514-key-card-fields.patch b/patchs/514-key-card-fields.patch
+new file mode 100644
+index 0000000..f2ba319
+--- /dev/null
++++ b/patchs/514-key-card-fields.patch
+@@ -0,0 +1,1697 @@
++diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
++new file mode 100644
++index 0000000..a8e5de2
++--- /dev/null
+++++ b/__tests__/room/key-items-fields-514.test.js
++@@ -0,0 +1,160 @@
+++// Приёмочный тест 514: «правим ui карточек и создаём для них поля и
+++// требования». Проверяем доменные поля, две строки формы, вложенность ключа,
+++// перетаскивание и живой план. Серверная проверка ключа в этот патч НЕ входит
+++// (тезис 8 docs/roadmap.md).
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++import {
+++  CONTAINER_KIND,
+++  KEY_REQUIREMENT,
+++  RESERVED_LOCK_KIND,
+++  containerCanHoldKey,
+++  containerCanRequireKey,
+++  normalizeContainerEntity,
+++  normalizeKeyItemIds,
+++  normalizeKeyRequirement,
+++} from '../../domain/lootTrade.js';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++
+++describe('514: поля требований', () => {
+++  it('три режима обязательности и зарезервированный замок', () => {
+++    expect(KEY_REQUIREMENT.NONE).toBe('none');
+++    expect(KEY_REQUIREMENT.OPTIONAL).toBe('optional');
+++    expect(KEY_REQUIREMENT.REQUIRED).toBe('required');
+++    expect(RESERVED_LOCK_KIND).toBe('lock');
+++    expect(normalizeKeyRequirement('required')).toBe(KEY_REQUIREMENT.REQUIRED);
+++    expect(normalizeKeyRequirement(true)).toBe(KEY_REQUIREMENT.REQUIRED);
+++    expect(normalizeKeyRequirement('optional')).toBe(KEY_REQUIREMENT.OPTIONAL);
+++    expect(normalizeKeyRequirement('мусор')).toBe(KEY_REQUIREMENT.NONE);
+++    expect(normalizeKeyItemIds(['a', 'a', '', 'b'])).toEqual(['a', 'b']);
+++  });
+++
+++  it('ключ вкладывается в локацию/контейнер/торговца, но не в терминал', () => {
+++    expect(containerCanHoldKey(CONTAINER_KIND.HUB)).toBe(true);
+++    expect(containerCanHoldKey(CONTAINER_KIND.LOOT)).toBe(true);
+++    expect(containerCanHoldKey(CONTAINER_KIND.MERCHANT)).toBe(true);
+++    expect(containerCanHoldKey(CONTAINER_KIND.TERMINAL)).toBe(false);
+++    expect(containerCanRequireKey(CONTAINER_KIND.TERMINAL)).toBe(true);
+++    expect(containerCanRequireKey(RESERVED_LOCK_KIND)).toBe(true);
+++  });
+++
+++  it('нормализация сохраняет поля у контейнера и чистит их у терминала', () => {
+++    const loot = normalizeContainerEntity({
+++      id: 'c1', kind: CONTAINER_KIND.LOOT, name: 'Сейф',
+++      keyItemIds: ['k1', 'k1', ''], requiredKeyItemId: 'k1',
+++      keyRequirement: KEY_REQUIREMENT.OPTIONAL, linkedCheckId: 'term1',
+++    });
+++    expect(loot.keyItemIds).toEqual(['k1']);
+++    expect(loot.requiredKeyItemId).toBe('k1');
+++    expect(loot.keyRequirement).toBe(KEY_REQUIREMENT.OPTIONAL);
+++    expect(loot.linkedCheckId).toBe('term1');
+++
+++    const terminal = normalizeContainerEntity({
+++      id: 't1', kind: CONTAINER_KIND.TERMINAL, name: 'Терминал',
+++      keyItemIds: ['k1'], requiredKeyItemId: 'k2',
+++      keyRequirement: KEY_REQUIREMENT.REQUIRED, linkedCheckId: 'term2',
+++    });
+++    expect(terminal.keyItemIds).toEqual([]);
+++    expect(terminal.requiredKeyItemId).toBe('k2');
+++    expect(terminal.keyRequirement).toBe(KEY_REQUIREMENT.REQUIRED);
+++    expect(terminal.linkedCheckId).toBe('term2');
+++  });
+++});
+++
+++describe('514: две строки настройки в форме точки', () => {
+++  const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+++
+++  it('первая строка — поиск и список ключей с полем «Обязателен?»', () => {
+++    expect(form).toContain('availableKeyItems');
+++    expect(form).toContain('testID="container-form-key-search"');
+++    expect(form).toContain('container-form-key-required');
+++    expect(form).toContain('container-form-key-optional');
+++    expect(form).toContain("tLootTrade('form.keyMandatoryLabel')");
+++    expect(form).toContain('styles.roomChips');
+++  });
+++
+++  it('вторая строка — поиск и список терминалов / замков', () => {
+++    expect(form).toContain('availableCheckContainers');
+++    expect(form).toContain('testID="container-form-check-search"');
+++    expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
+++    expect(screen).toContain('availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}');
+++  });
+++
+++  it('поля уезжают в сохранение и показываются на карточке', () => {
+++    expect(form).toContain('requiredKeyItemId: canRequireKey ? requiredKeyItemId');
+++    expect(form).toContain('keyRequirement: canRequireKey && requiredKeyItemId');
+++    expect(form).toContain('linkedCheckId: canRequireKey ? linkedCheckId');
+++    expect(screen).toContain('card-requires-key-');
+++    expect(screen).toContain("'card.keyRequiredBadge'");
+++  });
+++});
+++
+++describe('514: вложенность и перетаскивание', () => {
+++  const keyForm = read('components/screens/LootTradeScreen/modals/KeyItemFormModal.js');
+++  const card = read('components/lootTrade/KeyItemCardCell.js');
+++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+++
+++  it('у ключа есть строка «Часть чего» без терминалов', () => {
+++    expect(keyForm).toContain('availableParents');
+++    expect(keyForm).toContain('testID="key-item-form-parent-search"');
+++    expect(keyForm).toContain("tLootTrade('keyItems.attachToLabel')");
+++    expect(keyForm).toContain('attachedTo');
+++    expect(screen).toContain('containerCanHoldKey(c.kind)');
+++  });
+++
+++  it('у всех четырёх карточек перетаскивание, ключ уходит в локацию', () => {
+++    expect(card).toContain('arrow-all');
+++    expect(card).toContain('cardStyles.cardDragHandle');
+++    expect(card).toContain('PanResponder.create');
+++    expect(screen).toContain('const handleMoveKeyItemIntoHub');
+++    expect(screen).toContain('setMovingKeyItemId');
+++    expect(screen).toContain('const attachedKeyItemIds');
+++    expect(screen).toContain('hubKeysSection');
+++    expect(screen).toContain('hub-key-detach-');
+++  });
+++
+++  it('пункт выдачи ключа сохранён (исключение совместимости)', () => {
+++    expect(card).toContain('key-item-issue-');
+++    expect(screen).toContain('const handleIssueKeyItem');
+++  });
+++
+++  it('правило 512 не нарушено: форма ключа берёт каркас соседней формы', () => {
+++    expect(keyForm).toContain("import { lootTradeFormStyles as styles } from './ContainerFormModal'");
+++  });
+++});
+++
+++describe('514: словари и живой план', () => {
+++  it('все новые подписи парные RU/EN', () => {
+++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
+++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
+++    for (const [section, key] of [
+++      ['form', 'keyRequirementLabel'], ['form', 'keyMandatoryLabel'],
+++      ['form', 'keyRequiredLabel'], ['form', 'keyOptionalLabel'],
+++      ['form', 'linkedCheckLabel'], ['form', 'linkedCheckHint'],
+++      ['card', 'requiresKey'], ['card', 'hubKind'],
+++      ['keyItems', 'attachToLabel'], ['keyItems', 'attachToHint'],
+++      ['detail', 'hubKeysTitle'], ['detail', 'hubKeyDetach'],
+++    ]) {
+++      expect(ru[section][key]).toBeTruthy();
+++      expect(en[section][key]).toBeTruthy();
+++    }
+++  });
+++
+++  it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
+++    const plan = read('docs/roadmap.md');
+++    expect(plan).toContain('514');
+++    expect(plan).toContain('Осталось после патча 514');
+++    expect(plan).toContain('Серверная проверка ключа');
+++    expect(plan).toContain('Ворота между контейнерами');
+++    expect(plan).toContain('две панели');
+++    expect(plan).toContain('нет проверок на стоимость');
+++    expect(plan).toContain('Мини-игра взлома замков');
+++    expect(read('docs/agents/README.md')).toContain('docs/roadmap.md');
+++    expect(read('replit.md')).toContain('docs/roadmap.md');
+++  });
+++});
++diff --git a/components/lootTrade/KeyItemCardCell.js b/components/lootTrade/KeyItemCardCell.js
++index af04306..771d014 100644
++--- a/components/lootTrade/KeyItemCardCell.js
+++++ b/components/lootTrade/KeyItemCardCell.js
++@@ -17,6 +17,7 @@ import {
++   Modal,
++   Dimensions,
++   StyleSheet,
+++  PanResponder,
++ } from 'react-native';
++ import { MaterialCommunityIcons } from '@expo/vector-icons';
++ import { useLocale } from '../../i18n/locale';
++@@ -27,10 +28,42 @@ import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
++ const MENU_WIDTH = 224;
++ const MENU_HEIGHT = 100;
++ 
++-const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
+++const KeyItemCardCell = ({
+++  keyItem,
+++  roomLabel = '',
+++  canMoveToHub = false,
+++  onDragStart,
+++  onDragMove,
+++  onDragEnd,
+++  onEdit,
+++  onIssue,
+++}) => {
++   useLocale();
++   const menuBtnRef = useRef(null);
++   const [menuPos, setMenuPos] = useState(null);
+++  const dragCallbacks = useRef({});
+++  dragCallbacks.current = { onDragStart, onDragMove, onDragEnd };
+++  const panResponder = useRef(PanResponder.create({
+++    onStartShouldSetPanResponderCapture: () => true,
+++    onMoveShouldSetPanResponderCapture: () => true,
+++    onStartShouldSetPanResponder: () => true,
+++    onMoveShouldSetPanResponder: () => true,
+++    onPanResponderTerminationRequest: () => false,
+++    onShouldBlockNativeResponder: () => true,
+++    onPanResponderGrant: (_evt, gesture) => {
+++      dragCallbacks.current.onDragStart?.({ pageX: gesture.x0, pageY: gesture.y0 });
+++    },
+++    onPanResponderMove: (_evt, gesture) => {
+++      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+++      dragCallbacks.current.onDragMove?.({ pageX: gesture.moveX, pageY: gesture.moveY });
+++    },
+++    onPanResponderRelease: (_evt, gesture) => {
+++      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+++    },
+++    onPanResponderTerminate: (_evt, gesture) => {
+++      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+++    },
+++  })).current;
++ 
++   const openMenu = (event) => {
++     event?.stopPropagation?.();
++@@ -56,6 +89,11 @@ const KeyItemCardCell = ({ keyItem, roomLabel = '', onEdit, onIssue }) => {
++       onPress={onEdit}
++       activeOpacity={0.82}
++     >
+++      {canMoveToHub && onDragStart && (
+++        <View testID={`key-item-drag-${keyItem.id}`} {...panResponder.panHandlers} style={cardStyles.cardDragHandle}>
+++          <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+++        </View>
+++      )}
++       <View style={[cardStyles.cardHero, localStyles.cardHeroKey]}>
++         <MaterialCommunityIcons name="key-variant" size={34} color="#f0e68c" />
++       </View>
++diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
++index e654114..b4677d3 100644
++--- a/components/screens/LootTradeScreen/LootTradeScreen.js
+++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
++@@ -31,6 +31,9 @@ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
++ import {
++   CONTAINER_KIND,
++   CONTAINER_KIND_SORT_ORDER,
+++  containerCanHoldKey,
+++  containerCanRequireKey,
+++  KEY_REQUIREMENT,
++   addOrMergeContainerItem,
++   analyzeHubDeletion,
++   buildHubSessionNodes,
++@@ -120,6 +123,7 @@ const ContainerCardCell = ({
++   onDuplicate,
++   onEdit,
++   onDelete,
+++  keyItemNames = {},
++   onDragStart,
++   onDragMove,
++   onDragEnd,
++@@ -266,6 +270,22 @@ const ContainerCardCell = ({
++         )}
++       </View>
++ 
+++      {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
+++        <Text
+++          testID={`card-requires-key-${container.id}`}
+++          style={styles.cardMeta}
+++          numberOfLines={1}
+++        >
+++          {formatLootTrade(tLootTrade('card.requiresKey'), {
+++            name: keyItemNames[container.requiredKeyItemId] || container.requiredKeyItemId,
+++          })}
+++          {' · '}
+++          {tLootTrade(container.keyRequirement === KEY_REQUIREMENT.REQUIRED
+++            ? 'card.keyRequiredBadge'
+++            : 'card.keyOptionalBadge')}
+++        </Text>
+++      )}
+++
++       <TouchableOpacity
++         ref={menuBtnRef}
++         style={styles.cardActionButton}
++@@ -367,6 +387,7 @@ export default function LootTradeScreen() {
++   const [hubPickerOpen, setHubPickerOpen] = useState(false);
++   const [moveToHubTarget, setMoveToHubTarget] = useState(null); // container для переноса через меню ⋮
++   const [movingContainerId, setMovingContainerId] = useState(null);
+++  const [movingKeyItemId, setMovingKeyItemId] = useState(null); // патч 514: перетаскивание ключа в локацию
++   const [drag, setDrag] = useState(null); // { container, x, y }
++   const hubRefs = useRef({});
++   const hubDropBounds = useRef({});
++@@ -779,6 +800,23 @@ export default function LootTradeScreen() {
++       ...draft,
++       id: draft.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
++     });
+++    // Патч 514: «ключ должен быть частью чего-либо». Привязка хранится в
+++    // родителе (keyItemIds), поэтому правки шаблона не гасят добытую запись.
+++    const attachedTo = String(draft.attachedTo || '').trim();
+++    if (saved?.id) {
+++      const currentList = await db.getGmContainersList();
+++      for (const parent of currentList || []) {
+++        const holds = (parent.keyItemIds || []).includes(saved.id);
+++        const shouldHold = attachedTo === parent.id;
+++        if (holds === shouldHold) continue;
+++        await persistAndSyncContainer({
+++          ...parent,
+++          keyItemIds: shouldHold
+++            ? [...(parent.keyItemIds || []), saved.id]
+++            : (parent.keyItemIds || []).filter((id) => id !== saved.id),
+++        });
+++      }
+++    }
++     const freshList = await db.getGmKeyItems();
++     setKeyItems(freshList || []);
++     setKeyItemForm(null);
++@@ -808,6 +846,34 @@ export default function LootTradeScreen() {
++     }
++   };
++ 
+++  const handleMoveKeyItemIntoHub = async (keyItemId, hubId) => {
+++    if (!keyItemId || !hubId) return;
+++    const currentList = await db.getGmContainersList();
+++    for (const parent of currentList || []) {
+++      const holds = (parent.keyItemIds || []).includes(keyItemId);
+++      const shouldHold = parent.id === hubId;
+++      if (holds === shouldHold) continue;
+++      await persistAndSyncContainer({
+++        ...parent,
+++        keyItemIds: shouldHold
+++          ? [...(parent.keyItemIds || []), keyItemId]
+++          : (parent.keyItemIds || []).filter((id) => id !== keyItemId),
+++      });
+++    }
+++    setMovingKeyItemId(null);
+++    setMovingContainerId(null);
+++    setDrag(null);
+++    hubDropBounds.current = {};
+++  };
+++
+++  const handleDetachKeyItem = async (keyItemId) => {
+++    if (!activeContainer || !keyItemId) return;
+++    await persistAndSyncContainer({
+++      ...activeContainer,
+++      keyItemIds: (activeContainer.keyItemIds || []).filter((id) => id !== keyItemId),
+++    });
+++  };
+++
++   const handleMoveCardIntoHub = async (cardId, hubId) => {
++     if (!cardId || !hubId) return;
++     const card = containers.find((c) => c.id === cardId);
++@@ -829,6 +895,7 @@ export default function LootTradeScreen() {
++       await loadData();
++     }
++     setMovingContainerId(null);
+++    setMovingKeyItemId(null);
++     setDrag(null);
++     hubDropBounds.current = {};
++   };
++@@ -866,7 +933,9 @@ export default function LootTradeScreen() {
++   const handleDragStart = async (point, card) => {
++     if (!card || card.kind === CONTAINER_KIND.HUB) return;
++     hubDropBounds.current = {};
++-    setMovingContainerId(card.id);
+++    const isKeyItem = card.type === 'keyItem';
+++    setMovingKeyItemId(isKeyItem ? card.id : null);
+++    setMovingContainerId(isKeyItem ? null : card.id);
++     setDrag({ container: card, x: point.pageX, y: point.pageY });
++     await measureHubDropTargets();
++   };
++@@ -884,9 +953,12 @@ export default function LootTradeScreen() {
++       && point.pageY >= b.y
++       && point.pageY <= b.y + b.height
++     ));
++-    if (hit && movingContainerId) {
+++    if (hit && movingKeyItemId) {
+++      await handleMoveKeyItemIntoHub(movingKeyItemId, hit[0]);
+++    } else if (hit && movingContainerId) {
++       await handleMoveCardIntoHub(movingContainerId, hit[0]);
++     } else {
+++      setMovingKeyItemId(null);
++       setMovingContainerId(null);
++       setDrag(null);
++     }
++@@ -1461,6 +1533,31 @@ export default function LootTradeScreen() {
++     return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
++   }, [formatSingleRoomName]);
++ 
+++  const keyItemNames = useMemo(
+++    () => Object.fromEntries(keyItems.map((k) => [k.id, k.name])),
+++    [keyItems],
+++  );
+++
+++  const availableParents = useMemo(
+++    () => containers
+++      .filter((c) => containerCanHoldKey(c.kind))
+++      .map((c) => ({
+++        id: c.id,
+++        name: c.name,
+++        kindLabel: c.kind === CONTAINER_KIND.HUB
+++          ? tLootTrade('card.hubKind')
+++          : (c.kind === CONTAINER_KIND.MERCHANT
+++            ? tLootTrade('card.merchantKind')
+++            : tLootTrade('card.lootKind')),
+++      })),
+++    [containers],
+++  );
+++
+++  const attachedKeyItemIds = useMemo(
+++    () => new Set(containers.flatMap((c) => c.keyItemIds || [])),
+++    [containers],
+++  );
+++
++   const gridItems = [
++     { type: 'createHub', id: '__create_hub__' },
++     { type: 'createLoot', id: '__create_loot__' },
++@@ -1469,7 +1566,10 @@ export default function LootTradeScreen() {
++     { type: 'createKeyItem', id: '__create_key_item__' },
++     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
++     // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
++-    ...keyItems.map((k) => ({ type: 'keyItem', ...k })),
+++    // Патч 514: вложенные в локацию/контейнер/торговца уходят с корня.
+++    ...keyItems
+++      .filter((k) => !attachedKeyItemIds.has(k.id))
+++      .map((k) => ({ type: 'keyItem', ...k })),
++   ];
++ 
++   const rows = [];
++@@ -1635,12 +1735,17 @@ export default function LootTradeScreen() {
++                     }
++                     if (cell.type === 'keyItem') {
++                       const roomRecord = roomByCode[cell.roomCode];
+++                      const attachedTo = containers.find((c) => (c.keyItemIds || []).includes(cell.id))?.id || '';
++                       return (
++                         <KeyItemCardCell
++                           key={cell.id}
++                           keyItem={cell}
++                           roomLabel={roomRecord?.name || ''}
++-                          onEdit={() => setKeyItemForm({ initialKeyItem: cell })}
+++                          canMoveToHub={availableHubs.length > 0}
+++                          onDragStart={availableHubs.length > 0 ? (point) => handleDragStart(point, cell) : undefined}
+++                          onDragMove={availableHubs.length > 0 ? handleDragMove : undefined}
+++                          onDragEnd={availableHubs.length > 0 ? handleDragEnd : undefined}
+++                          onEdit={() => setKeyItemForm({ initialKeyItem: { ...cell, attachedTo } })}
++                           onIssue={() => void handleIssueKeyItem(cell)}
++                         />
++                       );
++@@ -1655,6 +1760,7 @@ export default function LootTradeScreen() {
++                         key={cell.id}
++                         container={cell}
++                         roomLabel={roomLabel}
+++                        keyItemNames={keyItemNames}
++                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
++                         isDropTarget={Boolean(isHubCell && movingContainerId)}
++                         canMoveToHub={!isHubCell && availableHubs.length > 0}
++@@ -2071,6 +2177,29 @@ export default function LootTradeScreen() {
++                 <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
++               </TouchableOpacity>
++ 
+++              <View style={styles.hubKeysSection}>
+++                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubKeysTitle')}</Text>
+++                {(activeContainer.keyItemIds || []).length === 0 ? (
+++                  <Text style={styles.emptyListText}>{tLootTrade('detail.hubKeysEmpty')}</Text>
+++                ) : (activeContainer.keyItemIds || []).map((keyId) => {
+++                  const record = keyItems.find((k) => k.id === keyId);
+++                  if (!record) return null;
+++                  return (
+++                    <View key={keyId} testID={`hub-key-${keyId}`} style={styles.hubKeyRow}>
+++                      <MaterialCommunityIcons name="key-variant" size={18} color="#d4af37" />
+++                      <Text style={styles.hubKeyRowName} numberOfLines={1}>{record.name}</Text>
+++                      <TouchableOpacity
+++                        testID={`hub-key-detach-${keyId}`}
+++                        style={styles.hubKeyDetachBtn}
+++                        onPress={() => void handleDetachKeyItem(keyId)}
+++                      >
+++                        <Text style={styles.hubKeyDetachText}>{tLootTrade('detail.hubKeyDetach')}</Text>
+++                      </TouchableOpacity>
+++                    </View>
+++                  );
+++                })}
+++              </View>
+++
++               <ScrollView style={styles.itemsListContainer}>
++                 {(activeContainer.links || []).length === 0 ? (
++                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
++@@ -2297,6 +2426,7 @@ export default function LootTradeScreen() {
++         visible={Boolean(keyItemForm)}
++         initialKeyItem={keyItemForm?.initialKeyItem || null}
++         availableRooms={availableRooms}
+++        availableParents={availableParents}
++         onSave={handleSaveKeyItem}
++         onClose={() => setKeyItemForm(null)}
++       />
++@@ -2306,6 +2436,8 @@ export default function LootTradeScreen() {
++         initialContainer={formModal?.initialContainer || null}
++         availableRooms={availableRooms}
++         availableHubs={availableHubs}
+++        availableKeyItems={keyItems}
+++        availableCheckContainers={containers.filter((c) => c.kind === CONTAINER_KIND.TERMINAL)}
++         initialLinkedHubIds={
++           formModal?.initialContainer?.id
++             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
++diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++index 8c440de..8e8b436 100644
++--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++@@ -27,6 +27,9 @@ import {
++   normalizeSaleMarkupPercent,
++   normalizeBuyDepreciationPercent,
++   matchHubSuggestions,
+++  KEY_REQUIREMENT,
+++  normalizeKeyRequirement,
+++  containerCanRequireKey,
++ } from '../../../../domain/lootTrade';
++ import { showRawAlert } from '../../../alerts/alertService';
++ 
++@@ -39,6 +42,8 @@ const ContainerFormModal = ({
++   availableRooms = EMPTY_ARRAY,
++   availableHubs = EMPTY_ARRAY,
++   initialLinkedHubIds = EMPTY_ARRAY,
+++  availableKeyItems = EMPTY_ARRAY,
+++  availableCheckContainers = EMPTY_ARRAY,
++   onQuickCreateHub = null,
++   onSave,
++   onClose,
++@@ -49,6 +54,7 @@ const ContainerFormModal = ({
++   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
++   const isHub = effectiveKind === CONTAINER_KIND.HUB;
++   const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
+++  const canRequireKey = containerCanRequireKey(effectiveKind);
++   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
++   const initSessionKey = visible
++     ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
++@@ -69,6 +75,12 @@ const ContainerFormModal = ({
++   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
++   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
++   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
+++  // Патч 514: две строки требования доступа (ключ + проверка).
+++  const [keyQuery, setKeyQuery] = useState('');
+++  const [checkQuery, setCheckQuery] = useState('');
+++  const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
+++  const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
+++  const [linkedCheckId, setLinkedCheckId] = useState('');
++ 
++   useEffect(() => {
++     if (!initSessionKey) return;
++@@ -107,9 +119,26 @@ const ContainerFormModal = ({
++         ? initialContainer.buyDepreciationPercent
++         : DEFAULT_BUY_DEPRECIATION_PERCENT,
++     ));
+++    setKeyQuery('');
+++    setCheckQuery('');
+++    setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
+++    setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
+++    setLinkedCheckId(String(initialContainer?.linkedCheckId || '').trim());
++     // eslint-disable-next-line react-hooks/exhaustive-deps
++   }, [initSessionKey]);
++ 
+++  const filteredKeys = useMemo(() => {
+++    const q = keyQuery.trim().toLowerCase();
+++    return (Array.isArray(availableKeyItems) ? availableKeyItems : [])
+++      .filter((k) => !q || String(k?.name || '').toLowerCase().includes(q));
+++  }, [availableKeyItems, keyQuery]);
+++
+++  const filteredChecks = useMemo(() => {
+++    const q = checkQuery.trim().toLowerCase();
+++    return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
+++      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
+++  }, [availableCheckContainers, checkQuery]);
+++
++   const combinedHubs = useMemo(() => {
++     const map = new Map();
++     for (const h of Array.isArray(availableHubs) ? availableHubs : []) {
++@@ -258,6 +287,9 @@ const ContainerFormModal = ({
++         caps: resolvedCaps,
++         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
++         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+++        requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
+++        keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
+++        linkedCheckId: canRequireKey ? linkedCheckId : '',
++       },
++       capsRollInfo,
++       isHub ? null : finalSelectedHubIds,
++@@ -591,6 +623,103 @@ const ContainerFormModal = ({
++                 <Text style={styles.hintText}>{tLootTrade('form.buyDepreciationHint')}</Text>
++               </>
++             )}
+++
+++            {canRequireKey && (
+++              <>
+++                <Text style={styles.label}>{tLootTrade('form.keyRequirementLabel')}</Text>
+++                <TextInput
+++                  testID="container-form-key-search"
+++                  style={styles.input}
+++                  value={keyQuery}
+++                  onChangeText={setKeyQuery}
+++                  placeholder={tLootTrade('form.keySearchPlaceholder')}
+++                  placeholderTextColor="#8c8c8c"
+++                />
+++                <View style={styles.roomChips}>
+++                  {filteredKeys.length === 0 ? (
+++                    <Text style={styles.hintText}>{tLootTrade('form.keyEmpty')}</Text>
+++                  ) : filteredKeys.map((key) => {
+++                    const selected = key.id === requiredKeyItemId;
+++                    return (
+++                      <TouchableOpacity
+++                        key={key.id}
+++                        testID={`container-form-key-${key.id}`}
+++                        style={[styles.roomChip, selected && styles.roomChipActive]}
+++                        onPress={() => {
+++                          setRequiredKeyItemId(selected ? '' : key.id);
+++                          setKeyRequirement(selected ? KEY_REQUIREMENT.NONE : KEY_REQUIREMENT.OPTIONAL);
+++                        }}
+++                      >
+++                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+++                          {key.name}
+++                        </Text>
+++                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]} numberOfLines={1}>
+++                          {key.description || tLootTrade('form.keyNoDescription')}
+++                        </Text>
+++                      </TouchableOpacity>
+++                    );
+++                  })}
+++                </View>
+++                {Boolean(requiredKeyItemId) && (
+++                  <>
+++                    <Text style={styles.label}>{tLootTrade('form.keyMandatoryLabel')}</Text>
+++                    <View style={styles.requirementRow}>
+++                      <TouchableOpacity
+++                        testID="container-form-key-required"
+++                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipActive]}
+++                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.REQUIRED)}
+++                      >
+++                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.REQUIRED && styles.roomChipTextActive]}>
+++                          {tLootTrade('form.keyRequiredLabel')}
+++                        </Text>
+++                      </TouchableOpacity>
+++                      <TouchableOpacity
+++                        testID="container-form-key-optional"
+++                        style={[styles.roomChip, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipActive]}
+++                        onPress={() => setKeyRequirement(KEY_REQUIREMENT.OPTIONAL)}
+++                      >
+++                        <Text style={[styles.roomChipName, keyRequirement === KEY_REQUIREMENT.OPTIONAL && styles.roomChipTextActive]}>
+++                          {tLootTrade('form.keyOptionalLabel')}
+++                        </Text>
+++                      </TouchableOpacity>
+++                    </View>
+++                  </>
+++                )}
+++
+++                <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
+++                <TextInput
+++                  testID="container-form-check-search"
+++                  style={styles.input}
+++                  value={checkQuery}
+++                  onChangeText={setCheckQuery}
+++                  placeholder={tLootTrade('form.linkedCheckSearchPlaceholder')}
+++                  placeholderTextColor="#8c8c8c"
+++                />
+++                <View style={styles.roomChips}>
+++                  {filteredChecks.length === 0 ? (
+++                    <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
+++                  ) : filteredChecks.map((check) => {
+++                    const selected = check.id === linkedCheckId;
+++                    return (
+++                      <TouchableOpacity
+++                        key={check.id}
+++                        testID={`container-form-check-${check.id}`}
+++                        style={[styles.roomChip, selected && styles.roomChipActive]}
+++                        onPress={() => setLinkedCheckId(selected ? '' : check.id)}
+++                      >
+++                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+++                          {check.name}
+++                        </Text>
+++                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+++                          {tLootTrade('form.linkedCheckTerminal')}
+++                        </Text>
+++                      </TouchableOpacity>
+++                    );
+++                  })}
+++                </View>
+++                <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
+++              </>
+++            )}
++           </ScrollView>
++ 
++           <View style={styles.footer}>
++@@ -948,6 +1077,11 @@ export const lootTradeFormStyles = StyleSheet.create({
++   unitSegTextActive: {
++     color: ADMIN_MODAL_PALETTE.text,
++   },
+++  requirementRow: {
+++    flexDirection: 'row',
+++    flexWrap: 'wrap',
+++    gap: 8,
+++  },
++   footer: {
++     flexDirection: 'row',
++     gap: 10,
++diff --git a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
++index c1858a4..8574b69 100644
++--- a/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
+++++ b/components/screens/LootTradeScreen/modals/KeyItemFormModal.js
++@@ -41,6 +41,7 @@ const KeyItemFormModal = ({
++   visible,
++   initialKeyItem = null,
++   availableRooms = [],
+++  availableParents = [],
++   onSave,
++   onClose,
++ }) => {
++@@ -49,13 +50,22 @@ const KeyItemFormModal = ({
++   const [name, setName] = useState('');
++   const [description, setDescription] = useState('');
++   const [roomCode, setRoomCode] = useState('');
+++  const [attachedTo, setAttachedTo] = useState('');
+++  const [parentQuery, setParentQuery] = useState('');
++ 
++   useEffect(() => {
++     if (!visible) return;
++     setName(initialKeyItem?.name || '');
++     setDescription(initialKeyItem?.description || '');
++     setRoomCode(initialKeyItem?.roomCode || '');
++-  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode]);
+++    setAttachedTo(initialKeyItem?.attachedTo || '');
+++    setParentQuery('');
+++  }, [visible, initialKeyItem?.id, initialKeyItem?.name, initialKeyItem?.description, initialKeyItem?.roomCode, initialKeyItem?.attachedTo]);
+++
+++  const filteredParents = availableParents.filter((parent) => (
+++    !parentQuery.trim()
+++    || String(parent?.name || '').toLowerCase().includes(parentQuery.trim().toLowerCase())
+++  ));
++ 
++   const handleSave = () => {
++     const cleanName = name.trim();
++@@ -68,6 +78,7 @@ const KeyItemFormModal = ({
++       name: cleanName,
++       description,
++       roomCode,
+++      attachedTo,
++     });
++   };
++ 
++@@ -119,6 +130,46 @@ const KeyItemFormModal = ({
++               </>
++             )}
++ 
+++            <Text style={styles.label}>{tLootTrade('keyItems.attachToLabel')}</Text>
+++            <TextInput
+++              testID="key-item-form-parent-search"
+++              style={styles.input}
+++              value={parentQuery}
+++              onChangeText={setParentQuery}
+++              placeholder={tLootTrade('keyItems.attachToSearchPlaceholder')}
+++              placeholderTextColor="#8c8c8c"
+++            />
+++            <View style={styles.roomChips}>
+++              <TouchableOpacity
+++                testID="key-item-parent-none"
+++                style={[styles.roomChip, !attachedTo && styles.roomChipActive]}
+++                onPress={() => setAttachedTo('')}
+++              >
+++                <Text style={[styles.roomChipName, !attachedTo && styles.roomChipTextActive]}>
+++                  {tLootTrade('keyItems.attachToNone')}
+++                </Text>
+++              </TouchableOpacity>
+++              {filteredParents.map((parent) => {
+++                const selected = parent.id === attachedTo;
+++                return (
+++                  <TouchableOpacity
+++                    key={parent.id}
+++                    testID={`key-item-parent-${parent.id}`}
+++                    style={[styles.roomChip, selected && styles.roomChipActive]}
+++                    onPress={() => setAttachedTo(selected ? '' : parent.id)}
+++                  >
+++                    <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+++                      {parent.name}
+++                    </Text>
+++                    <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+++                      {parent.kindLabel}
+++                    </Text>
+++                  </TouchableOpacity>
+++                );
+++              })}
+++            </View>
+++            <Text style={styles.hintText}>{tLootTrade('keyItems.attachToHint')}</Text>
+++
++             <Text style={styles.label}>{tLootTrade('keyItems.descriptionLabel')}</Text>
++             <View style={extraStyles.tagRow}>
++               {TAG_BUTTONS.map((tag) => (
++diff --git a/docs/agents/README.md b/docs/agents/README.md
++index 47b0a2c..0a3cea2 100644
++--- a/docs/agents/README.md
+++++ b/docs/agents/README.md
++@@ -22,6 +22,8 @@
++ 6. `docs/ui-modals-rules.md` — обязателен перед созданием/переделкой любого
++    модального окна: брать каркас ближайшей модалки, не рисовать заново.
++    `docs/ui-alerts-rules.md` — для уведомлений и подтверждений.
+++7. `docs/roadmap.md` — живой план: что сделано, что осталось. Обновлять в
+++   КАЖДОМ патче и дублировать список оставшихся тезисов в ответе владельцу.
++ 
++ ## Карта репозитория по слоям
++ 
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 0354005..88e64fe 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,33 @@
++ # Changelog
++ ---
+++## Requirement fields in cards (patch 514)
+++
+++The first half of design step 3: "we are now editing card UI and creating
+++fields and requirements for them". **Server-side key checking is NOT in this
+++patch** — it stays the next item on the plan.
+++
+++- **Access-point fields.** Locations, containers, merchants and terminals now
+++  store `requiredKeyItemId`, `keyRequirement` (none / optional / mandatory),
+++  `linkedCheckId` and `keyItemIds`. Normalization clears nested keys on
+++  terminals: a key can be placed there neither by the form nor by dragging.
+++- **Two setup rows.** The first is a name search or a list of created keys and
+++  notes, with a "Is it mandatory?" toggle next to it; the second is a search
+++  or list of terminals as the alternative check. The card shows which key is
+++  required and whether it is mandatory.
+++- **A key is part of something.** The key form has a "Part of" row: location,
+++  container or merchant (no terminals in the list). The link lives on the
+++  parent, so editing or deleting the template never extinguishes a found
+++  record.
+++- **Dragging.** The key card now has the same arrow drag handle as containers.
+++  It leaves the root grid for a location, is listed there separately, and can
+++  be moved back with a button. "Add to storage" in the `⋮` menu stays as the
+++  backward-compatibility exception.
+++- **Live roadmap.** New `docs/roadmap.md`: a status table of every item and an
+++  "Outstanding after this patch" list. As requested, it is updated in every
+++  patch and repeated in the reply. It also records the new storage description:
+++  "Like the merchant, two panels ... just no price checks" — the current
+++  storage window does not match it yet.
+++
++ ## Key and access-point rules clarified (patch 513, docs only)
++ 
++ The owner extended the design and chose "document it for now" — **no code,
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 00ce9f4..e3b2b0a 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,33 @@
++ # История изменений
++ 
++ ---
+++## Поля и требования в карточках (патч 514)
+++
+++Первая половина шага 3 дизайна: «сейчас правим ui карточек и создаём для них
+++поля и требования». **Серверная проверка ключа в этот патч не входит** — она
+++осталась следующим тезисом плана.
+++
+++- **Поля точки доступа.** У локации, контейнера, торговца и терминала в базе
+++  появились `requiredKeyItemId`, `keyRequirement` (нет / необязателен /
+++  обязателен), `linkedCheckId` и `keyItemIds`. Нормализация чистит вложенные
+++  ключи у терминала: туда ключ не кладут ни формой, ни перетаскиванием.
+++- **Две строки в форме.** Первая — поиск по названию или список созданных
+++  ключей и записок, рядом переключатель «Обязателен?»; вторая — поиск или
+++  список терминалов как альтернативная проверка. На карточке точки видно,
+++  какой ключ требуется и обязателен ли он.
+++- **Ключ — часть чего-то.** В форме ключа строка «Часть чего»: локация,
+++  контейнер или торговец (терминала в списке нет). Привязка хранится в
+++  родителе, поэтому правка или удаление шаблона не гасит уже добытую запись.
+++- **Перетаскивание.** У карточки ключа появилась иконка со стрелками, та же,
+++  что у контейнеров. Ключ уходит с корня в локацию, показывается там отдельным
+++  списком и возвращается на сетку кнопкой. Пункт «Выдать на склад» в меню `⋮`
+++  сохранён как исключение обратной совместимости.
+++- **Живой план.** Новый `docs/roadmap.md`: таблица всех тезисов со статусами и
+++  список «Осталось после патча». По просьбе владельца файл обновляется в
+++  каждом патче, а список дублируется в ответе. Туда же внесено новое описание
+++  склада: «Аналогично торговцу, 2 панели ... Просто нет проверок на
+++  стоимость» — текущее окно склада ему пока не соответствует.
+++
++ ## Уточнение правил ключей и точек доступа (патч 513, только документ)
++ 
++ Владелец дал дополнение к дизайну и выбрал «пока только зафиксировать» —
++diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
++index b81d24c..60e040a 100644
++--- a/docs/guides/admin-and-loot-trade.en.md
+++++ b/docs/guides/admin-and-loot-trade.en.md
++@@ -138,7 +138,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
++ - **When attempts run out, the Game Master gets "Allow another hack? Yes/No"** over *any* screen, not only inside the Loot/Trade tab. It never appears after a success. **"Yes"** immediately builds a fresh board from the *current* card settings (including edits made while the board was open): new words, hints and brackets, exactly 4 attempts, with the operator sheet preserved. **"No"** leaves the card visible with a **"CLOSED"** badge and disables both "Hack" and "View" for players. Only **"Broadcast again"** in the admin panel, re-issuing the terminal, or re-issuing the location reopens it; an ordinary settings edit does not clear the ban. The same Yes/No buttons and the state ("Available" / "Awaiting decision" / "Closed") are shown in the terminal's live admin panel. Until the GM answers, hacking again is impossible.
++ - **A successful hack no longer rebuilds the board.** The **"ACCESS GRANTED"** label and the full hint history stay in the player window, the Game Master receives a **"Terminal hacked"** notice over any screen with the operator name, and the live card panel shows a **"Hacked"** state. Neither reopening the window, nor a second browser tab, nor a reconnect erases the win: only the GM **"Broadcast again"** starts a new run. When attempts do run out, discovered hints such as `5/7` remain on the failure screen.
++ - **Terminal access is one-shot per broadcast.** The first **"Hack"** press is tied to a broadcast id issued by the server: closing the window no longer restores the button, and after a success, a failure or a "No" answer both card buttons are disabled with a state badge. Only **"Broadcast again"**, re-issuing the location, or the GM answering **"Yes"** reopens it. The hacked notice reaches the GM in any browser tab, even when the interface mode switch is shared: ownership comes from the room member list. **"Leave location"** sits next to **"Minimize"** — that player disconnects while the scene stays open for everyone else; only the GM can end it for all.
++-- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See `docs/patch-512-install.md`. Key placement, dragging and access requirements are specified in `docs/key-items-and-gates-design.md` (patch 513, no code changes).
+++- **Keys and notes.** The "Create key / note" tile on the Loot / Trade grid opens a form styled like container creation: a name is required, the description with bold, italics and lists may be empty, and a preview is shown before saving. Once saved, the record stays as a card on the grid; it can be edited, added to shared storage or placed in a loot container — finding it gives the party a shared card. Keys have their own list, can be read, but cannot be withdrawn into a personal inventory. They travel with the storage snapshot. The window and card reuse the nearest modals' shared layout (`docs/ui-modals-rules.md`). See also `docs/patch-514-install.md` and the live plan `docs/roadmap.md`. Key placement, dragging and access requirements are specified in `docs/key-items-and-gates-design.md` (patch 513, no code changes).
++ - **Handover.** Snapshots sync from the GM Google Drive in both directions, so the save arrives on another device. Both the GM and players can export storage to a file and import it back: when the GM changes, the new GM fills storage on the new server in one action. Room state lives only in server memory and disappears on disconnect — the file and Drive are the recovery path. See `docs/patch-509-install.md`.
++ - **"Shared storage"** is available from the player inventory: a full-width green bar below "Add loot" / "Buy items". Items are shared across the room: anyone can deposit or withdraw, and an absent player picks up what was left later. Storage belongs to the GM: its snapshot is saved in the GM local database and Google Drive, while the server keeps only the current in-memory room state. A connecting player receives the current snapshot; without the GM online storage is read-only. The GM may deposit but cannot take back what players already own; the name is not customizable. See `docs/key-items-and-gates-design.md` and `docs/patch-507-install.md`.
++ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board has **three groups** of words sharing a combination (ending, prefix or suffix), each with **two variants** of that combination — e.g. `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. A hint first reveals the right group, then the right sequence inside it; extra words lower blind-guess odds. Hints can reach `L−1` matching letters out of `L`: a high hint is fine because it requires deduction, not brute force. The password is revealed by neither the "most similar to everything" nor the "least similar" heuristic. Difficulty 0 keeps its special anagram families and outlier password.
++diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
++index 650a413..72c6f52 100644
++--- a/docs/guides/admin-and-loot-trade.ru.md
+++++ b/docs/guides/admin-and-loot-trade.ru.md
++@@ -138,7 +138,7 @@
++ - **Когда попытки исчерпаны, Мастеру всплывает «Разрешить повторный взлом? Да/Нет»** — поверх любого экрана, а не только на вкладке «Добыча/Торговля». После успеха вопрос не задаётся. **«Да»** сразу собирает новую доску по *текущим* настройкам карточки (включая правки, сделанные во время доска): новые слова, подсказки, скобки, ровно 4 попытки, лист оператора сохраняется. **«Нет»** оставляет карточку видимой с отметкой **«ЗАКРЫТ»** и запрещает игрокам и «Взломать», и «Смотреть». Снова открыть терминал можно только **«Транслировать заново»** в админ-панели, повторной выдачей терминала или повторной выдачей локации; обычная правка настроек запрет не снимает. Те же кнопки «Да»/«Нет» и состояние («Доступен» / «Ожидает решения» / «Закрыт») видны в живой панели карточки терминала. Пока Мастер не ответил, повторный взлом невозможен.
++ - **После удачного взлома доска не пересобирается.** Надпись **«ДОСТУП РАЗРЕШЁН»** и вся история подсказок остаются в окне игрока, Мастеру поверх любого экрана приходит уведомление **«Терминал взломан»** с именем оператора, а в живой панели карточки появляется состояние **«Взломан»**. Ни повторное открытие окна, ни вторая вкладка браузера, ни смена подключения не стирают победу: новую партию начинает только **«Транслировать заново»** у Мастера. Если попытки всё же исчерпаны, найденные подсказки (например `5/7`) остаются на экране провала.
++ - **Доступ к терминалу одноразовый в рамках одной трансляции.** Первое нажатие **«Взломать»** привязывается к номеру трансляции, который выдаёт сервер: закрытие окна больше не возвращает кнопку, а после успеха, провала или ответа «Нет» обе кнопки карточки блокируются с отметкой состояния. Снова открыть терминал можно только **«Транслировать заново»**, повторной выдачей локации или ответом **«Да»** Мастера. Уведомление о взломе приходит Мастеру в любой вкладке браузера, даже если переключатель режима интерфейса сбит: владелец определяется по участнику комнаты. **«Покинуть локацию»** стоит рядом с **«Свернуть»** — игрок отключается сам, сцена остаётся открытой для остальных, а завершает её только Мастер.
++-- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). Подробности — `docs/patch-512-install.md`. Порядок вложения ключей, перетаскивания и требования доступа зафиксирован в `docs/key-items-and-gates-design.md` (патче 513, код не менялся).
+++- **Ключи и записки.** Плитка «Создать ключ / записку» на сетке «Добыча / Торговля» открывает форму в стиле создания контейнера: имя обязательно, описание с жирным текстом, курсивом и списками можно оставить пустым, перед сохранением виден предпросмотр. После сохранения запись остаётся карточкой на сетке; её можно изменить, выдать в общее хранилище или положить в контейнер добычи — найдя её, партия получит общую карточку. Ключи лежат отдельным списком, их можно прочитать, но нельзя забрать в личный инвентарь. Они уезжают вместе со снимком хранилища. Окно и карточка используют общий каркас соседних модалок (`docs/ui-modals-rules.md`). См. также `docs/patch-514-install.md` и живой план `docs/roadmap.md`. Порядок вложения ключей, перетаскивания и требования доступа зафиксирован в `docs/key-items-and-gates-design.md` (патче 513, код не менялся).
++ - **Перенос хранилища.** Снимок синхронизируется из Google Drive Мастера в обе стороны, поэтому сейв приезжает на другое устройство. И Мастер, и игрок могут выгрузить хранилище в файл и импортировать его обратно: если ведущий сменился, новый Мастер наполняет хранилище нового сервера одним действием. Состояние комнаты живёт только в памяти сервера и исчезает при отключении — файл и Drive служат для восстановления. Подробности — `docs/patch-509-install.md`.
++ - **«Общее хранилище»** доступно из инвентаря игрока: зелёная плашка во всю ширину под «Добавить добычу» / «Купить предметы». Вещи общие для всей комнаты: каждый может положить и забрать, а отсутствующий игрок достанет оставленное позже. Хранилище принадлежит Мастеру: его снимок сохраняется в локальной базе ведущего и его Google Drive, а сервер держит только текущее состояние в памяти комнаты. При подключении игрок получает актуальный снимок; без Мастера в сети хранилище только для просмотра. Ведущий может положить вещь, но не может забрать уже добытое игроками; название не настраивается. Подробности — `docs/key-items-and-gates-design.md` и `docs/patch-507-install.md`.
++ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска состоит из **трёх групп** слов с общими сочетаниями (окончаниями, приставками или суффиксами), и в каждой группе есть **два варианта** этого сочетания — например `TION`/`SION`, `NESS`/`LESS`, `THE`/`THO`. Сначала по подсказке нужно понять верную группу, затем внутри неё — верную последовательность; лишние слова занижают вероятность слепого перебора. Подсказка показывает до `L−1` совпавших букв из `L`: высокая подсказка допустима, потому что она требует вывода, а не перебора. Пароль не выдаётся ни «самым похожим на все», ни «самым непохожим» словом. На сложности 0 по-прежнему особый случай: анаграммные семьи и пароль-выброс.
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index dba328e..ae1c3fe 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -13,8 +13,10 @@
++ атомарность, плашка и модалка 507 сохранены. Патч **513** (только документ,
++ без кода) зафиксировал уточнение владельца о вложенности ключей,
++ перетаскивании карточек и двух строках требования — **Обновление 7** ниже.
++-Шаги 3–5 (`requires`, ворота, мини-игра замков) **не реализованы**: для шага 3
++-описан контракт, код начнётся отдельной командой владельца.
+++Шаг 3 разбит: патч **514** реализовал **поля, формы и вложенность**
+++(две строки требования, привязка ключа к родителю, перетаскивание всех четырёх
+++карточек), но **серверная проверка ключа ещё не начата**. Шаги 4–5 (ворота,
+++мини-игра замков) не реализованы. Живой порядок — `docs/roadmap.md`.
++ 
++ **Обновление 6 (патч 511, уточнение интерфейса шага 2):**
++ «Я полагал ключ будет, как карточка контейнера/торговца/терминала и с модалкой
++@@ -123,7 +125,25 @@
++   или «компрометирующая записка». Без записи лавка закрыта (обязательное
++   требование) или открывается после взлома / убеждения (необязательное).
++ 
++-### 7.6 Границы патча 513
+++### 7.6 Патч 514: что из этого уже в коде
+++
+++- у карточек контейнера, торговца, терминала и локации появились поля
+++  `requiredKeyItemId`, `keyRequirement`, `linkedCheckId` и `keyItemIds`;
+++  нормализация чистит их у терминала (ключи туда не вкладываются);
+++- в форме точки — две строки из 7.3: поиск/список ключей с переключателем
+++  «Обязателен?» и поиск/список терминалов для второй строки;
+++- в форме ключа — строка «Часть чего» (локация, контейнер, торговец; терминала
+++  в списке нет); привязка хранится в родителе, поэтому правка шаблона не гасит
+++  уже добытую запись;
+++- у ключа появилась иконка перетаскивания, ключ уходит с корня в локацию и
+++  показывается там отдельным списком; кнопка «Вернуть на сетку» снимает
+++  привязку;
+++- пункт «Выдать на склад» в меню `⋮` сохранён (исключение 7.1).
+++
+++**Не сделано в 514:** проверка склада сервером, пропуск мини-игры, отказ по
+++обязательному ключу и ворота. Это тезис 8 `docs/roadmap.md`.
+++
+++### 7.7 Границы патча 513
++ 
++ Патч меняет **только документы и номер версии**. Код, протокол, база данных,
++ форма создания, серверная проверка и поведение игры не тронуты: владелец
++@@ -512,9 +532,10 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
++    «Забрать». Записи едут в снимке хранилища.
++ 3. **Серверная проверка ключа.** Контейнер объявляет `requires`, сервер
++    проверяет склад и помечает `hacked`, не запуская мини-игру. Без
++-   уведомления Мастеру. ⏳ **Контракт уточнён в 513** (вложенность ключей,
++-   перетаскивание, две строки настройки, обязательный / необязательный ключ),
++-   **код не начат** — ждёт отдельной команды владельца.
+++   уведомления Мастеру. 🔶 **Патч 514 сделал первую половину**: поля, формы,
+++   вложенность и перетаскивание (раздел 7.6). Сама проверка склада, пропуск
+++   мини-игры и отказ по обязательному ключу **остались** — тезис 8
+++   `docs/roadmap.md`.
++ 4. **Ворота.** `requires` по событию другого контейнера, снятие `locked`,
++    общее состояние на комнату, отображение связей в админке.
++ 5. **Позже:** мини-игра взлома замков на том же контракте `hacked`.
++@@ -538,9 +559,11 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
++   «предметы есть на складе или нет, игроки сами смотрят».
++ - **Осталось:** лимиты и стаканье; поведение при удалении записи-шаблона;
++   тихое срабатывание ключа.
++-- Шаг 2 ✅ реализован в 510–512. Шаги 3–5 в плане: `requires` и проверка
++-  ключа (контракт зафиксирован в 513), ворота между контейнерами, мини-игра
++-  взлома замков. Патч 513 код не менял.
+++- Шаг 2 ✅ реализован в 510–512. Патч 513 зафиксировал контракт без кода,
+++  патч 514 реализовал поля/формы/вложенность шага 3. Остались: серверная
+++  проверка ключа, ворота между контейнерами, мини-игра взлома замков,
+++  двухпанельное окно склада и мелочи склада — полный список в
+++  `docs/roadmap.md`.
++ 
++ 
++ ---
++diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
++index ba85828..f235a87 100644
++--- a/docs/patch-493-install.md
+++++ b/docs/patch-493-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 493: терминал в локации открывает мини-игру
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
++index 88cf75c..b20cc52 100644
++--- a/docs/patch-495-install.md
+++++ b/docs/patch-495-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
++index 80ea702..dabfffb 100644
++--- a/docs/patch-496-install.md
+++++ b/docs/patch-496-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 496: «Саммари v2» взлома терминалов
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
++index 3527c9a..cb0e44a 100644
++--- a/docs/patch-497-install.md
+++++ b/docs/patch-497-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 497: канонические 4 попытки и доска «последовательности»
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
++index 1bf0013..d126d64 100644
++--- a/docs/patch-498-install.md
+++++ b/docs/patch-498-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 498: чистый интерфейс терминала
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
++index d3b022a..33ac668 100644
++--- a/docs/patch-499-install.md
+++++ b/docs/patch-499-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 499: скобки двух сортов, число задаёт Наука
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
++index 808315c..8d00201 100644
++--- a/docs/patch-500-install.md
+++++ b/docs/patch-500-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 500: доска «25 − ИНТ»
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
++index 4c6ed92..e3ab331 100644
++--- a/docs/patch-501-install.md
+++++ b/docs/patch-501-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 501: характеристики берутся из листа персонажа
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
++index a867055..597ea88 100644
++--- a/docs/patch-502-install.md
+++++ b/docs/patch-502-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 502: сейв из файла экспорта читается на любой глубине
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
++index e078a69..c2b0558 100644
++--- a/docs/patch-503-install.md
+++++ b/docs/patch-503-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 503: три группы слов, смена оператора, один полный возврат
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
++index 9638925..6c02630 100644
++--- a/docs/patch-504-install.md
+++++ b/docs/patch-504-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 504: решение Мастера вместо блокировки после провала
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
++index 44e9325..2304bd9 100644
++--- a/docs/patch-505-install.md
+++++ b/docs/patch-505-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 505: успешный взлом больше не пропадает
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
++index 1b0137a..96f4006 100644
++--- a/docs/patch-506-install.md
+++++ b/docs/patch-506-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
++index cf2e128..60b6678 100644
++--- a/docs/patch-507-install.md
+++++ b/docs/patch-507-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
++index 6eaf797..251a734 100644
++--- a/docs/patch-508-install.md
+++++ b/docs/patch-508-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 508: хранилище Мастера + снапшот игрокам
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
++index 3a91863..5545944 100644
++--- a/docs/patch-509-install.md
+++++ b/docs/patch-509-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
++index 883bdab..c57aefa 100644
++--- a/docs/patch-510-install.md
+++++ b/docs/patch-510-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 510: ключи и записки на общем складе (шаг 2)
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
++index 264f71d..c84c9fa 100644
++--- a/docs/patch-511-install.md
+++++ b/docs/patch-511-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ > **Модалки берут каркас у соседних окон — правила: `docs/ui-modals-rules.md`, установка: `docs/patch-512-install.md`.**
++diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
++index 693e40d..ec14109 100644
++--- a/docs/patch-512-install.md
+++++ b/docs/patch-512-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 512: модалки берут дизайн у соседних окон
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ > **Правила ключей и требований доступа уточнены (только документ) — `docs/key-items-and-gates-design.md`, установка: `docs/patch-513-install.md`.**
++ 
++ Патч подготовлен от состояния **версии 511** (коммит `860fe82`, ветка
++diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
++index 0b69313..d5af108 100644
++--- a/docs/patch-513-install.md
+++++ b/docs/patch-513-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 513: уточнение правил ключей (только документ)
++ 
+++> **Поля и требования в карточках — патч 514. Живой план: `docs/roadmap.md`, установка: `docs/patch-514-install.md`.**
+++
++ Патч подготовлен от состояния **версии 512** (коммит `6da0a37`, ветка
++ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–513
++diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
++new file mode 100644
++index 0000000..9a3bace
++--- /dev/null
+++++ b/docs/patch-514-install.md
++@@ -0,0 +1,119 @@
+++# Установка патча 514: поля и требования в карточках
+++
+++Патч подготовлен от состояния **версии 513** (коммит `8a3e274`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–514
+++цепочкой.
+++
+++Это **первая половина шага 3** дизайна: поля, формы, вложенность и
+++перетаскивание. Серверная проверка ключа (пропуск мини-игры, отказ по
+++обязательному ключу) и ворота **не входят** — см. `docs/roadmap.md`.
+++
+++## Что изменилось
+++
+++### 1. Поля точки доступа
+++
+++`domain/lootTrade.js` — новые поля в `normalizeContainerEntity`:
+++
+++| Поле | Смысл |
+++| --- | --- |
+++| `keyItemIds` | вложенные ключевые записи (только локация, контейнер, торговец; у терминала всегда пусто) |
+++| `requiredKeyItemId` | идентификатор требуемой записи |
+++| `keyRequirement` | `none` / `optional` / `required` |
+++| `linkedCheckId` | терминал (в будущем — замок) как альтернативная проверка |
+++
+++Добавлены `containerCanHoldKey`, `containerCanRequireKey`,
+++`normalizeKeyItemIds`, `normalizeKeyRequirement`, `KEY_REQUIREMENT` и
+++зарезервированный `RESERVED_LOCK_KIND = 'lock'`. Изменений схемы БД нет:
+++поля едут в уже существующем JSON карточки.
+++
+++### 2. Две строки в форме точки
+++
+++`ContainerFormModal` получил `availableKeyItems` и
+++`availableCheckContainers`:
+++
+++- строка 1 — поиск по названию или список ключей/записок, рядом переключатель
+++  «Обязателен?» (обязателен / необязателен);
+++- строка 2 — поиск или список терминалов;
+++- на карточке точки показывается название требуемого ключа и пометка
+++  обязательности.
+++
+++Стили новых строк взяты из того же `lootTradeFormStyles` (правило
+++`docs/ui-modals-rules.md` не нарушено).
+++
+++### 3. Ключ как часть родителя
+++
+++`KeyItemFormModal` — строка «Часть чего»: локация, контейнер или торговец.
+++Терминал в список не входит. Привязка хранится в `keyItemIds` родителя, а не в
+++шаблоне ключа, поэтому правка шаблона не влияет на уже добытую запись на
+++складе. `handleSaveKeyItem` синхронизирует привязку у всех родителей.
+++
+++### 4. Перетаскивание всех четырёх карточек
+++
+++`KeyItemCardCell` получил `arrow-all` и `PanResponder` как у
+++`ContainerCardCell`. Ключ уходит с корня в локацию, в локации показывается
+++отдельным списком с кнопкой «Вернуть на сетку». Пункт «Выдать на склад» в меню
+++`⋮` сохранён (исключение обратной совместимости из патча 513).
+++
+++### 5. Живой план
+++
+++`docs/roadmap.md` — таблица тезисов со статусами и раздел «Осталось после
+++патча 514». По просьбе владельца обновляется в каждом патче и дублируется в
+++ответе. Туда же записано новое описание окна склада: две панели как у
+++торговца, без проверок стоимости.
+++
+++## Файлы
+++
+++| Файл | Изменение |
+++| --- | --- |
+++| `domain/lootTrade.js` | поля требований, хелперы, резерв `lock` |
+++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | две строки настройки |
+++| `components/screens/LootTradeScreen/modals/KeyItemFormModal.js` | «Часть чего» |
+++| `components/lootTrade/KeyItemCardCell.js` | иконка перетаскивания |
+++| `components/screens/LootTradeScreen/LootTradeScreen.js` | привязка, перенос, список в локации, метка на карточке, props |
+++| `styles/LootTradeScreen.styles.js` | стили списка ключей в локации |
+++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные подписи |
+++| `__tests__/room/key-items-fields-514.test.js` | 12 приёмочных проверок |
+++| `docs/roadmap.md` | новый живой план |
+++| `docs/key-items-and-gates-design.md` | раздел 7.6, статус шага 3 |
+++| `docs/changelog.*.md`, `docs/guides/admin-and-loot-trade.*.md` | RU/EN описание |
+++| `public/version.json`, `patchs/baseline.json` | версия 514, 80/80 заметок |
+++| `patchs/514-key-card-fields.patch` | сам патч для установщика |
+++
+++## Установка
+++
+++С действующей версии 513:
+++
+++```bash
+++./apply-patch.sh 514
+++# ✓ Установлен патч: №514 (версия 513 → 514)
+++```
+++
+++С чистого `main` со старым установщиком:
+++
+++```bash
+++git fetch origin arena/054e6676-fallout-2d20-companion
+++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
+++./apply-patch.sh 514
+++```
+++
+++`patchs/baseline.json` в источнике равен `514`. После установки
+++`public/version.json` → `514`; закоммитьте изменения и пересоберите
+++веб-сборку. Серверный код не менялся, перезапуск сервиса не обязателен.
+++
+++## Проверка
+++
+++```bash
+++npm run typecheck
+++npx vitest run __tests__/room/key-items-fields-514.test.js
+++npx vitest run
+++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
+++curl -s http://localhost:5000/version.json | grep '"version": "514"'
+++```
+++
+++### Прямой `git apply` без установщика
+++
+++```bash
+++git apply patchs/514-key-card-fields.patch
+++cp /path/to/514-key-card-fields.patch patchs/
+++```
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++new file mode 100644
++index 0000000..6b8e882
++--- /dev/null
+++++ b/docs/roadmap.md
++@@ -0,0 +1,58 @@
+++# Живой план работ
+++
+++> Просьба владельца (патч 514): «мне было бы полезно после каждого патча ещё
+++> видеть, какие тезисы плана остались». **Правило:** каждый патч обновляет
+++> таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+++> ответе владельцу. Этот файл — источник истины для порядка шагов.
+++
+++Дата ревизии: 2026-11-03. Текущая версия: **514**.
+++
+++## Тезисы
+++
+++| # | Тезис | Статус | Патч |
+++| --- | --- | --- | --- |
+++| 1 | Терминал внутри локации открывает мини-игру взлома, а не сундук | ✅ сделано | 493 |
+++| 2 | Баланс мини-игры: свой словарь, ИНТ / Наука / Удача, группы слов, четыре попытки | ✅ сделано | 494–503 |
+++| 3 | Решение Мастера после провала, фиксация победы, одноразовый доступ, «Покинуть локацию» | ✅ сделано | 504–506 |
+++| 4 | Общий склад: каркас, канон Мастера, сейв в Drive и перенос файлом | ✅ сделано | 507–509 |
+++| 5 | Ключи и записки как записи на складе; карточки на сетке; форма в стиле контейнера | ✅ сделано | 510–512 |
+++| 6 | Правила вложенности ключей, перетаскивания и двух видов требования зафиксированы | ✅ сделано (документ) | 513 |
+++| 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + «Обязателен?» / проверка), вложенные ключи в локации | ✅ сделано | **514** |
+++| 8 | Серверная проверка ключа: есть ключ → мини-игра не запускается, точка открыта; нет обязательного → отказать; нет необязательного → привязанная проверка или Мастер вручную | ⏳ осталось | — |
+++| 9 | Ворота между контейнерами: доступ по событию другой точки, общее состояние на комнату, снятие блокировки | ⏳ осталось | — |
+++| 10 | Окно «Общего хранилища» в **две панели** (как у торговца), без проверок стоимости — см. описание ниже | ⏳ осталось | — |
+++| 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
+++| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+++
+++## Осталось после патча 514
+++
+++1. **Серверная проверка ключа** — логика из разделов 7.3–7.4 дизайна: ключ на складе пропускает мини-игру, обязательный без ключа закрывает доступ, необязательный отправляет к привязанному терминалу / взлому / решению Мастера.
+++2. **Ворота между контейнерами** — общие на комнату, по событию другой точки.
+++3. **Общее хранилище в две панели** — новое описание владельца, текущая модалка со списком ему не соответствует.
+++4. **Мини-игра взлома замков** — будущий вид точки и нейтральное событие.
+++5. **Мелочи склада** — лимиты, стаканье, удаление шаблона, тихое срабатывание.
+++
+++## Описание склада со стороны пользователя (для тезиса 10)
+++
+++Слово владельца (патч 514):
+++
+++> «Аналогично торговцу, 2 панели, что в инвентаре юзера, что в инвентаре
+++> склада. Просто нет проверок на стоимость».
+++
+++То есть окно склада повторяет двухпанельное окно торговца: слева личный
+++инвентарь игрока, справа общее хранилище, между ними кнопки «положить» и
+++«взять». Никаких цен, наценок, крышек и проверок стоимости — предмет просто
+++переезжает с одной панели на другую. Ключи и записки по-прежнему идут
+++отдельным списком и не забираются в личный инвентарь
+++(`docs/key-items-and-gates-design.md`, Обновление 3).
+++
+++Владелец предупредил, что даст развёрнутое описание работы склада со стороны
+++пользователя; когда оно придёт, этот раздел заменяется целиком, а тезис 10
+++уточняется **до начала кода**.
+++
+++## Связанные документы
+++
+++- `docs/key-items-and-gates-design.md` — полный контракт ключей, требований и ворот (Обновление 7, раздел 10).
+++- `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+++- `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+++- `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
++diff --git a/domain/lootTrade.js b/domain/lootTrade.js
++index 0e6fab1..0c7d9b0 100644
++--- a/domain/lootTrade.js
+++++ b/domain/lootTrade.js
++@@ -29,6 +29,53 @@ export const CONTAINER_KIND = Object.freeze({
++   TERMINAL: 'terminal',
++ });
++ 
+++// Патч 514: «замок» — будущая мини-игра. Вид точки зарезервирован, но пока
+++// не создаётся и не нормализуется: серверная проверка ключа (шаг 3.2) и
+++// ворота (шаг 4) придут отдельными патчами. Нейтральное событие `hacked`
+++// остаётся контрактом из docs/key-items-and-gates-design.md.
+++export const RESERVED_LOCK_KIND = 'lock';
+++
+++/** Обязательность ключа для точки доступа. */
+++export const KEY_REQUIREMENT = Object.freeze({
+++  NONE: 'none',
+++  OPTIONAL: 'optional',
+++  REQUIRED: 'required',
+++});
+++
+++/** Ключ можно вложить в локацию, контейнер или торговца, но НЕ в терминал. */
+++export const containerCanHoldKey = (kind) => (
+++  kind === CONTAINER_KIND.HUB
+++  || kind === CONTAINER_KIND.LOOT
+++  || kind === CONTAINER_KIND.MERCHANT
+++);
+++
+++/** Точка, которая может требовать ключ: контейнер, торговец, терминал, замок. */
+++export const containerCanRequireKey = (kind) => (
+++  kind === CONTAINER_KIND.HUB
+++  || kind === CONTAINER_KIND.LOOT
+++  || kind === CONTAINER_KIND.MERCHANT
+++  || kind === CONTAINER_KIND.TERMINAL
+++  || kind === RESERVED_LOCK_KIND
+++);
+++
+++export const normalizeKeyItemIds = (raw) => {
+++  const list = Array.isArray(raw) ? raw : [];
+++  const seen = new Set();
+++  return list
+++    .map((id) => String(id || '').trim())
+++    .filter((id) => {
+++      if (!id || seen.has(id)) return false;
+++      seen.add(id);
+++      return true;
+++    });
+++};
+++
+++export const normalizeKeyRequirement = (raw) => {
+++  if (raw === KEY_REQUIREMENT.REQUIRED || raw === true) return KEY_REQUIREMENT.REQUIRED;
+++  if (raw === KEY_REQUIREMENT.OPTIONAL) return KEY_REQUIREMENT.OPTIONAL;
+++  return KEY_REQUIREMENT.NONE;
+++};
+++
++ /**
++  * Маркер терминала внутри узла локации.
++  *
++@@ -558,6 +605,16 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
++       : DEFAULT_BUY_DEPRECIATION_PERCENT,
++     items,
++     links,
+++    // Патч 514: вложенные ключевые записи и две строки требования доступа.
+++    // Терминал ключи не содержит ни при создании, ни перетаскиванием.
+++    keyItemIds: containerCanHoldKey(kind) ? normalizeKeyItemIds(raw.keyItemIds) : [],
+++    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+++    keyRequirement: containerCanRequireKey(kind)
+++      ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
+++      : KEY_REQUIREMENT.NONE,
+++    linkedCheckId: containerCanRequireKey(kind)
+++      ? String(raw.linkedCheckId || '').trim()
+++      : '',
++     createdAt: Number(raw.createdAt) || now,
++     updatedAt: Number(raw.updatedAt) || now,
++   };
++diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
++index ae78df1..440cf9a 100644
++--- a/i18n/en-EN/screens/lootTrade/screen.json
+++++ b/i18n/en-EN/screens/lootTrade/screen.json
++@@ -28,7 +28,13 @@
++     "edit": "Edit",
++     "delete": "Delete",
++     "copySuffix": "copy",
++-    "terminalDifficulty": "Difficulty {difficulty}"
+++    "terminalDifficulty": "Difficulty {difficulty}",
+++    "requiresKey": "Key: {name}",
+++    "keyRequiredBadge": "mandatory",
+++    "keyOptionalBadge": "optional",
+++    "hubKind": "location",
+++    "merchantKind": "merchant",
+++    "lootKind": "container"
++   },
++   "form": {
++     "createLootTitle": "New Loot Container",
++@@ -65,7 +71,19 @@
++     "editTerminalTitle": "Terminal settings",
++     "terminalDifficultyLabel": "Difficulty",
++     "createKeyItemTitle": "New key record",
++-    "editKeyItemTitle": "Edit key record"
+++    "editKeyItemTitle": "Edit key record",
+++    "keyRequirementLabel": "Required key",
+++    "keySearchPlaceholder": "Search keys and notes",
+++    "keyEmpty": "No keys yet — create a card on the grid",
+++    "keyNoDescription": "no description",
+++    "keyMandatoryLabel": "Is it mandatory?",
+++    "keyRequiredLabel": "Mandatory",
+++    "keyOptionalLabel": "Optional",
+++    "linkedCheckLabel": "Check (terminal / lock)",
+++    "linkedCheckSearchPlaceholder": "Search terminals",
+++    "linkedCheckEmpty": "No terminals yet",
+++    "linkedCheckTerminal": "terminal",
+++    "linkedCheckHint": "Without the key, access opens after this check or manually by the GM."
++   },
++   "detail": {
++     "backToList": "← Back to containers",
++@@ -115,7 +133,10 @@
++     "deleteHubWithChildren": "Delete all",
++     "emptyLootPromptTitle": "Container is empty. Delete it?",
++     "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
++-    "emptyLootKeep": "Keep"
+++    "emptyLootKeep": "Keep",
+++    "hubKeysTitle": "Keys and notes in this location",
+++    "hubKeysEmpty": "Drag a key card onto the location",
+++    "hubKeyDetach": "Move back to grid"
++   },
++   "catalog": {
++     "titleLoot": "Add to Container",
++@@ -251,7 +272,11 @@
++     "noRoom": "No connected GM room",
++     "failed": "Could not add the key",
++     "hint": "A name is required; the description may be empty. The card appears on the screen after saving.",
++-    "saved": "Key saved on the Loot / Trade screen"
+++    "saved": "Key saved on the Loot / Trade screen",
+++    "attachToLabel": "Part of",
+++    "attachToSearchPlaceholder": "Search locations, containers or merchants",
+++    "attachToNone": "None (on the grid)",
+++    "attachToHint": "The key reaches players with the chosen card. It cannot be placed in a terminal."
++   },
++   "terminal": {
++     "title": "Terminal",
++diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
++index 360932d..590e2e8 100644
++--- a/i18n/ru-RU/screens/lootTrade/screen.json
+++++ b/i18n/ru-RU/screens/lootTrade/screen.json
++@@ -28,7 +28,13 @@
++     "edit": "Изменить",
++     "delete": "Удалить",
++     "copySuffix": "копия",
++-    "terminalDifficulty": "Сложность {difficulty}"
+++    "terminalDifficulty": "Сложность {difficulty}",
+++    "requiresKey": "Ключ: {name}",
+++    "keyRequiredBadge": "обязателен",
+++    "keyOptionalBadge": "необязателен",
+++    "hubKind": "локация",
+++    "merchantKind": "торговец",
+++    "lootKind": "контейнер"
++   },
++   "form": {
++     "createLootTitle": "Новый контейнер добычи",
++@@ -65,7 +71,19 @@
++     "editTerminalTitle": "Настройки терминала",
++     "terminalDifficultyLabel": "Сложность",
++     "createKeyItemTitle": "Новая ключевая запись",
++-    "editKeyItemTitle": "Изменить ключевую запись"
+++    "editKeyItemTitle": "Изменить ключевую запись",
+++    "keyRequirementLabel": "Требуемый ключ",
+++    "keySearchPlaceholder": "Поиск ключа или записки",
+++    "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
+++    "keyNoDescription": "без описания",
+++    "keyMandatoryLabel": "Обязателен?",
+++    "keyRequiredLabel": "Обязателен",
+++    "keyOptionalLabel": "Необязателен",
+++    "linkedCheckLabel": "Проверка (терминал / замок)",
+++    "linkedCheckSearchPlaceholder": "Поиск терминала",
+++    "linkedCheckEmpty": "Терминалов пока нет",
+++    "linkedCheckTerminal": "терминал",
+++    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
++   },
++   "detail": {
++     "backToList": "← К списку контейнеров",
++@@ -115,7 +133,10 @@
++     "deleteHubWithChildren": "Удалить всё",
++     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
++     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
++-    "emptyLootKeep": "Оставить"
+++    "emptyLootKeep": "Оставить",
+++    "hubKeysTitle": "Ключи и записки в локации",
+++    "hubKeysEmpty": "Перетащите карточку ключа на локацию",
+++    "hubKeyDetach": "Вернуть на сетку"
++   },
++   "catalog": {
++     "titleLoot": "Добавить в контейнер",
++@@ -251,7 +272,11 @@
++     "noRoom": "Нет подключённой комнаты Мастера",
++     "failed": "Не удалось выдать ключ",
++     "hint": "Название обязательно, описание можно оставить пустым. После сохранения карточка появится на экране.",
++-    "saved": "Ключ сохранён на экране «Добыча / Торговля»"
+++    "saved": "Ключ сохранён на экране «Добыча / Торговля»",
+++    "attachToLabel": "Часть чего",
+++    "attachToSearchPlaceholder": "Поиск локации, контейнера или торговца",
+++    "attachToNone": "Никуда (на сетке)",
+++    "attachToHint": "Ключ попадает к игрокам вместе с выбранной карточкой. В терминал вложить нельзя."
++   },
++   "terminal": {
++     "title": "Терминал",
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index 2ba94a6..8581ba3 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "513"
+++  "baseline": "514"
++ }
++diff --git a/public/version.json b/public/version.json
++index f87fd60..efe3010 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "513",
+++  "version": "514",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
++       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
++       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
++       "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
++@@ -84,6 +85,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
++       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
++       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
++       "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
++diff --git a/replit.md b/replit.md
++index 3da1cb8..3996562 100644
++--- a/replit.md
+++++ b/replit.md
++@@ -17,6 +17,8 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
++   a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
++ - `docs/key-items-and-gates-design.md` (sections 7 and 10) before touching key
++   records, container/hub placement, drag handles or access requirements.
+++- `docs/roadmap.md` — the live plan; update it in EVERY patch and list the
+++  remaining items in the reply to the owner.
++ 
++ This project is evolving from a Fallout-only application into a universal
++ TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform
++diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
++index 0f782b7..c672541 100644
++--- a/styles/LootTradeScreen.styles.js
+++++ b/styles/LootTradeScreen.styles.js
++@@ -275,6 +275,40 @@ const styles = StyleSheet.create({
++   actionMenuText: { flex: 1, color: '#e8e8e8', fontSize: 14 },
++   actionMenuDeleteText: { color: '#e57373' },
++ 
+++  // Патч 514: вложенные ключи и записки в локации.
+++  hubKeysSection: {
+++    marginTop: 10,
+++    marginBottom: 8,
+++    padding: 10,
+++    borderRadius: 5,
+++    borderWidth: 1,
+++    borderColor: '#d4af37',
+++    backgroundColor: 'rgba(31,31,31,0.92)',
+++  },
+++  hubKeysTitle: {
+++    color: '#f0e68c',
+++    fontSize: 12,
+++    fontWeight: '700',
+++    marginBottom: 6,
+++  },
+++  hubKeyRow: {
+++    flexDirection: 'row',
+++    alignItems: 'center',
+++    gap: 8,
+++    paddingVertical: 6,
+++    borderTopWidth: 1,
+++    borderTopColor: '#3a3a3a',
+++  },
+++  hubKeyRowName: { flex: 1, color: '#e8e8e8', fontSize: 12 },
+++  hubKeyDetachBtn: {
+++    paddingHorizontal: 9,
+++    paddingVertical: 5,
+++    borderRadius: 4,
+++    borderWidth: 1,
+++    borderColor: '#5a5a5a',
+++  },
+++  hubKeyDetachText: { color: '#cccccc', fontSize: 10 },
+++
++   // Детальный экран контейнера / торговца
++   detailWrapper: {
++     flex: 1,
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 2ba94a6..8581ba3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "513"
++  "baseline": "514"
+ }
+diff --git a/public/version.json b/public/version.json
+index f87fd60..efe3010 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "513",
++  "version": "514",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
+       "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
+       "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
+       "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
+@@ -84,6 +85,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
+       "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
+       "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
+       "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
+diff --git a/replit.md b/replit.md
+index 3da1cb8..3996562 100644
+--- a/replit.md
++++ b/replit.md
+@@ -17,6 +17,8 @@ Before making architectural, state, catalog, save, or gameplay changes, read:
+   a new one; `docs/ui-alerts-rules.md` for alerts/confirmations.
+ - `docs/key-items-and-gates-design.md` (sections 7 and 10) before touching key
+   records, container/hub placement, drag handles or access requirements.
++- `docs/roadmap.md` — the live plan; update it in EVERY patch and list the
++  remaining items in the reply to the owner.
+ 
+ This project is evolving from a Fallout-only application into a universal
+ TypeScript-oriented TTRPG engine with Fallout as a setting module. Do not perform
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index 0f782b7..c672541 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -275,6 +275,40 @@ const styles = StyleSheet.create({
+   actionMenuText: { flex: 1, color: '#e8e8e8', fontSize: 14 },
+   actionMenuDeleteText: { color: '#e57373' },
+ 
++  // Патч 514: вложенные ключи и записки в локации.
++  hubKeysSection: {
++    marginTop: 10,
++    marginBottom: 8,
++    padding: 10,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#d4af37',
++    backgroundColor: 'rgba(31,31,31,0.92)',
++  },
++  hubKeysTitle: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++    marginBottom: 6,
++  },
++  hubKeyRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    paddingVertical: 6,
++    borderTopWidth: 1,
++    borderTopColor: '#3a3a3a',
++  },
++  hubKeyRowName: { flex: 1, color: '#e8e8e8', fontSize: 12 },
++  hubKeyDetachBtn: {
++    paddingHorizontal: 9,
++    paddingVertical: 5,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++  },
++  hubKeyDetachText: { color: '#cccccc', fontSize: 10 },
++
+   // Детальный экран контейнера / торговца
+   detailWrapper: {
+     flex: 1,

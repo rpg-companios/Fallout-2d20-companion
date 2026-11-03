@@ -28,7 +28,13 @@
     "edit": "Изменить",
     "delete": "Удалить",
     "copySuffix": "копия",
-    "terminalDifficulty": "Сложность {difficulty}"
+    "terminalDifficulty": "Сложность {difficulty}",
+    "requiresKey": "Ключ: {name}",
+    "keyRequiredBadge": "обязателен",
+    "keyOptionalBadge": "необязателен",
+    "hubKind": "локация",
+    "merchantKind": "торговец",
+    "lootKind": "контейнер"
   },
   "form": {
     "createLootTitle": "Новый контейнер добычи",
@@ -65,7 +71,19 @@
     "editTerminalTitle": "Настройки терминала",
     "terminalDifficultyLabel": "Сложность",
     "createKeyItemTitle": "Новая ключевая запись",
-    "editKeyItemTitle": "Изменить ключевую запись"
+    "editKeyItemTitle": "Изменить ключевую запись",
+    "keyRequirementLabel": "Требуемый ключ",
+    "keySearchPlaceholder": "Поиск ключа или записки",
+    "keyEmpty": "Ключей пока нет — создайте карточку на сетке",
+    "keyNoDescription": "без описания",
+    "keyMandatoryLabel": "Обязателен?",
+    "keyRequiredLabel": "Обязателен",
+    "keyOptionalLabel": "Необязателен",
+    "linkedCheckLabel": "Проверка (терминал / замок)",
+    "linkedCheckSearchPlaceholder": "Поиск терминала",
+    "linkedCheckEmpty": "Терминалов пока нет",
+    "linkedCheckTerminal": "терминал",
+    "linkedCheckHint": "Если ключа нет, доступ открывается после этой проверки или вручную Мастером."
   },
   "detail": {
     "backToList": "← К списку контейнеров",
@@ -115,7 +133,10 @@
     "deleteHubWithChildren": "Удалить всё",
     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
-    "emptyLootKeep": "Оставить"
+    "emptyLootKeep": "Оставить",
+    "hubKeysTitle": "Ключи и записки в локации",
+    "hubKeysEmpty": "Перетащите карточку ключа на локацию",
+    "hubKeyDetach": "Вернуть на сетку"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",
@@ -251,7 +272,11 @@
     "noRoom": "Нет подключённой комнаты Мастера",
     "failed": "Не удалось выдать ключ",
     "hint": "Название обязательно, описание можно оставить пустым. После сохранения карточка появится на экране.",
-    "saved": "Ключ сохранён на экране «Добыча / Торговля»"
+    "saved": "Ключ сохранён на экране «Добыча / Торговля»",
+    "attachToLabel": "Часть чего",
+    "attachToSearchPlaceholder": "Поиск локации, контейнера или торговца",
+    "attachToNone": "Никуда (на сетке)",
+    "attachToHint": "Ключ попадает к игрокам вместе с выбранной карточкой. В терминал вложить нельзя."
   },
   "terminal": {
     "title": "Терминал",

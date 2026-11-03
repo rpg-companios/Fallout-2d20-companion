@@ -1,5 +1,33 @@
 # Changelog
 ---
+## Requirement fields in cards (patch 514)
+
+The first half of design step 3: "we are now editing card UI and creating
+fields and requirements for them". **Server-side key checking is NOT in this
+patch** — it stays the next item on the plan.
+
+- **Access-point fields.** Locations, containers, merchants and terminals now
+  store `requiredKeyItemId`, `keyRequirement` (none / optional / mandatory),
+  `linkedCheckId` and `keyItemIds`. Normalization clears nested keys on
+  terminals: a key can be placed there neither by the form nor by dragging.
+- **Two setup rows.** The first is a name search or a list of created keys and
+  notes, with a "Is it mandatory?" toggle next to it; the second is a search
+  or list of terminals as the alternative check. The card shows which key is
+  required and whether it is mandatory.
+- **A key is part of something.** The key form has a "Part of" row: location,
+  container or merchant (no terminals in the list). The link lives on the
+  parent, so editing or deleting the template never extinguishes a found
+  record.
+- **Dragging.** The key card now has the same arrow drag handle as containers.
+  It leaves the root grid for a location, is listed there separately, and can
+  be moved back with a button. "Add to storage" in the `⋮` menu stays as the
+  backward-compatibility exception.
+- **Live roadmap.** New `docs/roadmap.md`: a status table of every item and an
+  "Outstanding after this patch" list. As requested, it is updated in every
+  patch and repeated in the reply. It also records the new storage description:
+  "Like the merchant, two panels ... just no price checks" — the current
+  storage window does not match it yet.
+
 ## Key and access-point rules clarified (patch 513, docs only)
 
 The owner extended the design and chose "document it for now" — **no code,
