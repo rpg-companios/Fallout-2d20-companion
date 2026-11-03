@@ -1,5 +1,34 @@
 # Changelog
 ---
+## Keys and notes in shared storage (patch 510)
+
+Step 2 of `docs/key-items-and-gates-design.md`. The owner: "Many such items
+can be created. Each needs a name and some description ... The GM may name an
+item 'warehouse key' and give no description. Or write 'Mercenary note' and
+put a whole mini-story in the description". The owner rejected a counter on
+the bar and an operation log: "Items are either in storage or not. Players
+handle them themselves and can see what is there".
+
+- **GM catalog.** New `gm_key_items` table; `KeyItemCatalogModal` opens from
+  the key icon in the Loot/Trade header. A name is required, the description
+  may be empty. The editor inserts the existing tags (`**bold**`, `*italic*`,
+  list, `{CD}`, `{CAP}`) and previews them through `renderTextWithIcons` —
+  no second markup format.
+- **Arriving in storage.** "Add to storage" sends `storage.addKey` (GM only,
+  online only). If a loot container held a record with `keyItemId`, `lootTake`
+  puts it into shared storage instead of the taker's personal inventory. No
+  duplicates.
+- **Cannot withdraw.** A record stores `kind: 'keyItem'`, `keyItemId`, name
+  and description inside itself. `withdraw` returns `STORAGE_KEY_READ_ONLY`.
+  The storage window lists keys separately; tapping opens a card with the
+  formatted text and a note that the record stays shared.
+- **Handover.** The storage snapshot format keeps keys, so the file and the
+  GM save carry discovered records to a new server along with the items.
+
+Mini-game bypass and gates (`requires`) are steps 3 and 4, not in this patch.
+
+Installation: `docs/patch-510-install.md`.
+
 ## Cross-platform save and JSON handover (patch 509)
 
 The owner: "Yes, the save must be cross-platform. And both the GM and players

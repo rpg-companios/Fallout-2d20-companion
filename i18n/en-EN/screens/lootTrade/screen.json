@@ -230,6 +230,25 @@
     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
     "tradeSuccess": "Trade completed!"
   },
+  "keyItems": {
+  "title": "Keys and notes",
+  "nameLabel": "Name",
+  "namePlaceholder": "Warehouse key",
+  "descriptionLabel": "Description",
+  "descriptionPlaceholder": "Press the top-left brick…",
+  "previewEmpty": "Description preview appears here",
+  "save": "Save",
+  "clear": "Clear",
+  "catalog": "Catalog",
+  "empty": "No records yet",
+  "edit": "Edit",
+  "issue": "Add to storage",
+  "issued": "Key added to shared storage",
+  "nameRequired": "Enter a name first",
+  "noRoom": "No connected GM room",
+  "failed": "Could not add the key",
+  "hint": "A name is required; the description may be empty."
+},
   "terminal": {
     "title": "Terminal",
     "hack": "Hack",

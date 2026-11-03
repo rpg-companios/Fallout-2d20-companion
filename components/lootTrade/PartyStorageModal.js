@@ -27,7 +27,9 @@ import {
   storageExportFileName,
 } from '../../domain/partyStorageTransfer';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
+import { renderTextWithIcons } from '../../modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
 import { showRawAlert } from '../alerts/alertService';
+import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { useLocale } from '../../i18n/locale';
 
 // В сейве/сторе предмета есть служебные поля, которые не должны уезжать на
@@ -49,6 +51,7 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
   useLocale();
   const rooms = useRoomStore((state) => state.rooms);
   const [busy, setBusy] = useState(false);
+  const [selectedKeyId, setSelectedKeyId] = useState(null);
 
   const room = useMemo(() => {
     // Патч 509: окно склада доступно и Мастеру, и игроку — оба должны уметь
@@ -64,6 +67,10 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
   }, [rooms]);
 
   const entries = room?.storage?.entries || [];
+  // Патч 510: ключевые записи лежат рядом с вещами, но их нельзя забрать.
+  const items = entries.filter((entry) => entry.kind !== 'keyItem');
+  const keys = entries.filter((entry) => entry.kind === 'keyItem');
+  const selectedKey = keys.find((entry) => entry.entryId === selectedKeyId) || null;
   // Без Мастера в сети хранилище только для чтения.
   const writable = Boolean(room?.storage?.gmOnline);
 
@@ -186,9 +193,9 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
               <View style={styles.column}>
                 <Text style={styles.columnTitle}>{tInventory('screen.storage.title')}</Text>
                 <ScrollView style={styles.list}>
-                  {entries.length === 0
+                  {items.length === 0
                     ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
-                    : entries.map((entry) => (
+                    : items.map((entry) => (
                       <TouchableOpacity
                         key={entry.entryId}
                         style={styles.row}
@@ -203,6 +210,31 @@ const PartyStorageModal = ({ visible, inventoryItems = [], onClose, onDepositLoc
                     ))}
                 </ScrollView>
               </View>
+            </View>
+          )}
+
+          <Text style={styles.keysTitle}>{tLootTrade('keyItems.title')}</Text>
+          {keys.length === 0
+            ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
+            : keys.map((key) => (
+              <TouchableOpacity
+                key={key.entryId}
+                testID={`storage-key-${key.keyItemId}`}
+                style={styles.keyRow}
+                onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
+              >
+                <Text style={styles.rowName}>{key.name}</Text>
+                <Text style={styles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
+              </TouchableOpacity>
+            ))}
+          {selectedKey && (
+            <View style={styles.keyCard}>
+              <Text style={styles.keyCardTitle}>{selectedKey.name}</Text>
+              {renderTextWithIcons(
+                selectedKey.description || tLootTrade('keyItems.previewEmpty'),
+                styles.keyCardText,
+              )}
+              <Text style={styles.hint}>{tInventory('screen.storage.keyStays')}</Text>
             </View>
           )}
 
@@ -257,6 +289,12 @@ const styles = StyleSheet.create({
   },
   transferButtonText: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
   readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+  keysTitle: { color: '#8da38b', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 10, fontFamily: 'monospace' },
+  keyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderColor: '#1c2d20' },
+  keyRead: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
+  keyCard: { borderWidth: 1, borderColor: '#29482d', borderRadius: 4, padding: 9, marginTop: 6 },
+  keyCardTitle: { color: '#93d17a', fontSize: 13, fontWeight: '800', marginBottom: 5 },
+  keyCardText: { color: '#c8d4b1', fontSize: 12 },
 });
 
 export default PartyStorageModal;

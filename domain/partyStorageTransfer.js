@@ -22,6 +22,9 @@ export const createStorageExportPayload = ({ code, storage, exportedBy = '' }) =
     revision: Number(storage?.revision) || 0,
     entries: (storage?.entries || []).map((entry) => ({
       entryId: String(entry.entryId || ''),
+      kind: entry.kind === 'keyItem' ? 'keyItem' : 'item',
+      keyItemId: entry.keyItemId ? String(entry.keyItemId) : undefined,
+      description: entry.kind === 'keyItem' ? String(entry.description || '') : undefined,
       item: entry.item && typeof entry.item === 'object' ? { ...entry.item } : {},
       name: String(entry.name || ''),
       itemType: String(entry.itemType || 'misc'),
@@ -53,6 +56,9 @@ export const parseStorageImportPayload = (raw) => {
     .filter((entry) => entry && typeof entry === 'object' && entry.name)
     .map((entry, index) => ({
       entryId: String(entry.entryId || `imported_${index}`),
+      kind: entry.kind === 'keyItem' ? 'keyItem' : 'item',
+      keyItemId: entry.keyItemId ? String(entry.keyItemId) : undefined,
+      description: entry.kind === 'keyItem' ? String(entry.description || '') : undefined,
       item: entry.item && typeof entry.item === 'object' ? { ...entry.item } : { name: String(entry.name) },
       name: String(entry.name),
       itemType: String(entry.itemType || 'misc'),

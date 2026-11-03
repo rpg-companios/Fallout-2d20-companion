@@ -111,6 +111,7 @@ interface RoomStoreState {
   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
   restorePartyStorage: (input: { code: string; storage: PartyStorageState }) => Promise<PartyStorageState | null>;
+  addKeyItemToStorage: (input: { code: string; keyItemId: string; name: string; description: string }) => Promise<PartyStorageState | null>;
   openRoomSession: (input: {
     code: string;
     session: Record<string, unknown>;
@@ -822,6 +823,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     restorePartyStorage: async ({ code, storage }) => {
       const response = await sendRequest(ROOM_MESSAGE.STORAGE_RESTORE, {
         code, storage,
+      }, code);
+      return (response.payload?.storage as PartyStorageState | null) ?? null;
+    },
+
+    addKeyItemToStorage: async ({ code, keyItemId, name, description }) => {
+      const response = await sendRequest(ROOM_MESSAGE.STORAGE_ADD_KEY, {
+        code, keyItemId, name, description,
       }, code);
       return (response.payload?.storage as PartyStorageState | null) ?? null;
     },

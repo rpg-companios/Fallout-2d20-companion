@@ -64,6 +64,10 @@ const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
       ? { ...raw.itemSnapshot }
       : null,
+    // Патч 510: ключевая запись, найденная в контейнере, уходит на склад,
+    // а не в личный инвентарь.
+    keyItemId: raw.keyItemId ? String(raw.keyItemId).trim() : '',
+    keyDescription: raw.keyDescription ? String(raw.keyDescription) : '',
   };
 };
 

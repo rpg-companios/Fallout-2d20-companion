@@ -74,6 +74,7 @@ import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
+import KeyItemCatalogModal from '../../lootTrade/KeyItemCatalogModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
 import IssueContainerModal from './modals/IssueContainerModal';
@@ -356,6 +357,8 @@ export default function LootTradeScreen() {
 
   // Модалки и перетаскивание в локации
   const [formModal, setFormModal] = useState(null); // { kind, initialContainer }
+  // Патч 510: справочник ключевых записей.
+  const [keyCatalogVisible, setKeyCatalogVisible] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
@@ -1469,6 +1472,15 @@ export default function LootTradeScreen() {
     <View style={styles.container}>
       {/* Верхняя шапка Мастера */}
       <View style={styles.topBar}>
+        {/* Патч 510: ключевые записи (карточки доступа, записки с кодами). */}
+        <TouchableOpacity
+          testID="key-catalog-button"
+          style={styles.syncIconButton}
+          onPress={() => setKeyCatalogVisible(true)}
+          accessibilityLabel={tLootTrade('keyItems.title')}
+        >
+          <MaterialCommunityIcons name="key-variant" size={20} color="#f0e68c" />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.syncIconButton}
           onPress={handleCloudSyncPress}
@@ -2223,6 +2235,10 @@ export default function LootTradeScreen() {
       )}
 
       {/* Модалки создания/правки, каталога, правки строки, локации и выдачи */}
+      <KeyItemCatalogModal
+        visible={keyCatalogVisible}
+        onClose={() => setKeyCatalogVisible(false)}
+      />
       <ContainerFormModal
         visible={Boolean(formModal)}
         kind={formModal?.kind || CONTAINER_KIND.LOOT}

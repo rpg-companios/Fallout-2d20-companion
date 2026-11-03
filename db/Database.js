@@ -459,6 +459,46 @@ const rowToGmContainer = (row) => {
 };
 
 // Патч 508: снимок «Общего хранилища» в локальной БД Мастера.
+// Патч 510: справочник ключевых записей Мастера.
+export async function saveGmKeyItem(raw, { preserveUpdatedAt = false } = {}) {
+  const id = String(raw?.id || '').trim();
+  if (!id) return null;
+  const now = Date.now();
+  const existing = await getFirst('SELECT created_at, updated_at FROM gm_key_items WHERE id = ?', [id]);
+  const createdAt = Number(existing?.created_at) || now;
+  const updatedAt = preserveUpdatedAt && Number(raw?.updatedAt) > 0 ? Number(raw.updatedAt) : now;
+  const row = {
+    id,
+    name: String(raw?.name || '').trim() || id,
+    description: String(raw?.description || ''),
+    roomCode: String(raw?.roomCode || '').trim(),
+    createdAt,
+    updatedAt,
+  };
+  await runQuery(
+    'INSERT OR REPLACE INTO gm_key_items (id, name, description, room_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [row.id, row.name, row.description, row.roomCode, row.createdAt, row.updatedAt],
+  );
+  return row;
+}
+
+export async function getGmKeyItems() {
+  const rows = await getAll('SELECT * FROM gm_key_items ORDER BY created_at DESC');
+  return (rows || []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    roomCode: row.room_code,
+    createdAt: Number(row.created_at) || 0,
+    updatedAt: Number(row.updated_at) || 0,
+  }));
+}
+
+export async function getGmKeyItemById(id) {
+  const list = await getGmKeyItems();
+  return list.find((item) => item.id === String(id || '')) || null;
+}
+
 export async function saveRoomStorage(code, storage) {
   const cleanCode = String(code || '').trim();
   if (!cleanCode) return null;

@@ -1,8 +1,12 @@
 {
-  "version": "509",
+  "version": "510",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Мастер может создавать ключи и записки: имя, описание с жирным текстом, курсивом и списками, предпросмотр перед сохранением.",
+      "Найденная в контейнере запись или выданная Мастером карточка доступа попадает в общее хранилище и остаётся общей для всей группы.",
+      "Ключи и записки видны отдельным списком: название можно прочитать с полным текстом, забрать запись в личный инвентарь нельзя.",
+      "Ключи переносятся вместе со снимком хранилища, поэтому смена Мастера или сервера не теряет найденные записи.",
       "Снимок общего хранилища теперь синхронизируется из Google Drive в обе стороны: сейв Мастера приезжает на другое устройство и на другой платформе.",
       "И Мастер, и игрок могут выгрузить общее хранилище в JSON-файл и загрузить его обратно.",
       "Если ведущий перестал водить или сменился Мастер, импорт снимка наполняет хранилище нового сервера одним действием.",
@@ -77,6 +81,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The GM can create keys and notes: a name, a description with bold, italics and lists, and a live preview before saving.",
+      "A record found in a container or issued by the GM goes to shared storage and stays common to the whole group.",
+      "Keys and notes have their own list: the full text can be read, but a record cannot be withdrawn into a personal inventory.",
+      "Keys travel with the storage snapshot, so changing the GM or the server does not lose discovered records.",
       "Shared storage snapshots now sync from Google Drive in both directions, so the GM save arrives on another device and platform.",
       "Both the Game Master and players can export shared storage to a JSON file and import it back.",
       "If the GM steps down or the group changes its GM, importing a snapshot fills storage on the new server in one action.",

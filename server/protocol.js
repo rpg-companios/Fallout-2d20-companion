@@ -40,6 +40,7 @@ const MESSAGE = Object.freeze({
   STORAGE_DEPOSIT: 'storage.deposit',
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
+  STORAGE_ADD_KEY: 'storage.addKey',
   ERROR: 'error',
 });
 
@@ -76,6 +77,7 @@ const ERROR_CODE = Object.freeze({
   STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+  STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
 });
 
 const LIMITS = Object.freeze({

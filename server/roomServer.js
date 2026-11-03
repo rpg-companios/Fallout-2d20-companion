@@ -744,6 +744,24 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        // Патч 510: Мастер выдаёт ключевую запись на общий склад.
+        case MESSAGE.STORAGE_ADD_KEY: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.addKeyItemToStorage({
+            code: canonical,
+            clientId,
+            keyItemId: payload.keyItemId,
+            name: payload.name,
+            description: payload.description,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = { storage: result.storage, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
         // Патч 508: Мастер поднимает своё сохранённое хранилище в комнату.
         // После этого все подключившиеся игроки получают актуальный снапшот.
         case MESSAGE.STORAGE_RESTORE: {
@@ -963,6 +981,13 @@ const attachRoomWebSocketServer = (httpServer, {
             session: result.session,
             ...closeMeta,
           });
+          // Патч 510: если в добыче лежала ключевая запись, все видят её
+          // появление на общем складе.
+          if ((result.granted || []).some((entry) => entry?.keyItemId)) {
+            const storage = registry.getPartyStorage(canonical);
+            sendEnvelope(ws, MESSAGE.STORAGE_STATE, { storage }, canonical, clientId);
+            broadcastToRoom(result.room, null, MESSAGE.STORAGE_STATE, { storage });
+          }
           break;
         }
 

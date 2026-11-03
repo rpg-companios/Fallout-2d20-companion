@@ -664,6 +664,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const result = applyAtomicLootTake(room.activeSession, payload, now());
     if (result.error) return result;
 
+    // Патч 510: ключ, найденный в контейнере, становится общей записью
+    // склада, а не личным предметом забравшего игрока.
+    const foundKeys = (result.granted || []).filter((entry) => entry?.keyItemId);
+    for (const found of foundKeys) {
+      appendKeyItem(room, {
+        keyItemId: found.keyItemId,
+        name: found.name,
+        description: found.keyDescription,
+        clientId,
+      });
+    }
+
     // Если из контейнера добычи забрали весь лут — закрываем его у забравшего игрока,
     // а если других активных игроков-зрителей нет — сразу глушим всю раздачу.
     const emptiedByTake = Boolean(
@@ -902,6 +914,42 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, storage: storageSnapshot(room), entry: { ...entry } };
   };
 
+  /** Патч 510: ключевая запись попадает на склад, но не уходит в инвентарь. */
+  const appendKeyItem = (room, { keyItemId, name, description, clientId }) => {
+    if (!keyItemId) return null;
+    const storage = room.partyStorage || emptyStorage();
+    const cleanId = String(keyItemId).trim();
+    if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
+    const entry = {
+      entryId: `key_${now()}_${++storageEntryCounter}`,
+      kind: 'keyItem',
+      keyItemId: cleanId,
+      name: String(name || '').trim() || cleanId,
+      description: String(description || ''),
+      itemType: 'keyItem',
+      quantity: 1,
+      depositedBy: clientId,
+      depositedByName: String(room.members.get(clientId)?.name || '').trim(),
+      at: now(),
+    };
+    storage.entries = [...storage.entries, entry];
+    storage.revision += 1;
+    room.partyStorage = storage;
+    return entry;
+  };
+
+  /** Мастер выдаёт ключевую запись партии напрямую. */
+  const addKeyItemToStorage = ({ code, clientId, keyItemId, name, description }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+    const member = room.members.get(clientId);
+    if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+    if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
+    return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
+  };
+
   /** Забрать предмет из общего хранилища (только игрок, атомарно). */
   const withdrawFromPartyStorage = ({ code, clientId, entryId, quantity }) => {
     const room = rooms.get(code);
@@ -917,6 +965,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       ? Math.min(requested, storage.entries[index].quantity)
       : storage.entries[index].quantity;
     const taken = storage.entries[index];
+    // Ключевые записи можно только прочитать: они остаются общими.
+    if (taken.kind === 'keyItem') return { error: ERROR_CODE.STORAGE_KEY_READ_ONLY };
     const entries = [...storage.entries];
     if (qty >= taken.quantity) entries.splice(index, 1);
     else entries[index] = { ...taken, quantity: taken.quantity - qty };
@@ -988,6 +1038,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     depositToPartyStorage,
     withdrawFromPartyStorage,
     getPartyStorage,
+    addKeyItemToStorage,
     restorePartyStorage,
     sweep,
     _rooms: rooms, // диагностика/тесты

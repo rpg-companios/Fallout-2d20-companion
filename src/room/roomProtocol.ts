@@ -35,6 +35,7 @@ export const ROOM_MESSAGE = {
   STORAGE_DEPOSIT: 'storage.deposit',
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
+  STORAGE_ADD_KEY: 'storage.addKey',
   ERROR: 'error',
 } as const;
 
@@ -70,6 +71,7 @@ export const ROOM_ERROR = {
   STORAGE_ENTRY_NOT_FOUND: 'STORAGE_ENTRY_NOT_FOUND',
   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+  STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
 } as const;
 
 export interface ActiveLootTradeItem {
