@@ -4,7 +4,7 @@
  * Патч 520: мини-игра взлома замков. Чистое ядро без сетевого состояния —
  * комната держит доску в общем реестре состояний проверок (terminalStates).
  * Патч 526: «один взлом на трансляцию» убран — игрок сам решает, когда
- * начать новый подход (купил отмычки, прокачал PER/LOCKPICK). Замки пока
+ * начать новый подход (купил заколки, прокачал PER/LOCKPICK). Замки пока
  * НЕ блокируются: shouldBlockLock() — единственная точка, куда владелец
  * позже добавит своё условие блокировки. Терминал сохраняет блокировку
  * после провала и решение Мастера «Да/Нет».
@@ -12,8 +12,8 @@
  * Правила: docs/lockpicking-mini-game-design.md. Коротко:
  *   N = 12 − PER + 2·D ячеек, PER 4…10, D 0…5 (D=0 только понижением);
  *   угадывание по позиции, четыре стрелки; провал остаётся в ячейке;
- *   одна отмычка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
- *   в момент поломки Удача 4…10 даёт 5…20% спасти отмычку;
+ *   одна заколка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
+ *   в момент поломки Удача 4…10 даёт 5…20% спасти заколку;
  *   при поломке комбинация та же, зелёные стрелки сереют и остаются видны;
  *   победа любого источника открывает точку через общее событие `hacked`.
  */
@@ -141,11 +141,11 @@ const findNamed = (entries, aliases) => {
   return found ? toNumber(found) : 0;
 };
 
-// Патч 524: отмычки в живом инвентаре могут лежать и в словаре items (ключ —
+// Патч 524: заколки в живом инвентаре могут лежать и в словаре items (ключ —
 // id экземпляра), и в массиве equipment.items, и в обёртке itemSnapshot. Канон
 // каталога при этом живёт в разных полях: itemId / catalogId / weaponId / code
 // / id, а старые сейвы оставляют только ключ записи. Проверяем все формы и
-// считаем каждый экземпляр один раз — иначе доска стартовала с «0 отмычек».
+// считаем каждый экземпляр один раз — иначе доска стартовала с «0 заколок».
 const PIN_ID_FIELDS = Object.freeze([
   'itemId', 'catalogId', 'weaponId', 'code', 'id', 'key', 'Name',
 ]);
@@ -155,6 +155,22 @@ const PIN_BUCKETS = (source) => [
   source.inventory,
   source.bag,
 ];
+const PIN_QUANTITY_FIELDS = Object.freeze(['quantity', 'count', 'qty', 'amount']);
+const quantityFieldOf = (item) => PIN_QUANTITY_FIELDS.find(
+  (field) => item && Object.prototype.hasOwnProperty.call(item, field),
+) || 'quantity';
+// Патч 527: старые сейвы прячут предмет в item/snapshot/data. Списывать
+// quantity надо именно там, где он живёт, иначе «списанная» заколка останется
+// в инвентаре в неизменной вложенной записи.
+const quantityHolderOf = (item) => {
+  for (const candidate of [item, item?.item, item?.snapshot, item?.data]) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    if (PIN_QUANTITY_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(candidate, field))) {
+      return candidate;
+    }
+  }
+  return item && typeof item === 'object' ? item : null;
+};
 
 const candidatePinIds = (key, item) => {
   const ids = [String(key || '').trim()];
@@ -171,9 +187,9 @@ const candidatePinIds = (key, item) => {
 };
 
 const pinQuantity = (item) => {
-  const raw = item?.quantity ?? item?.count ?? item?.qty ?? item?.amount
-    ?? item?.item?.quantity ?? item?.snapshot?.quantity ?? 1;
-  const parsed = Number(String(raw).replace(/\s+/g, '').replace(',', '.'));
+  const holder = quantityHolderOf(item);
+  const raw = holder ? holder[quantityFieldOf(holder)] : 1;
+  const parsed = Number(String(raw ?? 1).replace(/\s+/g, '').replace(',', '.'));
   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 1;
 };
 
@@ -231,6 +247,80 @@ const lockStats = (snapshot) => {
     reduction: hasDifficultyReduction(source),
     luckSave: 0, // заполняется ниже после чтения luck
   };
+};
+
+/**
+ * Патч 527: сломанные заколки ДОЛЖНЫ исчезать из инвентаря. Сервер держит
+ * последний опубликованный снимок листа — он и есть источник истины для
+ * числа заколок в мини-игре. При поломке уменьшаем quantity в самом снимке,
+ * сохраняя все остальные поля предмета (правило 522: поля не обрезаются).
+ * Клиент зеркально списывает заколку из локального инвентаря и сохраняет лист.
+ * Возвращает НОВЫЙ снимок — исходный не мутируется.
+ */
+const consumeBobbyPins = (snapshot, count = 1) => {
+  const need = Math.max(0, Math.floor(Number(count) || 0));
+  let clone;
+  try {
+    clone = JSON.parse(JSON.stringify(snapshot || {}));
+  } catch {
+    return { snapshot, consumed: 0 };
+  }
+  if (!need) return { snapshot: clone, consumed: 0 };
+  let remaining = need;
+  const roots = [clone, clone.data && typeof clone.data === 'object' ? clone.data : null]
+    .filter(Boolean);
+  const seen = new Set();
+  for (const root of roots) {
+    for (const path of [['items'], ['equipment', 'items'], ['inventory'], ['bag']]) {
+      let parent = root;
+      for (let i = 0; i < path.length - 1; i += 1) parent = parent?.[path[i]];
+      if (!parent || typeof parent !== 'object') continue;
+      const key = path[path.length - 1];
+      const bucket = parent[key];
+      if (!bucket || typeof bucket !== 'object') continue;
+      const isArray = Array.isArray(bucket);
+      const entries = isArray
+        ? bucket.map((item, idx) => [String(idx), item])
+        : Object.entries(bucket);
+      const nextArray = [];
+      const nextObject = { ...bucket };
+      for (const [entryKey, value] of entries) {
+        if (!value || typeof value !== 'object') {
+          if (isArray) nextArray.push(value);
+          continue;
+        }
+        const isPin = candidatePinIds(entryKey, value).includes('item_bobby_pin');
+        if (!isPin || remaining <= 0) {
+          if (isArray) nextArray.push(value);
+          continue;
+        }
+        // Один экземпляр мог быть продублирован в items и equipment.items.
+        const instance = String(value.instanceId ?? value.uniqueId ?? value.key ?? '');
+        const dedupeKey = instance && instance !== 'item_bobby_pin'
+          ? `id:${instance}`
+          : `path:${path.join('.')}:${entryKey}`;
+        if (seen.has(dedupeKey)) {
+          if (isArray) nextArray.push(value);
+          continue;
+        }
+        seen.add(dedupeKey);
+        const holder = quantityHolderOf(value) || value;
+        const field = quantityFieldOf(holder);
+        let qty = pinQuantity(value);
+        const take = Math.min(qty, remaining);
+        qty -= take;
+        remaining -= take;
+        holder[field] = qty;
+        if (qty <= 0) {
+          if (!isArray) delete nextObject[entryKey];
+        } else if (isArray) {
+          nextArray.push(value);
+        }
+      }
+      parent[key] = isArray ? nextArray : nextObject;
+    }
+  }
+  return { snapshot: clone, consumed: need - remaining };
 };
 
 const effectiveDifficulty = (config, stats) => Math.max(
@@ -357,7 +447,7 @@ const closeLockGame = (game, { now = Date.now() } = {}) => ({
 
 /**
  * Одно нажатие стрелки. Ошибки возвращаются строкой, реестр комнаты
- * превращает их в ERROR_CODE. Списание отмычек атомарно внутри хода.
+ * превращает их в ERROR_CODE. Списание заколок атомарно внутри хода.
  */
 const applyLockAction = ({
   game = null,
@@ -384,7 +474,7 @@ const applyLockAction = ({
   }
   // Патч 526: ЯВНЫЙ новый подход игрока. Отличается от 'start' тем, что
   // пересобирает доску по ТЕКУЩЕМУ листу в любом состоянии (в т.ч. после
-  // победы, провала или «кончились отмычки»). Автоматический рестарт после
+  // победы, провала или «кончились заколки»). Автоматический рестарт после
   // ACCESS GRANTED по-прежнему невозможен: это действие шлётся только по
   // нажатию кнопки, а start запрещён при won/playing.
   if (action === 'newAttempt') {
@@ -405,7 +495,14 @@ const applyLockAction = ({
   if (!game.pinActive) return { error: 'LOCK_NO_PINS' };
 
   const idx = game.cursor;
-  const cells = game.cells.map((cell) => ({ ...cell }));
+  // Патч 527: прошлый ошибочный «?» не должен оставаться на доске вечно.
+  // Каждое нажатие начинается с чистого листа: только ОДНА красная ячейка —
+  // та, в которой ошиблись сейчас.
+  const cells = game.cells.map((cell) => (
+    cell?.state === CELL_STATE.RED
+      ? { arrow: null, state: CELL_STATE.HIDDEN }
+      : { ...cell }
+  ));
   const pressedArrows = [...(game.pressedArrows || []), arrow].slice(-24);
   let next = {
     ...game,
@@ -433,7 +530,7 @@ const applyLockAction = ({
   next.result = 'TRY AGAIN';
   if (next.pinFailures <= game.skill) return { game: next };
 
-  // Отмычка «должна» сломаться. Спас-бросок Удачи не сбрасывает счётчик:
+  // Заколка «должна» сломаться. Спас-бросок Удачи не сбрасывает счётчик:
   // следующий провал снова кидает тот же шанс.
   if (rng() < game.luckSave) {
     next.pinFailures = game.skill;
@@ -445,10 +542,15 @@ const applyLockAction = ({
   next.pinFailures = 0;
   next.cursor = 0;
   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
-  next.cells = cells.map((cell) => (
-    cell.state === CELL_STATE.GREEN
-      ? { arrow: cell.arrow, state: CELL_STATE.GREY }
-      : { arrow: null, state: CELL_STATE.HIDDEN }
+  // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
+  // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
+  // красный не показывался вообще).
+  next.cells = cells.map((cell, cellIdx) => (
+    cellIdx === idx
+      ? { arrow: null, state: CELL_STATE.RED }
+      : (cell.state === CELL_STATE.GREEN
+        ? { arrow: cell.arrow, state: CELL_STATE.GREY }
+        : { arrow: null, state: CELL_STATE.HIDDEN })
   ));
   if (game.pinsRemaining > 0) {
     next.pinsRemaining = game.pinsRemaining - 1;
@@ -475,6 +577,7 @@ module.exports = {
   shouldBlockLock,
   lockStats,
   countBobbyPins,
+  consumeBobbyPins,
   effectiveDifficulty,
   createLockGame,
   keyWonLockGame,

@@ -1,5 +1,68 @@
 # Changelog
 ---
+## Bobby pins, arrows and honest consumption (patch 527)
+
+Four notes from the owner about the lock mini-game: the Russian item name, the
+arrow block on desktop/phone, broken pins leaving the inventory, and a red «?»
+on a wrong press.
+
+### 1. The Russian item name is «Заколка»
+
+`item_bobby_pin` in `modules/fallout/i18n/ru-RU/data/equipment/general_goods.json`
+is now exactly **«Заколка»** (previously «Шпилька») — not «отмычка», not
+«булавка». Every player-facing lock string in
+`i18n/ru-RU/screens/lootTrade/screen.json` now says «заколки/заколка»: the
+counter, the out-of-pins title, the missing-item hint, «Another attempt» and
+the new arrows hint. `item_electronic_lockpicker` stays **«Электронная
+отмычка»** — a different item that is never counted as a bobby pin.
+
+### 2. Arrow area and the hint
+
+On desktop and phone the arrows were "crossed by lines, too close and
+unclear". `components/lootTrade/lockPickingStyles.js` now has a separate
+`arrowPad` filled slightly darker than the light card; the buttons are one step
+darker still, icons are larger (`30`), horizontal spacing grew from `8` to `16`
+and the two rows gained a gap. The window content is wrapped in `ScrollView`,
+so the long text no longer overlaps the board on a narrow screen. The exact
+owner-approved hint is rendered directly under the pin counter, with a paired
+English `lock.arrowsHint` string.
+
+### 3. A broken bobby pin leaves the inventory
+
+Previously a break only decremented `pinLedger` in room memory, so pins never
+ran out on the character sheet. Now every `brokenPins + 1` makes
+`server/roomRegistry.js` call `consumeBobbyPins()` from `server/lockPicking.js`:
+`quantity` is reduced (or the empty stack removed) in the published
+`room.lastSnapshots` sheet itself, keeping the name, mods, durability and all
+other fields per the 522 rule. The client mirrors the spend in the live store
+through the new `components/lootTrade/spendBobbyPins.js` (atomic
+`spendItemStacks`, a fallback for legacy snapshot shapes, `saveCharacter` and a
+re-publish to the room). `pinLedger` is diagnostic only; available pins are
+read from the current sheet, so there is no double deduction. The local board
+fallback (old servers without the protocol) follows the same rule. Newly bought
+pins arrive with a normal sheet publication and are visible to «Another
+attempt» immediately.
+
+### 4. A wrong «?» is red and stays visible
+
+`server/lockPicking.js` clears previous red cells before each press, so there
+is exactly one red «?» — the current mistake. On the press that breaks a pin
+this cell is no longer erased (at skill 0 the red mark used to disappear
+entirely). In the light theme `cellTextRed` is an explicit `#c1121f` and
+`cellRed` a pink fill with a red border.
+
+### Regressions and checks
+
+Laws 520–526 are intact: PER/Luck/LOCKPICK, four terminal attempts, unlimited
+explicit player attempts, no automatic restart after ACCESS GRANTED, the GM
+Yes/No only for terminals, the `shouldBlockLock()` hook for a future lock
+block, the 525 light palette and entry modal. Server protection (roles, message
+caps, validation, atomicity) was not weakened. Acceptance tests:
+`__tests__/room/lock-consumption-527.test.js`,
+`__tests__/lootTrade/lock-arrows-527.test.js`,
+`__tests__/lootTrade/spend-bobby-pins-527.test.js`. Historical 520/524/526
+tests were updated for the new consumption law and naming canon.
+
 ## Player attempts and the Game Master's decision (patch 526)
 
 The owner clarified the meaning of the 506 report: "That was a bug report.

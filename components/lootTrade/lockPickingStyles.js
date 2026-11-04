@@ -83,18 +83,63 @@ export const lockLightStyles = StyleSheet.create({
   },
   cellHidden: {},
   cellGreen: { borderColor: '#2e7d32', backgroundColor: '#dff0d8' },
-  cellRed: { borderColor: ADMIN_MODAL_PALETTE.danger, backgroundColor: '#fdecea' },
+  // Патч 527: ошибочный «?» должен быть ЯВНО красным, а не просто тёмным
+  // знаком на чуть розовом фоне.
+  cellRed: { borderColor: '#c1121f', backgroundColor: '#fbe0e2' },
   cellGrey: { borderColor: '#888888', backgroundColor: '#e3e3e3' },
   cellText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 20, fontWeight: '800' },
   cellTextGreen: { color: '#1b5e20' },
-  cellTextRed: { color: ADMIN_MODAL_PALETTE.danger },
+  cellTextRed: { color: '#c1121f', fontSize: 22, fontWeight: '900' },
   cellTextGrey: { color: ADMIN_MODAL_PALETTE.mutedText },
 
-  crossArea: { alignItems: 'center', marginTop: 14, marginBottom: 6 },
-  crossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  arrowButton: { width: 52, height: 44, flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
+  // Патч 527: длинная подсказка + доска + стрелки должны прокручиваться на
+  // телефоне, иначе строки накладываются друг на друга («стрелки пересекает
+  // черты»). Каркас карточки (maxHeight 84 %) остаётся общим с формами.
+  scrollArea: { flexShrink: 1 },
+  scrollContent: { paddingBottom: 4 },
+  arrowsHint: {
+    color: ADMIN_MODAL_PALETTE.mutedText,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+    marginBottom: 2,
+    textAlign: 'left',
+  },
+
+  // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
+  // темнее области. Стрелки крупнее и разведены дальше друг от друга.
+  arrowPad: {
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+    alignItems: 'center',
+  },
+  crossArea: { alignItems: 'center' },
+  crossRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginVertical: 5,
+  },
+  arrowButton: {
+    width: 58,
+    height: 50,
+    flex: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#9a9a9a',
+    backgroundColor: '#dadada',
+  },
   arrowButtonDisabled: { opacity: 0.45 },
-  arrowSpacer: { width: 52, height: 44 },
+  arrowSpacer: { width: 58, height: 50 },
 
   resultText: {
     color: ADMIN_MODAL_PALETTE.text,

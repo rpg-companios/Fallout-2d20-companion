@@ -36,6 +36,7 @@ const {
   closeLockGame,
   applyLockAction,
   shouldBlockLock,
+  consumeBobbyPins,
 } = require('./lockPicking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
@@ -194,9 +195,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
     accessEvents: new Map(),
-    // Патч 520: потраченные отмычки по персонажу. Снимок персонажа приходит
-    // с полным инвентарём, поэтому без этого счётчика каждый новый замок
-    // «находил» бы отмычки заново. Живёт в памяти комнаты, без файлов.
+    // Патч 520/527: диагностический счётчик сломанных заколок по персонажу.
+    // С 527 число заколок для доски читается напрямую из опубликованного
+    // снимка листа: при поломке снимок уменьшается сервером, а клиент
+    // списывает заколку из локального инвентаря. Живёт в памяти комнаты.
     pinLedger: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
@@ -527,7 +529,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
     // Патч 526: для замков вопрос не задаётся — замки пока не блокируются,
     // игрок сам начинает новый подход; awaitingRetry у замка означает
-    // «подход завершён» (например, кончились отмычки).
+    // «подход завершён» (например, кончились заколки).
     awaitingGm: Boolean(
       entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
     ),
@@ -675,7 +677,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
               characterSnapshot: operatorSnapshot,
               now: now(),
               rng: lockRandom,
-              spentPins: room.pinLedger?.get(operatorCharacterId) || 0,
+              spentPins: 0,
             })
           : createGame({
               config: entry.config,
@@ -718,7 +720,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // и понимает legacy-массивы [{ name, value }] из сохранения. Объявление
     // вынесено выше: новый подход (526) читает тот же текущий снимок листа.
     const snapshot = published.snapshot || {};
-    // Патч 526: игрок сам начинает новый подход (купил отмычки, прокачал
+    // Патч 526: игрок сам начинает новый подход (купил заколки, прокачал
     // PER/LOCKPICK). Это НЕ автоперезапуск после победы: действие приходит
     // только по нажатию «Взломать»/«Ещё подход», а `start` по-прежнему
     // запрещён при won/playing. Терминал после блокировки может открыть
@@ -735,7 +737,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         characterSnapshot: snapshot,
         now: now(),
         rng: lockRandom,
-        spentPins: room.pinLedger?.get(charId) || 0,
+        spentPins: 0,
       });
       fresh.operatorName = String(published.fromName || snapshot?.name || '').trim();
       entry.game = fresh;
@@ -779,7 +781,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           value,
           now: now(),
           rng: lockRandom,
-          spentPins: room.pinLedger?.get(charId) || 0,
+          spentPins: 0,
         })
       : applyGameAction({
           game: entry.game || entry.config,
@@ -798,7 +800,22 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     entry.game = result.game;
     if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
       const delta = result.game.brokenPins - brokenBefore;
+      // Патч 527: сломанная заколка исчезает из инвентаря. Сервер уменьшает
+      // quantity в опубликованном снимке листа (источник истины для доски),
+      // клиент зеркально списывает её из локального инвентаря и сохраняет лист.
+      // pinLedger оставлен как диагностический счётчик, но доступность заколок
+      // больше из него не считается — иначе списание учлось бы дважды.
       room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
+      const consumed = consumeBobbyPins(published.snapshot || {}, delta);
+      if (consumed.consumed > 0) {
+        room.lastSnapshots.set(charId, {
+          ...published,
+          snapshot: consumed.snapshot,
+          revision: (Number(published.revision) || 0) + 1,
+          updatedAt: now(),
+        });
+        entry.operatorSnapshot = consumed.snapshot;
+      }
     }
     if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
       // Держим слова последних трёх досок (по 12–20 слов каждая).

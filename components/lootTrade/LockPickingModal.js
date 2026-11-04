@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -23,6 +24,7 @@ import {
   buildLocalLockSnapshot,
 } from './localLockGame';
 import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
+import { spendBobbyPins } from './spendBobbyPins';
 
 const styles = lockLightStyles;
 
@@ -48,7 +50,7 @@ const CELL_ICON = {
 };
 
 // Патч 524: повторный start, «уже закрыт», «ждём Мастера» и отсутствие
-// отмычек — штатные состояния доски, а не «Действие не выполнено».
+// заколок — штатные состояния доски, а не «Действие не выполнено».
 const SILENT_ERRORS = new Set([
   'ROOM_TIMEOUT',
   'LOCK_NOT_ACTIVE',
@@ -74,6 +76,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   const [forceLocal, setForceLocal] = useState(false);
   const autoStartRef = useRef('');
   const republishRef = useRef(false);
+  const brokenPinsRef = useRef(null);
 
   const containerId = String(lock?.containerId || '').trim();
   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
@@ -97,6 +100,23 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     && game?.status === 'playing' && isOperator && !busy,
   );
   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+
+  // Патч 527: каждая сломанная заколка уходит из РЕАЛЬНОГО инвентаря.
+  // Первое наблюдение за доской лишь запоминает базу (иначе перезагрузка
+  // страницы с уже сломанными заколками списала бы их повторно). Спектаторы
+  // чужие заколки не списывают — только оператор доски.
+  useEffect(() => {
+    brokenPinsRef.current = null;
+  }, [containerId, visible]);
+
+  useEffect(() => {
+    if (!visible || !game) return;
+    const broken = Math.max(0, Number(game.brokenPins) || 0);
+    const previous = brokenPinsRef.current;
+    brokenPinsRef.current = broken;
+    if (previous === null || broken <= previous || !isOperator) return;
+    void spendBobbyPins(broken - previous, { characterId });
+  }, [game?.brokenPins, isOperator, visible, containerId, characterId]);
 
   const localStep = (state, action, value) => {
     const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
@@ -272,7 +292,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       disabled={!canPress}
       onPress={() => void doAction('press', arrow)}
     >
-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
+      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={30} color={LOCK_PALETTE.text} />
     </TouchableOpacity>
   );
 
@@ -314,10 +334,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             </Text>
           ) : null}
 
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.statusRow}>
             <View>
               <Text testID="lock-pins-count" style={styles.pinCount}>
                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+              </Text>
+              <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
+                {tLootTrade('lock.arrowsHint')}
               </Text>
               <Text style={styles.statText}>
                 {game?.cellCount
@@ -357,7 +385,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
           ) : awaitingGm ? (
             // Патч 526: замки не блокируются. Вместо «Ожидание решения
             // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
-            // начать ли новый (купил отмычки, прокачал PER/LOCKPICK).
+            // начать ли новый (купил заколки, прокачал PER/LOCKPICK).
             <View style={styles.accessPanel} testID="lock-approach-finished">
               <Text style={styles.awaitingText}>{tLootTrade('lock.approachFinished')}</Text>
               {resultLabel ? (
@@ -388,16 +416,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                 ))}
               </View>
 
-              <View style={styles.crossArea}>
-                <View style={styles.crossRow}>
-                  <View style={styles.arrowSpacer} />
-                  {arrowButton('up')}
-                  <View style={styles.arrowSpacer} />
-                </View>
-                <View style={styles.crossRow}>
-                  {arrowButton('left')}
-                  {arrowButton('down')}
-                  {arrowButton('right')}
+              <View style={styles.arrowPad} testID="lock-arrow-pad">
+                <View style={styles.crossArea}>
+                  <View style={styles.crossRow}>
+                    <View style={styles.arrowSpacer} />
+                    {arrowButton('up')}
+                    <View style={styles.arrowSpacer} />
+                  </View>
+                  <View style={styles.crossRow}>
+                    {arrowButton('left')}
+                    {arrowButton('down')}
+                    {arrowButton('right')}
+                  </View>
                 </View>
               </View>
 
@@ -418,6 +448,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               </Text>
             </>
           )}
+          </ScrollView>
         </View>
       </View>
     </Modal>

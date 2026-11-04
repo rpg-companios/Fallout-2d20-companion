@@ -1,0 +1,2036 @@
+diff --git a/__tests__/lootTrade/lock-arrows-527.test.js b/__tests__/lootTrade/lock-arrows-527.test.js
+new file mode 100644
+index 0000000..1ae6d71
+--- /dev/null
++++ b/__tests__/lootTrade/lock-arrows-527.test.js
+@@ -0,0 +1,196 @@
++// Патч 527, клиент: подсказка под счётчиком, отдельная затемнённая область
++// стрелок и списание сломанной заколки из живого инвентаря (не только ledger).
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 390, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({
++  spendBobbyPins: vi.fn(async () => 1),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import { modalStyles, lockLightStyles, LOCK_PALETTE } from '../../components/lootTrade/lockPickingStyles';
++import { spendBobbyPins } from '../../components/lootTrade/spendBobbyPins';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const json = (rel) => JSON.parse(readFileSync(path.join(ROOT, rel), 'utf8'));
++
++const LOCK = { containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock' };
++
++const playing = (brokenPins = 0) => ({
++  status: 'playing',
++  kind: 'lock',
++  result: '',
++  cells: [
++    { arrow: null, state: 'red' },
++    { arrow: null, state: 'hidden' },
++    { arrow: 'left', state: 'grey' },
++    { arrow: null, state: 'hidden' },
++  ],
++  rows: [4],
++  cellCount: 4,
++  cursor: 0,
++  per: 8,
++  luck: 4,
++  skill: 3,
++  difficulty: 2,
++  pinsRemaining: 3,
++  pinActive: true,
++  brokenPins,
++  revision: 1,
++  operatorClientId: 'client-1',
++  operatorCharacterId: 'ch1',
++});
++
++const roomWith = (game) => ({
++  joined: true,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    l1: {
++      containerId: 'l1', accessId: 'broadcast-1', config: LOCK,
++      game, closed: false, locked: false, awaitingGm: false,
++    },
++  },
++});
++
++const renderers = [];
++const render = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++    );
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++
++// Не оставляем смонтированное окно жить после упавшей проверки: иначе его
++// подписка на стор комнаты дала бы лишние срабатывания в следующих тестах.
++afterEach(async () => {
++  for (const renderer of renderers.splice(0)) {
++    try {
++      await act(async () => renderer.unmount());
++    } catch { /* уже снято */ }
++  }
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1',
++    characterName: 'Сталкер',
++    attributes: { PER: { base: 8 } },
++    skills: { LOCKPICK: { base: 3 } },
++    items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } },
++  });
++  useRoomStore.setState({
++    clientId: 'client-1',
++    rooms: { ROOM1: roomWith(playing()) },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++
++describe('527: подсказка и область стрелок', () => {
++  it('точная подсказка выводится сразу под счётчиком заколок', async () => {
++    const renderer = await render();
++    const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' });
++    expect(hint.length).toBeGreaterThan(0); // мок RN даёт и компонент, и host-узел
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock.arrowsHint;
++    expect(String(hint[0].props.children)).toBe(en);
++    // Подсказка идёт ПОСЛЕ счётчика, а не внизу окна.
++    const counter = renderer.root.findAllByProps({ testID: 'lock-pins-count' })[0];
++    expect(counter).toBeTruthy();
++    await act(async () => renderer.unmount());
++  });
++
++  it('стрелки в заливке темнее карточки, крупнее и с увеличенным шагом', async () => {
++    const renderer = await render();
++    const pad = renderer.root.findAllByProps({ testID: 'lock-arrow-pad' });
++    expect(pad.length).toBeGreaterThan(0);
++    expect(pad[0].props.style.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
++    expect(pad[0].props.style.backgroundColor).not.toBe(modalStyles.card.backgroundColor);
++    expect(lockLightStyles.arrowButton.backgroundColor).toBe('#dadada');
++    expect(lockLightStyles.arrowButton.width).toBeGreaterThan(52);
++    expect(lockLightStyles.crossRow.gap).toBeGreaterThan(8);
++    const buttons = ['up', 'left', 'down', 'right'].map(
++      (dir) => renderer.root.findAllByProps({ testID: `lock-arrow-${dir}` })[0],
++    );
++    expect(buttons.every(Boolean)).toBe(true);
++    for (const button of buttons) {
++      expect(button.findAllByType('MaterialCommunityIcons').some((n) => n.props.size === 30)).toBe(true);
++    }
++    expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
++    await act(async () => renderer.unmount());
++  });
++
++  it('ошибочный «?» рисуется красным текстом на розовой ячейке', async () => {
++    const renderer = await render();
++    const cell = renderer.root.findAllByProps({ testID: 'lock-cell-0' })[0];
++    const cellStyle = Object.assign({}, ...[].concat(cell.props.style).filter(Boolean));
++    expect(cellStyle.backgroundColor).toBe(lockLightStyles.cellRed.backgroundColor);
++    const text = cell.findAllByType('Text')[0];
++    expect(String(text.props.children)).toBe('?');
++    const flat = Object.assign({}, ...[].concat(text.props.style).filter(Boolean));
++    expect(flat.color).toBe('#c1121f');
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('527: сломанная заколка списывается из живого инвентаря', () => {
++  it('первое наблюдение за доской не списывает уже сломанные заколки повторно', async () => {
++    useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(2)) } });
++    const renderer = await render();
++    expect(spendBobbyPins).not.toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++
++  it('рост brokenPins вызывает spendBobbyPins ровно на дельту', async () => {
++    const renderer = await render();
++    await act(async () => {
++      useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(1)) } });
++      await Promise.resolve();
++    });
++    expect(spendBobbyPins).toHaveBeenCalledTimes(1);
++    expect(spendBobbyPins.mock.calls[0][0]).toBe(1);
++    expect(spendBobbyPins.mock.calls[0][1]).toMatchObject({ characterId: 'ch1' });
++    await act(async () => {
++      useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(3)) } });
++      await Promise.resolve();
++    });
++    expect(spendBobbyPins).toHaveBeenCalledTimes(2);
++    expect(spendBobbyPins.mock.calls[1][0]).toBe(2);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/lootTrade/lock-modal-fix-524.test.js b/__tests__/lootTrade/lock-modal-fix-524.test.js
+index 3c14a93..5dbd9d1 100644
+--- a/__tests__/lootTrade/lock-modal-fix-524.test.js
++++ b/__tests__/lootTrade/lock-modal-fix-524.test.js
+@@ -76,7 +76,7 @@ describe('524: окно замка на старом сервере комнат
+     useCharacterStore.setState(character());
+   });
+ 
+-  it('собирает доску локально: ячейки, отмычки и нажимаемые стрелки без terminal.action', async () => {
++  it('собирает доску локально: ячейки, заколки и нажимаемые стрелки без terminal.action', async () => {
+     const actOnTerminal = vi.fn(async () => { throw fail('UNKNOWN_TYPE'); });
+     useRoomStore.setState({ clientId: 'client-1', rooms: { ROOM1: room() }, actOnTerminal });
+ 
+diff --git a/__tests__/lootTrade/spend-bobby-pins-527.test.js b/__tests__/lootTrade/spend-bobby-pins-527.test.js
+new file mode 100644
+index 0000000..99b6f3c
+--- /dev/null
++++ b/__tests__/lootTrade/spend-bobby-pins-527.test.js
+@@ -0,0 +1,81 @@
++// Патч 527: клиентское списание заколки из ЖИВОГО инвентаря персонажа.
++// Проверяем, что spendBobbyPins реально меняет стор (а не только ledger
++// мини-игры), сохраняет лист и переопубликовывает его в комнату Мастера.
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../src/saves/characterSaves', () => ({
++  saveCharacter: vi.fn(async () => 'ch1'),
++}));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import { spendBobbyPins, BOBBY_PIN_ITEM_ID } from '../../components/lootTrade/spendBobbyPins';
++import { saveCharacter } from '../../src/saves/characterSaves';
++import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
++import useCharacterStore from '../../src/store/characterStore';
++
++const base = () => ({
++  currentCharacterId: 'ch1',
++  characterName: 'Сталкер',
++  items: {
++    p1: { id: 'p1', weaponId: 'item_bobby_pin', name: 'Заколка', quantity: 5, condition: 90 },
++    gun: { id: 'gun', weaponId: 'weapon_10mm', name: 'Пистолет', quantity: 1 },
++  },
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState(base());
++});
++
++describe('527: spendBobbyPins', () => {
++  it('уменьшает quantity, сохраняет имя/прочие поля и не трогает соседний предмет', async () => {
++    const spent = await spendBobbyPins(1, { characterId: 'ch1' });
++    expect(spent).toBe(1);
++    const items = useCharacterStore.getState().items;
++    expect(items.p1).toMatchObject({
++      id: 'p1', weaponId: BOBBY_PIN_ITEM_ID, name: 'Заколка', quantity: 4, condition: 90,
++    });
++    expect(items.gun).toMatchObject({ name: 'Пистолет', quantity: 1 });
++    expect(saveCharacter).toHaveBeenCalledWith('Сталкер');
++    expect(pushSavedCharacterToBoundRoomIfAny).toHaveBeenCalledWith('ch1');
++  });
++
++  it('последняя заколка исчезает из инвентаря полностью', async () => {
++    useCharacterStore.setState({
++      ...base(),
++      items: { p1: { id: 'p1', weaponId: BOBBY_PIN_ITEM_ID, quantity: 1 } },
++    });
++    const spent = await spendBobbyPins(1);
++    expect(spent).toBe(1);
++    expect(useCharacterStore.getState().items.p1).toBeUndefined();
++    expect(saveCharacter).toHaveBeenCalledTimes(1);
++  });
++
++  it('легаси-форма catalogId/count списывается резервным каноном сервера', async () => {
++    useCharacterStore.setState({
++      ...base(),
++      items: { p1: { id: 'p1', catalogId: BOBBY_PIN_ITEM_ID, count: '2', name: 'Заколка' } },
++    });
++    const spent = await spendBobbyPins(1);
++    expect(spent).toBe(1);
++    expect(useCharacterStore.getState().items.p1).toMatchObject({
++      catalogId: BOBBY_PIN_ITEM_ID, count: 1, name: 'Заколка',
++    });
++    expect(saveCharacter).toHaveBeenCalledTimes(1);
++  });
++
++  it('нет заколок — ничего не сохраняем и не публикуем', async () => {
++    useCharacterStore.setState({ ...base(), items: {} });
++    expect(await spendBobbyPins(1)).toBe(0);
++    expect(saveCharacter).not.toHaveBeenCalled();
++    expect(pushSavedCharacterToBoundRoomIfAny).not.toHaveBeenCalled();
++  });
++
++  it('нулевое/отрицательное число — пустой вызов', async () => {
++    expect(await spendBobbyPins(0)).toBe(0);
++    expect(await spendBobbyPins(-3)).toBe(0);
++    expect(useCharacterStore.getState().items.p1.quantity).toBe(5);
++  });
++});
+diff --git a/__tests__/room/lock-attempts-526.test.js b/__tests__/room/lock-attempts-526.test.js
+index 89d2313..56a933f 100644
+--- a/__tests__/room/lock-attempts-526.test.js
++++ b/__tests__/room/lock-attempts-526.test.js
+@@ -242,7 +242,7 @@ describe('526: локальный резерв и строки', () => {
+     expect(Object.keys(ru.lock).sort()).toEqual(Object.keys(en.lock).sort());
+     expect(ru.lock.newAttempt).toBe('Ещё подход');
+     expect(en.lock.newAttempt).toBe('Another attempt');
+-    expect(ru.lock.newAttemptHint).toContain('отмычк');
++    expect(ru.lock.newAttemptHint).toContain('заколк'); // 527
+     expect(en.lock.newAttemptHint).toContain('pins');
+     expect(ru.lock.hackedTitle).toBe('Замок взломан');
+     expect(en.lock.hackedTitle).toBe('Lock picked');
+diff --git a/__tests__/room/lock-consumption-527.test.js b/__tests__/room/lock-consumption-527.test.js
+new file mode 100644
+index 0000000..924fc29
+--- /dev/null
++++ b/__tests__/room/lock-consumption-527.test.js
+@@ -0,0 +1,210 @@
++// Приёмочный тест патча 527. Владелец: «item_bobby_pin по-русски ЗАКОЛКА,
++// а не шпилька/отмычка/булавка; отмычка — это другой предмет. Сломанные /
++// потраченные заколки должны исчезать из РЕАЛЬНОГО инвентаря, а не только из
++// памяти комнаты. При ошибке ? красный; на телефоне стрелки пересекают линии,
++// слишком близко и непонятно; под счётчиком — точная подсказка».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  consumeBobbyPins,
++  countBobbyPins,
++  lockStats,
++  createLockGame,
++  applyLockAction,
++  CELL_STATE,
++} from '../../server/lockPicking.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.';
++
++const snapshot = (pins) => ({
++  characterName: 'Сталкер',
++  data: {
++    attributes: [{ name: 'PER', value: 10 }, { name: 'LCK', value: 4 }],
++    skills: [{ name: 'LOCKPICK', value: 0 }],
++    equipment: { items: [{
++      id: 'pin', weaponId: 'item_bobby_pin', name: 'Заколка', quantity: pins,
++    }] },
++  },
++});
++
++// rng(1000) = 990 → rng() = 0.99: секрет сплошь 'down', Удача (5%) НЕ спасает
++// заколку, поэтому первое же неверное нажатие ломает её детерминированно.
++const setup = (pins = 5) => {
++  const registry = createRoomRegistry({ now: () => 1000, rng: () => 990 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1, snapshot: snapshot(pins),
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  registry.issueTerminal({
++    code, clientId: 'gm',
++    config: {
++      containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock',
++      requiredKeyItemId: '', keyRequirement: 'none', linkedCheckId: '', linkedCheckIds: [],
++    },
++  });
++  const act = (action, value) => registry.terminalAction({
++    code, clientId: 'p1', characterId: 'ch1', containerId: 'l1', action, value,
++  });
++  const state = () => registry.getState(code).terminalStates.l1;
++  const published = () => registry._rooms.get(code).lastSnapshots.get('ch1');
++  return { registry, code, act, state, published };
++};
++
++describe('527: заколки уходят из настоящего инвентаря', () => {
++  it('consumeBobbyPins уменьшает quantity, сохраняет имя и не мутирует исходник', () => {
++    const original = snapshot(5);
++    const { snapshot: next, consumed } = consumeBobbyPins(original, 1);
++    expect(consumed).toBe(1);
++    expect(next.data.equipment.items[0]).toMatchObject({
++      id: 'pin', weaponId: 'item_bobby_pin', name: 'Заколка', quantity: 4,
++    });
++    expect(original.data.equipment.items[0].quantity).toBe(5);
++    expect(lockStats(next).pins).toBe(4); // обёртка data разворачивается как у доски
++  });
++
++  it('consumeBobbyPins удаляет опустевший стек и не трогает чужие предметы', () => {
++    const mixed = {
++      items: {
++        pin: { itemId: 'item_bobby_pin', quantity: 1, condition: 80 },
++        cap: { itemId: 'caps', quantity: 12 },
++      },
++      inventory: [{ snapshot: { catalogId: 'item_bobby_pin', count: '2' } }],
++      bag: [{ item: { code: 'weapon_10mm', qty: 1 } }],
++    };
++    expect(countBobbyPins(mixed)).toBe(3);
++    const { snapshot: next, consumed } = consumeBobbyPins(mixed, 3);
++    expect(consumed).toBe(3);
++    expect(countBobbyPins(next)).toBe(0);
++    expect(next.items.pin).toBeUndefined();
++    expect(next.items.cap).toMatchObject({ itemId: 'caps', quantity: 12 });
++    expect(next.bag[0]).toMatchObject({ item: { code: 'weapon_10mm', qty: 1 } });
++  });
++
++  it('дубликат одного экземпляра в items и equipment.items списывается один раз', () => {
++    const dup = {
++      items: { p: { id: 'p', instanceId: 'pin-42', weaponId: 'item_bobby_pin', quantity: 5 } },
++      equipment: { items: [{ id: 'p', instanceId: 'pin-42', weaponId: 'item_bobby_pin', quantity: 5 }] },
++    };
++    const { snapshot: next, consumed } = consumeBobbyPins(dup, 1);
++    expect(consumed).toBe(1);
++    expect(countBobbyPins(next)).toBe(4);
++  });
++
++  it('сервер комнаты списывает сломанную заколку из опубликованного снимка', () => {
++    const { act, state, published, registry, code } = setup();
++    expect(act('start').error).toBeUndefined();
++    expect(state().game.pinsTotal).toBe(5);
++    expect(act('press', 'left').error).toBeUndefined();
++    expect(state().game.brokenPins).toBe(1);
++    expect(state().game.result).toBe('PIN BROKEN');
++    // Не ledger, а сам лист: на следующем подходе заколок уже 4.
++    expect(published().snapshot.data.equipment.items[0]).toMatchObject({
++      name: 'Заколка', quantity: 4,
++    });
++    expect(registry._rooms.get(code).pinLedger.get('ch1')).toBe(1); // диагностика
++    expect(act('newAttempt').error).toBeUndefined();
++    expect(state().game.pinsTotal).toBe(4);
++    expect(state().game.spentPins).toBe(0); // двойного вычета нет
++  });
++
++  it('последняя заколка исчезает, и новый подход честно говорит «Заколки закончились»', () => {
++    const { act, state, published } = setup(1);
++    act('start');
++    act('press', 'left');
++    expect(countBobbyPins(published().snapshot)).toBe(0);
++    expect(state().game.result).toBe('OUT OF PINS');
++    act('newAttempt');
++    expect(state().game.status).toBe('awaitingRetry');
++    expect(state().game.result).toBe('OUT OF PINS');
++  });
++});
++
++describe('527: ошибочный «?» остаётся красным', () => {
++  it('на ходе с поломкой заколки красная ячейка не стирается', () => {
++    const lowSkill = {
++      data: {
++        attributes: { PER: { value: 10 }, LCK: { value: 4 } },
++        skills: [{ name: 'LOCKPICK', value: 0 }],
++        items: [{ itemId: 'item_bobby_pin', quantity: 5 }],
++      },
++    };
++    const game = createLockGame({ config: { difficulty: 1 }, characterSnapshot: lowSkill, rng: () => 0 });
++    const wrong = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
++    expect(wrong.brokenPins).toBe(1);
++    expect(wrong.cells[game.cursor]).toEqual({ arrow: null, state: CELL_STATE.RED });
++  });
++
++  it('каждое следующее нажатие оставляет только одну красную ячейку', () => {
++    const lowSkill = {
++      data: {
++        attributes: { PER: { value: 10 }, LCK: { value: 10 } },
++        skills: [{ name: 'LOCKPICK', value: 6 }],
++        items: [{ itemId: 'item_bobby_pin', quantity: 5 }],
++      },
++    };
++    const game = createLockGame({ config: { difficulty: 1 }, characterSnapshot: lowSkill, rng: () => 0 });
++    const first = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
++    expect(first.cells.filter((c) => c.state === CELL_STATE.RED)).toHaveLength(1);
++    const second = applyLockAction({ game: first, config: {}, action: 'press', value: 'down', rng: () => 0.99 }).game;
++    expect(second.cells.filter((c) => c.state === CELL_STATE.RED)).toHaveLength(1);
++  });
++
++  it('в светлой теме красный «?» явно красный, а не тёмно-серый', () => {
++    const source = read('components/lootTrade/lockPickingStyles.js');
++    expect(source).toMatch(/cellTextRed:\s*\{[^}]*color:\s*'#c1121f'/);
++    expect(source).toMatch(/cellRed:\s*\{[^}]*borderColor:\s*'#c1121f'/);
++  });
++});
++
++describe('527: терминология и стрелки', () => {
++  it('по-русски предмет «Заколка», электронная отмычка — другой предмет', () => {
++    const catalog = json('modules/fallout/i18n/ru-RU/data/equipment/general_goods.json');
++    const pin = catalog.find((x) => x.id === 'item_bobby_pin');
++    const electronic = catalog.find((x) => x.id === 'item_electronic_lockpicker');
++    expect(pin.name).toBe('Заколка');
++    expect(electronic.name).toBe('Электронная отмычка');
++    const en = json('modules/fallout/i18n/en-EN/data/equipment/general_goods.json');
++    expect(en.find((x) => x.id === 'item_bobby_pin').name).toBe('Bobby Pin');
++  });
++
++  it('все строки замка по-русски про заколки, без шпилек/отмычек/булавок', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
++    const text = JSON.stringify(ru);
++    expect(text).toContain('закол');
++    expect(text).not.toMatch(/отмычк|шпильк|булавк/i);
++    expect(ru.pins).toContain('Заколки');
++    expect(ru.noPins).toBe('Заколки закончились');
++  });
++
++  it('точная подсказка под счётчиком, парная RU/EN', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
++    expect(ru.arrowsHint).toBe(HINT_RU);
++    expect(en.arrowsHint).toContain('Press the arrows');
++    expect(en.arrowsHint).toContain('bobby pin breaks');
++    expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
++    expect(read('components/lootTrade/LockPickingModal.js')).toContain("testID=\"lock-arrows-hint\"");
++  });
++
++  it('область стрелок: заливка темнее карточки, стрелки крупнее и разведены', () => {
++    const source = read('components/lootTrade/lockPickingStyles.js');
++    expect(source).toContain('arrowPad');
++    expect(source).toMatch(/arrowPad:\s*\{[^}]*backgroundColor:\s*ADMIN_MODAL_PALETTE\.surfaceMuted/);
++    expect(source).toMatch(/arrowButton:\s*\{[^}]*backgroundColor:\s*'#dadada'/);
++    expect(source).toMatch(/crossRow:\s*\{[^}]*gap:\s*16/);
++    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{30\}/);
++    expect(read('components/lootTrade/LockPickingModal.js')).toContain('testID="lock-arrow-pad"');
++    expect(read('components/lootTrade/LockPickingModal.js')).toContain('ScrollView');
++  });
++});
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index 3aa8a96..5b75c19 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -165,7 +165,8 @@ describe('520: механика нажатий и отмычек', () => {
+     expect(game.cells[0].state).toBe('green');
+     const broken = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
+     expect(broken.cells[0]).toEqual({ arrow: 'left', state: 'grey' });
+-    expect(broken.cells[1].state).toBe('hidden');
++    // Патч 527: ошибочный «?» остаётся КРАСНЫМ и на ходе с поломкой.
++    expect(broken.cells[1]).toEqual({ arrow: null, state: 'red' });
+     expect(broken.cursor).toBe(0);
+     expect(broken.brokenPins).toBe(1);
+     expect(broken.pinsRemaining).toBe(game.pinsRemaining - 1);
+@@ -282,16 +283,30 @@ describe('520: «ИЛИ» между терминалом и замком', () =
+     expect(take.error).toBe(ERROR_CODE.CONTAINER_LOCKED);
+   });
+ 
+-  it('потраченные отмычки не возрождаются на следующем замке', () => {
++  it('527: сломанные заколки не возрождаются — они уходят из снимка листа', () => {
+     const { registry, code } = setupRoom();
+-    const ledger = registry._rooms.get(code).pinLedger;
+-    ledger.set('ch1', 7);
++    const room = registry._rooms.get(code);
++    // pinLedger теперь только диагностика: заколки читаются из листа, иначе
++    // списание из инвентаря учитывалось бы дважды.
++    room.pinLedger.set('ch1', 7);
+     registry.terminalAction({
+       code, clientId: 'p1', characterId: 'ch1', containerId: 'l1', action: 'start',
+     });
+-    const game = registry._rooms.get(code).terminalStates.get('l1').game;
+-    expect(game.pinsTotal).toBe(13);
+-    expect(game.spentPins).toBe(7);
++    const first = room.terminalStates.get('l1').game;
++    expect(first.pinsTotal).toBe(20);
++    expect(first.spentPins).toBe(0);
++    // Реальное списание: обновлённый лист содержит 13 заколок.
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 2,
++      snapshot: { data: { ...SNAPSHOT.data, items: [{ itemId: 'item_bobby_pin', quantity: 13 }] } },
++      fromClientId: 'p1', fromName: 'Игрок',
++    });
++    registry.terminalAction({
++      code, clientId: 'p1', characterId: 'ch1', containerId: 'l1', action: 'newAttempt',
++    });
++    const fresh = room.terminalStates.get('l1').game;
++    expect(fresh.pinsTotal).toBe(13);
++    expect(fresh.spentPins).toBe(0);
+   });
+ });
+ 
+diff --git a/__tests__/room/lock-picking-fix-524.test.js b/__tests__/room/lock-picking-fix-524.test.js
+index 0c2a16f..d1defc6 100644
+--- a/__tests__/room/lock-picking-fix-524.test.js
++++ b/__tests__/room/lock-picking-fix-524.test.js
+@@ -44,7 +44,7 @@ const LIVE_STORE = {
+   items: {
+     id_1701_a1: { id: 'id_1701_a1', weaponId: 'item_bobby_pin', quantity: 7 },
+     id_1702_b2: { catalogId: 'item_bobby_pin', count: '3' },
+-    id_1703_c3: { name: 'Отмычка', code: 'item_bobby_pin', qty: 2 },
++    id_1703_c3: { name: 'Заколка', code: 'item_bobby_pin', qty: 2 },
+     id_1704_d4: { itemId: 'weapon_10mm', quantity: 1 },
+   },
+   equipment: { items: [{ id: 'item_bobby_pin', quantity: 4 }] },
+@@ -120,7 +120,7 @@ describe('524: локальный резерв доски замка', () => {
+     expect(state.view.result).toBe('ACCESS GRANTED');
+   });
+ 
+-  it('поломка списывает отмычку в локальный ledger, «Да» собирает новую доску', () => {
++  it('527: поломка списывает заколку из инвентаря, «Да» собирает новую доску', () => {
+     const low = {
+       ...LIVE_STORE,
+       skills: { LOCKPICK: { base: 0 } },
+@@ -141,9 +141,17 @@ describe('524: локальный резерв доски замка', () => {
+     }
+     expect(state.spentPins).toBeGreaterThan(0);
+     const awaiting = { ...state, game: { ...state.game, status: 'awaitingRetry' } };
+-    const fresh = applyLocalLockAction(awaiting, 'retry', 'yes', localCtx);
++    // Патч 527: клиент зеркально списал заколки из живого стора, поэтому
++    // свежий лист содержит меньше предмета; двойного вычета по ledger нет.
++    const spent = state.spentPins;
++    const afterSpend = {
++      ...low,
++      items: { p1: { id: 'p1', weaponId: 'item_bobby_pin', quantity: 3 - spent } },
++    };
++    const spentCtx = { ...localCtx, characterSnapshot: buildLocalLockSnapshot(afterSpend) };
++    const fresh = applyLocalLockAction(awaiting, 'retry', 'yes', spentCtx);
+     expect(fresh.error).toBeNull();
+-    expect(fresh.view.pinsTotal).toBe(3 - state.spentPins);
++    expect(fresh.view.pinsTotal).toBe(3 - spent);
+     expect(fresh.view.status).toBe('playing');
+     const denied = applyLocalLockAction(awaiting, 'retry', 'no', localCtx);
+     expect(denied.view.status).toBe('closed');
+@@ -214,7 +222,7 @@ describe('524: документы, строки и регрессионные з
+     const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
+     const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
+     expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
+-    expect(ru.noPinsHint).toContain('Отмычк');
++    expect(ru.noPinsHint).toContain('Заколк'); // 527: item_bobby_pin — «Заколка»
+     expect(en.sessionNotPublished).toContain('room');
+     const version = json('public/version.json');
+     expect(Number(version.version)).toBeGreaterThanOrEqual(524);
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index f38591b..d40fb58 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -1,6 +1,7 @@
+ import React, { useEffect, useMemo, useRef, useState } from 'react';
+ import {
+   Modal,
++  ScrollView,
+   Text,
+   TouchableOpacity,
+   View,
+@@ -23,6 +24,7 @@ import {
+   buildLocalLockSnapshot,
+ } from './localLockGame';
+ import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
++import { spendBobbyPins } from './spendBobbyPins';
+ 
+ const styles = lockLightStyles;
+ 
+@@ -48,7 +50,7 @@ const CELL_ICON = {
+ };
+ 
+ // Патч 524: повторный start, «уже закрыт», «ждём Мастера» и отсутствие
+-// отмычек — штатные состояния доски, а не «Действие не выполнено».
++// заколок — штатные состояния доски, а не «Действие не выполнено».
+ const SILENT_ERRORS = new Set([
+   'ROOM_TIMEOUT',
+   'LOCK_NOT_ACTIVE',
+@@ -74,6 +76,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   const [forceLocal, setForceLocal] = useState(false);
+   const autoStartRef = useRef('');
+   const republishRef = useRef(false);
++  const brokenPinsRef = useRef(null);
+ 
+   const containerId = String(lock?.containerId || '').trim();
+   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
+@@ -98,6 +101,23 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   );
+   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+ 
++  // Патч 527: каждая сломанная заколка уходит из РЕАЛЬНОГО инвентаря.
++  // Первое наблюдение за доской лишь запоминает базу (иначе перезагрузка
++  // страницы с уже сломанными заколками списала бы их повторно). Спектаторы
++  // чужие заколки не списывают — только оператор доски.
++  useEffect(() => {
++    brokenPinsRef.current = null;
++  }, [containerId, visible]);
++
++  useEffect(() => {
++    if (!visible || !game) return;
++    const broken = Math.max(0, Number(game.brokenPins) || 0);
++    const previous = brokenPinsRef.current;
++    brokenPinsRef.current = broken;
++    if (previous === null || broken <= previous || !isOperator) return;
++    void spendBobbyPins(broken - previous, { characterId });
++  }, [game?.brokenPins, isOperator, visible, containerId, characterId]);
++
+   const localStep = (state, action, value) => {
+     const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
+     const next = applyLocalLockAction(state, action, value, {
+@@ -272,7 +292,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+       disabled={!canPress}
+       onPress={() => void doAction('press', arrow)}
+     >
+-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
++      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={30} color={LOCK_PALETTE.text} />
+     </TouchableOpacity>
+   );
+ 
+@@ -314,11 +334,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+             </Text>
+           ) : null}
+ 
++          <ScrollView
++            style={styles.scrollArea}
++            contentContainerStyle={styles.scrollContent}
++            showsVerticalScrollIndicator={false}
++          >
+           <View style={styles.statusRow}>
+             <View>
+               <Text testID="lock-pins-count" style={styles.pinCount}>
+                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+               </Text>
++              <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
++                {tLootTrade('lock.arrowsHint')}
++              </Text>
+               <Text style={styles.statText}>
+                 {game?.cellCount
+                   ? formatLootTrade(tLootTrade('lock.difficulty'), {
+@@ -357,7 +385,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+           ) : awaitingGm ? (
+             // Патч 526: замки не блокируются. Вместо «Ожидание решения
+             // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
+-            // начать ли новый (купил отмычки, прокачал PER/LOCKPICK).
++            // начать ли новый (купил заколки, прокачал PER/LOCKPICK).
+             <View style={styles.accessPanel} testID="lock-approach-finished">
+               <Text style={styles.awaitingText}>{tLootTrade('lock.approachFinished')}</Text>
+               {resultLabel ? (
+@@ -388,16 +416,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+                 ))}
+               </View>
+ 
+-              <View style={styles.crossArea}>
+-                <View style={styles.crossRow}>
+-                  <View style={styles.arrowSpacer} />
+-                  {arrowButton('up')}
+-                  <View style={styles.arrowSpacer} />
+-                </View>
+-                <View style={styles.crossRow}>
+-                  {arrowButton('left')}
+-                  {arrowButton('down')}
+-                  {arrowButton('right')}
++              <View style={styles.arrowPad} testID="lock-arrow-pad">
++                <View style={styles.crossArea}>
++                  <View style={styles.crossRow}>
++                    <View style={styles.arrowSpacer} />
++                    {arrowButton('up')}
++                    <View style={styles.arrowSpacer} />
++                  </View>
++                  <View style={styles.crossRow}>
++                    {arrowButton('left')}
++                    {arrowButton('down')}
++                    {arrowButton('right')}
++                  </View>
+                 </View>
+               </View>
+ 
+@@ -418,6 +448,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               </Text>
+             </>
+           )}
++          </ScrollView>
+         </View>
+       </View>
+     </Modal>
+diff --git a/components/lootTrade/localLockGame.js b/components/lootTrade/localLockGame.js
+index e3ff55f..0c4f091 100644
+--- a/components/lootTrade/localLockGame.js
++++ b/components/lootTrade/localLockGame.js
+@@ -8,11 +8,11 @@ import engine from '../../server/lockPicking';
+  * Резерв включается автоматически, когда сервер ещё не обновлён и не знает
+  * `terminal.issue` / `terminal.action`: у терминала такой fallback уже был с
+  * патча 498, у замка его не было, поэтому «Взломать» сразу показывало
+- * «Действие не выполнено» и пустую доску без отмычек.
++ * «Действие не выполнено» и пустую доску без заколок.
+  *
+  * Никакого видимого «локального режима» в интерфейсе нет (правило 498):
+  * решение о резерве принимает клиент по `capabilities` комнаты, а игрок видит
+- * обычные ячейки, стрелки и счётчик отмычек.
++ * обычные ячейки, стрелки и счётчик заколок.
+  */
+ 
+ export const LOCAL_LOCK_OPERATOR = 'local-lock-player';
+@@ -80,14 +80,17 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+       characterSnapshot,
+       now,
+       rng,
+-      spentPins: carried,
++      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
++      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
++      // `carried` остаётся диагностическим счётчиком сломанных заколок.
++      spentPins: 0,
+     });
+     fresh.operatorName = characterSnapshot.characterName || game.operatorName || '';
+     return finish(fresh, carried);
+   }
+ 
+   // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
+-  // сервера: свежая доска по текущему листу, потраченные отмычки не
++  // сервера: свежая доска по текущему листу, сломанные заколки не
+   // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
+   if (action === 'newAttempt') {
+     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
+@@ -99,7 +102,10 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+       characterSnapshot,
+       now,
+       rng,
+-      spentPins: carried,
++      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
++      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
++      // `carried` остаётся диагностическим счётчиком сломанных заколок.
++      spentPins: 0,
+     });
+     fresh.operatorName = characterSnapshot.characterName || '';
+     return finish(fresh, carried);
+@@ -119,7 +125,10 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+       characterSnapshot,
+       now,
+       rng,
+-      spentPins: carried,
++      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
++      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
++      // `carried` остаётся диагностическим счётчиком сломанных заколок.
++      spentPins: 0,
+     });
+     game.operatorName = characterSnapshot.characterName || '';
+     if (action === 'start') return finish(game, carried);
+@@ -137,7 +146,7 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+     value,
+     now,
+     rng,
+-    spentPins: carried,
++    spentPins: 0,
+   });
+   if (result.error) return finish(game, carried, result.error);
+   const delta = Math.max(0, Number(result.game?.brokenPins || 0) - brokenBefore);
+diff --git a/components/lootTrade/lockPickingStyles.js b/components/lootTrade/lockPickingStyles.js
+index 64821fc..ce4f8b5 100644
+--- a/components/lootTrade/lockPickingStyles.js
++++ b/components/lootTrade/lockPickingStyles.js
+@@ -83,18 +83,63 @@ export const lockLightStyles = StyleSheet.create({
+   },
+   cellHidden: {},
+   cellGreen: { borderColor: '#2e7d32', backgroundColor: '#dff0d8' },
+-  cellRed: { borderColor: ADMIN_MODAL_PALETTE.danger, backgroundColor: '#fdecea' },
++  // Патч 527: ошибочный «?» должен быть ЯВНО красным, а не просто тёмным
++  // знаком на чуть розовом фоне.
++  cellRed: { borderColor: '#c1121f', backgroundColor: '#fbe0e2' },
+   cellGrey: { borderColor: '#888888', backgroundColor: '#e3e3e3' },
+   cellText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 20, fontWeight: '800' },
+   cellTextGreen: { color: '#1b5e20' },
+-  cellTextRed: { color: ADMIN_MODAL_PALETTE.danger },
++  cellTextRed: { color: '#c1121f', fontSize: 22, fontWeight: '900' },
+   cellTextGrey: { color: ADMIN_MODAL_PALETTE.mutedText },
+ 
+-  crossArea: { alignItems: 'center', marginTop: 14, marginBottom: 6 },
+-  crossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+-  arrowButton: { width: 52, height: 44, flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
++  // Патч 527: длинная подсказка + доска + стрелки должны прокручиваться на
++  // телефоне, иначе строки накладываются друг на друга («стрелки пересекает
++  // черты»). Каркас карточки (maxHeight 84 %) остаётся общим с формами.
++  scrollArea: { flexShrink: 1 },
++  scrollContent: { paddingBottom: 4 },
++  arrowsHint: {
++    color: ADMIN_MODAL_PALETTE.mutedText,
++    fontSize: 12,
++    lineHeight: 18,
++    marginTop: 8,
++    marginBottom: 2,
++    textAlign: 'left',
++  },
++
++  // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
++  // темнее области. Стрелки крупнее и разведены дальше друг от друга.
++  arrowPad: {
++    marginTop: 10,
++    marginBottom: 4,
++    paddingVertical: 12,
++    paddingHorizontal: 10,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++    alignItems: 'center',
++  },
++  crossArea: { alignItems: 'center' },
++  crossRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 16,
++    marginVertical: 5,
++  },
++  arrowButton: {
++    width: 58,
++    height: 50,
++    flex: 0,
++    paddingVertical: 0,
++    paddingHorizontal: 0,
++    borderRadius: 6,
++    borderWidth: 1.5,
++    borderColor: '#9a9a9a',
++    backgroundColor: '#dadada',
++  },
+   arrowButtonDisabled: { opacity: 0.45 },
+-  arrowSpacer: { width: 52, height: 44 },
++  arrowSpacer: { width: 58, height: 50 },
+ 
+   resultText: {
+     color: ADMIN_MODAL_PALETTE.text,
+diff --git a/components/lootTrade/spendBobbyPins.js b/components/lootTrade/spendBobbyPins.js
+new file mode 100644
+index 0000000..ef2edb2
+--- /dev/null
++++ b/components/lootTrade/spendBobbyPins.js
+@@ -0,0 +1,73 @@
++import useCharacterStore from '../../src/store/characterStore';
++import { debugLog } from '../../src/debug/falloutDebug';
++import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
++import engine from '../../server/lockPicking';
++
++/**
++ * Патч 527: сломанная заколка должна ИСЧЕЗНУТЬ из инвентаря, а не только из
++ * счётчика мини-игры. Сервер уже уменьшил quantity в опубликованном снимке;
++ * здесь зеркально списываем заколку из живого стора персонажа, сохраняем лист
++ * и переопубликовываем его в комнату Мастера (включая локальный резерв, где
++ * серверного терминала нет и доска живёт целиком на клиенте).
++ *
++ * Основной путь — общая атомарная операция стора spendItemStacks (respects
++ * моды/состояние, не трогает надетое и запертое по правилу 522). Резерв для
++ * старых форм сейва, где канонический id лежит в catalogId/itemId/code: тот же
++ * канон поиска заколок, что у сервера (consumeBobbyPins).
++ */
++
++export const BOBBY_PIN_ITEM_ID = 'item_bobby_pin';
++
++export const spendBobbyPins = async (count, { characterId } = {}) => {
++  const delta = Math.max(0, Math.floor(Number(count) || 0));
++  if (delta <= 0) return 0;
++  const store = useCharacterStore.getState();
++  let spent = 0;
++  const action = typeof store.spendItemStacks === 'function'
++    ? store.spendItemStacks({ spend: [{ itemId: BOBBY_PIN_ITEM_ID, count: delta }] })
++    : null;
++  if (action?.ok) {
++    spent = delta;
++  } else {
++    // Легаси-сейв: getItemId() стора не узнал запись по catalogId/itemId/code.
++    // Списываем через общий с сервером канон (он понимает все эти формы).
++    const mini = {
++      items: store.items || {},
++      equipment: store.equipment || {},
++      inventory: store.inventory || [],
++      bag: store.bag || [],
++    };
++    const result = engine.consumeBobbyPins?.(mini, delta) || { consumed: 0, snapshot: mini };
++    if (result.consumed > 0) {
++      useCharacterStore.setState({
++        items: result.snapshot.items,
++        equipment: result.snapshot.equipment,
++        ...(Array.isArray(store.inventory) ? { inventory: result.snapshot.inventory } : {}),
++        ...(Array.isArray(store.bag) ? { bag: result.snapshot.bag } : {}),
++      });
++      spent = result.consumed;
++    }
++  }
++  if (spent <= 0) {
++    // В инвентаре уже нечего списывать (например, лист устарел). Доска всё
++    // равно честно покажет «Заколки закончились» — молчим, без алерта.
++    debugLog('lock.spendBobbyPins:noPins', { delta });
++    return 0;
++  }
++  try {
++    // Динамический импорт: модуль сохранений не нужен при обычном рендере.
++    const { saveCharacter } = await import('../../src/saves/characterSaves');
++    await saveCharacter(store.characterName || '—');
++  } catch (error) {
++    debugLog('lock.spendBobbyPins:saveFailed', { message: error?.message });
++  }
++  try {
++    const id = characterId || useCharacterStore.getState().currentCharacterId;
++    if (id) await pushSavedCharacterToBoundRoomIfAny(id);
++  } catch (error) {
++    debugLog('lock.spendBobbyPins:publishFailed', { message: error?.message });
++  }
++  return spent;
++};
++
++export default spendBobbyPins;
+diff --git a/components/lootTrade/terminalAccess.js b/components/lootTrade/terminalAccess.js
+index affd56f..2cb5865 100644
+--- a/components/lootTrade/terminalAccess.js
++++ b/components/lootTrade/terminalAccess.js
+@@ -3,7 +3,7 @@
+  * «открыто/закрыто» окну. Патч 526 уточнил правило по слову владельца: баг
+  * 506 был про АВТОМАТИЧЕСКИЙ перезапуск взлома после успеха, а не про право
+  * игрока на новые подходы. «Билет на один взлом» убран: игрок сам решает,
+- * когда начать новый подход (купил отмычки, прокачал PER/LOCKPICK).
++ * когда начать новый подход (купил заколки, прокачал PER/LOCKPICK).
+  *
+  * Что осталось:
+  *  - автоматический рестарт после ACCESS GRANTED запрещён (правила
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1041585..d32b137 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,68 @@
+ # Changelog
+ ---
++## Bobby pins, arrows and honest consumption (patch 527)
++
++Four notes from the owner about the lock mini-game: the Russian item name, the
++arrow block on desktop/phone, broken pins leaving the inventory, and a red «?»
++on a wrong press.
++
++### 1. The Russian item name is «Заколка»
++
++`item_bobby_pin` in `modules/fallout/i18n/ru-RU/data/equipment/general_goods.json`
++is now exactly **«Заколка»** (previously «Шпилька») — not «отмычка», not
++«булавка». Every player-facing lock string in
++`i18n/ru-RU/screens/lootTrade/screen.json` now says «заколки/заколка»: the
++counter, the out-of-pins title, the missing-item hint, «Another attempt» and
++the new arrows hint. `item_electronic_lockpicker` stays **«Электронная
++отмычка»** — a different item that is never counted as a bobby pin.
++
++### 2. Arrow area and the hint
++
++On desktop and phone the arrows were "crossed by lines, too close and
++unclear". `components/lootTrade/lockPickingStyles.js` now has a separate
++`arrowPad` filled slightly darker than the light card; the buttons are one step
++darker still, icons are larger (`30`), horizontal spacing grew from `8` to `16`
++and the two rows gained a gap. The window content is wrapped in `ScrollView`,
++so the long text no longer overlaps the board on a narrow screen. The exact
++owner-approved hint is rendered directly under the pin counter, with a paired
++English `lock.arrowsHint` string.
++
++### 3. A broken bobby pin leaves the inventory
++
++Previously a break only decremented `pinLedger` in room memory, so pins never
++ran out on the character sheet. Now every `brokenPins + 1` makes
++`server/roomRegistry.js` call `consumeBobbyPins()` from `server/lockPicking.js`:
++`quantity` is reduced (or the empty stack removed) in the published
++`room.lastSnapshots` sheet itself, keeping the name, mods, durability and all
++other fields per the 522 rule. The client mirrors the spend in the live store
++through the new `components/lootTrade/spendBobbyPins.js` (atomic
++`spendItemStacks`, a fallback for legacy snapshot shapes, `saveCharacter` and a
++re-publish to the room). `pinLedger` is diagnostic only; available pins are
++read from the current sheet, so there is no double deduction. The local board
++fallback (old servers without the protocol) follows the same rule. Newly bought
++pins arrive with a normal sheet publication and are visible to «Another
++attempt» immediately.
++
++### 4. A wrong «?» is red and stays visible
++
++`server/lockPicking.js` clears previous red cells before each press, so there
++is exactly one red «?» — the current mistake. On the press that breaks a pin
++this cell is no longer erased (at skill 0 the red mark used to disappear
++entirely). In the light theme `cellTextRed` is an explicit `#c1121f` and
++`cellRed` a pink fill with a red border.
++
++### Regressions and checks
++
++Laws 520–526 are intact: PER/Luck/LOCKPICK, four terminal attempts, unlimited
++explicit player attempts, no automatic restart after ACCESS GRANTED, the GM
++Yes/No only for terminals, the `shouldBlockLock()` hook for a future lock
++block, the 525 light palette and entry modal. Server protection (roles, message
++caps, validation, atomicity) was not weakened. Acceptance tests:
++`__tests__/room/lock-consumption-527.test.js`,
++`__tests__/lootTrade/lock-arrows-527.test.js`,
++`__tests__/lootTrade/spend-bobby-pins-527.test.js`. Historical 520/524/526
++tests were updated for the new consumption law and naming canon.
++
+ ## Player attempts and the Game Master's decision (patch 526)
+ 
+ The owner clarified the meaning of the 506 report: "That was a bug report.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a42d140..ace5e0f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,74 @@
+ # История изменений
+ 
+ ---
++## Заколки, стрелки и честное списание (патч 527)
++
++Четыре замечания владельца к мини-игре замка: русское имя предмета, вид блока
++стрелок на ПК/телефоне, списание сломанных заколок из инвентаря и красный «?»
++при ошибке.
++
++### 1. Русское название предмета — «Заколка»
++
++`item_bobby_pin` в `modules/fallout/i18n/ru-RU/data/equipment/general_goods.json`
++теперь называется ровно **«Заколка»** (было «Шпилька»). Не «отмычка», не
++«булавка». Все пользовательские строки замка в
++`i18n/ru-RU/screens/lootTrade/screen.json` переведены на «заколки/заколка»:
++счётчик, «Заколки закончились», подсказка про отсутствие предмета, «Ещё
++подход», новая подсказка про стрелки. `item_electronic_lockpicker` остаётся
++**«Электронная отмычка»** — это отдельный предмет, в число заколок он не
++входит. Исторические упоминания в примечаниях к версии испецификации
++приведены к тому же канону.
++
++### 2. Область стрелок и подсказка
++
++На компьютере и телефоне стрелки «пересекали линии, были слишком близко и
++непонятно». В `components/lootTrade/lockPickingStyles.js` появилась отдельная
++область `arrowPad` с заливкой чуть темнее светлой карточки; кнопки ещё на одну
++ступень темнее, иконки крупнее (`30`), горизонтальный шаг увеличен с `8` до
++`16`, между рядами добавлен отступ. Содержимое окна обёрнуто в `ScrollView`,
++поэтому длинный текст больше не накладывается на доску на узком экране.
++Непосредственно под счётчиком заколок выводится точный текст владельца:
++
++> Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.
++
++Парная английская строка лежит рядом, в `lock.arrowsHint`.
++
++### 3. Сломанная заколка уходит из инвентаря
++
++Раньше поломка уменьшала только `pinLedger` в памяти комнаты, поэтому в листе
++персонажа заколки «не кончались». Теперь при каждом `brokenPins + 1`
++`server/roomRegistry.js` вызывает `consumeBobbyPins()` из
++`server/lockPicking.js` и уменьшает `quantity` (или удаляет опустевшую стопку)
++в самом опубликованном снимке `room.lastSnapshots`, сохраняя имя, моды,
++прочность и прочие поля по закону 522. Клиент зеркально списывает заколку из
++живого стора через новый `components/lootTrade/spendBobbyPins.js`
++(атомарный `spendItemStacks`, резерв для легаси-форм снимка, `saveCharacter`
++и переопубликация листа в комнату). `pinLedger` остался диагностикой, а
++доступные заколки читаются только из текущего листа — двойного вычета нет.
++Локальный резерв доски (старый сервер без протокола) работает по тому же
++правилу. Купленные заколки приходят обычной публикацией листа и сразу видны
++«Ещё подход».
++
++### 4. Ошибочный «?» красный и не пропадает
++
++`server/lockPicking.js` перед каждым нажатием очищает прошлые красные ячейки,
++поэтому на доске ровно один красный «?» — текущая ошибка. На ходе, где
++заколка ломается, эта ячейка больше не стирается (раньше при навыке 0 красный
++не показывался вовсе). В светлой теме `cellTextRed` — явный `#c1121f`,
++`cellRed` — розовая заливка с красной рамкой.
++
++### Регрессии и проверки
++
++Законы 520–526 не тронуты: PER/Удача/LOCKPICK, четыре попытки терминала,
++сколько угодно явных подходов игрока, запрет автоматического рестарта после
++ACCESS GRANTED, «Да/Нет» Мастера только для терминала, задел
++`shouldBlockLock()` на будущую блокировку замков, светлая гамма и входная
++модалка 525. Защита сервера (роли, лимиты сообщений, валидация, атомарность)
++не ослаблялась. Приёмочные тесты: `__tests__/room/lock-consumption-527.test.js`,
++`__tests__/lootTrade/lock-arrows-527.test.js`,
++`__tests__/lootTrade/spend-bobby-pins-527.test.js`. Исторические тесты 520/524/526
++обновлены под новый закон списания и канон имени.
++
+ ## Подходы игрока и решение Мастера (патч 526)
+ 
+ Владелец уточнил смысл сообщения 506: «То было сообщение на баг. Когда после
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 49e14a0..7537e06 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -31,7 +31,7 @@
+   общий журнал `accessEvents` достаются без дублирования сетевого кода. Ядро —
+   `server/lockPicking.js`, окно — `components/lootTrade/LockPickingModal.js`
+   на каркасе `terminalHackingStyles.js`.
+-- **Отмычки между замками.** Потраченные отмычки ведутся счётчиком комнаты
++- **Заколки между замками.** Потраченные заколки ведутся счётчиком комнаты
+   `pinLedger` по персонажу: снимок приходит с полным инвентарём, и без вычета
+   каждый новый замок «находил» бы их заново. Счётчик в памяти комнаты, без
+   файлов и офлайн-очередей; списание в БД персонажа не производится.
+@@ -43,9 +43,9 @@
+ | # | Вопрос | Решение |
+ | --- | --- | --- |
+ | 1 | Как стрелка считается угаданной | **По позиции.** Сравниваем с текущей ячейкой: угадал → зелёная стрелка и ход в следующую; не угадал → красный `?`. Комбинация идёт слева направо. |
+-| 2 | Что такое «попытка» | **Одна отмычка в руке.** Берётся из инвентаря, живёт до поломки (выдерживает `S` провалов), после поломки берётся следующая. Навык 0…6 реально влияет на расход. |
++| 2 | Что такое «попытка» | **Одна заколка в руке.** Берётся из инвентаря, живёт до поломки (выдерживает `S` провалов), после поломки берётся следующая. Навык 0…6 реально влияет на расход. |
+ | 3 | Неверное нажатие | **Остаёмся в ячейке.** Позиция не сдвигается, красная ячейка не показывает, какую стрелку нажали; игрок давит дальше, пока не угадает. |
+-| 4 | Поломка отмычки | **Та же комбинация, стрелки видны серыми.** Угаданные ячейки остаются на доске, меняют цвет на серый, игрок повторяет последовательность заново. Информация не теряется: штраф — отмычка и клики. |
++| 4 | Поломка заколки | **Та же комбинация, стрелки видны серыми.** Угаданные ячейки остаются на доске, меняют цвет на серый, игрок повторяет последовательность заново. Информация не теряется: штраф — заколка и клики. |
+ | 5 | Атрибут числа ячеек | **Восприятие (PER)** — канонический атрибут навыка `LOCKPICK` в этом приложении (`SKILL_DEFAULT_ATTRIBUTE`). Не Ловкость и не Интеллект. |
+ | 6 | Видимость замка | **Скрыт у игроков, как терминал в паче 519.** Мастер видит карточку на сетке, игрок — только запертый сундук; нажатие на него открывает мини-игру замка. |
+ 
+@@ -88,42 +88,42 @@ D  ∈ [0, 5]  (Мастер создаёт 1…5; 0 приходит тольк
+ 
+ | Состояние | Вид | Как получается |
+ | --- | --- | --- |
+-| `hidden` | серый `?` | начало / после поломки отмычки |
++| `hidden` | серый `?` | начало / после поломки заколки |
+ | `green` | зелёная нужная стрелка | нажатая стрелка совпала с ответом текущей ячейки; курсор сдвигается |
+ | `red` | красный `?` | провал; курсор остаётся, нажатая стрелка интерфейсом не показывается |
+-| `grey` | серая стрелка (видна) | была зелёной, отмычка сломалась |
++| `grey` | серая стрелка (видна) | была зелёной, заколка сломалась |
+ 
+ Победа — все `N` ячеек зелёные. Тогда на комнату публикуется нейтральное
+ событие `hacked` (контракт пачей 516–517), узел локации снимает `locked`,
+ добыча становится доступна. Успех **не сбрасывается**, одна победа на
+ `accessId`.
+ 
+-## 4. Отмычки
++## 4. Заколки
+ 
+-Счётчик в строке «**Отмычки: n шт**» берётся из инвентаря **оператора**
++Счётчик в строке «**Заколки: n шт**» берётся из инвентаря **оператора**
+ (предмет `item_bobby_pin`). Сервер держит счётчик в памяти комнаты и списывает
+-атомарно, как `storage.transfer`; клиент сам отмычки не изобретает.
++атомарно, как `storage.transfer`; клиент сам заколки не изобретает.
+ 
+-- Одна отмычка «в руке» берётся в момент начала попытки и **не возвращается**
++- Одна заколка «в руке» берётся в момент начала попытки и **не возвращается**
+   ни при победе, ни при закрытии модалки.
+-- Отмычка выдерживает `S` провалов, где `S` — ранг навыка `LOCKPICK`, кламп
++- Заколка выдерживает `S` провалов, где `S` — ранг навыка `LOCKPICK`, кламп
+   `0…6`. Ломается на `(S+1)`-м провале: при `S=0` — на каждом провале,
+   при `S=6` — на седьмом.
+-- В момент, когда отмычка **должна** сломаться, кидается Удача:
++- В момент, когда заколка **должна** сломаться, кидается Удача:
+ 
+ ```
+ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удаче 10
+ ```
+ 
+   Та же кривая, что уже работает в `server/terminalHacking.js:104`.
+-  Спас-бросок **не сбрасывает** счётчик провалов: отмычка переживает этот
++  Спас-бросок **не сбрасывает** счётчик провалов: заколка переживает этот
+   конкретный момент, следующий провал снова кидает шанс. Ожидаемая жизнь
+-  отмычки `S + 1/(1−p)` провалов.
++  заколки `S + 1/(1−p)` провалов.
+ - При поломке: все зелёные ячейки → `grey` (стрелки видны), курсор
+   возвращается на первую ячейку, комбинация **не перегенерируется**, игрок
+   повторяет последовательность; правильные нажатия снова красят в зелёный.
+-  Берётся следующая отмычка из инвентаря.
+-- `n = 0` → кнопка взлома недоступна с подсказкой «Нет отмычек»; Мастер
++  Берётся следующая заколка из инвентаря.
++- `n = 0` → кнопка взлома недоступна с подсказкой «Нет заколок»; Мастер
+   по-прежнему может открыть доступ вручную. Отрицательного счётчика нет.
+ 
+ ### Сложность 0
+@@ -139,8 +139,8 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ 
+ - Один оператор, остальные участники **только смотрят**.
+ - Один взлом на `accessId`; повтор без одобрения Мастера запрещён.
+-- Провал = «отмычки кончились» → запрос Мастеру **Да/Нет**; «Да» даёт свежую
+-  доску с той же конфигурацией и текущим счётчиком отмычек, «Нет» — бейдж
++- Провал = «заколки кончились» → запрос Мастеру **Да/Нет**; «Да» даёт свежую
++  доску с той же конфигурацией и текущим счётчиком заколок, «Нет» — бейдж
+   «Закрыто» до новой трансляции. Уведомление Мастеру работает и в общем UI,
+   и в нескольких вкладках.
+ - Успех не сбрасывает состояние; «Покинуть локацию» сессию Мастера не убивает.
+@@ -164,7 +164,7 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ 
+ При позиционном переборе с четырёх стрелок и «красный `?` без подсказки»:
+ если игрок помнит свои нажатия — **≈1,5 провала на ячейку**; если полагается
+-только на интерфейс — **≈3 провала на ячейку**. Расход отмычек
++только на интерфейс — **≈3 провала на ячейку**. Расход заколок
+ `≈ провалы / (S + 1/(1−p))`:
+ 
+ | Замок | S=0, LCK 4 (помнит / не помнит) | S=3, LCK 4 | S=6, LCK 10 |
+@@ -173,16 +173,16 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ | D1, PER 4 (10) | 14 / 28 | 4–7 | 2–3 |
+ | D5, PER 4 (18) | **26 / 51** | 7–13 | 4–8 |
+ 
+-Вывод: **механика не разбалансирована**. 20% Удачи экономят ~16% отмычек —
++Вывод: **механика не разбалансирована**. 20% Удачи экономят ~16% заколок —
+ это слабый, но честный бонус. Основной рычаг — навык `LOCKPICK` (0→6 даёт
+ ≈7× разницы), второй — `PER` (4 вместо 10 = +6 ячеек = как +3 уровня
+-сложности). Жёсткая стена в 26–51 отмычку существует **только** у персонажа
++сложности). Жёсткая стена в 26–51 заколку существует **только** у персонажа
+ с `S=0…1` на `D5/PER4`, то есть у неумёхи на мастер-замке — это осмысленная
+ отсечка, а не баг. Предохранители:
+ 
+-1. В форме Мастера показывать оценку «замок съест ориентировочно N отмычек
++1. В форме Мастера показывать оценку «замок съест ориентировочно N заколок
+    при навыке 0» — чтобы ГМ не выдавал такой замок новичкам не глядя.
+-2. Явное состояние «отмычки кончились» с «Да/Нет» Мастера, а не молчаливый
++2. Явное состояние «заколки кончились» с «Да/Нет» Мастера, а не молчаливый
+    тупик.
+ 3. D0 даёт минимум 2 ячейки и остаётся наградой за журнал/перк, а не чипом.
+ 
+@@ -190,14 +190,15 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ 
+ Меняются одним словом владельца, в код зашиваются константами:
+ 
+-- Считается только `item_bobby_pin`; `item_electronic_lockpicker` в счёт не
+-  идёт. Подпись «Отмычки: n шт» остаётся, хотя в RU-инвентаре предмет
+-  называется «Шпилька», а в журналах «невидимка».
++- Считается только `item_bobby_pin`; `item_electronic_lockpicker`
++  («Электронная отмычка») в счёт не идёт. С патча 527 русское имя предмета —
++  ровно «Заколка», подпись «Заколки: n шт»; слова «шпилька», «булавка» и
++  «отмычка» для этого предмета не употребляются.
+ - Порог двух рядов — `N > 8`.
+ - Скидки сложности берутся из уже перечисленных в снимке перков/журналов;
+   точный список источников фиксируется при реализации (минимум —
+   `mag_tumblers_today_02`, аналог `hackerRank`).
+-- Отмычка, взятая в руку, не возвращается в инвентарь при победе.
++- Заколка, взятая в руку, не возвращается в инвентарь при победе.
+ - Иконка карточки выбирается из трёх названных владельцем вариантов перед
+   сборкой пача.
+ 
+@@ -221,9 +222,9 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+   ответы сервера не считаются ошибкой и не показывают «Действие не
+   выполнено»; при `SESSION_FORBIDDEN` клиент один раз публикует лист
+   персонажа и повторяет действие.
+-- **Отмычки ищутся по всем формам инвентаря.** Канон в
++- **Заколки ищутся по всем формам инвентаря.** Канон в
+   `server/lockPicking.js` читает `itemId`/`catalogId`/`weaponId`/`code`/
+-  `id`, ключ записи словаря и вложенный снимок. Если отмычек нет вовсе —
++  `id`, ключ записи словаря и вложенный снимок. Если заколок нет вовсе —
+   понятная подсказка и «Да/Нет» Мастера, а не пустая доска.
+ - **Автоматический локальный резерв** (`localLockGame.js`) включается, когда
+   сервер комнаты не знает `terminal.action`, — как у терминала с пача 498.
+@@ -235,14 +236,14 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ - **Сначала модалка точки.** Отдельно выданный замок (и терминал) открывает
+   `StandaloneCheckModal`: карточка точки, сложность, «Смотреть» и «Взломать»,
+   без «Покинуть локацию». Мини-игра не монтируется до нажатия.
+-- **Доска сразу готова.** «Взломать» передаёт `autoStart`; ячейки, отмычки и
++- **Доска сразу готова.** «Взломать» передаёт `autoStart`; ячейки, заколки и
+   стрелки приходят собранными. Внутри окна доски нет второй кнопки «Взломать» и нет
+   пустой «как бы запущенной» раскладки — до партии показывается подсказка
+   `player.checkWaitingBoard`.
+ - **Светлая палитра.** Общий модуль `lockPickingStyles.js` переиспользует
+   `lootTradeFormStyles` и `ADMIN_MODAL_PALETTE`: светлая карточка, тёмный
+   текст, светлые ячейки/стрелки. Терминал не перекрашивался.
+-- **Регрессии.** PER/отмычки/«Да-Нет» из 520, один `start`, поиск отмычек и
++- **Регрессии.** PER/заколки/«Да-Нет» из 520, один `start`, поиск заколок и
+   локальный резерв из 524, а также одноразовый доступ на трансляцию — без
+   изменений.
+ 
+@@ -250,12 +251,12 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ 
+ - **«Билет» на один взлом убран.** Баг 506 был про АВТОМАТИЧЕСКИЙ
+   перезапуск доски после ACCESS GRANTED, а не про право игрока на новые
+-  подходы. Игрок может закрыть окно, купить отмычки, прокачать PER/LOCKPICK,
++  подходы. Игрок может закрыть окно, купить заколки, прокачать PER/LOCKPICK,
+   вернуться и начать новый подход — сколько угодно раз, но только явным
+   нажатием «Взломать»/«Ещё подход».
+ - **Явный `newAttempt`.** Свежая доска собирается по текущему
+-  опубликованному листу: новые отмычки, новая сложность, новое число ячеек.
+-  `pinLedger` не возвращает потраченные отмычки, событие `hacked` не
++  опубликованному листу: новые заколки, новая сложность, новое число ячеек.
++  `pinLedger` не возвращает потраченные заколки, событие `hacked` не
+   отзывается, `accessId` не меняется. `start` по-прежнему не пересобирает
+   доску в `won`/`playing`, поэтому автоматический рестарт невозможен.
+ - **Замки пока не блокируются.** `awaitingRetry` у замка означает «подход
+@@ -266,3 +267,50 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ - **Терминал сохраняет 504/505.** После провала «заблокировано» и вопрос
+   Мастеру; «Да» запускает новую конфигурацию, «Нет» закрывает до повторной
+   трансляции. `newAttempt` для терминала запрещён.
++
++
++## 13. Уточнение 527: терминология, стрелки и реальное списание заколок
++
++Канон названия. `item_bobby_pin` по-русски — **«Заколка»** (ровно это слово);
++замок просит «заколки», все строки `i18n/ru-RU/screens/lootTrade/screen.json`
++говорят «заколки/заколка». «Шпилька», «булавка» и «отмычка» к этому предмету
++не относятся. `item_electronic_lockpicker` остаётся **«Электронная отмычка»** —
++это другой предмет, он по-прежнему не считается заколкой. Ранние разделы этой
++спецификации (1–12) исторически употребляли слово «отмычки» именно про
++`item_bobby_pin`; выше оно приведено к канону 527.
++
++Списание из инвентаря (главное отличие от 520/526). `pinLedger` больше не
++источник доступных заколок, а только диагностический счётчик сломанных:
++доска всегда собирается по ТЕКУЩЕМУ опубликованному снимку листа. При каждом
++`brokenPins + 1` сервер вызывает `consumeBobbyPins()` и уменьшает `quantity`
++(или удаляет опустевшую стопку) прямо в `room.lastSnapshots`, сохраняя все
++прочие поля предмета по правилу 522. Клиент зеркально вызывает
++`components/lootTrade/spendBobbyPins.js`: атомарный `spendItemStacks()`, резерв
++для легаси-сейвов через тот же серверный канон, затем `saveCharacter()` и
++переопубликация листа в комнату. Двойного вычета нет — `spentPins` при сборке
++доски всегда `0`. Купленные заколки появляются обычной публикацией листа и
++сразу видны новому подходу.
++
++Красная ошибка. Перед каждым нажатием прошлые `red`-ячейки очищаются, поэтому
++на доске ровно один красный «?» — текущая ошибка. На ходу, где заколка
++ломается, эта ячейка НЕ стирается: игрок видит и красный «?», и серые угаданные
++стрелки. `cellTextRed` — явный `#c1121f`, `cellRed` — розовая заливка с красной
++рамкой.
++
++Область стрелок. Светлый каркас из 525 (`lootTradeFormStyles` +
++`ADMIN_MODAL_PALETTE`) сохранён. Добавлена отдельная область `arrowPad` с
++заливкой `surfaceMuted` — чуть темнее карточки `surface`; сами кнопки ещё чуть
++темнее (`#dadada`), иконки крупнее (`30`), горизонтальный шаг `16` вместо `8`,
++между рядами `10`. Содержимое окна обёрнуто в `ScrollView`: длинная подсказка
++больше не «пересекает» стрелки на телефоне. Непосредственно под счётчиком
++`lock.pins` выводится точный текст владельца (парная строка `lock.arrowsHint`
++в RU/EN):
++
++> Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.
++
++Регрессии. Законы 520–526 не меняются: PER/Удача/LOCKPICK, четыре попытки
++терминала, явные подходы игрока без «билета», запрет автоматического рестарта
++после ACCESS GRANTED, «Да/Нет» Мастера только для терминала, задел
++`shouldBlockLock()` для будущей блокировки замков, светлая гамма и двухшаговый
++вход 525. Защита сервера (роли, размеры сообщений, валидация, атомарность)
++не ослаблялась.
+diff --git a/docs/patch-527-install.md b/docs/patch-527-install.md
+new file mode 100644
+index 0000000..a527924
+--- /dev/null
++++ b/docs/patch-527-install.md
+@@ -0,0 +1,116 @@
++# Установка патча 527: заколки, стрелки и честное списание
++
++Патч подготовлен от состояния **версии 526** (коммит `4f8982a`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–527
++цепочкой. Файл установки: `patchs/527-bobby-pins-ui.patch`.
++
++Четыре замечания владельца к мини-игре замка: (1) русское имя
++`item_bobby_pin` — «Заколка», а не «шпилька» / «отмычка» / «булавка»;
++(2) на ПК и телефоне стрелки пересекают линии, слишком близко и непонятно,
++нужна чуть более тёмная залитая область, более выраженные стрелки, чуть
++большее расстояние и точная подсказка под счётчиком; (3) потраченные /
++сломанные заколки должны исчезать из инвентаря, а не только из памяти
++комнаты; (4) при ошибке знак `?` не красный.
++
++## Что изменено
++
++### 1. Терминология
++
++- `modules/fallout/i18n/ru-RU/data/equipment/general_goods.json`:
++  `item_bobby_pin.name` = **«Заколка»** (было «Шпилька»).
++- `i18n/ru-RU/screens/lootTrade/screen.json`: все строки замка говорят
++  «заколки/заколка» (`pins`, `noPins`, `noPinsHint`, `newAttemptHint`,
++  `arrowsHint`). `i18n/en-EN/screens/lootTrade/screen.json` — парные строки.
++- `item_electronic_lockpicker` остаётся **«Электронная отмычка»**: это другой
++  предмет, он не считается заколкой и в мини-игре не участвует.
++- Исторические примечания `public/version.json` и спецификация
++  `docs/lockpicking-mini-game-design.md` приведены к тому же канону; раздел 13
++  спецификации явно оговаривает, что слова «шпилька», «булавка», «отмычка»
++  к `item_bobby_pin` не относятся.
++
++### 2. Область стрелок и подсказка
++
++- `components/lootTrade/lockPickingStyles.js`: новый `arrowPad` (заливка
++  `ADMIN_MODAL_PALETTE.surfaceMuted` — чуть темнее карточки `surface`),
++  кнопки `arrowButton` ещё на ступень темнее (`#dadada`), иконки `30`,
++  `crossRow.gap = 16` вместо `8`, между рядами `marginVertical: 5`.
++  `cellRed` / `cellTextRed` дают явный красный `#c1121f`.
++- `components/lootTrade/LockPickingModal.js`: содержимое окна обёрнуто в
++  `ScrollView` (на телефоне текст больше не накладывается на доску), под
++  счётчиком `lock.pins` выведен `testID="lock-arrows-hint"` с точным текстом
++  владельца, блок стрелок помечен `testID="lock-arrow-pad"`, иконки крупнее.
++- Точный RU-текст (EN-пара `lock.arrowsHint`):
++
++  > Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.
++
++- `docs/ui-modals-rules.md`: правило «не изобретать новый каркас, брать
++  ближайший» дополнено уточнением 527 (вложенная залитая область, а не новая
++  модалка).
++
++### 3. Сломанная заколка уходит из инвентаря
++
++- `server/lockPicking.js`: экспортируется `consumeBobbyPins(snapshot, count)`.
++  Он клонирует снимок, находит заколки во всех формах (`items`,
++  `equipment.items`, `inventory`, `bag`, обёртка `data`, вложенные
++  `item`/`snapshot`/`data`), уменьшает `quantity`/`count`/`qty`/`amount` или
++  удаляет опустевшую стопку, дедуплицирует один экземпляр по `instanceId` и
++  не трогает остальные поля предмета (закон 522). Исходный снимок не мутируется.
++- `server/roomRegistry.js`: при каждом росте `brokenPins` вызывается
++  `consumeBobbyPins()` для `published.snapshot`, обновлённый лист кладётся в
++  `room.lastSnapshots` и в `entry.operatorSnapshot`, затем рассылается обычным
++  состоянием комнаты. `pinLedger` остаётся только диагностикой; при сборке
++  доски `spentPins` теперь всегда `0`, поэтому двойного вычета нет.
++- `components/lootTrade/spendBobbyPins.js` (новый): клиент зеркально списывает
++  дельту из живого `useCharacterStore` через атомарный `spendItemStacks`, с
++  резервом для легаси-сейвов через тот же серверный канон, затем
++  `saveCharacter()` и `pushSavedCharacterToBoundRoomIfAny()`. Работает и в
++  локальном резерве доски.
++- `components/lootTrade/localLockGame.js`: `spentPins: 0` при сборке доски —
++  заколки читаются из уже обновлённого листа, а не из счётчика.
++- `components/lootTrade/LockPickingModal.js`: эффект на дельту `brokenPins`
++  вызывает списание только у оператора доски; первое наблюдение за уже
++  начатой партией лишь запоминает базу, чтобы перезагрузка страницы не
++  списала заколки повторно.
++
++### 4. Красный «?»
++
++- `server/lockPicking.js`: перед каждым нажатием прежние `red`-ячейки
++  очищаются (ровно одна красная ошибка), а на ходе с поломкой заколки текущая
++  красная ячейка **сохраняется** — раньше при навыке 0 красный «?» стирался
++  сразу и игрок не видел ошибку.
++- `components/lootTrade/lockPickingStyles.js`: `cellTextRed` — `#c1121f`,
++  жирный и крупнее обычного знака; `cellRed` — розовая заливка с красной
++  рамкой.
++
++## Что сохранено
++
++- Защита сервера: лимиты сообщений, проверки роли/владельца/членства,
++  валидация JSON, целые положительные количества, атомарность переносов.
++- Законы 520–526: PER/Удача/LOCKPICK, четыре попытки терминала, сколько
++  угодно ЯВНЫХ подходов игрока, запрет автоматического рестарта после ACCESS
++  GRANTED, «Да/Нет» Мастера только для терминала, `shouldBlockLock()` как задел
++  под будущую блокировку замков, входная модалка и светлая гамма 525,
++  «Покинуть локацию» в настоящей локации.
++- Законы 522 (единый предмет, без игровых лимитов, поля не обрезаются) и 523
++  (граф, граница видимости, адресный взлом, общие ресурсы).
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор: 255 файлов,
++  2302 теста).
++- `git apply --check patchs/527-bobby-pins-ui.patch` от дерева 526.
++- `./apply-patch.sh 527` от версии 526 и полная цепочка 493–527 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Приёмочные тесты: `__tests__/room/lock-consumption-527.test.js` (ядро
++  списания, снимок комнаты, красная ячейка, точная подсказка, канон имени),
++  `__tests__/lootTrade/lock-arrows-527.test.js` (рендер подсказки, заливка
++  области, красный «?», вызов списания по дельте),
++  `__tests__/lootTrade/spend-bobby-pins-527.test.js` (живой стор, сохранение и
++  переопубликация листа, легаси-формы).
++- Исторические тесты 520 / 524 / 526 обновлены под новый закон: заколки не
++  «возрождаются» потому, что их нет в обновлённом листе, а не потому, что
++  `pinLedger` вычитает их повторно; красная ячейка на поломке остаётся красной.
++- Живой сервер комнат: `/version.json` = 527/4/101+101 и WS-проба.
++- После установки на боевой площадке перезапустить процесс сервера комнат,
++  чтобы подхватить обновлённые файлы `server/`.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index d3b34b4..d876fa9 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **526**.
++Дата ревизии: 2026-11-04. Текущая версия: **527**.
+ 
+ ## Тезисы
+ 
+@@ -28,12 +28,14 @@
+ | 14 | Исправление взлома замка: одна доска на нажатие, отмычки из любого инвентаря, локальный резерв старого сервера, понятные отказы; окно локации не перекрывает мини-игру, «Покинуть локацию» работает сразу | ✅ сделано | **524** |
+ | 15 | Двухшаговый вход в мини-игру: сначала модалка точки по образцу локации с «Взломать»/«Смотреть» и без «Покинуть локацию», доска монтируется уже готовой; светлая гамма взлома замка из палитры модалок | ✅ сделано | **525** |
+ | 16 | Подходы игрока без «билета»: сколько угодно явных попыток по своему усмотрению (купил отмычки / прокачался), без автоматического рестарта после победы; терминал после блокировки — по решению Мастера, замки пока не блокируются с заделом под будущее условие | ✅ сделано | **526** |
++| 17 | Исправление мини-игры замка: русское имя предмета «Заколка» (не шпилька/отмычка/булавка), затемнённая область стрелок с крупными разведёнными стрелками и точной подсказкой под счётчиком, списание сломанных заколок из настоящего инвентаря, красный «?» при ошибке | ✅ сделано | **527** |
+ 
+-## Осталось после патча 526
++## Осталось после патча 527
+ 
+-Патчи 524–526 закрыли сбой мини-игры замка, окна локации, входа в игру и
+-правило подходов, не меняя порядок тринадцатого тезиса: граф, граница
+-видимости, адресный взлом, общие ресурсы и одна сессия из 523 остаются
++Патчи 524–527 закрыли сбой мини-игры замка, окна локации, входа в игру,
++правило подходов, а также терминологию, вид стрелок, списание заколок из
++инвентаря и красную ошибку — не меняя порядок тринадцатого тезиса: граф,
++граница видимости, адресный взлом, общие ресурсы и одна сессия из 523 остаются
+ регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+@@ -145,6 +147,7 @@
+ - `docs/patch-524-install.md` — установка исправления 524 и его проверки.
+ - `docs/patch-525-install.md` — установка обновления 525 и его проверки.
+ - `docs/patch-526-install.md` — установка обновления 526 и его проверки.
++- `docs/patch-527-install.md` — установка исправления 527 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/docs/ui-modals-rules.md b/docs/ui-modals-rules.md
+index b0b39c7..71291e4 100644
+--- a/docs/ui-modals-rules.md
++++ b/docs/ui-modals-rules.md
+@@ -97,3 +97,16 @@
+ `terminalHackingStyles` остаётся только у терминала. Входная модалка по
+ структуре повторяет окно локации (карточка точки + «Смотреть»/«Взломать»), но
+ не содержит «Покинуть локацию»: отдельная точка проверки не является локацией.
++
++## Уточнение 527: область стрелок и подсказка под счётчиком
++
++На ПК и телефоне «стрелки пересекали линии, были слишком близко и непонятно».
++Каркас карточки из 525 не переделывался: добавилась только вложенная область
++`arrowPad` с заливкой `ADMIN_MODAL_PALETTE.surfaceMuted` (чуть темнее
++`card.surface`), кнопки `arrowButton` ещё на одну ступень темнее, иконки
++крупнее, шаг `crossRow.gap` увеличен, между рядами добавлен отступ. Содержимое
++окна обёрнуто в `ScrollView` — длинная подсказка под счётчиком заколок больше
++не накладывается на доску и стрелки на узком экране. Подсказка — точный текст
++владельца, парная строка `lock.arrowsHint` в RU/EN; новый текста в коде не
++выдумываем. Ошибочная ячейка использует явный красный `cellTextRed` и розовую
++`cellRed`; зелёная/серая гамма 525 сохранена.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 6f2deee..2b1dd8b 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -394,6 +394,7 @@
+     "arrowLeft": "Left",
+     "arrowUp": "Up",
+     "arrowRight": "Right",
+-    "arrowDown": "Down"
++    "arrowDown": "Down",
++    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, you have to start the lockpicking over."
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index cc41e71..1439124 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -43,7 +43,8 @@
+     "lockKind": "замок",
+     "terminalKindLabel": "Терминал ур. {difficulty}",
+     "lockKindLabel": "Замок ур. {difficulty}",
+-    "gateOr": "или"
++    "gateOr": "или",
++    "lockPinEstimate": "Ориентировочно {count} заколок при навыке 0"
+   },
+   "form": {
+     "createLootTitle": "Новый контейнер добычи",
+@@ -361,16 +362,16 @@
+   },
+   "lock": {
+     "title": "Взлом замка",
+-    "pins": "Отмычки: {count} шт",
+-    "noPins": "Отмычки закончились",
++    "pins": "Заколки: {count} шт",
++    "noPins": "Заколки закончились",
+     "skill": "Навык {skill} · Восприятие {per} · Удача {luck}",
+     "difficulty": "Сложность {difficulty} · {count} ячеек",
+     "view": "Смотреть",
+     "hack": "Взломать",
+     "close": "Закрыть",
+     "won": "ДОСТУП РАЗРЕШЁН",
+-    "pinBroken": "Отмычка сломалась",
+-    "pinHeld": "Отмычка уцелела",
++    "pinBroken": "Заколка сломалась",
++    "pinHeld": "Заколка уцелела",
+     "wrong": "Не подходит",
+     "awaiting": "Ожидание решения Мастера",
+     "closed": "Замок закрыт",
+@@ -382,11 +383,11 @@
+     "actionFailed": "Действие не выполнено",
+     "newAttempt": "Ещё подход",
+     "approachFinished": "Подход завершён",
+-    "newAttemptHint": "Начните новый подход, когда купите отмычки или улучшите характеристики.",
+-    "stateOutOfPins": "Нет отмычек",
++    "newAttemptHint": "Начните новый подход, когда купите заколки или улучшите характеристики.",
++    "stateOutOfPins": "Нет заколок",
+     "hackedTitle": "Замок взломан",
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Игрок может начать новый подход сам.",
+-    "noPinsHint": "В инвентаре персонажа нет отмычек: добавьте предмет «Отмычка» и обновите лист в комнате.",
++    "noPinsHint": "В инвентаре персонажа нет заколок: добавьте предмет «Заколка» и обновите лист в комнате.",
+     "sessionNotPublished": "Лист персонажа ещё не передан в комнату. Откройте персонажа и повторите взлом.",
+     "ready": "Замок готов к взлому",
+     "progress": "Отгадано {done} из {total}",
+@@ -394,6 +395,7 @@
+     "arrowLeft": "Влево",
+     "arrowUp": "Вверх",
+     "arrowRight": "Вправо",
+-    "arrowDown": "Вниз"
++    "arrowDown": "Вниз",
++    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала."
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json b/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
+index 5fcb355..63ac62c 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
+@@ -1,7 +1,7 @@
+ [
+   {
+     "id": "item_bobby_pin",
+-    "name": "Шпилька",
++    "name": "Заколка",
+     "effectLabel": "Помогает при взломе замков"
+   },
+   {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6e1f911..a218dbf 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "526"
++  "baseline": "527"
+ }
+diff --git a/public/version.json b/public/version.json
+index 23a8357..84dc87b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,20 +1,24 @@
+ {
+-  "version": "526",
++  "version": "527",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+-      "Теперь игрок сам решает, сколько раз подходить к терминалу или замку: закрыл окно, купил новые отмычки или прокачал восприятие — вернулся и начал новый подход.",
++      "Предмет для взлома по-русски теперь называется «Заколка» — не «шпилька», не «отмычка» и не «булавка». «Электронная отмычка» осталась отдельным предметом, а все подписи замка говорят про заколки.",
++      "Область стрелок на компьютере и телефоне стала чуть темнее окна: стрелки крупнее и расставлены шире, линии их больше не пересекают. Под счётчиком заколок появилась точная подсказка про зелёный, красный и поломку заколки.",
++      "Сломанная заколка теперь действительно исчезает из инвентаря персонажа: и из локального листа игрока, и из опубликованного снимка в комнате Мастера, а не только из счётчика мини-игры.",
++      "Ошибочный знак «?» теперь явно красный и остаётся видимым даже на том нажатии, где сломалась заколка.",
++      "Теперь игрок сам решает, сколько раз подходить к терминалу или замку: закрыл окно, купил новые заколки или прокачал восприятие — вернулся и начал новый подход.",
+       "Терминал после провала по-прежнему ждёт решения Мастера «Да/Нет»; замки пока не блокируются. После победы игра больше не запускается сама.",
+       "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
+       "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
+-      "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
++      "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, заколки находятся в инвентаре, ячейки и стрелки сразу доступны.",
+       "Окно локации больше не выглядывает из-под мини-игры: «Покинуть локацию» работает с первого нажатия, а отдельно выданный замок открывается сразу своей мини-игрой без лишней кнопки выхода.",
+       "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
+       "У Мастера появилась кнопка «Заблокировать всё» на любом узле с вложенными точками, а взлом стал адресным: открывается только та точка, которую взломали, без цепочки.",
+       "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
+       "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
+       "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
+-      "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
++      "Добавлена мини-игра взлома замков: заколки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
+       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
+       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
+       "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
+@@ -102,6 +106,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The Russian name of the lockpicking item is now exactly «Заколка» — not «шпилька», «отмычка» or «булавка». The Electronic Lockpick remains a separate item, and every lock label now says «заколки».",
++      "The arrow area is slightly darker than the window on desktop and phone: arrows are bolder and more widely spaced, no lines crossing them. An exact hint under the pin counter explains green, red and a broken bobby pin.",
++      "A broken bobby pin now really leaves the character's inventory — both the local player sheet and the published snapshot in the Game Master's room — instead of only decrementing the mini-game counter.",
++      "A wrong «?» is now clearly red and stays visible even on the press that breaks a bobby pin.",
+       "Players now decide how many attempts to make at a terminal or lock: close the window, buy new bobby pins or improve Perception, then come back and start another attempt.",
+       "A terminal still waits for the Game Master's Yes/No after a failure; locks are not blocked for now. A successful hack no longer restarts itself.",
+       "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index 88abf49..bdaf9d5 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -4,7 +4,7 @@
+  * Патч 520: мини-игра взлома замков. Чистое ядро без сетевого состояния —
+  * комната держит доску в общем реестре состояний проверок (terminalStates).
+  * Патч 526: «один взлом на трансляцию» убран — игрок сам решает, когда
+- * начать новый подход (купил отмычки, прокачал PER/LOCKPICK). Замки пока
++ * начать новый подход (купил заколки, прокачал PER/LOCKPICK). Замки пока
+  * НЕ блокируются: shouldBlockLock() — единственная точка, куда владелец
+  * позже добавит своё условие блокировки. Терминал сохраняет блокировку
+  * после провала и решение Мастера «Да/Нет».
+@@ -12,8 +12,8 @@
+  * Правила: docs/lockpicking-mini-game-design.md. Коротко:
+  *   N = 12 − PER + 2·D ячеек, PER 4…10, D 0…5 (D=0 только понижением);
+  *   угадывание по позиции, четыре стрелки; провал остаётся в ячейке;
+- *   одна отмычка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
+- *   в момент поломки Удача 4…10 даёт 5…20% спасти отмычку;
++ *   одна заколка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
++ *   в момент поломки Удача 4…10 даёт 5…20% спасти заколку;
+  *   при поломке комбинация та же, зелёные стрелки сереют и остаются видны;
+  *   победа любого источника открывает точку через общее событие `hacked`.
+  */
+@@ -141,11 +141,11 @@ const findNamed = (entries, aliases) => {
+   return found ? toNumber(found) : 0;
+ };
+ 
+-// Патч 524: отмычки в живом инвентаре могут лежать и в словаре items (ключ —
++// Патч 524: заколки в живом инвентаре могут лежать и в словаре items (ключ —
+ // id экземпляра), и в массиве equipment.items, и в обёртке itemSnapshot. Канон
+ // каталога при этом живёт в разных полях: itemId / catalogId / weaponId / code
+ // / id, а старые сейвы оставляют только ключ записи. Проверяем все формы и
+-// считаем каждый экземпляр один раз — иначе доска стартовала с «0 отмычек».
++// считаем каждый экземпляр один раз — иначе доска стартовала с «0 заколок».
+ const PIN_ID_FIELDS = Object.freeze([
+   'itemId', 'catalogId', 'weaponId', 'code', 'id', 'key', 'Name',
+ ]);
+@@ -155,6 +155,22 @@ const PIN_BUCKETS = (source) => [
+   source.inventory,
+   source.bag,
+ ];
++const PIN_QUANTITY_FIELDS = Object.freeze(['quantity', 'count', 'qty', 'amount']);
++const quantityFieldOf = (item) => PIN_QUANTITY_FIELDS.find(
++  (field) => item && Object.prototype.hasOwnProperty.call(item, field),
++) || 'quantity';
++// Патч 527: старые сейвы прячут предмет в item/snapshot/data. Списывать
++// quantity надо именно там, где он живёт, иначе «списанная» заколка останется
++// в инвентаре в неизменной вложенной записи.
++const quantityHolderOf = (item) => {
++  for (const candidate of [item, item?.item, item?.snapshot, item?.data]) {
++    if (!candidate || typeof candidate !== 'object') continue;
++    if (PIN_QUANTITY_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(candidate, field))) {
++      return candidate;
++    }
++  }
++  return item && typeof item === 'object' ? item : null;
++};
+ 
+ const candidatePinIds = (key, item) => {
+   const ids = [String(key || '').trim()];
+@@ -171,9 +187,9 @@ const candidatePinIds = (key, item) => {
+ };
+ 
+ const pinQuantity = (item) => {
+-  const raw = item?.quantity ?? item?.count ?? item?.qty ?? item?.amount
+-    ?? item?.item?.quantity ?? item?.snapshot?.quantity ?? 1;
+-  const parsed = Number(String(raw).replace(/\s+/g, '').replace(',', '.'));
++  const holder = quantityHolderOf(item);
++  const raw = holder ? holder[quantityFieldOf(holder)] : 1;
++  const parsed = Number(String(raw ?? 1).replace(/\s+/g, '').replace(',', '.'));
+   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 1;
+ };
+ 
+@@ -233,6 +249,80 @@ const lockStats = (snapshot) => {
+   };
+ };
+ 
++/**
++ * Патч 527: сломанные заколки ДОЛЖНЫ исчезать из инвентаря. Сервер держит
++ * последний опубликованный снимок листа — он и есть источник истины для
++ * числа заколок в мини-игре. При поломке уменьшаем quantity в самом снимке,
++ * сохраняя все остальные поля предмета (правило 522: поля не обрезаются).
++ * Клиент зеркально списывает заколку из локального инвентаря и сохраняет лист.
++ * Возвращает НОВЫЙ снимок — исходный не мутируется.
++ */
++const consumeBobbyPins = (snapshot, count = 1) => {
++  const need = Math.max(0, Math.floor(Number(count) || 0));
++  let clone;
++  try {
++    clone = JSON.parse(JSON.stringify(snapshot || {}));
++  } catch {
++    return { snapshot, consumed: 0 };
++  }
++  if (!need) return { snapshot: clone, consumed: 0 };
++  let remaining = need;
++  const roots = [clone, clone.data && typeof clone.data === 'object' ? clone.data : null]
++    .filter(Boolean);
++  const seen = new Set();
++  for (const root of roots) {
++    for (const path of [['items'], ['equipment', 'items'], ['inventory'], ['bag']]) {
++      let parent = root;
++      for (let i = 0; i < path.length - 1; i += 1) parent = parent?.[path[i]];
++      if (!parent || typeof parent !== 'object') continue;
++      const key = path[path.length - 1];
++      const bucket = parent[key];
++      if (!bucket || typeof bucket !== 'object') continue;
++      const isArray = Array.isArray(bucket);
++      const entries = isArray
++        ? bucket.map((item, idx) => [String(idx), item])
++        : Object.entries(bucket);
++      const nextArray = [];
++      const nextObject = { ...bucket };
++      for (const [entryKey, value] of entries) {
++        if (!value || typeof value !== 'object') {
++          if (isArray) nextArray.push(value);
++          continue;
++        }
++        const isPin = candidatePinIds(entryKey, value).includes('item_bobby_pin');
++        if (!isPin || remaining <= 0) {
++          if (isArray) nextArray.push(value);
++          continue;
++        }
++        // Один экземпляр мог быть продублирован в items и equipment.items.
++        const instance = String(value.instanceId ?? value.uniqueId ?? value.key ?? '');
++        const dedupeKey = instance && instance !== 'item_bobby_pin'
++          ? `id:${instance}`
++          : `path:${path.join('.')}:${entryKey}`;
++        if (seen.has(dedupeKey)) {
++          if (isArray) nextArray.push(value);
++          continue;
++        }
++        seen.add(dedupeKey);
++        const holder = quantityHolderOf(value) || value;
++        const field = quantityFieldOf(holder);
++        let qty = pinQuantity(value);
++        const take = Math.min(qty, remaining);
++        qty -= take;
++        remaining -= take;
++        holder[field] = qty;
++        if (qty <= 0) {
++          if (!isArray) delete nextObject[entryKey];
++        } else if (isArray) {
++          nextArray.push(value);
++        }
++      }
++      parent[key] = isArray ? nextArray : nextObject;
++    }
++  }
++  return { snapshot: clone, consumed: need - remaining };
++};
++
+ const effectiveDifficulty = (config, stats) => Math.max(
+   0,
+   clamp(Math.floor(Number(config?.difficulty) || 0), 0, 5) - stats.reduction,
+@@ -357,7 +447,7 @@ const closeLockGame = (game, { now = Date.now() } = {}) => ({
+ 
+ /**
+  * Одно нажатие стрелки. Ошибки возвращаются строкой, реестр комнаты
+- * превращает их в ERROR_CODE. Списание отмычек атомарно внутри хода.
++ * превращает их в ERROR_CODE. Списание заколок атомарно внутри хода.
+  */
+ const applyLockAction = ({
+   game = null,
+@@ -384,7 +474,7 @@ const applyLockAction = ({
+   }
+   // Патч 526: ЯВНЫЙ новый подход игрока. Отличается от 'start' тем, что
+   // пересобирает доску по ТЕКУЩЕМУ листу в любом состоянии (в т.ч. после
+-  // победы, провала или «кончились отмычки»). Автоматический рестарт после
++  // победы, провала или «кончились заколки»). Автоматический рестарт после
+   // ACCESS GRANTED по-прежнему невозможен: это действие шлётся только по
+   // нажатию кнопки, а start запрещён при won/playing.
+   if (action === 'newAttempt') {
+@@ -405,7 +495,14 @@ const applyLockAction = ({
+   if (!game.pinActive) return { error: 'LOCK_NO_PINS' };
+ 
+   const idx = game.cursor;
+-  const cells = game.cells.map((cell) => ({ ...cell }));
++  // Патч 527: прошлый ошибочный «?» не должен оставаться на доске вечно.
++  // Каждое нажатие начинается с чистого листа: только ОДНА красная ячейка —
++  // та, в которой ошиблись сейчас.
++  const cells = game.cells.map((cell) => (
++    cell?.state === CELL_STATE.RED
++      ? { arrow: null, state: CELL_STATE.HIDDEN }
++      : { ...cell }
++  ));
+   const pressedArrows = [...(game.pressedArrows || []), arrow].slice(-24);
+   let next = {
+     ...game,
+@@ -433,7 +530,7 @@ const applyLockAction = ({
+   next.result = 'TRY AGAIN';
+   if (next.pinFailures <= game.skill) return { game: next };
+ 
+-  // Отмычка «должна» сломаться. Спас-бросок Удачи не сбрасывает счётчик:
++  // Заколка «должна» сломаться. Спас-бросок Удачи не сбрасывает счётчик:
+   // следующий провал снова кидает тот же шанс.
+   if (rng() < game.luckSave) {
+     next.pinFailures = game.skill;
+@@ -445,10 +542,15 @@ const applyLockAction = ({
+   next.pinFailures = 0;
+   next.cursor = 0;
+   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
+-  next.cells = cells.map((cell) => (
+-    cell.state === CELL_STATE.GREEN
+-      ? { arrow: cell.arrow, state: CELL_STATE.GREY }
+-      : { arrow: null, state: CELL_STATE.HIDDEN }
++  // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
++  // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
++  // красный не показывался вообще).
++  next.cells = cells.map((cell, cellIdx) => (
++    cellIdx === idx
++      ? { arrow: null, state: CELL_STATE.RED }
++      : (cell.state === CELL_STATE.GREEN
++        ? { arrow: cell.arrow, state: CELL_STATE.GREY }
++        : { arrow: null, state: CELL_STATE.HIDDEN })
+   ));
+   if (game.pinsRemaining > 0) {
+     next.pinsRemaining = game.pinsRemaining - 1;
+@@ -475,6 +577,7 @@ module.exports = {
+   shouldBlockLock,
+   lockStats,
+   countBobbyPins,
++  consumeBobbyPins,
+   effectiveDifficulty,
+   createLockGame,
+   keyWonLockGame,
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 22f90ca..623920f 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -36,6 +36,7 @@ const {
+   closeLockGame,
+   applyLockAction,
+   shouldBlockLock,
++  consumeBobbyPins,
+ } = require('./lockPicking');
+ 
+ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+@@ -194,9 +195,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+     accessEvents: new Map(),
+-    // Патч 520: потраченные отмычки по персонажу. Снимок персонажа приходит
+-    // с полным инвентарём, поэтому без этого счётчика каждый новый замок
+-    // «находил» бы отмычки заново. Живёт в памяти комнаты, без файлов.
++    // Патч 520/527: диагностический счётчик сломанных заколок по персонажу.
++    // С 527 число заколок для доски читается напрямую из опубликованного
++    // снимка листа: при поломке снимок уменьшается сервером, а клиент
++    // списывает заколку из локального инвентаря. Живёт в памяти комнаты.
+     pinLedger: new Map(),
+     partyStorage: emptyStorage(),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+@@ -527,7 +529,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
+     // Патч 526: для замков вопрос не задаётся — замки пока не блокируются,
+     // игрок сам начинает новый подход; awaitingRetry у замка означает
+-    // «подход завершён» (например, кончились отмычки).
++    // «подход завершён» (например, кончились заколки).
+     awaitingGm: Boolean(
+       entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
+     ),
+@@ -675,7 +677,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+               characterSnapshot: operatorSnapshot,
+               now: now(),
+               rng: lockRandom,
+-              spentPins: room.pinLedger?.get(operatorCharacterId) || 0,
++              spentPins: 0,
+             })
+           : createGame({
+               config: entry.config,
+@@ -718,7 +720,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // и понимает legacy-массивы [{ name, value }] из сохранения. Объявление
+     // вынесено выше: новый подход (526) читает тот же текущий снимок листа.
+     const snapshot = published.snapshot || {};
+-    // Патч 526: игрок сам начинает новый подход (купил отмычки, прокачал
++    // Патч 526: игрок сам начинает новый подход (купил заколки, прокачал
+     // PER/LOCKPICK). Это НЕ автоперезапуск после победы: действие приходит
+     // только по нажатию «Взломать»/«Ещё подход», а `start` по-прежнему
+     // запрещён при won/playing. Терминал после блокировки может открыть
+@@ -735,7 +737,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         characterSnapshot: snapshot,
+         now: now(),
+         rng: lockRandom,
+-        spentPins: room.pinLedger?.get(charId) || 0,
++        spentPins: 0,
+       });
+       fresh.operatorName = String(published.fromName || snapshot?.name || '').trim();
+       entry.game = fresh;
+@@ -779,7 +781,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           value,
+           now: now(),
+           rng: lockRandom,
+-          spentPins: room.pinLedger?.get(charId) || 0,
++          spentPins: 0,
+         })
+       : applyGameAction({
+           game: entry.game || entry.config,
+@@ -798,7 +800,22 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     entry.game = result.game;
+     if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
+       const delta = result.game.brokenPins - brokenBefore;
++      // Патч 527: сломанная заколка исчезает из инвентаря. Сервер уменьшает
++      // quantity в опубликованном снимке листа (источник истины для доски),
++      // клиент зеркально списывает её из локального инвентаря и сохраняет лист.
++      // pinLedger оставлен как диагностический счётчик, но доступность заколок
++      // больше из него не считается — иначе списание учлось бы дважды.
+       room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
++      const consumed = consumeBobbyPins(published.snapshot || {}, delta);
++      if (consumed.consumed > 0) {
++        room.lastSnapshots.set(charId, {
++          ...published,
++          snapshot: consumed.snapshot,
++          revision: (Number(published.revision) || 0) + 1,
++          updatedAt: now(),
++        });
++        entry.operatorSnapshot = consumed.snapshot;
++      }
+     }
+     if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+       // Держим слова последних трёх досок (по 12–20 слов каждая).

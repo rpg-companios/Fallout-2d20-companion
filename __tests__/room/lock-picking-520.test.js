@@ -165,7 +165,8 @@ describe('520: механика нажатий и отмычек', () => {
     expect(game.cells[0].state).toBe('green');
     const broken = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
     expect(broken.cells[0]).toEqual({ arrow: 'left', state: 'grey' });
-    expect(broken.cells[1].state).toBe('hidden');
+    // Патч 527: ошибочный «?» остаётся КРАСНЫМ и на ходе с поломкой.
+    expect(broken.cells[1]).toEqual({ arrow: null, state: 'red' });
     expect(broken.cursor).toBe(0);
     expect(broken.brokenPins).toBe(1);
     expect(broken.pinsRemaining).toBe(game.pinsRemaining - 1);
@@ -282,16 +283,30 @@ describe('520: «ИЛИ» между терминалом и замком', () =
     expect(take.error).toBe(ERROR_CODE.CONTAINER_LOCKED);
   });
 
-  it('потраченные отмычки не возрождаются на следующем замке', () => {
+  it('527: сломанные заколки не возрождаются — они уходят из снимка листа', () => {
     const { registry, code } = setupRoom();
-    const ledger = registry._rooms.get(code).pinLedger;
-    ledger.set('ch1', 7);
+    const room = registry._rooms.get(code);
+    // pinLedger теперь только диагностика: заколки читаются из листа, иначе
+    // списание из инвентаря учитывалось бы дважды.
+    room.pinLedger.set('ch1', 7);
     registry.terminalAction({
       code, clientId: 'p1', characterId: 'ch1', containerId: 'l1', action: 'start',
     });
-    const game = registry._rooms.get(code).terminalStates.get('l1').game;
-    expect(game.pinsTotal).toBe(13);
-    expect(game.spentPins).toBe(7);
+    const first = room.terminalStates.get('l1').game;
+    expect(first.pinsTotal).toBe(20);
+    expect(first.spentPins).toBe(0);
+    // Реальное списание: обновлённый лист содержит 13 заколок.
+    registry.putSnapshot({
+      code, characterId: 'ch1', revision: 2,
+      snapshot: { data: { ...SNAPSHOT.data, items: [{ itemId: 'item_bobby_pin', quantity: 13 }] } },
+      fromClientId: 'p1', fromName: 'Игрок',
+    });
+    registry.terminalAction({
+      code, clientId: 'p1', characterId: 'ch1', containerId: 'l1', action: 'newAttempt',
+    });
+    const fresh = room.terminalStates.get('l1').game;
+    expect(fresh.pinsTotal).toBe(13);
+    expect(fresh.spentPins).toBe(0);
   });
 });
 
