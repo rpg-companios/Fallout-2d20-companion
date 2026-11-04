@@ -1,8 +1,12 @@
 {
-  "version": "530",
+  "version": "531",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "По зацепке владельца нашли причину «полос через центр»: стиль flex: 0 (в браузере flex: 0 1 0%) схлопывал кнопку стрелки. Убрали его вместе с собственным фоном, рамками и жёсткими width/height кнопки; фоном служит затемнённая область стрелок.",
+      "Вернули начертание стрелок до светлой темы: иконки arrow-*-bold размера 22 с явным центрированием по обеим осям. Цветовая гамма осталась светлой — тёмная стрелка на светлой области, а не зелёная на тёмной.",
+      "Починили перенос длинной подсказки о правилах: левая колонка строки статуса теперь сжимается до ширины карточки, текст переносится внутри модалки и не уходит за её границы одной строкой.",
+      "Сохранили всё из 527–530: затемнённая область, увеличенный шаг между кнопками, прокрутка на телефоне, точный текст подсказки, команды списания, пауза красного «?» и семантика взлома локации/контейнера.",
       "Развели семантику взлома в иерархии пространств: взлом локации (узел с детьми) ВВОДИТ игрока внутрь, взлом контейнера показывает СОДЕРЖИМОЕ.",
       "Кнопки и подсказки теперь говорят прямо: «Взломать и войти» / «Взломать и открыть», а у вложенной локации вместо «Открыть» — «Войти».",
       "После ACCESS GRANTED исход применяется автоматически с небольшой паузой, чтобы игрок успел увидеть результат; переход адресный, каскада по графу нет.",
@@ -118,6 +122,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The owner's clue found the cause of the stripes through the center: flex: 0 (rendered as flex: 0 1 0% in the browser) collapsed the arrow button. Removed it along with the button's own background, borders and fixed width/height; the darker arrow area is the background now.",
+      "Restored the pre-light-theme arrow drawing: arrow-*-bold icons at size 22, explicitly centered on both axes. The palette stays light — a dark arrow on the light area instead of green on dark.",
+      "Fixed wrapping of the long rules hint: the left column of the status row now shrinks to the card width, so the text wraps inside the modal instead of overflowing in a single line.",
+      "Everything from 527–530 is preserved: the darker area, wider arrow spacing, phone scrolling, the exact hint text, spend commands, the red «?» pause and the location/container hack semantics.",
       "Split hacking semantics in the location hierarchy: hacking a location (a node with children) ENTERS it, hacking a container shows its CONTENTS.",
       "Buttons and hints now say it directly: «Hack & enter» / «Hack & open», and a nested location shows «Enter» instead of «Open».",
       "After ACCESS GRANTED the outcome is applied automatically after a short pause so the player sees the result; the transition is addressable, with no graph cascade.",

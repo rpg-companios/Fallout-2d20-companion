@@ -315,16 +315,16 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       testID={`lock-arrow-${arrow}`}
       accessibilityRole="button"
       accessibilityLabel={tLootTrade(ARROW_KEY[arrow])}
-      style={[
-        modalStyles.btn,
-        modalStyles.saveBtn,
-        styles.arrowButton,
-        !canPress && styles.arrowButtonDisabled,
-      ]}
+      // Патч 531: вернули начертание стрелок из версии ДО светлой темы.
+      // Базовые стили формы (modalStyles.btn/saveBtn) добавляли рамку и
+      // paddingVertical без justifyContent — иконка «прилипала» к верху, а
+      // линии рамки проходили прямо через стрелку. Теперь кнопка — отдельный
+      // самодостаточный стиль с явным центрированием, как в 520–524.
+      style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}
       disabled={!canPress}
       onPress={() => void doAction('press', arrow)}
     >
-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={30} color={LOCK_PALETTE.text} />
+      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
     </TouchableOpacity>
   );
 
@@ -372,7 +372,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.statusRow}>
-            <View>
+            <View style={styles.statusLeft}>
               <Text testID="lock-pins-count" style={styles.pinCount}>
                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
               </Text>

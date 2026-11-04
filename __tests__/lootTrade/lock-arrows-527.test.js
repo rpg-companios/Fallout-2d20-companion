@@ -141,15 +141,18 @@ describe('527: подсказка и область стрелок', () => {
     expect(pad.length).toBeGreaterThan(0);
     expect(pad[0].props.style.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
     expect(pad[0].props.style.backgroundColor).not.toBe(modalStyles.card.backgroundColor);
-    expect(lockLightStyles.arrowButton.backgroundColor).toBe('#dadada');
-    expect(lockLightStyles.arrowButton.width).toBeGreaterThan(52);
+    // Патч 531: затемнённая область arrowPad осталась (закон 527), а
+    // собственный фон и жёсткие размеры кнопки убраны по зацепке владельца.
+    expect(lockLightStyles.arrowPad.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
     expect(lockLightStyles.crossRow.gap).toBeGreaterThan(8);
     const buttons = ['up', 'left', 'down', 'right'].map(
       (dir) => renderer.root.findAllByProps({ testID: `lock-arrow-${dir}` })[0],
     );
     expect(buttons.every(Boolean)).toBe(true);
     for (const button of buttons) {
-      expect(button.findAllByType('MaterialCommunityIcons').some((n) => n.props.size === 30)).toBe(true);
+      // Патч 531: вернули начертание стрелок до светлой темы (size 22).
+      // Заливка, шаг и кнопочный вид 527 сохранены.
+      expect(button.findAllByType('MaterialCommunityIcons').some((n) => n.props.size === 22)).toBe(true);
     }
     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
     await act(async () => renderer.unmount());

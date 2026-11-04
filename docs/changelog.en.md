@@ -1,5 +1,60 @@
 # Changelog
 ---
+## Arrows without stripes and a wrapping hint (patch 531)
+
+The owner inspected the arrows in the browser and found the clue: "If you
+disable the `flex: 0 1 0%` style, the arrow icons are normal, they have a
+background and the line artifact disappears. But the icons lose centering."
+They also noted that `background-color: rgb(218,218,218)`, `height: 50px` and
+`width: 58px` can be removed, and reported: "The container with the rules
+description overflows the modal in one line, the text did not wrap. The text
+should wrap inside the modal."
+
+### 1. Root cause
+
+`flex: 0` on the arrow button (RN Web renders it as `flex: 0 1 0%`) collapsed
+the button to a zero basis: the border was drawn as a "stripe through the
+center", the icon was not centered and the background disappeared. It came
+from patch 525, when the arrow button was assembled from the base form styles
+(`modalStyles.btn/saveBtn`) and their `flex: 1` was overridden with `flex: 0`.
+
+**Fix:** the arrow button no longer inherits the base form styles; `flex`, its
+own `backgroundColor`, `borderWidth`, `width` and `height` are gone. Only
+`alignItems/justifyContent: center` and padding for the tap area remain. The
+darker `arrowPad` is the background (law 527), and its border was removed too.
+The top-row spacers were recalculated so "up" sits exactly above "down".
+
+### 2. Pre-light-theme drawing
+
+`arrow-*-bold` icons at size **22** (as in 520–524), explicitly centered. Only
+the palette changed: a dark arrow on the light area instead of green on dark.
+`CELL_ICON` in the board cells is unchanged. The wider spacing
+(`crossRow.gap = 16`), phone scrolling and the exact hint under the bobby pin
+counter are preserved.
+
+### 3. Hint wrapping
+
+`statusRow` is a horizontal container; its left column had no width
+constraint, so the long hint set its own width, stayed on one line and
+overflowed the modal. Added `statusLeft` with `flex: 1, flexShrink: 1,
+minWidth: 0`, and `flexShrink: 1` / `maxWidth: '100%'` on `arrowsHint`. The
+text now wraps inside the card.
+
+### What is preserved
+
+Laws 527–530 unchanged: the «Заколка» canon, `char.command` → `char.refresh`
+→ `char.publish` spend commands, the snapshot law, the red «?» pause, the
+location/container hack semantics, server protection. The server was not
+changed.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (260 files), `git apply
+--check`, installer from the exact `a62ec71` base and from version 530 with
+byte comparison, live WS probe. Acceptance tests:
+`__tests__/lootTrade/lock-arrows-legacy-531.test.js`; the historical 527 test
+was updated for the new drawing.
+
 ## Hacking a location = enter, hacking a container = contents (patch 530)
 
 The first of the four remaining items of thesis 13. The owner asked to move on

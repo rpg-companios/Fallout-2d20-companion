@@ -214,9 +214,12 @@ describe('527: терминология и стрелки', () => {
     const source = read('components/lootTrade/lockPickingStyles.js');
     expect(source).toContain('arrowPad');
     expect(source).toMatch(/arrowPad:\s*\{[^}]*backgroundColor:\s*ADMIN_MODAL_PALETTE\.surfaceMuted/);
-    expect(source).toMatch(/arrowButton:\s*\{[^}]*backgroundColor:\s*'#dadada'/);
+    // Патч 531: фон у области, а не у каждой кнопки; начертание стрелок
+    // вернулось к размеру 22 и явному центрированию (убраны flex/рамки).
+    expect(source).toMatch(/arrowButton:\s*\{[^}]*justifyContent:\s*'center'/);
+    expect(source).not.toMatch(/arrowButton:\s*\{[^}]*flex:/);
     expect(source).toMatch(/crossRow:\s*\{[^}]*gap:\s*16/);
-    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{30\}/);
+    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{22\}/);
     expect(read('components/lootTrade/LockPickingModal.js')).toContain('testID="lock-arrow-pad"');
     expect(read('components/lootTrade/LockPickingModal.js')).toContain('ScrollView');
   });

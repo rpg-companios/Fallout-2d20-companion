@@ -58,6 +58,10 @@ export const lockLightStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
+  // Патч 531: левая колонка строки статуса должна СЖИМАТЬСЯ до ширины
+  // карточки. Иначе длинная подсказка задаёт собственную (огромную) ширину,
+  // текст встаёт в одну строку и уходит за границы модалки.
+  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
@@ -104,18 +108,22 @@ export const lockLightStyles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 2,
     textAlign: 'left',
+    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
+    flexShrink: 1,
+    maxWidth: '100%',
   },
 
   // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
   // темнее области. Стрелки крупнее и разведены дальше друг от друга.
+  // Патч 531: область осталась чуть темнее карточки (закон 527), но БЕЗ
+  // рамки: лишняя горизонтальная черта вокруг стрелок и была «полосой через
+  // центр». В до-светлой версии у крестовины не было ни рамки, ни подложки.
   arrowPad: {
     marginTop: 10,
     marginBottom: 4,
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
     alignItems: 'center',
   },
@@ -127,19 +135,21 @@ export const lockLightStyles = StyleSheet.create({
     gap: 16,
     marginVertical: 5,
   },
+  // Патч 531 по зацепке владельца: артефакт «линия через центр» давал
+  // `flex: 0` (в браузере он превращается в `flex: 0 1 0%` и схлопывает
+  // кнопку). Убираем flex, собственный фон и жёсткие width/height — фоном
+  // служит затемнённая область arrowPad. Остаётся начертание 520–524:
+  // иконка arrow-*-bold размера 22, явно отцентрированная по обеим осям.
   arrowButton: {
-    width: 58,
-    height: 50,
-    flex: 0,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: '#9a9a9a',
-    backgroundColor: '#dadada',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   arrowButtonDisabled: { opacity: 0.45 },
-  arrowSpacer: { width: 58, height: 50 },
+  // Пустышки в верхнем ряду равны кнопке, чтобы «вверх» стоял ровно над
+  // «вниз»: иконка 22 + отступы 12*2 / 10*2.
+  arrowSpacer: { width: 46, height: 42 },
 
   resultText: {
     color: ADMIN_MODAL_PALETTE.text,
