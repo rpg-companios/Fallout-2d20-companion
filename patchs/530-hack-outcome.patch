@@ -1,0 +1,964 @@
+diff --git a/__tests__/lootTrade/hack-outcome-530.test.js b/__tests__/lootTrade/hack-outcome-530.test.js
+new file mode 100644
+index 0000000..0090a01
+--- /dev/null
++++ b/__tests__/lootTrade/hack-outcome-530.test.js
+@@ -0,0 +1,286 @@
++// Патч 530 — тезис 13, первый оставшийся пункт:
++// «развести в интерфейсе семантику "взлом локации = вход" и "взлом контейнера
++// = содержимое"». Локация = узел с детьми, контейнер = узел без детей.
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import {
++  HACK_OUTCOME,
++  HACK_OUTCOME_DELAY_MS,
++  nodeHasChildren,
++  hackOutcomeForNode,
++  hackWinKey,
++  applyHackOutcome,
++} from '../../components/lootTrade/hackOutcome';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible, autoStart }) => React.createElement('LockPickingModal', {
++    containerId: lock?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
++    visible, onHack, onView,
++  }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++
++const hubSession = () => ({
++  sessionId: 'session-530',
++  containerId: 'vault',
++  kind: 'hub',
++  name: 'Убежище',
++  targetType: 'room',
++  nodes: [
++    {
++      containerId: 'door-1', kind: 'lock', name: 'Дверь в бункер', difficulty: 2,
++      parentIds: ['vault'], childIds: ['inner-1'], items: [],
++    },
++    {
++      containerId: 'inner-1', kind: 'loot', name: 'Внутренний зал',
++      parentIds: ['door-1'], childIds: [], items: [],
++    },
++    {
++      containerId: 'box-1', kind: 'lock', name: 'Запертый ящик', difficulty: 2,
++      parentIds: ['vault'], childIds: [], items: [],
++    },
++    {
++      containerId: 'hall-1', kind: 'loot', name: 'Коридор', parentIds: ['vault'],
++      childIds: ['side-1'], items: [],
++    },
++    {
++      containerId: 'side-1', kind: 'loot', name: 'Боковая комната',
++      parentIds: ['hall-1'], childIds: [], items: [],
++    },
++  ],
++});
++
++const renderers = [];
++const mount = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++    await Promise.resolve();
++  });
++  await act(async () => {
++    useRoomStore.setState((state) => ({
++      rooms: { ...state.rooms, ROOM1: { ...state.rooms.ROOM1, activeSession: hubSession() } },
++    }));
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++const pause = async (ms) => {
++  await act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
++};
++const allText = (renderer) => renderer.root.findAllByType('Text')
++  .map((node) => String(node.props.children ?? '')).join(' | ');
++const nodeText = (renderer, testID) => {
++  const found = renderer.root.findAllByProps({ testID });
++  return found.map((n) => String(n.props.children ?? '')).join(' | ');
++};
++
++beforeEach(() => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({
++    currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
++  });
++  useRoomStore.setState({
++    clientId: 'player-client',
++    status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession: null,
++        terminalStates: {},
++      },
++    },
++  });
++});
++
++afterEach(async () => {
++  for (const renderer of renderers.splice(0)) {
++    try { await act(async () => renderer.unmount()); } catch { /* уже снято */ }
++  }
++});
++
++describe('530: чистая семантика узла', () => {
++  it('узел с детьми — локация, без детей — контейнер', () => {
++    expect(nodeHasChildren({ childIds: ['a'] })).toBe(true);
++    expect(nodeHasChildren({ childIds: [] })).toBe(false);
++    expect(nodeHasChildren({ kind: 'hub' })).toBe(true); // старый сервер без childIds
++    expect(nodeHasChildren({ kind: 'loot' })).toBe(false);
++  });
++
++  it('взлом локации = вход, взлом контейнера = содержимое', () => {
++    expect(hackOutcomeForNode({ childIds: ['a'] })).toBe(HACK_OUTCOME.ENTER);
++    expect(hackOutcomeForNode({ childIds: [] })).toBe(HACK_OUTCOME.CONTENTS);
++    expect(hackOutcomeForNode({ kind: 'hub' })).toBe(HACK_OUTCOME.ENTER);
++  });
++
++  it('переход адресный: только один узел, без каскада', () => {
++    const enterLocation = vi.fn();
++    const openContents = vi.fn();
++    expect(applyHackOutcome(HACK_OUTCOME.ENTER, 'loc-1', { enterLocation, openContents }))
++      .toBe(HACK_OUTCOME.ENTER);
++    expect(enterLocation).toHaveBeenCalledWith('loc-1');
++    expect(openContents).not.toHaveBeenCalled();
++    expect(applyHackOutcome(HACK_OUTCOME.CONTENTS, 'box-1', { enterLocation, openContents }))
++      .toBe(HACK_OUTCOME.CONTENTS);
++    expect(openContents).toHaveBeenCalledWith('box-1');
++    expect(applyHackOutcome(HACK_OUTCOME.CONTENTS, '', { openContents })).toBe(HACK_OUTCOME.CONTENTS);
++    expect(openContents).toHaveBeenCalledTimes(1);
++  });
++
++  it('пауза перед переходом и ключ победы', () => {
++    expect(HACK_OUTCOME_DELAY_MS).toBeGreaterThan(100);
++    expect(hackWinKey('t1', { accessId: 'b1', game: { revision: 3 } })).toBe('t1|b1|3');
++    expect(hackWinKey('t1', { accessId: 'b1', game: { revision: 4 } }))
++      .not.toBe(hackWinKey('t1', { accessId: 'b1', game: { revision: 3 } }));
++  });
++});
++
++describe('530: интерфейс локации', () => {
++  it('у локации «Взломать и войти» и подсказка про вход; у контейнера — про содержимое', async () => {
++    const renderer = await mount();
++    const text = allText(renderer);
++    expect(text).toMatch(/Hack & enter|Взломать и войти/);
++    expect(text).toMatch(/Hack & open|Взломать и открыть/);
++    expect(nodeText(renderer, 'hack-outcome-hint-door-1')).toMatch(/location|локаци/i);
++    // Подсказка рисуется только у запертых точек: box-1 не заперт, поэтому
++    // у него проверяем подпись кнопки, а не hint.
++    expect(text).toMatch(/Enter|Войти/); // обычная кнопка вложенной локации
++  });
++
++  it('у вложенной локации обычная кнопка говорит «Войти», а не «Открыть»', async () => {
++    const renderer = await mount();
++    const buttons = renderer.root.findAllByProps({ testID: 'hub-back-button' });
++    expect(buttons).toHaveLength(0); // ещё не вошли
++    const text = allText(renderer);
++    expect(text).toMatch(/Войти|Enter/);
++  });
++});
++
++describe('530: исход ACCESS GRANTED', () => {
++  const win = async (renderer, containerId) => {
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            activeSession: {
++              ...state.rooms.ROOM1.activeSession,
++              revision: (state.rooms.ROOM1.activeSession?.revision || 0) + 1,
++              nodes: state.rooms.ROOM1.activeSession.nodes.map((n) => (
++                n.containerId === containerId ? { ...n, locked: false } : n
++              )),
++            },
++            terminalStates: {
++              ...state.rooms.ROOM1.terminalStates,
++              [containerId]: {
++                containerId,
++                accessId: `broadcast-${containerId}`,
++                config: { containerId, kind: 'lock', name: nName(containerId), difficulty: 2 },
++                closed: false, locked: false, awaitingGm: false,
++                game: { status: 'won', result: 'ACCESS GRANTED', revision: 2 },
++              },
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++  };
++  const nName = (id) => (id === 'door-1' ? 'Дверь в бункер' : 'Запертый ящик');
++
++  it('взлом локации ВВОДИТ игрока внутрь (кнопка «Назад» в родителя)', async () => {
++    const renderer = await mount();
++    const hack = renderer.root.findAllByProps({ testID: 'terminal-hack-button' })[0];
++    await act(async () => { hack.props.onPress(); await Promise.resolve(); });
++    expect(renderer.root.findAllByType('LockPickingModal').length).toBeGreaterThan(0);
++    await win(renderer, 'door-1');
++    await pause(HACK_OUTCOME_DELAY_MS + 150);
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    const text = allText(renderer);
++    expect(text).toContain('Внутренний зал'); // вошли и видим детей локации
++  });
++
++  it('взлом контейнера показывает СОДЕРЖИМОЕ, не вход в локацию', async () => {
++    const renderer = await mount();
++    // В корне локации два источника проверки: door-1 (локация) и box-1
++    // (контейнер). Второй — нужный нам контейнер.
++    // RN-мок отдаёт и компонент, и host-узел для одного testID; берём только
++    // host-кнопки, чтобы индексы соответствовали реальным точкам.
++    const hacks = renderer.root.findAllByType('TouchableOpacity')
++      .filter((n) => n.props.testID === 'terminal-hack-button');
++    const boxHack = hacks[1];
++    await act(async () => { boxHack.props.onPress(); await Promise.resolve(); });
++    await win(renderer, 'box-1');
++    await pause(HACK_OUTCOME_DELAY_MS + 150);
++    // Список локации сменился окном содержимого.
++    expect(renderer.root.findAllByProps({ testID: 'hack-outcome-hint-door-1' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    const text = allText(renderer);
++    expect(text).toContain('Запертый ящик'); // открыто содержимое контейнера
++    expect(text).not.toContain('Дверь в бункер'); // список локации скрыт
++  });
++
++  it('победа без явного «Взломать» и отдельно выданная точка навигацию не дёргают', async () => {
++    const renderer = await mount();
++    await win(renderer, 'box-1'); // terminalSelection нет вообще
++    await pause(HACK_OUTCOME_DELAY_MS + 150);
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    expect(allText(renderer)).not.toMatch(/Назад в локацию|Back to location/);
++    // Список локации остался на месте: исход взлома НЕ применяется без
++    // явного «Взломать».
++    expect(allText(renderer)).toContain('Дверь в бункер');
++  });
++});
+diff --git a/__tests__/room/gate-terminal-519.test.js b/__tests__/room/gate-terminal-519.test.js
+index b562f7b..24ade30 100644
+--- a/__tests__/room/gate-terminal-519.test.js
++++ b/__tests__/room/gate-terminal-519.test.js
+@@ -85,7 +85,11 @@ describe('519: интерфейс игрока и документы', () => {
+     expect(overlay).toContain('gate-hack-button-');
+     expect(overlay).toContain('gate-view-button-');
+     expect(overlay).toContain('gateHackAllowed');
+-    expect(overlay).toContain("tLootTrade('terminal.hack')");
++    // Патч 530: подпись взлома зависит от исхода (вход / содержимое).
++    expect(overlay).toContain('tLootTrade(nodeHackLabelKey)');
++    expect(overlay).toContain("'player.hackAndEnter'");
++    expect(overlay).toContain("'player.hackAndOpen'");
++    expect(overlay).toContain('targetNodeId: node.containerId');
+     expect(overlay).toContain("node.keyAccessState !== 'denied'");
+   });
+ 
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index dcaee59..4350fb1 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect, useMemo, useCallback } from 'react';
++import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+ import {
+   Modal,
+   View,
+@@ -50,6 +50,14 @@ import {
+   terminalBlockedReason,
+ } from './terminalAccess';
+ import { debugLog } from '../../src/debug/falloutDebug';
++import {
++  HACK_OUTCOME,
++  HACK_OUTCOME_DELAY_MS,
++  nodeHasChildren,
++  hackOutcomeForNode,
++  hackWinKey,
++  applyHackOutcome,
++} from './hackOutcome';
+ 
+ const getItemIcon = (itemType) => {
+   if (itemType === 'caps') return '💰';
+@@ -235,6 +243,23 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
+ 
++  /**
++   * Патч 530: один переход на всех путях — обычная кнопка, кнопка после
++   * выигранной проверки и автоматический исход ACCESS GRANTED. Локация —
++   * входим, контейнер — показываем содержимое. Каскада нет.
++   */
++  const navigateHackOutcome = useCallback((node) => {
++    const id = String(node?.containerId || '').trim();
++    if (!id) return HACK_OUTCOME.CONTENTS;
++    return applyHackOutcome(hackOutcomeForNode(node), id, {
++      enterLocation: (targetId) => {
++        setSelectedHubNodeId(null);
++        setParentStack((stack) => [...stack, targetId]);
++      },
++      openContents: (targetId) => setSelectedHubNodeId(targetId),
++    });
++  }, []);
++
+   const selectedHubNode = useMemo(() => {
+     if (!isHubSession || !selectedHubNodeId) return null;
+     const found = (activeSession?.nodes || []).find(
+@@ -268,6 +293,45 @@ export default function PlayerLootTradeOverlay() {
+     }
+   }, [isHubSession, selectedHubNodeId, selectedHubNode]);
+ 
++  /**
++   * Патч 530: успешный взлом имеет АДРЕСНЫЙ исход. Взлом локации (узел с
++   * детьми) ВВОДИТ игрока внутрь, взлом контейнера — показывает СОДЕРЖИМОЕ.
++   * Переход делаем с небольшой паузой, чтобы игрок увидел ACCESS GRANTED.
++   *
++   * Работает только для явного «Взломать» (autoStart) внутри настоящей
++   * локации: «Смотреть», отдельно выданная точка и повторное открытие уже
++   * выигранной доски навигацию не дёргают. Каскада нет — только targetNodeId.
++   */
++  const handledWinRef = useRef('');
++  const winTimerRef = useRef(null);
++  useEffect(() => {
++    if (!isHubSession || !terminalSelection?.targetNodeId || !terminalSelection.autoStart) {
++      handledWinRef.current = '';
++      return;
++    }
++    const containerId = String(terminalSelection.node?.containerId || '').trim();
++    const state = rooms?.[matchedContext?.roomCode]?.terminalStates?.[containerId];
++    if (state?.game?.status !== 'won') return;
++    const key = hackWinKey(containerId, state);
++    if (handledWinRef.current === key) return;
++    handledWinRef.current = key;
++    if (winTimerRef.current) clearTimeout(winTimerRef.current);
++    const targetId = terminalSelection.targetNodeId;
++    const nodes = activeSession?.nodes || [];
++    winTimerRef.current = setTimeout(() => {
++      winTimerRef.current = null;
++      setTerminalSelection(null);
++      const target = nodes.find((n) => n.containerId === targetId) || { containerId: targetId };
++      navigateHackOutcome(target);
++    }, HACK_OUTCOME_DELAY_MS);
++  }, [
++    rooms, isHubSession, terminalSelection,
++    activeSession?.nodes, matchedContext?.roomCode, navigateHackOutcome,
++  ]);
++  useEffect(() => () => {
++    if (winTimerRef.current) clearTimeout(winTimerRef.current);
++  }, []);
++
+   // Автоподрезка буфера покупки, если остаток в лавке уменьшился (купил другой игрок)
+   useEffect(() => {
+     if (!viewTarget || viewTarget.kind !== CONTAINER_KIND.MERCHANT) return;
+@@ -675,6 +739,22 @@ export default function PlayerLootTradeOverlay() {
+                       kind: nodeCheckKind,
+                     };
+                     const nodeLocked = Boolean(node.locked);
++                    // Патч 530: выигранная проверка = доступ к содержимому
++                    // (или вход в локацию), а не только надпись «взломано».
++                    const nodeCheckPassed = Boolean(
++                      node.keyUnlocked || terminalState?.game?.status === 'won',
++                    );
++                    // Патч 530: локация (есть дети) — взлом = ВХОД, контейнер
++                    // (детей нет) — взлом = СОДЕРЖИМОЕ. Один и тот же предикат
++                    // используется и в кнопке «Открыть/Войти», и в исходе взлома.
++                    const nodeIsLocation = nodeHasChildren(node);
++                    const nodeHackOutcome = hackOutcomeForNode(node);
++                    const nodeHackLabelKey = nodeHackOutcome === HACK_OUTCOME.ENTER
++                      ? 'player.hackAndEnter'
++                      : 'player.hackAndOpen';
++                    const nodeHackHintKey = nodeHackOutcome === HACK_OUTCOME.ENTER
++                      ? 'player.hackLocationHint'
++                      : 'player.hackContainerHint';
+                     // Патч 504: «Нет» Мастера оставляет карточку visible, но
+                     // запрещает И взлом, И просмотр до новой трансляции.
+                     const terminalClosed = Boolean(
+@@ -796,6 +876,15 @@ export default function PlayerLootTradeOverlay() {
+                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
+                           )}
+ 
++                          {(nodeLocked || nodeIsTerminal) ? (
++                            <Text
++                              testID={`hack-outcome-hint-${node.containerId}`}
++                              style={styles.hubLockedHintText}
++                            >
++                              {tLootTrade(nodeHackHintKey)}
++                            </Text>
++                          ) : null}
++
+                           {node.keyUnlocked ? (
+                             <Text style={styles.hubUnlockedMetaText}>
+                               {tLootTrade('player.hubNodeKeyUnlockedBadge')}
+@@ -869,10 +958,11 @@ export default function PlayerLootTradeOverlay() {
+                                             kind: option.kind,
+                                             autoStart: true,
+                                             freshAttempt: option.kind === CONTAINER_KIND.LOCK,
++                                            targetNodeId: node.containerId,
+                                           });
+                                         }}
+                                       >
+-                                        <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                        <Text style={styles.terminalHackButtonText}>{tLootTrade(nodeHackLabelKey)}</Text>
+                                       </TouchableOpacity>
+                                     </View>
+                                   </View>
+@@ -920,11 +1010,29 @@ export default function PlayerLootTradeOverlay() {
+                                     kind: nodeCheckKind,
+                                     autoStart: true,
+                                     freshAttempt: nodeCheckKind === CONTAINER_KIND.LOCK,
++                                    targetNodeId: node.containerId,
+                                   });
+                                 }}
+                               >
+-                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                <Text style={styles.terminalHackButtonText}>{tLootTrade(nodeHackLabelKey)}</Text>
+                               </TouchableOpacity>
++                              {(nodeCheckPassed && (nodeIsLocation || nodeIsLock)) ? (
++                                <TouchableOpacity
++                                  testID={`hack-outcome-button-${node.containerId}`}
++                                  style={styles.takeAllRowBtn}
++                                  onPress={() => navigateHackOutcome(node)}
++                                >
++                                  <Text style={styles.takeAllRowBtnText}>
++                                    {tLootTrade(
++                                      nodeIsLocation
++                                        ? 'player.hubNodeOpenLocation'
++                                        : (nodeIsMerch
++                                          ? 'player.hubNodeOpenMerchant'
++                                          : 'player.hubNodeOpenLoot'),
++                                    )}
++                                  </Text>
++                                </TouchableOpacity>
++                              ) : null}
+                             </View>
+                           ) : (
+                             <TouchableOpacity
+@@ -936,21 +1044,16 @@ export default function PlayerLootTradeOverlay() {
+                                 // Патч 523: узел с детьми — это вложенная
+                                 // локация/контейнер, входим внутрь, а не
+                                 // открываем содержимое сразу.
+-                                const hasChildren = Array.isArray(node.childIds)
+-                                  ? node.childIds.length > 0
+-                                  : node.kind === CONTAINER_KIND.HUB;
+-                                if (hasChildren) {
+-                                  setParentStack((stack) => [...stack, node.containerId]);
+-                                } else {
+-                                  setSelectedHubNodeId(node.containerId);
+-                                }
++                                navigateHackOutcome(node);
+                               }}
+                             >
+                               <Text style={styles.takeAllRowBtnText}>
+                                 {tLootTrade(
+-                                  nodeIsMerch
+-                                    ? 'player.hubNodeOpenMerchant'
+-                                    : 'player.hubNodeOpenLoot',
++                                  nodeIsLocation
++                                    ? 'player.hubNodeOpenLocation'
++                                    : (nodeIsMerch
++                                      ? 'player.hubNodeOpenMerchant'
++                                      : 'player.hubNodeOpenLoot'),
+                                 )}
+                               </Text>
+                             </TouchableOpacity>
+diff --git a/components/lootTrade/hackOutcome.js b/components/lootTrade/hackOutcome.js
+new file mode 100644
+index 0000000..a7938a3
+--- /dev/null
++++ b/components/lootTrade/hackOutcome.js
+@@ -0,0 +1,54 @@
++/**
++ * Патч 530 — семантика взлома в иерархии пространств (тезис 13).
++ *
++ * Слово владельца: «развести в интерфейсе семантику "взлом локации = вход"
++ * и "взлом контейнера = содержимое"».
++ *
++ * Локация — узел с детьми (или kind=hub у старых сессий без childIds):
++ * успешный взлом ВВОДИТ игрока внутрь, показывая её точки. Контейнер — узел
++ * без детей: успешный взлом показывает СОДЕРЖИМОЕ (добычу или торговца).
++ *
++ * Чистые функции: их можно проверять без React и без комнатного сервера.
++ */
++
++export const HACK_OUTCOME = Object.freeze({
++  ENTER: 'enter',
++  CONTENTS: 'contents',
++});
++
++/** Небольшая пауза, чтобы игрок увидел ACCESS GRANTED до перехода. */
++export const HACK_OUTCOME_DELAY_MS = 700;
++
++export const HUB_KIND = 'hub';
++
++export const nodeHasChildren = (node) => {
++  if (Array.isArray(node?.childIds)) return node.childIds.length > 0;
++  return node?.kind === HUB_KIND;
++};
++
++export const hackOutcomeForNode = (node) => (
++  nodeHasChildren(node) ? HACK_OUTCOME.ENTER : HACK_OUTCOME.CONTENTS
++);
++
++/** Ключ победы, чтобы один и тот же ACCESS GRANTED не отработал дважды. */
++export const hackWinKey = (containerId, state) => (
++  `${containerId}|${state?.accessId || ''}|${state?.game?.revision || 0}`
++);
++
++/**
++ * Применить исход взлома к навигации игрока. enter — вложенная локация,
++ * contents — открытый контейнер. Никаких каскадов: только адресный узел.
++ */
++export const applyHackOutcome = (outcome, targetId, handlers = {}) => {
++  const { enterLocation = () => {}, openContents = () => {} } = handlers;
++  const id = String(targetId || '').trim();
++  if (!id) return HACK_OUTCOME.CONTENTS;
++  if (outcome === HACK_OUTCOME.ENTER) {
++    enterLocation(id);
++    return HACK_OUTCOME.ENTER;
++  }
++  openContents(id);
++  return HACK_OUTCOME.CONTENTS;
++};
++
++export default hackOutcomeForNode;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 05fc24e..4e46735 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,63 @@
+ # Changelog
+ ---
++## Hacking a location = enter, hacking a container = contents (patch 530)
++
++The first of the four remaining items of thesis 13. The owner asked to move on
++with the tasks; the snapshot law 529 was recorded separately.
++
++### 1. One predicate for every path
++
++New pure module `components/lootTrade/hackOutcome.js`: a node with `childIds`
++(or `kind: hub` on legacy sessions) is a **location**, a node without children
++is a **container**. `hackOutcomeForNode()` returns `enter` / `contents`;
++`applyHackOutcome()` performs exactly one addressable transition, with no graph
++cascade (the 523 invariant is intact).
++
++The same predicate drives three paths in `PlayerLootTradeOverlay.js`: the
++normal node button, the button after a won check, and the automatic ACCESS
++GRANTED outcome. The normal button of a nested location used to say «Open»
++while actually entering — it now correctly says «Enter».
++
++### 2. Interface
++
++- A locked point and a check-source point get a `hack-outcome-hint-*`:
++  «Hacking unlocks entry to this location» or «Hacking unlocks the contents»
++  (paired EN strings).
++- Hack button: «Hack & enter» for a location, «Hack & open» for a container;
++  gate (OR-source) buttons take the label from the target node.
++- The normal button of a nested location is «Enter»; containers keep «Open» /
++  «Trade».
++- A won point (lock/location) gets a separate `hack-outcome-button-*` so the
++  contents remain reachable even if the player closed the mini-game. A pure
++  terminal without children does not get the button: it is a check source, not
++  a container.
++
++### 3. Automatic win outcome
++
++ACCESS GRANTED on an explicit «Hack» press inside a real location closes the
++mini-game after `HACK_OUTCOME_DELAY_MS = 700` and applies the outcome: enter
++the location (`parentStack`) or open the contents (`selectedHubNodeId`). The
++pause lets the player see the board result first.
++
++It fires once per `(containerId, accessId, revision)`; «View», a standalone
++point and reopening an already-won board do not navigate. Laws 505/526 (the
++board is not rebuilt after a win, the player decides how many attempts to make)
++are intact: this is navigation, not a restart.
++
++### What is preserved
++
++The 529 snapshot law, `char.command` → `char.refresh` → `char.publish`, the
++«Заколка» canon, the 528 red pause, the 523 visibility boundary and
++addressable hack, server protection. The server was not changed in this patch.
++
++### Checks
++
++`npm run typecheck`, `npm run build`, `npm test` (259 files), `git apply
++--check`, installer from the exact `a62ec71` base and from version 529 with
++byte comparison, live WS probe. Acceptance tests:
++`__tests__/lootTrade/hack-outcome-530.test.js` (pure predicate, labels and
++hints, automatic enter/contents, no navigation without an explicit «Hack»).
++
+ ## Snapshot law: commands instead of editing the sheet (patch 529)
+ 
+ > **Owner's words:** "don't touch the user's snapshot; if something must change
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6d4daf5..fdf3a5a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,64 @@
+ # История изменений
+ 
+ ---
++## Взлом локации = вход, взлом контейнера = содержимое (патч 530)
++
++Первый из четырёх оставшихся пунктов тезиса 13. Владелец: «давай пока дальше
++по задачам» — закон снимка 529 зафиксирован отдельно, план продолжен.
++
++### 1. Один предикат на все пути
++
++Новый чистый модуль `components/lootTrade/hackOutcome.js`: узел с `childIds`
++(или `kind: hub` у старых сессий) — **локация**, узел без детей — **контейнер**.
++`hackOutcomeForNode()` даёт `enter` / `contents`; `applyHackOutcome()` применяет
++ровно один адресный переход, без каскада по графу (инвариант 523 сохранён).
++
++Тот же предикат используют три пути в `PlayerLootTradeOverlay.js`: обычная
++кнопка узла, кнопка после выигранной проверки и автоматический исход
++ACCESS GRANTED. Раньше обычная кнопка вложенной локации говорила «Открыть»,
++но всё равно входила внутрь — теперь она честно говорит «Войти».
++
++### 2. Интерфейс
++
++- Запертая точка и точка-источник проверки получают подсказку
++  `hack-outcome-hint-*`: «Взлом откроет вход в локацию» либо «Взлом откроет
++  содержимое» (парные EN-строки).
++- Кнопка взлома: «Взломать и войти» для локации, «Взломать и открыть» для
++  контейнера; у ворот (ИЛИ-источники) подпись берётся от целевого узла.
++- Обычная кнопка вложенной локации — «Войти»; контейнера — «Открыть» /
++  «Торговать» как раньше.
++- У выигранной точки (замок/локация) появляется отдельная кнопка
++  `hack-outcome-button-*`, чтобы содержимое было доступно, даже если игрок
++  закрыл окно мини-игры. Для чистого терминала без детей кнопка не рисуется:
++  он источник проверки, а не контейнер.
++
++### 3. Автоматический исход победы
++
++`ACCESS GRANTED` на явно нажатом «Взломать» внутри настоящей локации через
++`HACK_OUTCOME_DELAY_MS = 700` закрывает мини-игру и применяет исход: вход в
++локацию (`parentStack`) или открытие содержимого (`selectedHubNodeId`). Пауза
++нужна, чтобы игрок увидел результат доски.
++
++Срабатывает один раз на `(containerId, accessId, revision)`; «Смотреть»,
++отдельно выданная точка и повторное открытие уже выигранной доски навигацию
++не дёргают. Законы 505/526 (доска после победы не пересобирается, игрок сам
++решает, сколько подходов делать) не нарушены: это переход, а не рестарт.
++
++### Что сохранено
++
++Закон снимка 529, команды `char.command` → `char.refresh` → `char.publish`,
++канон «Заколка», пауза перед сбросом красного 528, граница видимости и
++адресный взлом 523, серверная защита. Сервер в этом патче не менялся.
++
++### Проверки
++
++`npm run typecheck`, `npm run build`, `npm test` (259 файлов), `git apply
++--check`, установщик от точной базы `a62ec71` и от версии 529 с побайтовым
++сравнением, живая WS-проба. Приёмочные тесты:
++`__tests__/lootTrade/hack-outcome-530.test.js` (чистый предикат, подписи и
++подсказки, автоматический вход/содержимое, отсутствие навигации без явного
++«Взломать»).
++
+ ## Закон снимка: команды вместо правки листа (патч 529)
+ 
+ > **Слово владельца:** «снапшот юзера не трогаем, если надо что-то изменить у
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index 09ae3be..ea6fb77 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -101,3 +101,37 @@
+ - `docs/key-items-and-gates-design.md` — контракт ключей и ворот.
+ - `docs/lockpicking-mini-game-design.md` — мини-игра взлома замков.
+ - `docs/patch-523-install.md` — установка и проверки.
++
++## Патч 530: семантика взлома «локация = вход», «контейнер = содержимое»
++
++Первый из четырёх оставшихся пунктов тезиса 13. До 530 обычная кнопка
++вложенной локации говорила «Открыть», но входила внутрь, а выигранная проверка
++оставляла игрока в списке точек с надписью «взломано» — без перехода к
++содержимому. Теперь один предикат управляет всеми путями.
++
++**Канон:** `components/lootTrade/hackOutcome.js` (чистые функции, без React):
++- `nodeHasChildren(node)` — `childIds.length > 0`, для старых сессий без
++  `childIds` — `kind === 'hub'`;
++- `hackOutcomeForNode(node)` → `enter` (локация) или `contents` (контейнер);
++- `applyHackOutcome(outcome, targetId, handlers)` — один адресный переход,
++  **без каскада** по графу (инвариант 523);
++- `HACK_OUTCOME_DELAY_MS = 700` — пауза перед переходом после ACCESS GRANTED;
++- `hackWinKey()` — `(containerId, accessId, revision)`, чтобы победа
++  отработала ровно один раз.
++
++**Три пути в `PlayerLootTradeOverlay.js`:** обычная кнопка узла, кнопка
++`hack-outcome-button-*` у выигранной точки, автоматический исход победы — все
++зовут `navigateHackOutcome()`. Подсказка `hack-outcome-hint-*` объясняет, что
++даст взлом; подписи «Взломать и войти» / «Взломать и открыть» и «Войти» для
++вложенной локации лежат в парных RU/EN словарях.
++
++**Границы:** автоматический переход работает только при явном «Взломать»
++(`autoStart`) внутри настоящей локации и только по `targetNodeId`; «Смотреть»,
++отдельно выданная точка, повторное открытие выигранной доски и чужие ворота
++навигацию не дёргают. Доска после победы не пересобирается (505/526) — это
++переход, а не новый подход. Чистый терминал без детей не получает кнопку
++«Открыть»: он источник проверки, а не контейнер. Кнопка доступа у выигранной
++точки остаётся, даже если окно мини-игры закрыли.
++
++Сервер не менялся: закон снимка 529, граница видимости, адресный взлом,
++общие ресурсы привязанных комнат и одна сессия сохранены.
+diff --git a/docs/patch-530-install.md b/docs/patch-530-install.md
+new file mode 100644
+index 0000000..88a78eb
+--- /dev/null
++++ b/docs/patch-530-install.md
+@@ -0,0 +1,70 @@
++# Установка патча 530: взлом локации = вход, взлом контейнера = содержимое
++
++Патч подготовлен от состояния **версии 529** (коммит `45fa59f`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–530
++цепочкой. Файл установки: `patchs/530-hack-outcome.patch`.
++
++Это первый из четырёх остававшихся пунктов тезиса 13 «Иерархия пространств и
++доступ». Закон снимка 529 (`docs/gm-snapshot-law.md`) обязателен и для этого
++патча, и для всех следующих.
++
++## Что изменено
++
++### 1. Канон семантики
++
++Новый `components/lootTrade/hackOutcome.js` — чистые функции без React и сети:
++`nodeHasChildren()`, `hackOutcomeForNode()` (`enter` / `contents`),
++`applyHackOutcome()` (ровно один адресный переход, без каскада),
++`hackWinKey()` (дедупликация победы), `HACK_OUTCOME_DELAY_MS = 700`.
++Узел с `childIds` (или `kind: hub` у старых сессий) — локация; без детей —
++контейнер.
++
++### 2. Интерфейс `PlayerLootTradeOverlay.js`
++
++- Один `navigateHackOutcome()` на три пути: обычная кнопка узла, кнопка после
++  выигранной проверки, автоматический исход ACCESS GRANTED.
++- Подсказка `hack-outcome-hint-*` у запертых точек и точек-источников:
++  «Взлом откроет вход в локацию» / «Взлом откроет содержимое».
++- Подписи кнопок: «Взломать и войти» / «Взломать и открыть» (у ворот — по
++  целевому узлу); обычная кнопка вложенной локации — «Войти».
++- У выигранной точки-замка/локации — `hack-outcome-button-*` («Войти» /
++  «Открыть»), чтобы доступ к содержимому не терялся после закрытия мини-игры.
++  Чистый терминал без детей такую кнопку не получает.
++- Парные RU/EN строки в `i18n/*/screens/lootTrade/screen.json`.
++
++### 3. Автоматический исход победы
++
++ACCESS GRANTED на явно нажатом «Взломать» (`autoStart`) внутри настоящей
++локации через 700 мс закрывает мини-игру и применяет исход по `targetNodeId`:
++`enter` → `parentStack`, `contents` → `selectedHubNodeId`. Срабатывает один раз
++на `(containerId, accessId, revision)`; «Смотреть», отдельно выданная точка и
++повторное открытие выигранной доски навигацию не дёргают. Это переход, а не
++рестарт: доска после победы не пересобирается (505/526), игрок сам решает,
++сколько подходов делать.
++
++## Что сохранено
++
++Сервер **не менялся**: закон снимка 529 (`char.command` → `char.refresh` →
++`char.publish`, снимок как наблюдение между сессиями), защита сообщений/ролей,
++граница видимости и адресный взлом 523, общие ресурсы привязанных комнат и
++одна сессия, канон «Заколка» 527, пауза перед сбросом красного 528,
++светлая гамма 525, четыре попытки терминала и `shouldBlockLock()`.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор: 259 файлов).
++- `git apply --check patchs/530-hack-outcome.patch` от дерева 529.
++- `./apply-patch.sh 530` от версии 529 и полная цепочка 493–530 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Приёмочные тесты `__tests__/lootTrade/hack-outcome-530.test.js`: чистый
++  предикат (дети / `kind: hub` / без детей), адресность без каскада, подписи и
++  подсказки, автоматический вход в локацию и открытие содержимого, отсутствие
++  навигации без явного «Взломать». Исторические тесты 524/525 оверлея проходят
++  без изменений.
++- Живой сервер комнат: `/version.json` = 530/4/113+113 и WS-проба мини-игры
++  (законы 528/529 не регрессируют).
++
++Перезапуск серверного процесса для этого патча не требуется (менялись только
++клиент, словари и документы), но после установки на боевой площадке полезно
++обновить PWA-кэш: имя бандла изменилось.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index f738157..38a71c5 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **529**.
++Дата ревизии: 2026-11-04. Текущая версия: **530**.
+ 
+ ## Тезисы
+ 
+@@ -31,15 +31,16 @@
+ | 17 | Исправление мини-игры замка: русское имя предмета «Заколка» (не шпилька/отмычка/булавка), затемнённая область стрелок с крупными разведёнными стрелками и точной подсказкой под счётчиком, списание сломанных заколок из настоящего инвентаря, красный «?» при ошибке | ✅ сделано | **527** |
+ | 18 | Списание заколки командами клиенту (`char.spend` → `char.refresh` → штатный `char.publish`), сервер не правит чужой снимок; пауза перед обновлением цветов на поломке, красный остаётся если заколка цела | ✅ сделано | **528** |
+ | 19 | **Закон снимка на всё пространство Мастера:** сервер не трогает лист игрока, изменения — команды `char.command` → `char.refresh` → `char.publish`; снимок как наблюдение между сессиями; эффект журнала «Программиста» переведён на команду | ✅ сделано | **529** |
++| 20 | **Семантика взлома в иерархии:** «взлом локации = вход» и «взлом контейнера = содержимое», подписи/подсказки, адресный исход ACCESS GRANTED с паузой, кнопка доступа после закрытия мини-игры | ✅ сделано | **530** |
+ 
+-## Осталось после патча 529
++## Осталось после патча 530
+ 
+-Патчи 524–529 закрыли сбой мини-игры замка, окна локации, входа в игру,
++Патчи 524–530 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+-красную ошибку, паузу перед её сбросом и закрепили закон снимка для всего
+-пространства Мастера — не меняя порядок тринадцатого
+-тезиса: граф, граница видимости, адресный взлом, общие ресурсы и одна сессия
+-из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
++красную ошибку, паузу перед её сбросом, закрепили закон снимка для всего
++пространства Мастера и развели семантику взлома локации/контейнера — не меняя порядок
++тринадцатого тезиса: граф, граница видимости, адресный взлом, общие ресурсы
++и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+ после ACCESS GRANTED, а не про запрет новых подходов игрока; «один взлом на
+@@ -52,9 +53,9 @@
+    точка знает свой ключ; «заблокировать всё» на любом узле с детьми ✅; одна
+    сессия до выхода из родительской локации ✅; коды комнат задают видимость
+    групп, а состояние локации общее для всех привязанных комнат ✅.
+-   Осталось довести до конца:
+-   - развести в интерфейсе семантику «взлом локации = вход» и «взлом контейнера
+-     = содержимое»;
++   Осталось довести до конца (первый пункт закрыт в 530 ✅):
++   - ~~развести в интерфейсе семантику «взлом локации = вход» и «взлом
++     контейнера = содержимое»~~ ✅ **530**;
+    - общая доска мини-игры и общий журнал событий для всех привязанных комнат
+      (сейчас `terminalStates` / `accessEvents` живут на комнате);
+    - ручное связывание второй строки «проверка» с уже созданными точками через
+@@ -69,7 +70,9 @@
+ оператором; БД Мастера + Drive / снимок в памяти / только чтение без Мастера;
+ узлы без замка открыты; запрет повторного источника) приняты в 523 и записаны
+ в спецификации — владелец может поправить их следующим обновлением.
+-Спецификация — `docs/location-hierarchy-design.md`, мини-игры —
++Семантика взлома 530 — `components/lootTrade/hackOutcome.js` и
++`docs/location-hierarchy-design.md` (§530). Спецификация графа —
++`docs/location-hierarchy-design.md`, мини-игры —
+ `docs/lockpicking-mini-game-design.md`. **Закон снимка (529) —
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 2b1dd8b..02b68b8 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -282,7 +282,12 @@
+     "gateLockLabel": "Lock lvl {difficulty}",
+     "backToParent": "← Back",
+     "checkEntryHint": "Press «Hack» to start a round; «View» shows one already in progress.",
+-    "checkWaitingBoard": "The board appears after pressing «Hack»"
++    "checkWaitingBoard": "The board appears after pressing «Hack»",
++    "hubNodeOpenLocation": "Enter",
++    "hackAndEnter": "Hack & enter",
++    "hackAndOpen": "Hack & open",
++    "hackLocationHint": "Hacking unlocks entry to this location",
++    "hackContainerHint": "Hacking unlocks the contents"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 1439124..e2f071b 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -283,7 +283,12 @@
+     "gateLockLabel": "Замок ур. {difficulty}",
+     "backToParent": "← Назад",
+     "checkEntryHint": "Нажмите «Взломать», чтобы начать партию; «Смотреть» показывает уже идущую.",
+-    "checkWaitingBoard": "Доска появится после нажатия «Взломать»"
++    "checkWaitingBoard": "Доска появится после нажатия «Взломать»",
++    "hubNodeOpenLocation": "Войти",
++    "hackAndEnter": "Взломать и войти",
++    "hackAndOpen": "Взломать и открыть",
++    "hackLocationHint": "Взлом откроет вход в локацию",
++    "hackContainerHint": "Взлом откроет содержимое"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 52acc34..96d34cb 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "529"
++  "baseline": "530"
+ }
+diff --git a/public/version.json b/public/version.json
+index b6cd655..3251a64 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "529",
++  "version": "530",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Развели семантику взлома в иерархии пространств: взлом локации (узел с детьми) ВВОДИТ игрока внутрь, взлом контейнера показывает СОДЕРЖИМОЕ.",
++      "Кнопки и подсказки теперь говорят прямо: «Взломать и войти» / «Взломать и открыть», а у вложенной локации вместо «Открыть» — «Войти».",
++      "После ACCESS GRANTED исход применяется автоматически с небольшой паузой, чтобы игрок успел увидеть результат; переход адресный, каскада по графу нет.",
++      "Если мини-игру закрыли, у выигранной точки остаётся отдельная кнопка «Войти»/«Открыть» — доступ к содержимому не теряется.",
+       "Заведён закон снимка: сервер не трогает лист игрока. Любое изменение оформляется командой char.command, которую исполняет клиент штатными средствами, а затем сам публикует обновлённый снимок.",
+       "Закон действует на всё пространство Мастера: списание заколок, эффект журнала «Программиста», директивы, добыча, переносы и торговля не правят снимок на сервере.",
+       "Снимок остаётся каналом наблюдения за состоянием игрока без вмешательства: он виден Мастеру, когда ни одна сессия не открыта, и не очищается при открытии/закрытии локации.",
+@@ -114,6 +118,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Split hacking semantics in the location hierarchy: hacking a location (a node with children) ENTERS it, hacking a container shows its CONTENTS.",
++      "Buttons and hints now say it directly: «Hack & enter» / «Hack & open», and a nested location shows «Enter» instead of «Open».",
++      "After ACCESS GRANTED the outcome is applied automatically after a short pause so the player sees the result; the transition is addressable, with no graph cascade.",
++      "If the mini-game was closed, a won point keeps a separate «Enter»/«Open» button — access to the contents is never lost.",
+       "Introduced the snapshot law: the server never edits a player's sheet. Every change is a char.command that the client executes with its standard tools, after which the client publishes the updated snapshot itself.",
+       "The law covers the whole Game Master space: pin spending, the Programmer's Digest magazine effect, directives, loot, storage transfers and trading no longer mutate the snapshot on the server.",
+       "The snapshot stays an observation channel for the player's state without interference: the GM sees it when no session is open, and it is not cleared when a location opens or closes.",

@@ -1,5 +1,63 @@
 # Changelog
 ---
+## Hacking a location = enter, hacking a container = contents (patch 530)
+
+The first of the four remaining items of thesis 13. The owner asked to move on
+with the tasks; the snapshot law 529 was recorded separately.
+
+### 1. One predicate for every path
+
+New pure module `components/lootTrade/hackOutcome.js`: a node with `childIds`
+(or `kind: hub` on legacy sessions) is a **location**, a node without children
+is a **container**. `hackOutcomeForNode()` returns `enter` / `contents`;
+`applyHackOutcome()` performs exactly one addressable transition, with no graph
+cascade (the 523 invariant is intact).
+
+The same predicate drives three paths in `PlayerLootTradeOverlay.js`: the
+normal node button, the button after a won check, and the automatic ACCESS
+GRANTED outcome. The normal button of a nested location used to say «Open»
+while actually entering — it now correctly says «Enter».
+
+### 2. Interface
+
+- A locked point and a check-source point get a `hack-outcome-hint-*`:
+  «Hacking unlocks entry to this location» or «Hacking unlocks the contents»
+  (paired EN strings).
+- Hack button: «Hack & enter» for a location, «Hack & open» for a container;
+  gate (OR-source) buttons take the label from the target node.
+- The normal button of a nested location is «Enter»; containers keep «Open» /
+  «Trade».
+- A won point (lock/location) gets a separate `hack-outcome-button-*` so the
+  contents remain reachable even if the player closed the mini-game. A pure
+  terminal without children does not get the button: it is a check source, not
+  a container.
+
+### 3. Automatic win outcome
+
+ACCESS GRANTED on an explicit «Hack» press inside a real location closes the
+mini-game after `HACK_OUTCOME_DELAY_MS = 700` and applies the outcome: enter
+the location (`parentStack`) or open the contents (`selectedHubNodeId`). The
+pause lets the player see the board result first.
+
+It fires once per `(containerId, accessId, revision)`; «View», a standalone
+point and reopening an already-won board do not navigate. Laws 505/526 (the
+board is not rebuilt after a win, the player decides how many attempts to make)
+are intact: this is navigation, not a restart.
+
+### What is preserved
+
+The 529 snapshot law, `char.command` → `char.refresh` → `char.publish`, the
+«Заколка» canon, the 528 red pause, the 523 visibility boundary and
+addressable hack, server protection. The server was not changed in this patch.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (259 files), `git apply
+--check`, installer from the exact `a62ec71` base and from version 529 with
+byte comparison, live WS probe. Acceptance tests:
+`__tests__/lootTrade/hack-outcome-530.test.js` (pure predicate, labels and
+hints, automatic enter/contents, no navigation without an explicit «Hack»).
+
 ## Snapshot law: commands instead of editing the sheet (patch 529)
 
 > **Owner's words:** "don't touch the user's snapshot; if something must change

@@ -85,7 +85,11 @@ describe('519: интерфейс игрока и документы', () => {
     expect(overlay).toContain('gate-hack-button-');
     expect(overlay).toContain('gate-view-button-');
     expect(overlay).toContain('gateHackAllowed');
-    expect(overlay).toContain("tLootTrade('terminal.hack')");
+    // Патч 530: подпись взлома зависит от исхода (вход / содержимое).
+    expect(overlay).toContain('tLootTrade(nodeHackLabelKey)');
+    expect(overlay).toContain("'player.hackAndEnter'");
+    expect(overlay).toContain("'player.hackAndOpen'");
+    expect(overlay).toContain('targetNodeId: node.containerId');
     expect(overlay).toContain("node.keyAccessState !== 'denied'");
   });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Modal,
   View,
@@ -50,6 +50,14 @@ import {
   terminalBlockedReason,
 } from './terminalAccess';
 import { debugLog } from '../../src/debug/falloutDebug';
+import {
+  HACK_OUTCOME,
+  HACK_OUTCOME_DELAY_MS,
+  nodeHasChildren,
+  hackOutcomeForNode,
+  hackWinKey,
+  applyHackOutcome,
+} from './hackOutcome';
 
 const getItemIcon = (itemType) => {
   if (itemType === 'caps') return '💰';
@@ -235,6 +243,23 @@ export default function PlayerLootTradeOverlay() {
 
   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
 
+  /**
+   * Патч 530: один переход на всех путях — обычная кнопка, кнопка после
+   * выигранной проверки и автоматический исход ACCESS GRANTED. Локация —
+   * входим, контейнер — показываем содержимое. Каскада нет.
+   */
+  const navigateHackOutcome = useCallback((node) => {
+    const id = String(node?.containerId || '').trim();
+    if (!id) return HACK_OUTCOME.CONTENTS;
+    return applyHackOutcome(hackOutcomeForNode(node), id, {
+      enterLocation: (targetId) => {
+        setSelectedHubNodeId(null);
+        setParentStack((stack) => [...stack, targetId]);
+      },
+      openContents: (targetId) => setSelectedHubNodeId(targetId),
+    });
+  }, []);
+
   const selectedHubNode = useMemo(() => {
     if (!isHubSession || !selectedHubNodeId) return null;
     const found = (activeSession?.nodes || []).find(
@@ -267,6 +292,45 @@ export default function PlayerLootTradeOverlay() {
       setSellBuffer({});
     }
   }, [isHubSession, selectedHubNodeId, selectedHubNode]);
+
+  /**
+   * Патч 530: успешный взлом имеет АДРЕСНЫЙ исход. Взлом локации (узел с
+   * детьми) ВВОДИТ игрока внутрь, взлом контейнера — показывает СОДЕРЖИМОЕ.
+   * Переход делаем с небольшой паузой, чтобы игрок увидел ACCESS GRANTED.
+   *
+   * Работает только для явного «Взломать» (autoStart) внутри настоящей
+   * локации: «Смотреть», отдельно выданная точка и повторное открытие уже
+   * выигранной доски навигацию не дёргают. Каскада нет — только targetNodeId.
+   */
+  const handledWinRef = useRef('');
+  const winTimerRef = useRef(null);
+  useEffect(() => {
+    if (!isHubSession || !terminalSelection?.targetNodeId || !terminalSelection.autoStart) {
+      handledWinRef.current = '';
+      return;
+    }
+    const containerId = String(terminalSelection.node?.containerId || '').trim();
+    const state = rooms?.[matchedContext?.roomCode]?.terminalStates?.[containerId];
+    if (state?.game?.status !== 'won') return;
+    const key = hackWinKey(containerId, state);
+    if (handledWinRef.current === key) return;
+    handledWinRef.current = key;
+    if (winTimerRef.current) clearTimeout(winTimerRef.current);
+    const targetId = terminalSelection.targetNodeId;
+    const nodes = activeSession?.nodes || [];
+    winTimerRef.current = setTimeout(() => {
+      winTimerRef.current = null;
+      setTerminalSelection(null);
+      const target = nodes.find((n) => n.containerId === targetId) || { containerId: targetId };
+      navigateHackOutcome(target);
+    }, HACK_OUTCOME_DELAY_MS);
+  }, [
+    rooms, isHubSession, terminalSelection,
+    activeSession?.nodes, matchedContext?.roomCode, navigateHackOutcome,
+  ]);
+  useEffect(() => () => {
+    if (winTimerRef.current) clearTimeout(winTimerRef.current);
+  }, []);
 
   // Автоподрезка буфера покупки, если остаток в лавке уменьшился (купил другой игрок)
   useEffect(() => {
@@ -675,6 +739,22 @@ export default function PlayerLootTradeOverlay() {
                       kind: nodeCheckKind,
                     };
                     const nodeLocked = Boolean(node.locked);
+                    // Патч 530: выигранная проверка = доступ к содержимому
+                    // (или вход в локацию), а не только надпись «взломано».
+                    const nodeCheckPassed = Boolean(
+                      node.keyUnlocked || terminalState?.game?.status === 'won',
+                    );
+                    // Патч 530: локация (есть дети) — взлом = ВХОД, контейнер
+                    // (детей нет) — взлом = СОДЕРЖИМОЕ. Один и тот же предикат
+                    // используется и в кнопке «Открыть/Войти», и в исходе взлома.
+                    const nodeIsLocation = nodeHasChildren(node);
+                    const nodeHackOutcome = hackOutcomeForNode(node);
+                    const nodeHackLabelKey = nodeHackOutcome === HACK_OUTCOME.ENTER
+                      ? 'player.hackAndEnter'
+                      : 'player.hackAndOpen';
+                    const nodeHackHintKey = nodeHackOutcome === HACK_OUTCOME.ENTER
+                      ? 'player.hackLocationHint'
+                      : 'player.hackContainerHint';
                     // Патч 504: «Нет» Мастера оставляет карточку visible, но
                     // запрещает И взлом, И просмотр до новой трансляции.
                     const terminalClosed = Boolean(
@@ -796,6 +876,15 @@ export default function PlayerLootTradeOverlay() {
                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
                           )}
 
+                          {(nodeLocked || nodeIsTerminal) ? (
+                            <Text
+                              testID={`hack-outcome-hint-${node.containerId}`}
+                              style={styles.hubLockedHintText}
+                            >
+                              {tLootTrade(nodeHackHintKey)}
+                            </Text>
+                          ) : null}
+
                           {node.keyUnlocked ? (
                             <Text style={styles.hubUnlockedMetaText}>
                               {tLootTrade('player.hubNodeKeyUnlockedBadge')}
@@ -869,10 +958,11 @@ export default function PlayerLootTradeOverlay() {
                                             kind: option.kind,
                                             autoStart: true,
                                             freshAttempt: option.kind === CONTAINER_KIND.LOCK,
+                                            targetNodeId: node.containerId,
                                           });
                                         }}
                                       >
-                                        <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                        <Text style={styles.terminalHackButtonText}>{tLootTrade(nodeHackLabelKey)}</Text>
                                       </TouchableOpacity>
                                     </View>
                                   </View>
@@ -920,11 +1010,29 @@ export default function PlayerLootTradeOverlay() {
                                     kind: nodeCheckKind,
                                     autoStart: true,
                                     freshAttempt: nodeCheckKind === CONTAINER_KIND.LOCK,
+                                    targetNodeId: node.containerId,
                                   });
                                 }}
                               >
-                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                <Text style={styles.terminalHackButtonText}>{tLootTrade(nodeHackLabelKey)}</Text>
                               </TouchableOpacity>
+                              {(nodeCheckPassed && (nodeIsLocation || nodeIsLock)) ? (
+                                <TouchableOpacity
+                                  testID={`hack-outcome-button-${node.containerId}`}
+                                  style={styles.takeAllRowBtn}
+                                  onPress={() => navigateHackOutcome(node)}
+                                >
+                                  <Text style={styles.takeAllRowBtnText}>
+                                    {tLootTrade(
+                                      nodeIsLocation
+                                        ? 'player.hubNodeOpenLocation'
+                                        : (nodeIsMerch
+                                          ? 'player.hubNodeOpenMerchant'
+                                          : 'player.hubNodeOpenLoot'),
+                                    )}
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
                             </View>
                           ) : (
                             <TouchableOpacity
@@ -936,21 +1044,16 @@ export default function PlayerLootTradeOverlay() {
                                 // Патч 523: узел с детьми — это вложенная
                                 // локация/контейнер, входим внутрь, а не
                                 // открываем содержимое сразу.
-                                const hasChildren = Array.isArray(node.childIds)
-                                  ? node.childIds.length > 0
-                                  : node.kind === CONTAINER_KIND.HUB;
-                                if (hasChildren) {
-                                  setParentStack((stack) => [...stack, node.containerId]);
-                                } else {
-                                  setSelectedHubNodeId(node.containerId);
-                                }
+                                navigateHackOutcome(node);
                               }}
                             >
                               <Text style={styles.takeAllRowBtnText}>
                                 {tLootTrade(
-                                  nodeIsMerch
-                                    ? 'player.hubNodeOpenMerchant'
-                                    : 'player.hubNodeOpenLoot',
+                                  nodeIsLocation
+                                    ? 'player.hubNodeOpenLocation'
+                                    : (nodeIsMerch
+                                      ? 'player.hubNodeOpenMerchant'
+                                      : 'player.hubNodeOpenLoot'),
                                 )}
                               </Text>
                             </TouchableOpacity>

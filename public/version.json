@@ -1,8 +1,12 @@
 {
-  "version": "529",
+  "version": "530",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Развели семантику взлома в иерархии пространств: взлом локации (узел с детьми) ВВОДИТ игрока внутрь, взлом контейнера показывает СОДЕРЖИМОЕ.",
+      "Кнопки и подсказки теперь говорят прямо: «Взломать и войти» / «Взломать и открыть», а у вложенной локации вместо «Открыть» — «Войти».",
+      "После ACCESS GRANTED исход применяется автоматически с небольшой паузой, чтобы игрок успел увидеть результат; переход адресный, каскада по графу нет.",
+      "Если мини-игру закрыли, у выигранной точки остаётся отдельная кнопка «Войти»/«Открыть» — доступ к содержимому не теряется.",
       "Заведён закон снимка: сервер не трогает лист игрока. Любое изменение оформляется командой char.command, которую исполняет клиент штатными средствами, а затем сам публикует обновлённый снимок.",
       "Закон действует на всё пространство Мастера: списание заколок, эффект журнала «Программиста», директивы, добыча, переносы и торговля не правят снимок на сервере.",
       "Снимок остаётся каналом наблюдения за состоянием игрока без вмешательства: он виден Мастеру, когда ни одна сессия не открыта, и не очищается при открытии/закрытии локации.",
@@ -114,6 +118,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Split hacking semantics in the location hierarchy: hacking a location (a node with children) ENTERS it, hacking a container shows its CONTENTS.",
+      "Buttons and hints now say it directly: «Hack & enter» / «Hack & open», and a nested location shows «Enter» instead of «Open».",
+      "After ACCESS GRANTED the outcome is applied automatically after a short pause so the player sees the result; the transition is addressable, with no graph cascade.",
+      "If the mini-game was closed, a won point keeps a separate «Enter»/«Open» button — access to the contents is never lost.",
       "Introduced the snapshot law: the server never edits a player's sheet. Every change is a char.command that the client executes with its standard tools, after which the client publishes the updated snapshot itself.",
       "The law covers the whole Game Master space: pin spending, the Programmer's Digest magazine effect, directives, loot, storage transfers and trading no longer mutate the snapshot on the server.",
       "The snapshot stays an observation channel for the player's state without interference: the GM sees it when no session is open, and it is not cleared when a location opens or closes.",
