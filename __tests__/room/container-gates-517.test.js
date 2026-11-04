@@ -148,7 +148,7 @@ describe('517: связи видны Мастеру и план обновлён
   it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('517');
-    expect(plan).toContain('Осталось после патча 518');
+    expect(plan).toContain('Осталось после патча');
     expect(plan).not.toContain('| 9 | ⏳');
     expect(plan).toContain('две панели');
     expect(plan).toContain('Мини-игра взлома замков');

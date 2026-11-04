@@ -197,7 +197,7 @@ describe('518: окно по дизайну торговца', () => {
   it('roadmap обновлён до 518', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('518');
-    expect(plan).toContain('Осталось после патча 518');
+    expect(plan).toContain('Осталось после патча');
     expect(plan).not.toContain('| 10 | ⏳');
     expect(plan).toContain('Мини-игра взлома замков');
   });

@@ -522,6 +522,44 @@ export default function PlayerLootTradeOverlay() {
                       finished: 'terminal.accessUsed',
                       used: 'terminal.accessUsed',
                     }[accessBlockedReason] || null;
+                    // Патч 519: привязанный терминал — это «замок» точки, а не
+                    // отдельная карточка. Он скрыт из списка, а нажатие на
+                    // запертую точку открывает его мини-игру. Обязательный
+                    // ключ по-прежнему не обойти взломом.
+                    const gateTerminalId = String(node.linkedCheckId || '').trim();
+                    const gateState = gateTerminalId
+                      ? rooms?.[matchedContext.roomCode]?.terminalStates?.[gateTerminalId]
+                      : null;
+                    const gateAvailable = nodeLocked
+                      && node.keyAccessState !== 'denied'
+                      && Boolean(gateTerminalId)
+                      && Boolean(gateState);
+                    const gateKey = terminalAccessKey({
+                      roomCode: matchedContext.roomCode,
+                      containerId: gateTerminalId,
+                      accessId: gateState?.accessId,
+                    });
+                    const gateClosed = Boolean(
+                      gateState?.closed || gateState?.locked
+                      || gateState?.game?.status === 'closed',
+                    );
+                    const gateAwaiting = Boolean(
+                      gateState?.awaitingGm || gateState?.game?.status === 'awaitingRetry',
+                    );
+                    const gateHackAllowed = canHackTerminal({
+                      used: usedTerminalAccess,
+                      key: gateKey,
+                      game: gateState?.game,
+                      terminalClosed: gateClosed,
+                      terminalAwaiting: gateAwaiting,
+                    });
+                    const gateSelection = {
+                      ...(gateState?.config || {}),
+                      containerId: gateTerminalId,
+                      kind: CONTAINER_KIND.TERMINAL,
+                      name: gateState?.config?.name || tLootTrade('player.gateTerminal'),
+                      difficulty: gateState?.config?.difficulty ?? 1,
+                    };
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -584,11 +622,36 @@ export default function PlayerLootTradeOverlay() {
 
                         <View style={styles.lootRowBtns}>
                           {nodeLocked ? (
-                            <View style={styles.hubLockedBadge}>
-                              <Text style={styles.hubLockedBadgeText}>
-                                {tLootTrade('player.hubNodeLockedBadge')}
-                              </Text>
-                            </View>
+                            gateAvailable ? (
+                              <View style={styles.terminalButtons}>
+                                <TouchableOpacity
+                                  testID={`gate-view-button-${node.containerId}`}
+                                  style={styles.terminalViewButton}
+                                  onPress={() => setTerminalSelection({ node: gateSelection, autoStart: false })}
+                                >
+                                  <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  testID={`gate-hack-button-${node.containerId}`}
+                                  style={[styles.terminalHackButton, !gateHackAllowed && styles.terminalButtonDisabled]}
+                                  disabled={!gateHackAllowed}
+                                  onPress={() => {
+                                    markTerminalAccess(gateKey);
+                                    setTerminalSelection({ node: gateSelection, autoStart: true });
+                                  }}
+                                >
+                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <View style={styles.hubLockedBadge}>
+                                <Text style={styles.hubLockedBadgeText}>
+                                  {tLootTrade(node.keyAccessState === 'denied'
+                                    ? 'player.keyRequiredError'
+                                    : 'player.hubNodeLockedBadge')}
+                                </Text>
+                              </View>
+                            )
                           ) : nodeIsTerminal ? (
                             <View style={styles.terminalButtons}>
                               {accessBadgeKey && (

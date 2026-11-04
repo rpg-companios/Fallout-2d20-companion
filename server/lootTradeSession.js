@@ -166,6 +166,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
+    // Патч 519: терминал, привязанный к другой точке как замок, не должен
+    // торчать отдельной карточкой в локации у игроков.
+    hiddenForPlayers: Boolean(raw.hiddenForPlayers),
   };
 };
 
@@ -179,7 +182,18 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
     seen.add(node.containerId);
     out.push(node);
   });
-  return out;
+  // Патч 519: если точка ссылается на терминал как на ворота, этот терминал
+  // становится «замком» точки и скрывается из списка локации у игроков.
+  // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
+  // скрытого терминала состояние мини-игры (syncTerminalNodes).
+  const referenced = new Set(
+    out.map((n) => String(n.linkedCheckId || '').trim()).filter(Boolean),
+  );
+  return out.map((node) => (
+    node.kind === 'terminal' && referenced.has(node.containerId)
+      ? { ...node, hiddenForPlayers: true }
+      : node
+  ));
 };
 
 /**
@@ -190,7 +204,9 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   if (!session || isGm || session.kind !== 'hub') return session;
   return {
     ...session,
-    nodes: (session.nodes || []).map((node) => {
+    nodes: (session.nodes || [])
+      .filter((node) => !node.hiddenForPlayers)
+      .map((node) => {
       if (!node.locked) return node;
       return {
         ...node,
@@ -201,7 +217,7 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
         characterOverrides: {},
         hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
       };
-    }),
+      }),
   };
 };
 

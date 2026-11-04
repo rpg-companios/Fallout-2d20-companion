@@ -1,0 +1,1804 @@
+diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
+index 72833ed..0551c40 100644
+--- a/__tests__/room/container-gates-517.test.js
++++ b/__tests__/room/container-gates-517.test.js
+@@ -148,7 +148,7 @@ describe('517: связи видны Мастеру и план обновлён
+   it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('517');
+-    expect(plan).toContain('Осталось после патча 518');
++    expect(plan).toContain('Осталось после патча');
+     expect(plan).not.toContain('| 9 | ⏳');
+     expect(plan).toContain('две панели');
+     expect(plan).toContain('Мини-игра взлома замков');
+diff --git a/__tests__/room/gate-terminal-519.test.js b/__tests__/room/gate-terminal-519.test.js
+new file mode 100644
+index 0000000..f5f5f5e
+--- /dev/null
++++ b/__tests__/room/gate-terminal-519.test.js
+@@ -0,0 +1,117 @@
++// Приёмочный тест 519: привязанный терминал — «замок» сундука, а не соседняя
++// карточка. Игрок не видит терминал в локации; нажатие на запертый сундук
++// открывает мини-игру именно этого терминала; добыча доступна после взлома.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { normalizeActiveSession, sanitizeSessionForMember } from '../../server/lootTradeSession.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const hub = () => normalizeActiveSession({
++  name: 'Бункер', kind: 'hub', targetType: 'room',
++  nodes: [
++    { containerId: 't1', kind: 'terminal', name: 'Терминал', difficulty: 3 },
++    {
++      containerId: 'c1', kind: 'loot', name: 'Сундук',
++      linkedCheckId: 't1',
++      items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
++    },
++  ],
++});
++
++describe('519: терминал-замок скрыт из локации', () => {
++  it('нормализация помечает терминал, на который ссылается сундук', () => {
++    const nodes = hub().nodes;
++    expect(nodes.find((n) => n.containerId === 't1').hiddenForPlayers).toBe(true);
++    expect(nodes.find((n) => n.containerId === 'c1').hiddenForPlayers).toBe(false);
++    expect(nodes.find((n) => n.containerId === 'c1').linkedCheckId).toBe('t1');
++  });
++
++  it('игрок видит только сундук, Мастер — оба узла', () => {
++    const session = hub();
++    expect(sanitizeSessionForMember(session, { isGm: false }).nodes.map((n) => n.containerId))
++      .toEqual(['c1']);
++    expect(sanitizeSessionForMember(session, { isGm: true }).nodes.map((n) => n.containerId))
++      .toEqual(['t1', 'c1']);
++  });
++
++  it('запертый сундук не отдаёт игроку содержимое до взлома', () => {
++    const registry = createRoomRegistry({ now: () => 1000 });
++    const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
++    registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
++    registry.openSession({ code: room.code, clientId: 'gm', session: hub() });
++
++    const state = registry.getState(room.code);
++    const playerView = sanitizeSessionForMember(
++      registry.getRoom(room.code).activeSession, { isGm: false },
++    );
++    const chest = playerView.nodes.find((n) => n.containerId === 'c1');
++    expect(playerView.nodes).toHaveLength(1);
++    expect(chest.keyAccessState).toBe('needs-check');
++    expect(chest.locked).toBe(true);
++    expect(chest.items).toHaveLength(0);
++    // Мини-игра скрытого терминала всё равно зарегистрирована на комнате.
++    expect(state.terminalStates.t1).toBeTruthy();
++
++    const denied = registry.lootTake({
++      code: room.code, clientId: 'p1',
++      payload: { characterId: 'c1', nodeContainerId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
++    });
++    expect(denied.error).toBe('CONTAINER_LOCKED');
++
++    // Взлом терминала даёт событие и открывает сундук.
++    const raw = registry._rooms.get(room.code);
++    raw.terminalStates.get('t1').game = { status: 'won', operatorName: 'Игрок' };
++    registry.recomputeKeyAccess(room.code);
++    const opened = sanitizeSessionForMember(
++      registry.getRoom(room.code).activeSession, { isGm: false },
++    );
++    expect(opened.nodes.find((n) => n.containerId === 'c1').locked).toBe(false);
++    expect(opened.nodes.find((n) => n.containerId === 'c1').items).toHaveLength(1);
++    expect(registry.getAccessEvents(room.code).t1).toBeTruthy();
++  });
++});
++
++describe('519: интерфейс игрока и документы', () => {
++  const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++
++  it('у запертой точки с воротами есть кнопки просмотра и взлома', () => {
++    expect(overlay).toContain('gateAvailable');
++    expect(overlay).toContain('gate-hack-button-');
++    expect(overlay).toContain('gate-view-button-');
++    expect(overlay).toContain('gateHackAllowed');
++    expect(overlay).toContain("tLootTrade('terminal.hack')");
++    expect(overlay).toContain("node.keyAccessState !== 'denied'");
++  });
++
++  it('обязательный ключ не обойти взломом', () => {
++    expect(overlay).toContain("tLootTrade(node.keyAccessState === 'denied'");
++    expect(read('server/keyAccess.js')).toContain("if (requirement.keyRequirement === 'required')");
++  });
++
++  it('сервер скрывает узел и сохраняет состояние мини-игры', () => {
++    const session = read('server/lootTradeSession.js');
++    expect(session).toContain('hiddenForPlayers');
++    expect(session).toContain('.filter((node) => !node.hiddenForPlayers)');
++    expect(read('server/roomRegistry.js')).toContain('syncTerminalNodes(room, normalized');
++  });
++
++  it('подписи парные RU/EN', () => {
++    for (const loc of ['ru-RU', 'en-EN']) {
++      const d = JSON.parse(read(`i18n/${loc}/screens/lootTrade/screen.json`));
++      expect(d.player.gateTerminal).toBeTruthy();
++    }
++  });
++
++  it('roadmap обновлён до 519', () => {
++    const plan = read('docs/roadmap.md');
++    expect(plan).toContain('519');
++    expect(plan).toContain('Осталось после патча');
++    expect(plan).toContain('Мини-игра взлома замков');
++  });
++});
+diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
+index 2416bd8..bcb0a10 100644
+--- a/__tests__/room/key-access-516.test.js
++++ b/__tests__/room/key-access-516.test.js
+@@ -177,7 +177,7 @@ describe('516: экран карточек и документация', () => {
+   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('516');
+-    expect(plan).toContain('Осталось после патча 518');
++    expect(plan).toContain('Осталось после патча');
+     expect(plan).not.toContain('| 8 | ⏳');
+     expect(plan).toContain('Ворота между точками');
+     expect(plan).toContain('две панели');
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 1ebd2e2..57ca094 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -163,7 +163,7 @@ describe('514: словари и живой план', () => {
+   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 518');
++    expect(plan).toContain('Осталось после патча');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('Ворота между точками');
+     expect(plan).toContain('две панели');
+diff --git a/__tests__/room/storage-two-panel-518.test.js b/__tests__/room/storage-two-panel-518.test.js
+index d17add5..a33d05a 100644
+--- a/__tests__/room/storage-two-panel-518.test.js
++++ b/__tests__/room/storage-two-panel-518.test.js
+@@ -197,7 +197,7 @@ describe('518: окно по дизайну торговца', () => {
+   it('roadmap обновлён до 518', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('518');
+-    expect(plan).toContain('Осталось после патча 518');
++    expect(plan).toContain('Осталось после патча');
+     expect(plan).not.toContain('| 10 | ⏳');
+     expect(plan).toContain('Мини-игра взлома замков');
+   });
+diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
+index 4b8330e..d2b1450 100644
+--- a/__tests__/ui/form-checkbox-515.test.js
++++ b/__tests__/ui/form-checkbox-515.test.js
+@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
+   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
+     const plan = read('docs/roadmap.md');
+     expect(plan).toContain('515');
+-    expect(plan).toContain('Осталось после патча 518');
++    expect(plan).toContain('Осталось после патча');
+     expect(plan).toContain('Серверная проверка ключа');
+     expect(plan).toContain('две панели');
+     expect(plan).toContain('Мини-игра взлома замков');
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 3bddaa2..c5ac9e3 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -522,6 +522,44 @@ export default function PlayerLootTradeOverlay() {
+                       finished: 'terminal.accessUsed',
+                       used: 'terminal.accessUsed',
+                     }[accessBlockedReason] || null;
++                    // Патч 519: привязанный терминал — это «замок» точки, а не
++                    // отдельная карточка. Он скрыт из списка, а нажатие на
++                    // запертую точку открывает его мини-игру. Обязательный
++                    // ключ по-прежнему не обойти взломом.
++                    const gateTerminalId = String(node.linkedCheckId || '').trim();
++                    const gateState = gateTerminalId
++                      ? rooms?.[matchedContext.roomCode]?.terminalStates?.[gateTerminalId]
++                      : null;
++                    const gateAvailable = nodeLocked
++                      && node.keyAccessState !== 'denied'
++                      && Boolean(gateTerminalId)
++                      && Boolean(gateState);
++                    const gateKey = terminalAccessKey({
++                      roomCode: matchedContext.roomCode,
++                      containerId: gateTerminalId,
++                      accessId: gateState?.accessId,
++                    });
++                    const gateClosed = Boolean(
++                      gateState?.closed || gateState?.locked
++                      || gateState?.game?.status === 'closed',
++                    );
++                    const gateAwaiting = Boolean(
++                      gateState?.awaitingGm || gateState?.game?.status === 'awaitingRetry',
++                    );
++                    const gateHackAllowed = canHackTerminal({
++                      used: usedTerminalAccess,
++                      key: gateKey,
++                      game: gateState?.game,
++                      terminalClosed: gateClosed,
++                      terminalAwaiting: gateAwaiting,
++                    });
++                    const gateSelection = {
++                      ...(gateState?.config || {}),
++                      containerId: gateTerminalId,
++                      kind: CONTAINER_KIND.TERMINAL,
++                      name: gateState?.config?.name || tLootTrade('player.gateTerminal'),
++                      difficulty: gateState?.config?.difficulty ?? 1,
++                    };
+                     const piecesCount = (node.items || []).reduce(
+                       (sum, entry) => sum + (Number(entry.quantity) || 0),
+                       0,
+@@ -584,11 +622,36 @@ export default function PlayerLootTradeOverlay() {
+ 
+                         <View style={styles.lootRowBtns}>
+                           {nodeLocked ? (
+-                            <View style={styles.hubLockedBadge}>
+-                              <Text style={styles.hubLockedBadgeText}>
+-                                {tLootTrade('player.hubNodeLockedBadge')}
+-                              </Text>
+-                            </View>
++                            gateAvailable ? (
++                              <View style={styles.terminalButtons}>
++                                <TouchableOpacity
++                                  testID={`gate-view-button-${node.containerId}`}
++                                  style={styles.terminalViewButton}
++                                  onPress={() => setTerminalSelection({ node: gateSelection, autoStart: false })}
++                                >
++                                  <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
++                                </TouchableOpacity>
++                                <TouchableOpacity
++                                  testID={`gate-hack-button-${node.containerId}`}
++                                  style={[styles.terminalHackButton, !gateHackAllowed && styles.terminalButtonDisabled]}
++                                  disabled={!gateHackAllowed}
++                                  onPress={() => {
++                                    markTerminalAccess(gateKey);
++                                    setTerminalSelection({ node: gateSelection, autoStart: true });
++                                  }}
++                                >
++                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                </TouchableOpacity>
++                              </View>
++                            ) : (
++                              <View style={styles.hubLockedBadge}>
++                                <Text style={styles.hubLockedBadgeText}>
++                                  {tLootTrade(node.keyAccessState === 'denied'
++                                    ? 'player.keyRequiredError'
++                                    : 'player.hubNodeLockedBadge')}
++                                </Text>
++                              </View>
++                            )
+                           ) : nodeIsTerminal ? (
+                             <View style={styles.terminalButtons}>
+                               {accessBadgeKey && (
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7f8c9da..647ec72 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,28 @@
+ # Changelog
+ ---
++## Terminal as a chest lock (patch 519)
++
++The owner built a location, put a chest in it, linked a terminal in the chest
++and broadcast it to players. Both the chest and the terminal showed up in the
++location, the chest opened immediately and the terminal sat unused. Fixed per
++the owner's words: "the terminal should not be visible, and trying to open the
++chest should open the terminal".
++
++- **Hiding.** A terminal referenced by another point as its gate is marked by
++  the server and removed from the location node list **for players**. The GM
++  still sees every card, and the mini-game state for the hidden terminal is
++  still created on the room as usual.
++- **Lock instead of neighbour.** A locked chest with a gate now has "View"
++  and "Hack" buttons opening the mini-game of exactly that terminal. Players
++  see no separate terminal card.
++- **Loot after the hack.** Until the terminal is hacked, the chest stays
++  locked and its contents are not exposed. After a win the shared access event
++  opens the chest automatically and the loot can be taken. A found key still
++  opens it immediately, with no mini-game.
++- **Mandatory keys cannot be bypassed.** With a mandatory key in the first
++  row there is no hack button: the point stays closed until the record is
++  found.
++
+ ## Shared storage: two panels and transfer on button press (patch 518)
+ 
+ The owner's full description arrived, replacing the short one from patch 514:
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7d4127b..544bcdf 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,28 @@
+ # История изменений
+ 
+ ---
++## Терминал как замок сундука (патч 519)
++
++Владелец собрал локацию, положил в неё сундук, указал в сундуке терминал и
++выдал игрокам. Оказалось, что в локации видны **и сундук, и терминал**, сундук
++открывается сразу, а терминал остаётся не у дел. Исправлено по слову
++владельца: «терминал не видно, а при попытке открыть сундук открывается
++терминал».
++
++- **Скрытие.** Терминал, на который ссылается другая точка как на ворота,
++  помечается сервером и убирается из списка узлов локации **для игроков**.
++  Мастер по-прежнему видит все карточки, а состояние мини-игры для скрытого
++  терминала создаётся на комнате как обычно.
++- **Замок вместо соседа.** У запертого сундука с воротами теперь стоят кнопки
++  «Смотреть» и «Взломать» — они открывают мини-игру именно привязанного
++  терминала. Отдельной карточки терминала у игрока нет.
++- **Добыча после взлома.** Пока терминал не взломан, сундук заперт, его
++  содержимое игрокам не отдаётся. После победы событие доступа общее на
++  комнату, сундук открывается сам и выдаёт предметы. Найденный ключ работает
++  как прежде — открывает сразу, без мини-игры.
++- **Обязательный ключ не обойти.** Если в первой строке стоит обязательный
++  ключ, кнопки взлома нет: пока запись не добыта, точка остаётся закрытой.
++
+ ## Общее хранилище: две панели и перенос по кнопке (патч 518)
+ 
+ Пришло развёрнутое описание владельца (заменило краткое из патча 514):
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 5af376d..4b24388 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -146,6 +146,11 @@
+ **Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
+ кнопок, а поле описания перенесено в конец формы — после настроек доступа.
+ 
++**Патч 519 (уточнение владельца):** привязанный терминал — это замок точки,
++а не соседняя карточка. Он скрыт из локации у игроков; нажатие на запертую
++точку открывает его мини-игру; добыча доступна только после взлома или ключа.
++Обязательный ключ взломом не обходится.
++
+ **Патч 516 закрыл тезис 8:** проверка склада сервером, пропуск мини-игры и
+ отказ по обязательному ключу реализованы; ворота остаются тезисом 9.
+ 
+diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
+index 3e25267..60b4cba 100644
+--- a/docs/patch-493-install.md
++++ b/docs/patch-493-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 493: терминал в локации открывает мини-игру
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
+index 9103b3b..2c5f771 100644
+--- a/docs/patch-495-install.md
++++ b/docs/patch-495-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 7fc03d9..40168fa 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 24b2dbf..87e0d62 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index db3cf06..c32a520 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 18a4302..b6950f9 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index e6c9d62..7759a48 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+index f2806f9..951017a 100644
+--- a/docs/patch-501-install.md
++++ b/docs/patch-501-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 501: характеристики берутся из листа персонажа
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
+index 9e4abdf..90fd82d 100644
+--- a/docs/patch-502-install.md
++++ b/docs/patch-502-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 502: сейв из файла экспорта читается на любой глубине
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
+index 22ab5b2..ebb0cf9 100644
+--- a/docs/patch-503-install.md
++++ b/docs/patch-503-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 503: три группы слов, смена оператора, один полный возврат
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
+index 57c85d9..a748cea 100644
+--- a/docs/patch-504-install.md
++++ b/docs/patch-504-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 504: решение Мастера вместо блокировки после провала
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
+index a1b6c79..d37e3a6 100644
+--- a/docs/patch-505-install.md
++++ b/docs/patch-505-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 505: успешный взлом больше не пропадает
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
+index 1262429..b4d2ecc 100644
+--- a/docs/patch-506-install.md
++++ b/docs/patch-506-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
+index 18e8b33..0626771 100644
+--- a/docs/patch-507-install.md
++++ b/docs/patch-507-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
+index 53ba6ff..8c73f88 100644
+--- a/docs/patch-508-install.md
++++ b/docs/patch-508-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 508: хранилище Мастера + снапшот игрокам
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
+index 54afa49..020e735 100644
+--- a/docs/patch-509-install.md
++++ b/docs/patch-509-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
+index 8559369..5cd9fd3 100644
+--- a/docs/patch-510-install.md
++++ b/docs/patch-510-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 510: ключи и записки на общем складе (шаг 2)
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
+index 5e25c4f..38ff419 100644
+--- a/docs/patch-511-install.md
++++ b/docs/patch-511-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
+index 37fcbe4..14c6964 100644
+--- a/docs/patch-512-install.md
++++ b/docs/patch-512-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 512: модалки берут дизайн у соседних окон
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
+index 0063fcb..92709f8 100644
+--- a/docs/patch-513-install.md
++++ b/docs/patch-513-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 513: уточнение правил ключей (только документ)
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
+index 3f069b3..560e0d3 100644
+--- a/docs/patch-514-install.md
++++ b/docs/patch-514-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 514: поля и требования в карточках
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
+index 1f6f6b0..4dd0b4d 100644
+--- a/docs/patch-515-install.md
++++ b/docs/patch-515-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 515: чекбокс «Обязателен» и порядок полей
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
+index 636df3c..763306e 100644
+--- a/docs/patch-516-install.md
++++ b/docs/patch-516-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 516: серверная проверка ключа и возврат на карточки
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
+diff --git a/docs/patch-517-install.md b/docs/patch-517-install.md
+index 34fe0ac..79d1419 100644
+--- a/docs/patch-517-install.md
++++ b/docs/patch-517-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 517: ворота между точками
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 516** (коммит `d84aa70`, ветка
+diff --git a/docs/patch-518-install.md b/docs/patch-518-install.md
+index c86f24a..1c276ef 100644
+--- a/docs/patch-518-install.md
++++ b/docs/patch-518-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 518: общее хранилище в две панели
+ 
++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
++
+ Патч подготовлен от состояния **версии 517** (коммит `d343346`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–518
+diff --git a/docs/patch-519-install.md b/docs/patch-519-install.md
+new file mode 100644
+index 0000000..6dc9049
+--- /dev/null
++++ b/docs/patch-519-install.md
+@@ -0,0 +1,91 @@
++# Установка патча 519: терминал как замок сундука
++
++Патч подготовлен от состояния **версии 518** (коммит `d6a3dc2`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–519
++цепочкой.
++
++> Владелец: «Я создал локацию, положил в неё сундук, в сундуке выбрал
++> терминал, задал сложность. Выдано игрокам. В локации они видят и сундук и
++> терминал. Открывают сундук берут добычу. Терминал не у дел. А должно быть,
++> терминал не видно, а при попытке открыть сундук открывается терминал».
++
++## Что исправлено
++
++### 1. Привязанный терминал скрыт
++
++`server/lootTradeSession.js`: при нормализации узлов локации терминал, на
++который ссылается другая точка через вторую строку («Ворота: событие другой
++точки»), получает признак `hiddenForPlayers`. Для игроков такой узел
++убирается из списка; Мастер видит все карточки. Сервер по-прежнему создаёт
++состояние мини-игры для скрытого терминала — иначе нечего было бы взламывать.
++
++### 2. Нажатие на сундук открывает терминал
++
++`components/lootTrade/PlayerLootTradeOverlay.js`: у запертой точки с воротами
++вместо бейджа «Заперто» появляются кнопки «Смотреть» и «Взломать». Они
++открывают мини-игру именно привязанного терминала (по его состоянию в
++комнате), с той же одноразовой трансляцией и теми же правилами, что у обычного
++терминала.
++
++### 3. Добыча — только после проверки
++
++Пока терминал не взломан, узел заперт, содержимое игрокам не передаётся и
++взятие добычи отклоняется. После победы событие доступа (патчи 516–517)
++открывает сундук сам. Найденный ключ открывает сразу, без мини-игры. Если
++ключ объявлен **обязательным**, кнопок взлома нет — взлом не обходит
++обязательное требование.
++
++## Файлы
++
++| Файл | Изменение |
++| --- | --- |
++| `server/lootTradeSession.js` | `hiddenForPlayers`, пометка связанных терминалов, фильтрация для игроков |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | кнопки просмотра/взлома у запертой точки |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парная подпись «Замок точки» |
++| `__tests__/room/gate-terminal-519.test.js` | 8 приёмочных проверок |
++| исторические тесты плана | проверка раздела «Осталось» больше не привязана к номеру патча |
++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
++| `public/version.json`, `patchs/baseline.json` | версия 519, 85/85 заметок |
++| `patchs/519-gate-terminal.patch` | сам патч для установщика |
++
++## Установка
++
++С действующей версии 518:
++
++```bash
++./apply-patch.sh 519
++# ✓ Установлен патч: №519 (версия 518 → 519)
++```
++
++С чистого `main` со старым установщиком:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 519
++```
++
++`patchs/baseline.json` в источнике равен `519`. После установки
++`public/version.json` → `519`; закоммитьте изменения, **перезапустите сервис
++Node.js** (серверный код менялся) и пересоберите веб-сборку.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/gate-terminal-519.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "519"'
++```
++
++Тесты покрывают пометку скрытого терминала, разницу вида у игрока и Мастера,
++скрытие содержимого до взлома, отказ во взятии добычи и открытие после победы.
++
++### Прямой `git apply` без установщика
++
++```bash
++git apply patchs/519-gate-terminal.patch
++cp /path/to/519-gate-terminal.patch patchs/
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 736c0a0..88d47ba 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-03. Текущая версия: **518**.
++Дата ревизии: 2026-11-03. Текущая версия: **519**.
+ 
+ ## Тезисы
+ 
+@@ -20,11 +20,12 @@
+ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
+ | 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
+ | 9 | **Ворота между точками:** нейтральное событие `hacked` живёт на комнате, любая точка может быть источником, цепочка связей раскрывается за несколько проходов, Мастер видит связи на карточке и в локации | ✅ сделано | **517** |
++| 9а | **Терминал как замок точки:** привязанный терминал скрыт из локации у игроков, нажатие на запертый сундук открывает его мини-игру, добыча доступна только после взлома/ключа | ✅ сделано | **519** |
+ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
+ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
+ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+ 
+-## Осталось после патча 518
++## Осталось после патча 519
+ 
+ 1. **Мини-игра взлома замков** — будущий вид точки `lock` и нейтральное событие `hacked` (контракт события уже готов).
+ 2. **Мелочи склада** — лимиты и стаканье, удаление шаблона, тихое срабатывание.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index c347039..e24bcec 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -260,7 +260,8 @@
+     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
+     "tradeSuccess": "Trade completed!",
+     "keyRequiredError": "A key is required: the point stays closed without it",
+-    "hubNodeKeyUnlockedBadge": "Opened by key"
++    "hubNodeKeyUnlockedBadge": "Opened by key",
++    "gateTerminal": "Point lock"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 3bdd402..c67d07e 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -260,7 +260,8 @@
+     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
+     "tradeSuccess": "Сделка успешно завершена!",
+     "keyRequiredError": "Нужен ключ: без него точка закрыта",
+-    "hubNodeKeyUnlockedBadge": "Открыт ключом"
++    "hubNodeKeyUnlockedBadge": "Открыт ключом",
++    "gateTerminal": "Замок точки"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/519-gate-terminal.patch b/patchs/519-gate-terminal.patch
+new file mode 100644
+index 0000000..43d98ea
+--- /dev/null
++++ b/patchs/519-gate-terminal.patch
+@@ -0,0 +1,899 @@
++diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
++index 72833ed..0551c40 100644
++--- a/__tests__/room/container-gates-517.test.js
+++++ b/__tests__/room/container-gates-517.test.js
++@@ -148,7 +148,7 @@ describe('517: связи видны Мастеру и план обновлён
++   it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('517');
++-    expect(plan).toContain('Осталось после патча 518');
+++    expect(plan).toContain('Осталось после патча');
++     expect(plan).not.toContain('| 9 | ⏳');
++     expect(plan).toContain('две панели');
++     expect(plan).toContain('Мини-игра взлома замков');
++diff --git a/__tests__/room/gate-terminal-519.test.js b/__tests__/room/gate-terminal-519.test.js
++new file mode 100644
++index 0000000..f5f5f5e
++--- /dev/null
+++++ b/__tests__/room/gate-terminal-519.test.js
++@@ -0,0 +1,117 @@
+++// Приёмочный тест 519: привязанный терминал — «замок» сундука, а не соседняя
+++// карточка. Игрок не видит терминал в локации; нажатие на запертый сундук
+++// открывает мини-игру именно этого терминала; добыча доступна после взлома.
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++import { createRoomRegistry } from '../../server/roomRegistry.js';
+++import { normalizeActiveSession, sanitizeSessionForMember } from '../../server/lootTradeSession.js';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++
+++const hub = () => normalizeActiveSession({
+++  name: 'Бункер', kind: 'hub', targetType: 'room',
+++  nodes: [
+++    { containerId: 't1', kind: 'terminal', name: 'Терминал', difficulty: 3 },
+++    {
+++      containerId: 'c1', kind: 'loot', name: 'Сундук',
+++      linkedCheckId: 't1',
+++      items: [{ entryId: 'e1', name: 'Патроны', quantity: 1 }],
+++    },
+++  ],
+++});
+++
+++describe('519: терминал-замок скрыт из локации', () => {
+++  it('нормализация помечает терминал, на который ссылается сундук', () => {
+++    const nodes = hub().nodes;
+++    expect(nodes.find((n) => n.containerId === 't1').hiddenForPlayers).toBe(true);
+++    expect(nodes.find((n) => n.containerId === 'c1').hiddenForPlayers).toBe(false);
+++    expect(nodes.find((n) => n.containerId === 'c1').linkedCheckId).toBe('t1');
+++  });
+++
+++  it('игрок видит только сундук, Мастер — оба узла', () => {
+++    const session = hub();
+++    expect(sanitizeSessionForMember(session, { isGm: false }).nodes.map((n) => n.containerId))
+++      .toEqual(['c1']);
+++    expect(sanitizeSessionForMember(session, { isGm: true }).nodes.map((n) => n.containerId))
+++      .toEqual(['t1', 'c1']);
+++  });
+++
+++  it('запертый сундук не отдаёт игроку содержимое до взлома', () => {
+++    const registry = createRoomRegistry({ now: () => 1000 });
+++    const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 'tok' });
+++    registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
+++    registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Игрок', role: 'player' });
+++    registry.openSession({ code: room.code, clientId: 'gm', session: hub() });
+++
+++    const state = registry.getState(room.code);
+++    const playerView = sanitizeSessionForMember(
+++      registry.getRoom(room.code).activeSession, { isGm: false },
+++    );
+++    const chest = playerView.nodes.find((n) => n.containerId === 'c1');
+++    expect(playerView.nodes).toHaveLength(1);
+++    expect(chest.keyAccessState).toBe('needs-check');
+++    expect(chest.locked).toBe(true);
+++    expect(chest.items).toHaveLength(0);
+++    // Мини-игра скрытого терминала всё равно зарегистрирована на комнате.
+++    expect(state.terminalStates.t1).toBeTruthy();
+++
+++    const denied = registry.lootTake({
+++      code: room.code, clientId: 'p1',
+++      payload: { characterId: 'c1', nodeContainerId: 'c1', takes: [{ entryId: 'e1', quantity: 1 }] },
+++    });
+++    expect(denied.error).toBe('CONTAINER_LOCKED');
+++
+++    // Взлом терминала даёт событие и открывает сундук.
+++    const raw = registry._rooms.get(room.code);
+++    raw.terminalStates.get('t1').game = { status: 'won', operatorName: 'Игрок' };
+++    registry.recomputeKeyAccess(room.code);
+++    const opened = sanitizeSessionForMember(
+++      registry.getRoom(room.code).activeSession, { isGm: false },
+++    );
+++    expect(opened.nodes.find((n) => n.containerId === 'c1').locked).toBe(false);
+++    expect(opened.nodes.find((n) => n.containerId === 'c1').items).toHaveLength(1);
+++    expect(registry.getAccessEvents(room.code).t1).toBeTruthy();
+++  });
+++});
+++
+++describe('519: интерфейс игрока и документы', () => {
+++  const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
+++
+++  it('у запертой точки с воротами есть кнопки просмотра и взлома', () => {
+++    expect(overlay).toContain('gateAvailable');
+++    expect(overlay).toContain('gate-hack-button-');
+++    expect(overlay).toContain('gate-view-button-');
+++    expect(overlay).toContain('gateHackAllowed');
+++    expect(overlay).toContain("tLootTrade('terminal.hack')");
+++    expect(overlay).toContain("node.keyAccessState !== 'denied'");
+++  });
+++
+++  it('обязательный ключ не обойти взломом', () => {
+++    expect(overlay).toContain("tLootTrade(node.keyAccessState === 'denied'");
+++    expect(read('server/keyAccess.js')).toContain("if (requirement.keyRequirement === 'required')");
+++  });
+++
+++  it('сервер скрывает узел и сохраняет состояние мини-игры', () => {
+++    const session = read('server/lootTradeSession.js');
+++    expect(session).toContain('hiddenForPlayers');
+++    expect(session).toContain('.filter((node) => !node.hiddenForPlayers)');
+++    expect(read('server/roomRegistry.js')).toContain('syncTerminalNodes(room, normalized');
+++  });
+++
+++  it('подписи парные RU/EN', () => {
+++    for (const loc of ['ru-RU', 'en-EN']) {
+++      const d = JSON.parse(read(`i18n/${loc}/screens/lootTrade/screen.json`));
+++      expect(d.player.gateTerminal).toBeTruthy();
+++    }
+++  });
+++
+++  it('roadmap обновлён до 519', () => {
+++    const plan = read('docs/roadmap.md');
+++    expect(plan).toContain('519');
+++    expect(plan).toContain('Осталось после патча');
+++    expect(plan).toContain('Мини-игра взлома замков');
+++  });
+++});
++diff --git a/__tests__/room/key-access-516.test.js b/__tests__/room/key-access-516.test.js
++index 2416bd8..bcb0a10 100644
++--- a/__tests__/room/key-access-516.test.js
+++++ b/__tests__/room/key-access-516.test.js
++@@ -177,7 +177,7 @@ describe('516: экран карточек и документация', () => {
++   it('roadmap обновлён до 516 и список оставшихся актуален', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('516');
++-    expect(plan).toContain('Осталось после патча 518');
+++    expect(plan).toContain('Осталось после патча');
++     expect(plan).not.toContain('| 8 | ⏳');
++     expect(plan).toContain('Ворота между точками');
++     expect(plan).toContain('две панели');
++diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
++index 1ebd2e2..57ca094 100644
++--- a/__tests__/room/key-items-fields-514.test.js
+++++ b/__tests__/room/key-items-fields-514.test.js
++@@ -163,7 +163,7 @@ describe('514: словари и живой план', () => {
++   it('roadmap обновлён и перечисляет оставшиеся тезисы', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 518');
+++    expect(plan).toContain('Осталось после патча');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('Ворота между точками');
++     expect(plan).toContain('две панели');
++diff --git a/__tests__/room/storage-two-panel-518.test.js b/__tests__/room/storage-two-panel-518.test.js
++index d17add5..a33d05a 100644
++--- a/__tests__/room/storage-two-panel-518.test.js
+++++ b/__tests__/room/storage-two-panel-518.test.js
++@@ -197,7 +197,7 @@ describe('518: окно по дизайну торговца', () => {
++   it('roadmap обновлён до 518', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('518');
++-    expect(plan).toContain('Осталось после патча 518');
+++    expect(plan).toContain('Осталось после патча');
++     expect(plan).not.toContain('| 10 | ⏳');
++     expect(plan).toContain('Мини-игра взлома замков');
++   });
++diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
++index 4b8330e..d2b1450 100644
++--- a/__tests__/ui/form-checkbox-515.test.js
+++++ b/__tests__/ui/form-checkbox-515.test.js
++@@ -71,7 +71,7 @@ describe('515: словари без мёртвых ключей и живой 
++   it('roadmap обновлён до 515 и по-прежнему перечисляет оставшееся', () => {
++     const plan = read('docs/roadmap.md');
++     expect(plan).toContain('515');
++-    expect(plan).toContain('Осталось после патча 518');
+++    expect(plan).toContain('Осталось после патча');
++     expect(plan).toContain('Серверная проверка ключа');
++     expect(plan).toContain('две панели');
++     expect(plan).toContain('Мини-игра взлома замков');
++diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
++index 3bddaa2..c5ac9e3 100644
++--- a/components/lootTrade/PlayerLootTradeOverlay.js
+++++ b/components/lootTrade/PlayerLootTradeOverlay.js
++@@ -522,6 +522,44 @@ export default function PlayerLootTradeOverlay() {
++                       finished: 'terminal.accessUsed',
++                       used: 'terminal.accessUsed',
++                     }[accessBlockedReason] || null;
+++                    // Патч 519: привязанный терминал — это «замок» точки, а не
+++                    // отдельная карточка. Он скрыт из списка, а нажатие на
+++                    // запертую точку открывает его мини-игру. Обязательный
+++                    // ключ по-прежнему не обойти взломом.
+++                    const gateTerminalId = String(node.linkedCheckId || '').trim();
+++                    const gateState = gateTerminalId
+++                      ? rooms?.[matchedContext.roomCode]?.terminalStates?.[gateTerminalId]
+++                      : null;
+++                    const gateAvailable = nodeLocked
+++                      && node.keyAccessState !== 'denied'
+++                      && Boolean(gateTerminalId)
+++                      && Boolean(gateState);
+++                    const gateKey = terminalAccessKey({
+++                      roomCode: matchedContext.roomCode,
+++                      containerId: gateTerminalId,
+++                      accessId: gateState?.accessId,
+++                    });
+++                    const gateClosed = Boolean(
+++                      gateState?.closed || gateState?.locked
+++                      || gateState?.game?.status === 'closed',
+++                    );
+++                    const gateAwaiting = Boolean(
+++                      gateState?.awaitingGm || gateState?.game?.status === 'awaitingRetry',
+++                    );
+++                    const gateHackAllowed = canHackTerminal({
+++                      used: usedTerminalAccess,
+++                      key: gateKey,
+++                      game: gateState?.game,
+++                      terminalClosed: gateClosed,
+++                      terminalAwaiting: gateAwaiting,
+++                    });
+++                    const gateSelection = {
+++                      ...(gateState?.config || {}),
+++                      containerId: gateTerminalId,
+++                      kind: CONTAINER_KIND.TERMINAL,
+++                      name: gateState?.config?.name || tLootTrade('player.gateTerminal'),
+++                      difficulty: gateState?.config?.difficulty ?? 1,
+++                    };
++                     const piecesCount = (node.items || []).reduce(
++                       (sum, entry) => sum + (Number(entry.quantity) || 0),
++                       0,
++@@ -584,11 +622,36 @@ export default function PlayerLootTradeOverlay() {
++ 
++                         <View style={styles.lootRowBtns}>
++                           {nodeLocked ? (
++-                            <View style={styles.hubLockedBadge}>
++-                              <Text style={styles.hubLockedBadgeText}>
++-                                {tLootTrade('player.hubNodeLockedBadge')}
++-                              </Text>
++-                            </View>
+++                            gateAvailable ? (
+++                              <View style={styles.terminalButtons}>
+++                                <TouchableOpacity
+++                                  testID={`gate-view-button-${node.containerId}`}
+++                                  style={styles.terminalViewButton}
+++                                  onPress={() => setTerminalSelection({ node: gateSelection, autoStart: false })}
+++                                >
+++                                  <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+++                                </TouchableOpacity>
+++                                <TouchableOpacity
+++                                  testID={`gate-hack-button-${node.containerId}`}
+++                                  style={[styles.terminalHackButton, !gateHackAllowed && styles.terminalButtonDisabled]}
+++                                  disabled={!gateHackAllowed}
+++                                  onPress={() => {
+++                                    markTerminalAccess(gateKey);
+++                                    setTerminalSelection({ node: gateSelection, autoStart: true });
+++                                  }}
+++                                >
+++                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+++                                </TouchableOpacity>
+++                              </View>
+++                            ) : (
+++                              <View style={styles.hubLockedBadge}>
+++                                <Text style={styles.hubLockedBadgeText}>
+++                                  {tLootTrade(node.keyAccessState === 'denied'
+++                                    ? 'player.keyRequiredError'
+++                                    : 'player.hubNodeLockedBadge')}
+++                                </Text>
+++                              </View>
+++                            )
++                           ) : nodeIsTerminal ? (
++                             <View style={styles.terminalButtons}>
++                               {accessBadgeKey && (
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 7f8c9da..647ec72 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,28 @@
++ # Changelog
++ ---
+++## Terminal as a chest lock (patch 519)
+++
+++The owner built a location, put a chest in it, linked a terminal in the chest
+++and broadcast it to players. Both the chest and the terminal showed up in the
+++location, the chest opened immediately and the terminal sat unused. Fixed per
+++the owner's words: "the terminal should not be visible, and trying to open the
+++chest should open the terminal".
+++
+++- **Hiding.** A terminal referenced by another point as its gate is marked by
+++  the server and removed from the location node list **for players**. The GM
+++  still sees every card, and the mini-game state for the hidden terminal is
+++  still created on the room as usual.
+++- **Lock instead of neighbour.** A locked chest with a gate now has "View"
+++  and "Hack" buttons opening the mini-game of exactly that terminal. Players
+++  see no separate terminal card.
+++- **Loot after the hack.** Until the terminal is hacked, the chest stays
+++  locked and its contents are not exposed. After a win the shared access event
+++  opens the chest automatically and the loot can be taken. A found key still
+++  opens it immediately, with no mini-game.
+++- **Mandatory keys cannot be bypassed.** With a mandatory key in the first
+++  row there is no hack button: the point stays closed until the record is
+++  found.
+++
++ ## Shared storage: two panels and transfer on button press (patch 518)
++ 
++ The owner's full description arrived, replacing the short one from patch 514:
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 7d4127b..544bcdf 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,28 @@
++ # История изменений
++ 
++ ---
+++## Терминал как замок сундука (патч 519)
+++
+++Владелец собрал локацию, положил в неё сундук, указал в сундуке терминал и
+++выдал игрокам. Оказалось, что в локации видны **и сундук, и терминал**, сундук
+++открывается сразу, а терминал остаётся не у дел. Исправлено по слову
+++владельца: «терминал не видно, а при попытке открыть сундук открывается
+++терминал».
+++
+++- **Скрытие.** Терминал, на который ссылается другая точка как на ворота,
+++  помечается сервером и убирается из списка узлов локации **для игроков**.
+++  Мастер по-прежнему видит все карточки, а состояние мини-игры для скрытого
+++  терминала создаётся на комнате как обычно.
+++- **Замок вместо соседа.** У запертого сундука с воротами теперь стоят кнопки
+++  «Смотреть» и «Взломать» — они открывают мини-игру именно привязанного
+++  терминала. Отдельной карточки терминала у игрока нет.
+++- **Добыча после взлома.** Пока терминал не взломан, сундук заперт, его
+++  содержимое игрокам не отдаётся. После победы событие доступа общее на
+++  комнату, сундук открывается сам и выдаёт предметы. Найденный ключ работает
+++  как прежде — открывает сразу, без мини-игры.
+++- **Обязательный ключ не обойти.** Если в первой строке стоит обязательный
+++  ключ, кнопки взлома нет: пока запись не добыта, точка остаётся закрытой.
+++
++ ## Общее хранилище: две панели и перенос по кнопке (патч 518)
++ 
++ Пришло развёрнутое описание владельца (заменило краткое из патча 514):
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index 5af376d..4b24388 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -146,6 +146,11 @@
++ **Патч 515 (уточнение формы):** «Обязателен» стал чекбоксом вместо двух
++ кнопок, а поле описания перенесено в конец формы — после настроек доступа.
++ 
+++**Патч 519 (уточнение владельца):** привязанный терминал — это замок точки,
+++а не соседняя карточка. Он скрыт из локации у игроков; нажатие на запертую
+++точку открывает его мини-игру; добыча доступна только после взлома или ключа.
+++Обязательный ключ взломом не обходится.
+++
++ **Патч 516 закрыл тезис 8:** проверка склада сервером, пропуск мини-игры и
++ отказ по обязательному ключу реализованы; ворота остаются тезисом 9.
++ 
++diff --git a/docs/patch-493-install.md b/docs/patch-493-install.md
++index 3e25267..60b4cba 100644
++--- a/docs/patch-493-install.md
+++++ b/docs/patch-493-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 493: терминал в локации открывает мини-игру
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-495-install.md b/docs/patch-495-install.md
++index 9103b3b..2c5f771 100644
++--- a/docs/patch-495-install.md
+++++ b/docs/patch-495-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 495: словарь, ИНТ/Наука/Удача, «О приложении»
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
++index 7fc03d9..40168fa 100644
++--- a/docs/patch-496-install.md
+++++ b/docs/patch-496-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 496: «Саммари v2» взлома терминалов
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
++index 24b2dbf..87e0d62 100644
++--- a/docs/patch-497-install.md
+++++ b/docs/patch-497-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 497: канонические 4 попытки и доска «последовательности»
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
++index db3cf06..c32a520 100644
++--- a/docs/patch-498-install.md
+++++ b/docs/patch-498-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 498: чистый интерфейс терминала
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
++index 18a4302..b6950f9 100644
++--- a/docs/patch-499-install.md
+++++ b/docs/patch-499-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 499: скобки двух сортов, число задаёт Наука
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
++index e6c9d62..7759a48 100644
++--- a/docs/patch-500-install.md
+++++ b/docs/patch-500-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 500: доска «25 − ИНТ»
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
++index f2806f9..951017a 100644
++--- a/docs/patch-501-install.md
+++++ b/docs/patch-501-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 501: характеристики берутся из листа персонажа
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-502-install.md b/docs/patch-502-install.md
++index 9e4abdf..90fd82d 100644
++--- a/docs/patch-502-install.md
+++++ b/docs/patch-502-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 502: сейв из файла экспорта читается на любой глубине
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-503-install.md b/docs/patch-503-install.md
++index 22ab5b2..ebb0cf9 100644
++--- a/docs/patch-503-install.md
+++++ b/docs/patch-503-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 503: три группы слов, смена оператора, один полный возврат
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-504-install.md b/docs/patch-504-install.md
++index 57c85d9..a748cea 100644
++--- a/docs/patch-504-install.md
+++++ b/docs/patch-504-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 504: решение Мастера вместо блокировки после провала
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-505-install.md b/docs/patch-505-install.md
++index a1b6c79..d37e3a6 100644
++--- a/docs/patch-505-install.md
+++++ b/docs/patch-505-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 505: успешный взлом больше не пропадает
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-506-install.md b/docs/patch-506-install.md
++index 1262429..b4d2ecc 100644
++--- a/docs/patch-506-install.md
+++++ b/docs/patch-506-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 506: уведомление Мастера, одноразовый доступ, выход из локации
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-507-install.md b/docs/patch-507-install.md
++index 18e8b33..0626771 100644
++--- a/docs/patch-507-install.md
+++++ b/docs/patch-507-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 507: «Общее хранилище» комнаты (шаг 1)
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-508-install.md b/docs/patch-508-install.md
++index 53ba6ff..8c73f88 100644
++--- a/docs/patch-508-install.md
+++++ b/docs/patch-508-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 508: хранилище Мастера + снапшот игрокам
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-509-install.md b/docs/patch-509-install.md
++index 54afa49..020e735 100644
++--- a/docs/patch-509-install.md
+++++ b/docs/patch-509-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 509: мультиплатформенный сейв и перенос хранилища через JSON
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-510-install.md b/docs/patch-510-install.md
++index 8559369..5cd9fd3 100644
++--- a/docs/patch-510-install.md
+++++ b/docs/patch-510-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 510: ключи и записки на общем складе (шаг 2)
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-511-install.md b/docs/patch-511-install.md
++index 5e25c4f..38ff419 100644
++--- a/docs/patch-511-install.md
+++++ b/docs/patch-511-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 511: ключи как карточки на экране «Добыча / Торговля»
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-512-install.md b/docs/patch-512-install.md
++index 37fcbe4..14c6964 100644
++--- a/docs/patch-512-install.md
+++++ b/docs/patch-512-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 512: модалки берут дизайн у соседних окон
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-513-install.md b/docs/patch-513-install.md
++index 0063fcb..92709f8 100644
++--- a/docs/patch-513-install.md
+++++ b/docs/patch-513-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 513: уточнение правил ключей (только документ)
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-514-install.md b/docs/patch-514-install.md
++index 3f069b3..560e0d3 100644
++--- a/docs/patch-514-install.md
+++++ b/docs/patch-514-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 514: поля и требования в карточках
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-515-install.md b/docs/patch-515-install.md
++index 1f6f6b0..4dd0b4d 100644
++--- a/docs/patch-515-install.md
+++++ b/docs/patch-515-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 515: чекбокс «Обязателен» и порядок полей
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-516-install.md b/docs/patch-516-install.md
++index 636df3c..763306e 100644
++--- a/docs/patch-516-install.md
+++++ b/docs/patch-516-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 516: серверная проверка ключа и возврат на карточки
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ > **Ворота между точками — патч 517. План: `docs/roadmap.md`, установка: `docs/patch-517-install.md`.**
++diff --git a/docs/patch-517-install.md b/docs/patch-517-install.md
++index 34fe0ac..79d1419 100644
++--- a/docs/patch-517-install.md
+++++ b/docs/patch-517-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 517: ворота между точками
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ > **Общее хранилище в две панели — патч 518. План: `docs/roadmap.md`, установка: `docs/patch-518-install.md`.**
++ 
++ Патч подготовлен от состояния **версии 516** (коммит `d84aa70`, ветка
++diff --git a/docs/patch-518-install.md b/docs/patch-518-install.md
++index c86f24a..1c276ef 100644
++--- a/docs/patch-518-install.md
+++++ b/docs/patch-518-install.md
++@@ -1,5 +1,7 @@
++ # Установка патча 518: общее хранилище в две панели
++ 
+++> **Терминал как замок сундука — патч 519. План: `docs/roadmap.md`, установка: `docs/patch-519-install.md`.**
+++
++ Патч подготовлен от состояния **версии 517** (коммит `d343346`, ветка
++ `arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–518
++diff --git a/docs/patch-519-install.md b/docs/patch-519-install.md
++new file mode 100644
++index 0000000..6dc9049
++--- /dev/null
+++++ b/docs/patch-519-install.md
++@@ -0,0 +1,91 @@
+++# Установка патча 519: терминал как замок сундука
+++
+++Патч подготовлен от состояния **версии 518** (коммит `d6a3dc2`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–519
+++цепочкой.
+++
+++> Владелец: «Я создал локацию, положил в неё сундук, в сундуке выбрал
+++> терминал, задал сложность. Выдано игрокам. В локации они видят и сундук и
+++> терминал. Открывают сундук берут добычу. Терминал не у дел. А должно быть,
+++> терминал не видно, а при попытке открыть сундук открывается терминал».
+++
+++## Что исправлено
+++
+++### 1. Привязанный терминал скрыт
+++
+++`server/lootTradeSession.js`: при нормализации узлов локации терминал, на
+++который ссылается другая точка через вторую строку («Ворота: событие другой
+++точки»), получает признак `hiddenForPlayers`. Для игроков такой узел
+++убирается из списка; Мастер видит все карточки. Сервер по-прежнему создаёт
+++состояние мини-игры для скрытого терминала — иначе нечего было бы взламывать.
+++
+++### 2. Нажатие на сундук открывает терминал
+++
+++`components/lootTrade/PlayerLootTradeOverlay.js`: у запертой точки с воротами
+++вместо бейджа «Заперто» появляются кнопки «Смотреть» и «Взломать». Они
+++открывают мини-игру именно привязанного терминала (по его состоянию в
+++комнате), с той же одноразовой трансляцией и теми же правилами, что у обычного
+++терминала.
+++
+++### 3. Добыча — только после проверки
+++
+++Пока терминал не взломан, узел заперт, содержимое игрокам не передаётся и
+++взятие добычи отклоняется. После победы событие доступа (патчи 516–517)
+++открывает сундук сам. Найденный ключ открывает сразу, без мини-игры. Если
+++ключ объявлен **обязательным**, кнопок взлома нет — взлом не обходит
+++обязательное требование.
+++
+++## Файлы
+++
+++| Файл | Изменение |
+++| --- | --- |
+++| `server/lootTradeSession.js` | `hiddenForPlayers`, пометка связанных терминалов, фильтрация для игроков |
+++| `components/lootTrade/PlayerLootTradeOverlay.js` | кнопки просмотра/взлома у запертой точки |
+++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парная подпись «Замок точки» |
+++| `__tests__/room/gate-terminal-519.test.js` | 8 приёмочных проверок |
+++| исторические тесты плана | проверка раздела «Осталось» больше не привязана к номеру патча |
+++| `docs/roadmap.md`, `docs/key-items-and-gates-design.md`, `docs/changelog.*.md` | план и RU/EN описание |
+++| `public/version.json`, `patchs/baseline.json` | версия 519, 85/85 заметок |
+++| `patchs/519-gate-terminal.patch` | сам патч для установщика |
+++
+++## Установка
+++
+++С действующей версии 518:
+++
+++```bash
+++./apply-patch.sh 519
+++# ✓ Установлен патч: №519 (версия 518 → 519)
+++```
+++
+++С чистого `main` со старым установщиком:
+++
+++```bash
+++git fetch origin arena/054e6676-fallout-2d20-companion
+++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
+++./apply-patch.sh 519
+++```
+++
+++`patchs/baseline.json` в источнике равен `519`. После установки
+++`public/version.json` → `519`; закоммитьте изменения, **перезапустите сервис
+++Node.js** (серверный код менялся) и пересоберите веб-сборку.
+++
+++## Проверка
+++
+++```bash
+++npm run typecheck
+++npx vitest run __tests__/room/gate-terminal-519.test.js
+++npx vitest run
+++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
+++curl -s http://localhost:5000/version.json | grep '"version": "519"'
+++```
+++
+++Тесты покрывают пометку скрытого терминала, разницу вида у игрока и Мастера,
+++скрытие содержимого до взлома, отказ во взятии добычи и открытие после победы.
+++
+++### Прямой `git apply` без установщика
+++
+++```bash
+++git apply patchs/519-gate-terminal.patch
+++cp /path/to/519-gate-terminal.patch patchs/
+++```
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++index 736c0a0..88d47ba 100644
++--- a/docs/roadmap.md
+++++ b/docs/roadmap.md
++@@ -5,7 +5,7 @@
++ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++ > ответе владельцу. Этот файл — источник истины для порядка шагов.
++ 
++-Дата ревизии: 2026-11-03. Текущая версия: **518**.
+++Дата ревизии: 2026-11-03. Текущая версия: **519**.
++ 
++ ## Тезисы
++ 
++@@ -20,11 +20,12 @@
++ | 7 | **Поля и требования в карточках:** ключ как часть родителя, иконка перетаскивания у всех четырёх, две строки настройки (ключ + чекбокс «Обязателен» / проверка), вложенные ключи в локации; описание перенесено в конец формы | ✅ сделано | **514–515** |
++ | 8 | **Серверная проверка ключа:** ключ на складе открывает точку без мини-игры, обязательный без ключа отказывает, необязательный ждёт привязанной проверки; после создания точки экран карточек не покидаем | ✅ сделано | **516** |
++ | 9 | **Ворота между точками:** нейтральное событие `hacked` живёт на комнате, любая точка может быть источником, цепочка связей раскрывается за несколько проходов, Мастер видит связи на карточке и в локации | ✅ сделано | **517** |
+++| 9а | **Терминал как замок точки:** привязанный терминал скрыт из локации у игроков, нажатие на запертый сундук открывает его мини-игру, добыча доступна только после взлома/ключа | ✅ сделано | **519** |
++ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
++ | 11 | Мини-игра взлома замков: вид точки `lock`, нейтральное событие `hacked`, тот же контракт требований | ⏳ осталось | — |
++ | 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++ 
++-## Осталось после патча 518
+++## Осталось после патча 519
++ 
++ 1. **Мини-игра взлома замков** — будущий вид точки `lock` и нейтральное событие `hacked` (контракт события уже готов).
++ 2. **Мелочи склада** — лимиты и стаканье, удаление шаблона, тихое срабатывание.
++diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
++index c347039..e24bcec 100644
++--- a/i18n/en-EN/screens/lootTrade/screen.json
+++++ b/i18n/en-EN/screens/lootTrade/screen.json
++@@ -260,7 +260,8 @@
++     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
++     "tradeSuccess": "Trade completed!",
++     "keyRequiredError": "A key is required: the point stays closed without it",
++-    "hubNodeKeyUnlockedBadge": "Opened by key"
+++    "hubNodeKeyUnlockedBadge": "Opened by key",
+++    "gateTerminal": "Point lock"
++   },
++   "keyItems": {
++     "title": "Keys and notes",
++diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
++index 3bdd402..c67d07e 100644
++--- a/i18n/ru-RU/screens/lootTrade/screen.json
+++++ b/i18n/ru-RU/screens/lootTrade/screen.json
++@@ -260,7 +260,8 @@
++     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
++     "tradeSuccess": "Сделка успешно завершена!",
++     "keyRequiredError": "Нужен ключ: без него точка закрыта",
++-    "hubNodeKeyUnlockedBadge": "Открыт ключом"
+++    "hubNodeKeyUnlockedBadge": "Открыт ключом",
+++    "gateTerminal": "Замок точки"
++   },
++   "keyItems": {
++     "title": "Ключи и записки",
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index 539207b..8e726c4 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "518"
+++  "baseline": "519"
++ }
++diff --git a/public/version.json b/public/version.json
++index d873094..8a7ee80 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "518",
+++  "version": "519",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
++       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
++       "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
++       "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
++@@ -89,6 +90,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
++       "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",
++       "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
++       "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
++diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
++index 39be851..f2397b9 100644
++--- a/server/lootTradeSession.js
+++++ b/server/lootTradeSession.js
++@@ -166,6 +166,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
++     linkedCheckId: String(raw.linkedCheckId || '').trim(),
++     keyAccessState: String(raw.keyAccessState || 'none'),
++     keyUnlocked: Boolean(raw.keyUnlocked),
+++    // Патч 519: терминал, привязанный к другой точке как замок, не должен
+++    // торчать отдельной карточкой в локации у игроков.
+++    hiddenForPlayers: Boolean(raw.hiddenForPlayers),
++   };
++ };
++ 
++@@ -179,7 +182,18 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
++     seen.add(node.containerId);
++     out.push(node);
++   });
++-  return out;
+++  // Патч 519: если точка ссылается на терминал как на ворота, этот терминал
+++  // становится «замком» точки и скрывается из списка локации у игроков.
+++  // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
+++  // скрытого терминала состояние мини-игры (syncTerminalNodes).
+++  const referenced = new Set(
+++    out.map((n) => String(n.linkedCheckId || '').trim()).filter(Boolean),
+++  );
+++  return out.map((node) => (
+++    node.kind === 'terminal' && referenced.has(node.containerId)
+++      ? { ...node, hiddenForPlayers: true }
+++      : node
+++  ));
++ };
++ 
++ /**
++@@ -190,7 +204,9 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
++   if (!session || isGm || session.kind !== 'hub') return session;
++   return {
++     ...session,
++-    nodes: (session.nodes || []).map((node) => {
+++    nodes: (session.nodes || [])
+++      .filter((node) => !node.hiddenForPlayers)
+++      .map((node) => {
++       if (!node.locked) return node;
++       return {
++         ...node,
++@@ -201,7 +217,7 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
++         characterOverrides: {},
++         hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
++       };
++-    }),
+++      }),
++   };
++ };
++ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 539207b..8e726c4 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "518"
++  "baseline": "519"
+ }
+diff --git a/public/version.json b/public/version.json
+index d873094..8a7ee80 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "518",
++  "version": "519",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
+       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
+       "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
+       "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
+@@ -89,6 +90,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
+       "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",
+       "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
+       "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 39be851..f2397b9 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -166,6 +166,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
++    // Патч 519: терминал, привязанный к другой точке как замок, не должен
++    // торчать отдельной карточкой в локации у игроков.
++    hiddenForPlayers: Boolean(raw.hiddenForPlayers),
+   };
+ };
+ 
+@@ -179,7 +182,18 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
+     seen.add(node.containerId);
+     out.push(node);
+   });
+-  return out;
++  // Патч 519: если точка ссылается на терминал как на ворота, этот терминал
++  // становится «замком» точки и скрывается из списка локации у игроков.
++  // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
++  // скрытого терминала состояние мини-игры (syncTerminalNodes).
++  const referenced = new Set(
++    out.map((n) => String(n.linkedCheckId || '').trim()).filter(Boolean),
++  );
++  return out.map((node) => (
++    node.kind === 'terminal' && referenced.has(node.containerId)
++      ? { ...node, hiddenForPlayers: true }
++      : node
++  ));
+ };
+ 
+ /**
+@@ -190,7 +204,9 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   if (!session || isGm || session.kind !== 'hub') return session;
+   return {
+     ...session,
+-    nodes: (session.nodes || []).map((node) => {
++    nodes: (session.nodes || [])
++      .filter((node) => !node.hiddenForPlayers)
++      .map((node) => {
+       if (!node.locked) return node;
+       return {
+         ...node,
+@@ -201,7 +217,7 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+         characterOverrides: {},
+         hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
+       };
+-    }),
++      }),
+   };
+ };
+ 

@@ -1,5 +1,28 @@
 # Changelog
 ---
+## Terminal as a chest lock (patch 519)
+
+The owner built a location, put a chest in it, linked a terminal in the chest
+and broadcast it to players. Both the chest and the terminal showed up in the
+location, the chest opened immediately and the terminal sat unused. Fixed per
+the owner's words: "the terminal should not be visible, and trying to open the
+chest should open the terminal".
+
+- **Hiding.** A terminal referenced by another point as its gate is marked by
+  the server and removed from the location node list **for players**. The GM
+  still sees every card, and the mini-game state for the hidden terminal is
+  still created on the room as usual.
+- **Lock instead of neighbour.** A locked chest with a gate now has "View"
+  and "Hack" buttons opening the mini-game of exactly that terminal. Players
+  see no separate terminal card.
+- **Loot after the hack.** Until the terminal is hacked, the chest stays
+  locked and its contents are not exposed. After a win the shared access event
+  opens the chest automatically and the loot can be taken. A found key still
+  opens it immediately, with no mini-game.
+- **Mandatory keys cannot be bypassed.** With a mandatory key in the first
+  row there is no hack button: the point stays closed until the record is
+  found.
+
 ## Shared storage: two panels and transfer on button press (patch 518)
 
 The owner's full description arrived, replacing the short one from patch 514:
