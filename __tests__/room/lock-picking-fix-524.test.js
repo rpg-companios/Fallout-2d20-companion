@@ -44,7 +44,7 @@ const LIVE_STORE = {
   items: {
     id_1701_a1: { id: 'id_1701_a1', weaponId: 'item_bobby_pin', quantity: 7 },
     id_1702_b2: { catalogId: 'item_bobby_pin', count: '3' },
-    id_1703_c3: { name: 'Отмычка', code: 'item_bobby_pin', qty: 2 },
+    id_1703_c3: { name: 'Заколка', code: 'item_bobby_pin', qty: 2 },
     id_1704_d4: { itemId: 'weapon_10mm', quantity: 1 },
   },
   equipment: { items: [{ id: 'item_bobby_pin', quantity: 4 }] },
@@ -120,7 +120,7 @@ describe('524: локальный резерв доски замка', () => {
     expect(state.view.result).toBe('ACCESS GRANTED');
   });
 
-  it('поломка списывает отмычку в локальный ledger, «Да» собирает новую доску', () => {
+  it('527: поломка списывает заколку из инвентаря, «Да» собирает новую доску', () => {
     const low = {
       ...LIVE_STORE,
       skills: { LOCKPICK: { base: 0 } },
@@ -141,9 +141,17 @@ describe('524: локальный резерв доски замка', () => {
     }
     expect(state.spentPins).toBeGreaterThan(0);
     const awaiting = { ...state, game: { ...state.game, status: 'awaitingRetry' } };
-    const fresh = applyLocalLockAction(awaiting, 'retry', 'yes', localCtx);
+    // Патч 527: клиент зеркально списал заколки из живого стора, поэтому
+    // свежий лист содержит меньше предмета; двойного вычета по ledger нет.
+    const spent = state.spentPins;
+    const afterSpend = {
+      ...low,
+      items: { p1: { id: 'p1', weaponId: 'item_bobby_pin', quantity: 3 - spent } },
+    };
+    const spentCtx = { ...localCtx, characterSnapshot: buildLocalLockSnapshot(afterSpend) };
+    const fresh = applyLocalLockAction(awaiting, 'retry', 'yes', spentCtx);
     expect(fresh.error).toBeNull();
-    expect(fresh.view.pinsTotal).toBe(3 - state.spentPins);
+    expect(fresh.view.pinsTotal).toBe(3 - spent);
     expect(fresh.view.status).toBe('playing');
     const denied = applyLocalLockAction(awaiting, 'retry', 'no', localCtx);
     expect(denied.view.status).toBe('closed');
@@ -214,7 +222,7 @@ describe('524: документы, строки и регрессионные з
     const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
     const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
     expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
-    expect(ru.noPinsHint).toContain('Отмычк');
+    expect(ru.noPinsHint).toContain('Заколк'); // 527: item_bobby_pin — «Заколка»
     expect(en.sessionNotPublished).toContain('room');
     const version = json('public/version.json');
     expect(Number(version.version)).toBeGreaterThanOrEqual(524);

@@ -76,7 +76,7 @@ describe('524: окно замка на старом сервере комнат
     useCharacterStore.setState(character());
   });
 
-  it('собирает доску локально: ячейки, отмычки и нажимаемые стрелки без terminal.action', async () => {
+  it('собирает доску локально: ячейки, заколки и нажимаемые стрелки без terminal.action', async () => {
     const actOnTerminal = vi.fn(async () => { throw fail('UNKNOWN_TYPE'); });
     useRoomStore.setState({ clientId: 'client-1', rooms: { ROOM1: room() }, actOnTerminal });
 

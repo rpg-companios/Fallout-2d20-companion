@@ -242,7 +242,7 @@ describe('526: локальный резерв и строки', () => {
     expect(Object.keys(ru.lock).sort()).toEqual(Object.keys(en.lock).sort());
     expect(ru.lock.newAttempt).toBe('Ещё подход');
     expect(en.lock.newAttempt).toBe('Another attempt');
-    expect(ru.lock.newAttemptHint).toContain('отмычк');
+    expect(ru.lock.newAttemptHint).toContain('заколк'); // 527
     expect(en.lock.newAttemptHint).toContain('pins');
     expect(ru.lock.hackedTitle).toBe('Замок взломан');
     expect(en.lock.hackedTitle).toBe('Lock picked');

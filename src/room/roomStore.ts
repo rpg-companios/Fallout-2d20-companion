@@ -234,6 +234,8 @@ const publishListeners = new Set<(message: RoomEnvelope) => void>();
 const sessionListeners = new Set<(message: RoomEnvelope) => void>();
 const storageListeners = new Set<(message: RoomEnvelope) => void>();
 const directiveListeners = new Set<(message: RoomEnvelope) => void>();
+/** Патч 528: команды списания предмета и обновления снимка (char.spend / char.refresh). */
+const charSpendListeners = new Set<(message: RoomEnvelope) => void>();
 
 const getWebTabSessionSuffix = (): string => {
   if (typeof window === 'undefined') return '';
@@ -305,6 +307,12 @@ export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) =>
 export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) => {
   storageListeners.add(listener);
   return () => { storageListeners.delete(listener); };
+};
+
+/** Патч 528/529: подписка на команды изменения листа и char.refresh. */
+export const onRoomCharSpend = (listener: (message: RoomEnvelope) => void) => {
+  charSpendListeners.add(listener);
+  return () => { charSpendListeners.delete(listener); };
 };
 
 /** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
@@ -461,6 +469,20 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       || message.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
     ) {
       applyDirectiveEnvelopeToStore(message);
+    }
+    // Патч 529 (ЗАКОН СНИМКА): сервер НЕ правит снимок — он посылает команду
+    // изменения листа, затем команду его обновления. Обработчик намеренно
+    // вызывается до разбора requestId: у этих кадров его нет.
+    if (
+      message.type === ROOM_MESSAGE.CHAR_COMMAND
+      || message.type === ROOM_MESSAGE.CHAR_SPEND
+      || message.type === ROOM_MESSAGE.CHAR_REFRESH
+    ) {
+      charSpendListeners.forEach((listener) => {
+        try { listener(message); } catch (error) {
+          debugLog('room.charSpendListener:failed', { message: (error as Error)?.message });
+        }
+      });
     }
     if (requestId && pendingRequests.has(requestId)) {
       const pending = pendingRequests.get(requestId)!;

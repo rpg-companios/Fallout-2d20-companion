@@ -58,6 +58,10 @@ export const lockLightStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
+  // Патч 531: левая колонка строки статуса должна СЖИМАТЬСЯ до ширины
+  // карточки. Иначе длинная подсказка задаёт собственную (огромную) ширину,
+  // текст встаёт в одну строку и уходит за границы модалки.
+  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
@@ -83,18 +87,69 @@ export const lockLightStyles = StyleSheet.create({
   },
   cellHidden: {},
   cellGreen: { borderColor: '#2e7d32', backgroundColor: '#dff0d8' },
-  cellRed: { borderColor: ADMIN_MODAL_PALETTE.danger, backgroundColor: '#fdecea' },
+  // Патч 527: ошибочный «?» должен быть ЯВНО красным, а не просто тёмным
+  // знаком на чуть розовом фоне.
+  cellRed: { borderColor: '#c1121f', backgroundColor: '#fbe0e2' },
   cellGrey: { borderColor: '#888888', backgroundColor: '#e3e3e3' },
   cellText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 20, fontWeight: '800' },
   cellTextGreen: { color: '#1b5e20' },
-  cellTextRed: { color: ADMIN_MODAL_PALETTE.danger },
+  cellTextRed: { color: '#c1121f', fontSize: 22, fontWeight: '900' },
   cellTextGrey: { color: ADMIN_MODAL_PALETTE.mutedText },
 
-  crossArea: { alignItems: 'center', marginTop: 14, marginBottom: 6 },
-  crossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  arrowButton: { width: 52, height: 44, flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
+  // Патч 527: длинная подсказка + доска + стрелки должны прокручиваться на
+  // телефоне, иначе строки накладываются друг на друга («стрелки пересекает
+  // черты»). Каркас карточки (maxHeight 84 %) остаётся общим с формами.
+  scrollArea: { flexShrink: 1 },
+  scrollContent: { paddingBottom: 4 },
+  arrowsHint: {
+    color: ADMIN_MODAL_PALETTE.mutedText,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+    marginBottom: 2,
+    textAlign: 'left',
+    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
+    flexShrink: 1,
+    maxWidth: '100%',
+  },
+
+  // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
+  // темнее области. Стрелки крупнее и разведены дальше друг от друга.
+  // Патч 531: область осталась чуть темнее карточки (закон 527), но БЕЗ
+  // рамки: лишняя горизонтальная черта вокруг стрелок и была «полосой через
+  // центр». В до-светлой версии у крестовины не было ни рамки, ни подложки.
+  arrowPad: {
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+    alignItems: 'center',
+  },
+  crossArea: { alignItems: 'center' },
+  crossRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginVertical: 5,
+  },
+  // Патч 531 по зацепке владельца: артефакт «линия через центр» давал
+  // `flex: 0` (в браузере он превращается в `flex: 0 1 0%` и схлопывает
+  // кнопку). Убираем flex, собственный фон и жёсткие width/height — фоном
+  // служит затемнённая область arrowPad. Остаётся начертание 520–524:
+  // иконка arrow-*-bold размера 22, явно отцентрированная по обеим осям.
+  arrowButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   arrowButtonDisabled: { opacity: 0.45 },
-  arrowSpacer: { width: 52, height: 44 },
+  // Пустышки в верхнем ряду равны кнопке, чтобы «вверх» стоял ровно над
+  // «вниз»: иконка 22 + отступы 12*2 / 10*2.
+  arrowSpacer: { width: 46, height: 42 },
 
   resultText: {
     color: ADMIN_MODAL_PALETTE.text,

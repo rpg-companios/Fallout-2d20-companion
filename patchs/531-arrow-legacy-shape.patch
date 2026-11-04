@@ -1,0 +1,696 @@
+diff --git a/__tests__/lootTrade/lock-arrows-527.test.js b/__tests__/lootTrade/lock-arrows-527.test.js
+index beb707e..be17321 100644
+--- a/__tests__/lootTrade/lock-arrows-527.test.js
++++ b/__tests__/lootTrade/lock-arrows-527.test.js
+@@ -141,15 +141,18 @@ describe('527: подсказка и область стрелок', () => {
+     expect(pad.length).toBeGreaterThan(0);
+     expect(pad[0].props.style.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
+     expect(pad[0].props.style.backgroundColor).not.toBe(modalStyles.card.backgroundColor);
+-    expect(lockLightStyles.arrowButton.backgroundColor).toBe('#dadada');
+-    expect(lockLightStyles.arrowButton.width).toBeGreaterThan(52);
++    // Патч 531: затемнённая область arrowPad осталась (закон 527), а
++    // собственный фон и жёсткие размеры кнопки убраны по зацепке владельца.
++    expect(lockLightStyles.arrowPad.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
+     expect(lockLightStyles.crossRow.gap).toBeGreaterThan(8);
+     const buttons = ['up', 'left', 'down', 'right'].map(
+       (dir) => renderer.root.findAllByProps({ testID: `lock-arrow-${dir}` })[0],
+     );
+     expect(buttons.every(Boolean)).toBe(true);
+     for (const button of buttons) {
+-      expect(button.findAllByType('MaterialCommunityIcons').some((n) => n.props.size === 30)).toBe(true);
++      // Патч 531: вернули начертание стрелок до светлой темы (size 22).
++      // Заливка, шаг и кнопочный вид 527 сохранены.
++      expect(button.findAllByType('MaterialCommunityIcons').some((n) => n.props.size === 22)).toBe(true);
+     }
+     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
+     await act(async () => renderer.unmount());
+diff --git a/__tests__/lootTrade/lock-arrows-legacy-531.test.js b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+new file mode 100644
+index 0000000..f80b8c2
+--- /dev/null
++++ b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+@@ -0,0 +1,201 @@
++// Патч 531: владелец проверил стрелки — «всё равно с какими полосами через
++// центр». Просьба: «вернём стрелки, которые были до внедрения светлой темы.
++// Только то начертание или иконки стрелок. Их форма была хороша, только
++// цветовая гамма была не та».
++//
++// Иконки `arrow-*-bold` не менялись с 520; «полосы» давала обвязка: базовые
++// стили формы 525 (рамка + paddingVertical без justifyContent), рамки 527 и
++// размер 30. Возвращаем до-светлое начертание, оставляя светлую палитру,
++// затемнённую область, увеличенный шаг и подсказку 527.
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 390, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({
++  spendBobbyPins: vi.fn(async () => 1),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import { modalStyles, lockLightStyles, LOCK_PALETTE } from '../../components/lootTrade/lockPickingStyles';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const LOCK = { containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock' };
++const playing = () => ({
++  status: 'playing', kind: 'lock', result: '',
++  cells: [
++    { arrow: null, state: 'red' },
++    { arrow: 'left', state: 'grey' },
++    { arrow: null, state: 'hidden' },
++    { arrow: null, state: 'hidden' },
++  ],
++  rows: [4], cellCount: 4, cursor: 0, per: 8, luck: 4, skill: 3, difficulty: 2,
++  pinsRemaining: 3, pinActive: true, brokenPins: 0, revision: 1,
++  operatorClientId: 'client-1', operatorCharacterId: 'ch1',
++});
++const roomWith = (game) => ({
++  joined: true,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    l1: { containerId: 'l1', accessId: 'broadcast-1', config: LOCK, game, closed: false, locked: false, awaitingGm: false },
++  },
++});
++
++const renderers = [];
++const render = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++    );
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++const flat = (style) => (Array.isArray(style)
++  ? Object.assign({}, ...style.filter(Boolean))
++  : (style || {}));
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1', characterName: 'Сталкер',
++    attributes: { PER: { base: 8 } }, skills: { LOCKPICK: { base: 3 } },
++    items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } },
++  });
++  useRoomStore.setState({
++    clientId: 'client-1', rooms: { ROOM1: roomWith(playing()) },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++afterEach(async () => {
++  for (const renderer of renderers.splice(0)) {
++    try { await act(async () => renderer.unmount()); } catch { /* уже снято */ }
++  }
++});
++
++describe('531: начертание стрелок до светлой темы', () => {
++  it('иконки ровно те же, что в 520–524 (arrow-*-bold), включая ячейки', () => {
++    const source = read('components/lootTrade/LockPickingModal.js');
++    for (const dir of ['left', 'up', 'right', 'down']) {
++      expect(source).toContain(`${dir}: 'arrow-${dir}-bold'`);
++      expect(source).toContain(`${dir}: 'arrow-${dir}'`); // CELL_ICON не менялся
++    }
++    expect(source).toContain('size={22}');
++    expect(source).not.toContain('size={30}');
++  });
++
++  it('кнопка стрелки больше не наследует базовые стили формы 525', () => {
++    const source = read('components/lootTrade/LockPickingModal.js');
++    // В массиве стилей кнопки нет modalStyles.btn / saveBtn: именно они
++    // добавляли рамку и paddingVertical без вертикального центрирования.
++    expect(source).toContain('style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}');
++    const arrowBlock = source
++      .slice(source.indexOf('const arrowButton'), source.indexOf('const hasBoard'))
++      .replace(/\/\/.*$/gm, ''); // комментарии не должны влиять на проверку кода
++    expect(arrowBlock).not.toContain('modalStyles.btn');
++    expect(arrowBlock).not.toContain('modalStyles.saveBtn');
++  });
++
++  it('никаких рамок/полос и никакой коробки у кнопки: только заливка области', () => {
++    const pad = lockLightStyles.arrowPad;
++    const button = lockLightStyles.arrowButton;
++    expect(pad.borderWidth).toBeUndefined();
++    expect(pad.borderColor).toBeUndefined();
++    expect(pad.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
++    expect(button.borderWidth).toBeUndefined();
++    expect(button.borderColor).toBeUndefined();
++    // Зацепка владельца: flex: 0 → в браузере `flex: 0 1 0%` схлопывал
++    // кнопку и рисовал линию; фон/размеры кнопки тоже убраны.
++    expect(button.flex).toBeUndefined();
++    expect(button.backgroundColor).toBeUndefined();
++    expect(button.width).toBeUndefined();
++    expect(button.height).toBeUndefined();
++    expect(button.paddingHorizontal).toBeGreaterThan(0); // осталась зона нажатия
++    expect(button.paddingVertical).toBeGreaterThan(0);
++  });
++
++  it('иконка центрирована по обеим осям, как до светлой темы', () => {
++    expect(lockLightStyles.arrowButton.alignItems).toBe('center');
++    expect(lockLightStyles.arrowButton.justifyContent).toBe('center');
++  });
++
++  it('цветовая гамма осталась СВЕТЛОЙ, а не зелёной 524', async () => {
++    const renderer = await render();
++    const button = renderer.root.findAllByProps({ testID: 'lock-arrow-up' })[0];
++    expect(flat(button.props.style).backgroundColor).toBeUndefined();
++    const pad = renderer.root.findAllByProps({ testID: 'lock-arrow-pad' })[0];
++    expect(flat(pad.props.style).backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
++    const icon = button.findAllByType('MaterialCommunityIcons')[0];
++    expect(icon.props.name).toBe('arrow-up-bold');
++    expect(icon.props.size).toBe(22);
++    expect(icon.props.color).toBe(LOCK_PALETTE.text);
++    expect(icon.props.color).not.toBe('#c8efb8');
++  });
++
++  it('законы 527 не регрессируют: тёмнее карточки, шире шаг, подсказка', async () => {
++    const renderer = await render();
++    const pad = renderer.root.findAllByProps({ testID: 'lock-arrow-pad' })[0];
++    expect(flat(pad.props.style).backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
++    expect(flat(pad.props.style).backgroundColor).not.toBe(modalStyles.card.backgroundColor);
++    expect(lockLightStyles.crossRow.gap).toBeGreaterThan(8);
++    expect(renderer.root.findAllByProps({ testID: 'lock-arrows-hint' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
++  });
++
++  it('подсказка правил переносится внутри модалки, а не уходит одной строкой', async () => {
++    const renderer = await render();
++    const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
++    const style = flat(hint.props.style);
++    expect(style.flexShrink).toBe(1);
++    expect(style.maxWidth).toBe('100%');
++    // Родитель-колонка сжимается до ширины карточки: иначе row-контейнер
++    // берёт ширину длиннейшей строки и вылезает за границы окна.
++    expect(lockLightStyles.statusLeft.flex).toBe(1);
++    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
++    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
++    const source = read('components/lootTrade/LockPickingModal.js');
++    expect(source).toContain('<View style={styles.statusLeft}>');
++  });
++
++  it('все четыре кнопки на месте и нажимаемы', async () => {
++    const renderer = await render();
++    for (const dir of ['up', 'left', 'down', 'right']) {
++      const button = renderer.root.findAllByProps({ testID: `lock-arrow-${dir}` })[0];
++      expect(button).toBeTruthy();
++      expect(button.props.disabled).toBe(false);
++      expect(button.findAllByType('MaterialCommunityIcons')[0].props.size).toBe(22);
++    }
++  });
++});
+diff --git a/__tests__/room/lock-consumption-527.test.js b/__tests__/room/lock-consumption-527.test.js
+index 3bd9653..1b1010e 100644
+--- a/__tests__/room/lock-consumption-527.test.js
++++ b/__tests__/room/lock-consumption-527.test.js
+@@ -214,9 +214,12 @@ describe('527: терминология и стрелки', () => {
+     const source = read('components/lootTrade/lockPickingStyles.js');
+     expect(source).toContain('arrowPad');
+     expect(source).toMatch(/arrowPad:\s*\{[^}]*backgroundColor:\s*ADMIN_MODAL_PALETTE\.surfaceMuted/);
+-    expect(source).toMatch(/arrowButton:\s*\{[^}]*backgroundColor:\s*'#dadada'/);
++    // Патч 531: фон у области, а не у каждой кнопки; начертание стрелок
++    // вернулось к размеру 22 и явному центрированию (убраны flex/рамки).
++    expect(source).toMatch(/arrowButton:\s*\{[^}]*justifyContent:\s*'center'/);
++    expect(source).not.toMatch(/arrowButton:\s*\{[^}]*flex:/);
+     expect(source).toMatch(/crossRow:\s*\{[^}]*gap:\s*16/);
+-    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{30\}/);
++    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{22\}/);
+     expect(read('components/lootTrade/LockPickingModal.js')).toContain('testID="lock-arrow-pad"');
+     expect(read('components/lootTrade/LockPickingModal.js')).toContain('ScrollView');
+   });
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 8f71ef6..92643fd 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -315,16 +315,16 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+       testID={`lock-arrow-${arrow}`}
+       accessibilityRole="button"
+       accessibilityLabel={tLootTrade(ARROW_KEY[arrow])}
+-      style={[
+-        modalStyles.btn,
+-        modalStyles.saveBtn,
+-        styles.arrowButton,
+-        !canPress && styles.arrowButtonDisabled,
+-      ]}
++      // Патч 531: вернули начертание стрелок из версии ДО светлой темы.
++      // Базовые стили формы (modalStyles.btn/saveBtn) добавляли рамку и
++      // paddingVertical без justifyContent — иконка «прилипала» к верху, а
++      // линии рамки проходили прямо через стрелку. Теперь кнопка — отдельный
++      // самодостаточный стиль с явным центрированием, как в 520–524.
++      style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}
+       disabled={!canPress}
+       onPress={() => void doAction('press', arrow)}
+     >
+-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={30} color={LOCK_PALETTE.text} />
++      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
+     </TouchableOpacity>
+   );
+ 
+@@ -372,7 +372,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+             showsVerticalScrollIndicator={false}
+           >
+           <View style={styles.statusRow}>
+-            <View>
++            <View style={styles.statusLeft}>
+               <Text testID="lock-pins-count" style={styles.pinCount}>
+                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+               </Text>
+diff --git a/components/lootTrade/lockPickingStyles.js b/components/lootTrade/lockPickingStyles.js
+index ce4f8b5..d353329 100644
+--- a/components/lootTrade/lockPickingStyles.js
++++ b/components/lootTrade/lockPickingStyles.js
+@@ -58,6 +58,10 @@ export const lockLightStyles = StyleSheet.create({
+     borderBottomWidth: 1,
+     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
++  // Патч 531: левая колонка строки статуса должна СЖИМАТЬСЯ до ширины
++  // карточки. Иначе длинная подсказка задаёт собственную (огромную) ширину,
++  // текст встаёт в одну строку и уходит за границы модалки.
++  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
+   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
+   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
+   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
+@@ -104,18 +108,22 @@ export const lockLightStyles = StyleSheet.create({
+     marginTop: 8,
+     marginBottom: 2,
+     textAlign: 'left',
++    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
++    flexShrink: 1,
++    maxWidth: '100%',
+   },
+ 
+   // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
+   // темнее области. Стрелки крупнее и разведены дальше друг от друга.
++  // Патч 531: область осталась чуть темнее карточки (закон 527), но БЕЗ
++  // рамки: лишняя горизонтальная черта вокруг стрелок и была «полосой через
++  // центр». В до-светлой версии у крестовины не было ни рамки, ни подложки.
+   arrowPad: {
+     marginTop: 10,
+     marginBottom: 4,
+     paddingVertical: 12,
+     paddingHorizontal: 10,
+     borderRadius: 6,
+-    borderWidth: 1,
+-    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+     backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+     alignItems: 'center',
+   },
+@@ -127,19 +135,21 @@ export const lockLightStyles = StyleSheet.create({
+     gap: 16,
+     marginVertical: 5,
+   },
++  // Патч 531 по зацепке владельца: артефакт «линия через центр» давал
++  // `flex: 0` (в браузере он превращается в `flex: 0 1 0%` и схлопывает
++  // кнопку). Убираем flex, собственный фон и жёсткие width/height — фоном
++  // служит затемнённая область arrowPad. Остаётся начертание 520–524:
++  // иконка arrow-*-bold размера 22, явно отцентрированная по обеим осям.
+   arrowButton: {
+-    width: 58,
+-    height: 50,
+-    flex: 0,
+-    paddingVertical: 0,
+-    paddingHorizontal: 0,
+-    borderRadius: 6,
+-    borderWidth: 1.5,
+-    borderColor: '#9a9a9a',
+-    backgroundColor: '#dadada',
++    alignItems: 'center',
++    justifyContent: 'center',
++    paddingHorizontal: 12,
++    paddingVertical: 10,
+   },
+   arrowButtonDisabled: { opacity: 0.45 },
+-  arrowSpacer: { width: 58, height: 50 },
++  // Пустышки в верхнем ряду равны кнопке, чтобы «вверх» стоял ровно над
++  // «вниз»: иконка 22 + отступы 12*2 / 10*2.
++  arrowSpacer: { width: 46, height: 42 },
+ 
+   resultText: {
+     color: ADMIN_MODAL_PALETTE.text,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4e46735..8628474 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,60 @@
+ # Changelog
+ ---
++## Arrows without stripes and a wrapping hint (patch 531)
++
++The owner inspected the arrows in the browser and found the clue: "If you
++disable the `flex: 0 1 0%` style, the arrow icons are normal, they have a
++background and the line artifact disappears. But the icons lose centering."
++They also noted that `background-color: rgb(218,218,218)`, `height: 50px` and
++`width: 58px` can be removed, and reported: "The container with the rules
++description overflows the modal in one line, the text did not wrap. The text
++should wrap inside the modal."
++
++### 1. Root cause
++
++`flex: 0` on the arrow button (RN Web renders it as `flex: 0 1 0%`) collapsed
++the button to a zero basis: the border was drawn as a "stripe through the
++center", the icon was not centered and the background disappeared. It came
++from patch 525, when the arrow button was assembled from the base form styles
++(`modalStyles.btn/saveBtn`) and their `flex: 1` was overridden with `flex: 0`.
++
++**Fix:** the arrow button no longer inherits the base form styles; `flex`, its
++own `backgroundColor`, `borderWidth`, `width` and `height` are gone. Only
++`alignItems/justifyContent: center` and padding for the tap area remain. The
++darker `arrowPad` is the background (law 527), and its border was removed too.
++The top-row spacers were recalculated so "up" sits exactly above "down".
++
++### 2. Pre-light-theme drawing
++
++`arrow-*-bold` icons at size **22** (as in 520–524), explicitly centered. Only
++the palette changed: a dark arrow on the light area instead of green on dark.
++`CELL_ICON` in the board cells is unchanged. The wider spacing
++(`crossRow.gap = 16`), phone scrolling and the exact hint under the bobby pin
++counter are preserved.
++
++### 3. Hint wrapping
++
++`statusRow` is a horizontal container; its left column had no width
++constraint, so the long hint set its own width, stayed on one line and
++overflowed the modal. Added `statusLeft` with `flex: 1, flexShrink: 1,
++minWidth: 0`, and `flexShrink: 1` / `maxWidth: '100%'` on `arrowsHint`. The
++text now wraps inside the card.
++
++### What is preserved
++
++Laws 527–530 unchanged: the «Заколка» canon, `char.command` → `char.refresh`
++→ `char.publish` spend commands, the snapshot law, the red «?» pause, the
++location/container hack semantics, server protection. The server was not
++changed.
++
++### Checks
++
++`npm run typecheck`, `npm run build`, `npm test` (260 files), `git apply
++--check`, installer from the exact `a62ec71` base and from version 530 with
++byte comparison, live WS probe. Acceptance tests:
++`__tests__/lootTrade/lock-arrows-legacy-531.test.js`; the historical 527 test
++was updated for the new drawing.
++
+ ## Hacking a location = enter, hacking a container = contents (patch 530)
+ 
+ The first of the four remaining items of thesis 13. The owner asked to move on
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index fdf3a5a..8d2ebe9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,61 @@
+ # История изменений
+ 
+ ---
++## Стрелки без «полос» и перенос подсказки (патч 531)
++
++Владелец проверил стрелки в браузере и нашёл зацепку: «Если отключить стиль
++`flex: 0 1 0%`, то иконки стрелок нормальные, у них есть фон и пропадает
++артефакт в виде линии. Но иконки теряют центрирование». Также указал, что можно
++убрать `background-color: rgb(218,218,218)`, `height: 50px`, `width: 58px`, и
++сообщил: «Контейнер с описанием правил уходит за границы модалки одной строкой,
++текст не перенёсся. Текст должен переноситься в строке внутри модалки».
++
++### 1. Причина артефакта
++
++`flex: 0` в стиле кнопки (в RN Web превращается в `flex: 0 1 0%`) схлопывал
++кнопку до нулевой базы: рамка рисовалась как «полоса через центр», иконка
++не центрировалась, а фон пропадал. Это пришло из 525, когда кнопку стрелки
++собрали из базовых стилей формы (`modalStyles.btn/saveBtn`) и попытались
++перебить их `flex: 1` значением `flex: 0`.
++
++**Что сделано:** кнопка стрелки больше не наследует базовые стили формы;
++`flex`, собственный `backgroundColor`, `borderWidth`, `width` и `height`
++убраны. Остались только `alignItems/justifyContent: center` и отступы для
++зоны нажатия. Фоном служит затемнённая область `arrowPad` (закон 527), у неё
++тоже убрана рамка. Пустышки верхнего ряда пересчитаны под новый размер кнопки,
++чтобы «вверх» стоял ровно над «вниз».
++
++### 2. Начертание до светлой темы
++
++Иконки `arrow-*-bold` размера **22** (как в 520–524) с явным центрированием.
++Поменялась только палитра: тёмная стрелка на светлой области вместо зелёной
++на тёмной. `CELL_ICON` в ячейках не менялся. Сохранены увеличенный шаг между
++кнопками (`crossRow.gap = 16`), прокрутка на телефоне и точный текст
++подсказки под счётчиком заколок.
++
++### 3. Перенос подсказки
++
++`statusRow` — горизонтальный контейнер; его левая колонка не имела ограничения
++ширины, поэтому длинная подсказка задавала собственную ширину, вставала в одну
++строку и вылезала за границы модалки. Добавлен `statusLeft` с
++`flex: 1, flexShrink: 1, minWidth: 0`, а у `arrowsHint` — `flexShrink: 1` и
++`maxWidth: '100%'`. Текст теперь переносится внутри карточки.
++
++### Что сохранено
++
++Законы 527–530 без изменений: канон «Заколка», команды списания
++`char.command` → `char.refresh` → `char.publish`, закон снимка, пауза перед
++сбросом красного «?», семантика взлома локации/контейнера, серверная защита.
++Сервер в патче не менялся.
++
++### Проверки
++
++`npm run typecheck`, `npm run build`, `npm test` (260 файлов), `git apply
++--check`, установщик от точной базы `a62ec71` и от версии 530 с побайтовым
++сравнением, живая WS-проба. Приёмочные тесты:
++`__tests__/lootTrade/lock-arrows-legacy-531.test.js`; исторический тест 527
++обновлён под новое начертание.
++
+ ## Взлом локации = вход, взлом контейнера = содержимое (патч 530)
+ 
+ Первый из четырёх оставшихся пунктов тезиса 13. Владелец: «давай пока дальше
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 9ac53a1..d2fe319 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -370,3 +370,34 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ сервера, команды уходят оператору; `pinLedger` — диагностика; `spentPins`
+ при сборке доски `0`, а число заколок берётся из листа, который игрок сам
+ опубликовал после списания. `breakHighlight` и пауза 528 не затрагиваются.
++
++## 16. Уточнение 531: «полосы через центр» и перенос подсказки
++
++Владелец проверил стрелки в браузере: отключение `flex: 0 1 0%` убирало
++артефакт-линию и возвращало фон, но ломало центрирование; также можно убрать
++`background-color: rgb(218,218,218)`, `height: 50px`, `width: 58px`. И отдельно:
++«Контейнер с описанием правил уходит за границы модалки одной строкой, текст
++не перенёсся».
++
++**Причина.** `flex: 0` (RN Web → `flex: 0 1 0%`) в `arrowButton` схлопывал
++кнопку до нулевой базы. Он появился в 525 как попытка перебить `flex: 1`
++базового `modalStyles.btn`; вместе с рамкой 527 это и рисовало «полосу через
++центр», а `btn` не задавал `justifyContent: center`, поэтому иконка была
++прижата к верху.
++
++**Решение.** Кнопка стрелки больше не собирается из `modalStyles.btn/saveBtn`.
++В стиле остались только `alignItems/justifyContent: center` и отступы для зоны
++нажатия: нет `flex`, нет собственного фона, рамок и жёстких `width/height`.
++Фон — затемнённая область `arrowPad` (закон 527), её рамка тоже убрана.
++`arrowSpacer` пересчитан под размер иконки 22 с отступами, чтобы «вверх»
++стоял ровно над «вниз». Начертание — `arrow-*-bold` размера 22 как в 520–524,
++но в светлой палитре; `CELL_ICON`, шаг `crossRow.gap = 16`, `ScrollView` и
++точный текст `lock.arrowsHint` сохранены.
++
++**Перенос.** `statusRow` — горизонтальный контейнер; левая колонка без
++ограничения ширины растягивалась до длины подсказки и вылезала за модалку.
++Добавлен `statusLeft { flex: 1, flexShrink: 1, minWidth: 0 }`, у `arrowsHint` —
++`flexShrink: 1, maxWidth: '100%'`. Текст переносится внутри карточки.
++
++Регрессии: законы 527–530 (канон «Заколка», команды списания, закон снимка,
++пауза красного «?», семантика взлома) и защита сервера не тронуты.
+diff --git a/docs/patch-531-install.md b/docs/patch-531-install.md
+new file mode 100644
+index 0000000..2129ac8
+--- /dev/null
++++ b/docs/patch-531-install.md
+@@ -0,0 +1,77 @@
++# Установка патча 531: стрелки без артефакта и перенос подсказки
++
++Патч подготовлен от состояния **версии 530** (коммит `5a951b8`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–531
++цепочкой. Файл установки: `patchs/531-arrow-legacy-shape.patch`.
++
++> Владелец: «Если отключить стиль `flex: 0 1 0%`, то иконки стрелок нормальные,
++> у них есть фон и пропадает артефакт в виде линии. Но иконки теряют
++> центрирование». Также: можно убрать `background-color: rgb(218,218,218)`,
++> `height: 50px`, `width: 58px`; «Контейнер с описанием правил уходит за
++> границы модалки одной строкой, текст не перенёсся. Текст должен
++> переноситься в строке внутри модалки».
++
++## Что изменено
++
++### 1. Причина «полос через центр»
++
++`flex: 0` в `arrowButton` (в браузере — `flex: 0 1 0%`) схлопывал кнопку до
++нулевой базы: рамка 527 рисовалась линией через иконку, фон пропадал, а
++`modalStyles.btn` не задавал `justifyContent: center`, поэтому иконка была
++прижата к верху. Стиль появился в 525 как перебивание `flex: 1` базового
++стиля формы.
++
++- `components/lootTrade/LockPickingModal.js`: кнопка стрелки больше не
++  наследует `modalStyles.btn/saveBtn` — массив стилей снова
++  `[styles.arrowButton, !canPress && styles.arrowButtonDisabled]`, как в
++  520–524. Размер иконки возвращён с 30 на **22**; цвет остался
++  `LOCK_PALETTE.text` (светлая палитра), а не зелёный `#c8efb8`.
++- `components/lootTrade/lockPickingStyles.js`: у `arrowButton` убраны `flex`,
++  `backgroundColor`, `borderWidth`, `borderColor`, `width`, `height` и
++  `borderRadius`; остались `alignItems/justifyContent: center` и отступы
++  `paddingHorizontal: 12, paddingVertical: 10` для зоны нажатия. У `arrowPad`
++  убрана рамка, сохранена заливка `ADMIN_MODAL_PALETTE.surfaceMuted`.
++  `arrowSpacer` пересчитан в `46×42`, чтобы «вверх» стоял ровно над «вниз».
++
++### 2. Перенос подсказки
++
++`statusRow` — горизонтальный контейнер, его левая колонка не имела ограничения
++ширины и растягивалась до длины `lock.arrowsHint`. Добавлен стиль `statusLeft`
++(`flex: 1, flexShrink: 1, minWidth: 0`) на обёртку счётчика/подсказки, а у
++`arrowsHint` — `flexShrink: 1, maxWidth: '100%'`. Текст переносится внутри
++карточки и не выходит за границы модалки.
++
++## Что сохранено
++
++- Законы 527: затемнённая область стрелок (чуть темнее карточки), увеличенный
++  шаг `crossRow.gap = 16`, прокрутка `ScrollView`, точный текст подсказки под
++  счётчиком заколок, канон «Заколка» и списание из инвентаря.
++- Законы 528–530: команды `char.command` → `char.refresh` → `char.publish`,
++  закон снимка, пауза перед сбросом красного «?», семантика взлома
++  локации/контейнера, защита сервера. **Сервер в патче не менялся.**
++- `CELL_ICON` в ячейках доски не менялся — менялось только начертание
++  нажимных стрелок, как и просил владелец.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`: успешно; `dist/version.json` =
++  531/4/117+117, в собранном бандле нет `flex: 0 1 0%` и `#dadada` у стрелок.
++- `npm test`: **260 файлов / 2352 теста**, все зелёные.
++- `git apply --check` вперёд от дерева 530 и в обратную сторону от 531: успешно.
++- `./apply-patch.sh 531` от версии 530 и полная цепочка 493–531 от чистого
++  `main` `a62ec71`; побайтовое сравнение с итоговым деревом патча 531:
++  **1095/1095 файлов совпали** в обеих установках (0 пропущенных, 0 отличий).
++- Приёмочные тесты `__tests__/lootTrade/lock-arrows-legacy-531.test.js`:
++  иконки 520–524, отсутствие базовых стилей формы и коробки у кнопки,
++  центрирование по обеим осям, светлая палитра, законы 527, перенос подсказки.
++  Исторический тест 527 обновлён под новое начертание.
++- Живой сервер комнат перезапущен на 531: `/version.json` = 531/4/117+117;
++  WS-проба мини-игры `LIVE 531 OK` (закон 529 соблюдён: `char.command(item.spend)`
++  → `char.refresh` до `char.publish`, сервер не трогал снимок с 5 заколками,
++  после публикации `newAttempt` видит 4; пауза `breakHighlight` 650 мс,
++  красное «?» сохранено, отложенная команда отслежена и снята).
++
++Перезапуск серверного процесса не требуется (менялись только клиент и
++документы), но после установки на боевой площадке нужно обновить PWA-кэш:
++имя бандла изменилось.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 38a71c5..9f9bc32 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **530**.
++Дата ревизии: 2026-11-04. Текущая версия: **531**.
+ 
+ ## Тезисы
+ 
+@@ -32,15 +32,17 @@
+ | 18 | Списание заколки командами клиенту (`char.spend` → `char.refresh` → штатный `char.publish`), сервер не правит чужой снимок; пауза перед обновлением цветов на поломке, красный остаётся если заколка цела | ✅ сделано | **528** |
+ | 19 | **Закон снимка на всё пространство Мастера:** сервер не трогает лист игрока, изменения — команды `char.command` → `char.refresh` → `char.publish`; снимок как наблюдение между сессиями; эффект журнала «Программиста» переведён на команду | ✅ сделано | **529** |
+ | 20 | **Семантика взлома в иерархии:** «взлом локации = вход» и «взлом контейнера = содержимое», подписи/подсказки, адресный исход ACCESS GRANTED с паузой, кнопка доступа после закрытия мини-игры | ✅ сделано | **530** |
++| 21 | Артефакт «полосы через центр» у стрелок: убран `flex: 0 1 0%`, фон/рамки/жёсткие размеры кнопки, возвращено до-светлое начертание иконок с центрированием; длинная подсказка переносится внутри модалки | ✅ сделано | **531** |
+ 
+-## Осталось после патча 530
++## Осталось после патча 531
+ 
+-Патчи 524–530 закрыли сбой мини-игры замка, окна локации, входа в игру,
++Патчи 524–531 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+ красную ошибку, паузу перед её сбросом, закрепили закон снимка для всего
+-пространства Мастера и развели семантику взлома локации/контейнера — не меняя порядок
+-тринадцатого тезиса: граф, граница видимости, адресный взлом, общие ресурсы
+-и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
++пространства Мастера, развели семантику взлома локации/контейнера и убрали
++артефакт стрелок — не меняя порядок тринадцатого тезиса: граф, граница
++видимости, адресный взлом,
++общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+ после ACCESS GRANTED, а не про запрет новых подходов игрока; «один взлом на
+@@ -157,6 +159,7 @@
+ - `docs/patch-526-install.md` — установка обновления 526 и его проверки.
+ - `docs/patch-527-install.md` — установка исправления 527 и его проверки.
+ - `docs/patch-528-install.md` — установка обновления 528 и его проверки.
++- `docs/patch-531-install.md` — установка исправления 531 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 96d34cb..6058484 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "530"
++  "baseline": "531"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3251a64..6309daf 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "530",
++  "version": "531",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "По зацепке владельца нашли причину «полос через центр»: стиль flex: 0 (в браузере flex: 0 1 0%) схлопывал кнопку стрелки. Убрали его вместе с собственным фоном, рамками и жёсткими width/height кнопки; фоном служит затемнённая область стрелок.",
++      "Вернули начертание стрелок до светлой темы: иконки arrow-*-bold размера 22 с явным центрированием по обеим осям. Цветовая гамма осталась светлой — тёмная стрелка на светлой области, а не зелёная на тёмной.",
++      "Починили перенос длинной подсказки о правилах: левая колонка строки статуса теперь сжимается до ширины карточки, текст переносится внутри модалки и не уходит за её границы одной строкой.",
++      "Сохранили всё из 527–530: затемнённая область, увеличенный шаг между кнопками, прокрутка на телефоне, точный текст подсказки, команды списания, пауза красного «?» и семантика взлома локации/контейнера.",
+       "Развели семантику взлома в иерархии пространств: взлом локации (узел с детьми) ВВОДИТ игрока внутрь, взлом контейнера показывает СОДЕРЖИМОЕ.",
+       "Кнопки и подсказки теперь говорят прямо: «Взломать и войти» / «Взломать и открыть», а у вложенной локации вместо «Открыть» — «Войти».",
+       "После ACCESS GRANTED исход применяется автоматически с небольшой паузой, чтобы игрок успел увидеть результат; переход адресный, каскада по графу нет.",
+@@ -118,6 +122,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The owner's clue found the cause of the stripes through the center: flex: 0 (rendered as flex: 0 1 0% in the browser) collapsed the arrow button. Removed it along with the button's own background, borders and fixed width/height; the darker arrow area is the background now.",
++      "Restored the pre-light-theme arrow drawing: arrow-*-bold icons at size 22, explicitly centered on both axes. The palette stays light — a dark arrow on the light area instead of green on dark.",
++      "Fixed wrapping of the long rules hint: the left column of the status row now shrinks to the card width, so the text wraps inside the modal instead of overflowing in a single line.",
++      "Everything from 527–530 is preserved: the darker area, wider arrow spacing, phone scrolling, the exact hint text, spend commands, the red «?» pause and the location/container hack semantics.",
+       "Split hacking semantics in the location hierarchy: hacking a location (a node with children) ENTERS it, hacking a container shows its CONTENTS.",
+       "Buttons and hints now say it directly: «Hack & enter» / «Hack & open», and a nested location shows «Enter» instead of «Open».",
+       "After ACCESS GRANTED the outcome is applied automatically after a short pause so the player sees the result; the transition is addressable, with no graph cascade.",

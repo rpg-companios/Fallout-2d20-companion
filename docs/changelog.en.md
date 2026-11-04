@@ -1,5 +1,315 @@
 # Changelog
 ---
+## Arrows without stripes and a wrapping hint (patch 531)
+
+The owner inspected the arrows in the browser and found the clue: "If you
+disable the `flex: 0 1 0%` style, the arrow icons are normal, they have a
+background and the line artifact disappears. But the icons lose centering."
+They also noted that `background-color: rgb(218,218,218)`, `height: 50px` and
+`width: 58px` can be removed, and reported: "The container with the rules
+description overflows the modal in one line, the text did not wrap. The text
+should wrap inside the modal."
+
+### 1. Root cause
+
+`flex: 0` on the arrow button (RN Web renders it as `flex: 0 1 0%`) collapsed
+the button to a zero basis: the border was drawn as a "stripe through the
+center", the icon was not centered and the background disappeared. It came
+from patch 525, when the arrow button was assembled from the base form styles
+(`modalStyles.btn/saveBtn`) and their `flex: 1` was overridden with `flex: 0`.
+
+**Fix:** the arrow button no longer inherits the base form styles; `flex`, its
+own `backgroundColor`, `borderWidth`, `width` and `height` are gone. Only
+`alignItems/justifyContent: center` and padding for the tap area remain. The
+darker `arrowPad` is the background (law 527), and its border was removed too.
+The top-row spacers were recalculated so "up" sits exactly above "down".
+
+### 2. Pre-light-theme drawing
+
+`arrow-*-bold` icons at size **22** (as in 520–524), explicitly centered. Only
+the palette changed: a dark arrow on the light area instead of green on dark.
+`CELL_ICON` in the board cells is unchanged. The wider spacing
+(`crossRow.gap = 16`), phone scrolling and the exact hint under the bobby pin
+counter are preserved.
+
+### 3. Hint wrapping
+
+`statusRow` is a horizontal container; its left column had no width
+constraint, so the long hint set its own width, stayed on one line and
+overflowed the modal. Added `statusLeft` with `flex: 1, flexShrink: 1,
+minWidth: 0`, and `flexShrink: 1` / `maxWidth: '100%'` on `arrowsHint`. The
+text now wraps inside the card.
+
+### What is preserved
+
+Laws 527–530 unchanged: the «Заколка» canon, `char.command` → `char.refresh`
+→ `char.publish` spend commands, the snapshot law, the red «?» pause, the
+location/container hack semantics, server protection. The server was not
+changed.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (260 files), `git apply
+--check`, installer from the exact `a62ec71` base and from version 530 with
+byte comparison, live WS probe. Acceptance tests:
+`__tests__/lootTrade/lock-arrows-legacy-531.test.js`; the historical 527 test
+was updated for the new drawing.
+
+## Hacking a location = enter, hacking a container = contents (patch 530)
+
+The first of the four remaining items of thesis 13. The owner asked to move on
+with the tasks; the snapshot law 529 was recorded separately.
+
+### 1. One predicate for every path
+
+New pure module `components/lootTrade/hackOutcome.js`: a node with `childIds`
+(or `kind: hub` on legacy sessions) is a **location**, a node without children
+is a **container**. `hackOutcomeForNode()` returns `enter` / `contents`;
+`applyHackOutcome()` performs exactly one addressable transition, with no graph
+cascade (the 523 invariant is intact).
+
+The same predicate drives three paths in `PlayerLootTradeOverlay.js`: the
+normal node button, the button after a won check, and the automatic ACCESS
+GRANTED outcome. The normal button of a nested location used to say «Open»
+while actually entering — it now correctly says «Enter».
+
+### 2. Interface
+
+- A locked point and a check-source point get a `hack-outcome-hint-*`:
+  «Hacking unlocks entry to this location» or «Hacking unlocks the contents»
+  (paired EN strings).
+- Hack button: «Hack & enter» for a location, «Hack & open» for a container;
+  gate (OR-source) buttons take the label from the target node.
+- The normal button of a nested location is «Enter»; containers keep «Open» /
+  «Trade».
+- A won point (lock/location) gets a separate `hack-outcome-button-*` so the
+  contents remain reachable even if the player closed the mini-game. A pure
+  terminal without children does not get the button: it is a check source, not
+  a container.
+
+### 3. Automatic win outcome
+
+ACCESS GRANTED on an explicit «Hack» press inside a real location closes the
+mini-game after `HACK_OUTCOME_DELAY_MS = 700` and applies the outcome: enter
+the location (`parentStack`) or open the contents (`selectedHubNodeId`). The
+pause lets the player see the board result first.
+
+It fires once per `(containerId, accessId, revision)`; «View», a standalone
+point and reopening an already-won board do not navigate. Laws 505/526 (the
+board is not rebuilt after a win, the player decides how many attempts to make)
+are intact: this is navigation, not a restart.
+
+### What is preserved
+
+The 529 snapshot law, `char.command` → `char.refresh` → `char.publish`, the
+«Заколка» canon, the 528 red pause, the 523 visibility boundary and
+addressable hack, server protection. The server was not changed in this patch.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (259 files), `git apply
+--check`, installer from the exact `a62ec71` base and from version 529 with
+byte comparison, live WS probe. Acceptance tests:
+`__tests__/lootTrade/hack-outcome-530.test.js` (pure predicate, labels and
+hints, automatic enter/contents, no navigation without an explicit «Hack»).
+
+## Snapshot law: commands instead of editing the sheet (patch 529)
+
+> **Owner's words:** "don't touch the user's snapshot; if something must change
+> for the user, send a command that the client executes. The whole Game Master
+> space must obey it. The snapshot is for observing the user's state without
+> interference, even between sessions."
+
+The canon is `docs/gm-snapshot-law.md`. This is a law for the whole GM space,
+not a one-off fix.
+
+### 1. The snapshot is observation only
+
+`room.lastSnapshots` lives on the room, not on a session: the GM sees the
+player's sheet when no loot/trade session is open, and it is not cleared when a
+location opens/closes or on «Leave location». The only writer is the client's
+own `char.publish`; only the client can remove its entry. The server no longer
+writes, clears or bumps a revision on someone else's sheet.
+
+### 2. A single command frame
+
+`char.command` `{ commandId, characterId, kind, payload }` → the client executes
+the change with **standard tools** (`useCharacterStore` + `saveCharacter`) →
+`char.refresh` awaits it → ordinary `char.publish`. The whitelist of executors
+lives in `components/gm/charCommands.js`:
+
+- `item.spend` — a broken bobby pin (former 528 `char.spend`, `spendItemStacks`);
+- `magazine.use` — the Programmer's Digest magazine (`markMagazineEffectUsed`).
+
+**The last loophole is closed:** the server used to write
+`usedMagazineEffects` and `terminalHacking` into the published sheet when
+«Use magazine» was pressed. It now returns `digestCommand`, the network layer
+sends `char.command(magazine.use)`, and the client edits and publishes its own
+sheet. The branch in `TerminalHackingModal` remains as an idempotent fallback
+for a 528 server.
+
+`commandId` is deduplicated (memory + AsyncStorage); `pendingCharCommands`
+replays commands on `room.join` and clears them in `putSnapshot`. Unknown
+`kind`, another character and items outside the whitelist are not executed.
+
+### 3. What is preserved
+
+State owned by the Game Master (sessions, `terminalStates`, `accessEvents`,
+`partyStorage`, directives, keys) is still server canon — the law is about the
+player's sheet. Message caps, roles, validation and atomicity are intact.
+Laws 520–528 (terminal balance, four attempts, explicit player attempts, light
+palette, the «Заколка» canon, the red pause, spend commands) are unchanged.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (258 files, 2334 tests),
+`git apply --check`, installer from the exact `a62ec71` base and from version
+528 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/gm-snapshot-law-529.test.js` (static guard "one
+lastSnapshots.set and only in putSnapshot", snapshots between sessions, kind
+whitelist, deduplication); the 528 tests were updated for the unified
+`char.command` frame.
+
+## Spend commands and a pause before the colours update (patch 528)
+
+The owner clarified the patch 527 architecture: "Bobby pins are removed not
+from the snapshot; instead the client is sent a command to spend a pin from the
+inventory using the standard tools. And after the spend a command is sent to
+update the snapshot." Plus: "If a cell turns red and a pin breaks, make a small
+pause before updating the colours. But if the pin did not break, the red stays."
+
+### 1. The server no longer edits someone else's inventory
+
+On a break `server/roomRegistry.js` no longer calls `consumeBobbyPins()` against
+`room.lastSnapshots`; it only returns `pinsToSpend` (the `brokenPins` delta),
+`characterId` and `clientId`. `server/roomServer.js` registers the command and
+sends the operator two frames in a row:
+
+- `char.spend` — spend the pin with the standard inventory tools;
+- `char.refresh` — after the spend, update the snapshot.
+
+Both messages are mirrored in `server/protocol.js` and
+`src/room/roomProtocol.ts`; message caps, roles and validation are intact.
+`putSnapshot()` clears unacknowledged commands and `room.state` carries
+`pendingSpends`, so commands are replayed on reconnect.
+
+### 2. The client applies them in strict order
+
+The new `components/lootTrade/CharSpendCommandHost.js` is mounted once in
+`App.js` above every screen (the mini-game window may already be closed). The
+`onRoomCharSpend` subscription in `src/room/roomStore.ts` receives both frames:
+
+1. `char.spend` → `spendBobbyPins()` uses the standard
+   `useCharacterStore.spendItemStacks` (plus a legacy-snapshot fallback) and
+   `saveCharacter()`, but deliberately does **not** publish (`publish: false`);
+2. `char.refresh` → explicitly awaits the spend, then the standard
+   `pushSavedCharacterToBoundRoomIfAny()` sends the ordinary `char.publish`.
+
+WebSocket frame order is guaranteed and the await is explicit, so the room
+receives an ALREADY updated sheet. `spendId` is deduplicated (memory +
+AsyncStorage), so a replay after reconnect never deducts twice. Commands for a
+different character or a different `itemId` are ignored. With the old-server
+local fallback the effect in `LockPickingModal` still spends — and only there,
+so there is no double deduction.
+
+`consumeBobbyPins()` remains a pure helper for the client fallback and tests;
+the server no longer uses it.
+
+### 3. Pause before the colours update
+
+- `server/lockPicking.js` puts `breakHighlight = { durationMs: 650 }` into the
+  board state on a break and keeps the red «?» in `cells`. The next press clears
+  the marker and wipes old red cells (exactly one red cell — the current
+  mistake).
+- `components/lootTrade/LockPickingModal.js` shows the red «?» during the pause,
+  then locally hides it after `durationMs`; the grey guessed arrows remain. The
+  window does NOT jump to «Attempt finished» during the pause even if it was the
+  last pin. The marker lives in the board state, so spectators and reconnected
+  tabs see the same pause; `localLockGame.js` forwards it through
+  `publicLockGameState`.
+- If the pin did **not** break there is no `breakHighlight` — the red «?» stays
+  until the next press, as requested.
+
+### What is preserved
+
+Laws 520–527: PER/Luck/LOCKPICK, four terminal attempts, unlimited explicit
+player attempts, no automatic restart after ACCESS GRANTED, GM Yes/No only for
+terminals, the `shouldBlockLock()` hook, the 525 light palette and entry modal,
+the 527 «Заколка» canon, darkened arrow area and hint. Server protection (roles,
+message caps, validation, atomicity) was not weakened.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (257 files, 2318 tests),
+`git apply --check`, installer from the exact `a62ec71` base and from version
+527 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/char-spend-commands-528.test.js`,
+`__tests__/lootTrade/lock-break-pause-528.test.js`; historical 527 tests were
+updated for the new spend law.
+
+## Bobby pins, arrows and honest consumption (patch 527)
+
+Four notes from the owner about the lock mini-game: the Russian item name, the
+arrow block on desktop/phone, broken pins leaving the inventory, and a red «?»
+on a wrong press.
+
+### 1. The Russian item name is «Заколка»
+
+`item_bobby_pin` in `modules/fallout/i18n/ru-RU/data/equipment/general_goods.json`
+is now exactly **«Заколка»** (previously «Шпилька») — not «отмычка», not
+«булавка». Every player-facing lock string in
+`i18n/ru-RU/screens/lootTrade/screen.json` now says «заколки/заколка»: the
+counter, the out-of-pins title, the missing-item hint, «Another attempt» and
+the new arrows hint. `item_electronic_lockpicker` stays **«Электронная
+отмычка»** — a different item that is never counted as a bobby pin.
+
+### 2. Arrow area and the hint
+
+On desktop and phone the arrows were "crossed by lines, too close and
+unclear". `components/lootTrade/lockPickingStyles.js` now has a separate
+`arrowPad` filled slightly darker than the light card; the buttons are one step
+darker still, icons are larger (`30`), horizontal spacing grew from `8` to `16`
+and the two rows gained a gap. The window content is wrapped in `ScrollView`,
+so the long text no longer overlaps the board on a narrow screen. The exact
+owner-approved hint is rendered directly under the pin counter, with a paired
+English `lock.arrowsHint` string.
+
+### 3. A broken bobby pin leaves the inventory
+
+Previously a break only decremented `pinLedger` in room memory, so pins never
+ran out on the character sheet. Now every `brokenPins + 1` makes
+`server/roomRegistry.js` call `consumeBobbyPins()` from `server/lockPicking.js`:
+`quantity` is reduced (or the empty stack removed) in the published
+`room.lastSnapshots` sheet itself, keeping the name, mods, durability and all
+other fields per the 522 rule. The client mirrors the spend in the live store
+through the new `components/lootTrade/spendBobbyPins.js` (atomic
+`spendItemStacks`, a fallback for legacy snapshot shapes, `saveCharacter` and a
+re-publish to the room). `pinLedger` is diagnostic only; available pins are
+read from the current sheet, so there is no double deduction. The local board
+fallback (old servers without the protocol) follows the same rule. Newly bought
+pins arrive with a normal sheet publication and are visible to «Another
+attempt» immediately.
+
+### 4. A wrong «?» is red and stays visible
+
+`server/lockPicking.js` clears previous red cells before each press, so there
+is exactly one red «?» — the current mistake. On the press that breaks a pin
+this cell is no longer erased (at skill 0 the red mark used to disappear
+entirely). In the light theme `cellTextRed` is an explicit `#c1121f` and
+`cellRed` a pink fill with a red border.
+
+### Regressions and checks
+
+Laws 520–526 are intact: PER/Luck/LOCKPICK, four terminal attempts, unlimited
+explicit player attempts, no automatic restart after ACCESS GRANTED, the GM
+Yes/No only for terminals, the `shouldBlockLock()` hook for a future lock
+block, the 525 light palette and entry modal. Server protection (roles, message
+caps, validation, atomicity) was not weakened. Acceptance tests:
+`__tests__/room/lock-consumption-527.test.js`,
+`__tests__/lootTrade/lock-arrows-527.test.js`,
+`__tests__/lootTrade/spend-bobby-pins-527.test.js`. Historical 520/524/526
+tests were updated for the new consumption law and naming canon.
+
 ## Player attempts and the Game Master's decision (patch 526)
 
 The owner clarified the meaning of the 506 report: "That was a bug report.

@@ -7,6 +7,7 @@
 // requestId в payload эхом возвращается в ответах create/join/error).
 
 const http = require('node:http');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
@@ -276,6 +277,29 @@ const attachRoomWebSocketServer = (httpServer, {
     sendEnvelope(ws, MESSAGE.ERROR, { code, requestId }, roomCode, clientId);
   };
 
+  /**
+   * Патч 529 (ЗАКОН СНИМКА): две команды оператору. Порядок кадров WebSocket
+   * гарантирует, что клиент сначала ИСПОЛНИТ изменение штатными средствами
+   * (characterStore + saveCharacter) и ТОЛЬКО ПОСЛЕ этого опубликует свежий
+   * снимок (char.publish). Сервер сам никогда не правит чужой лист: ни
+   * инвентарь, ни журнал журналов, ни эффекты, ни ревизию.
+   */
+  const sendCharacterCommand = (ws, code, clientId, entry) => {
+    if (!entry) return;
+    sendEnvelope(ws, MESSAGE.CHAR_COMMAND, {
+      commandId: entry.commandId,
+      characterId: entry.characterId,
+      kind: entry.kind,
+      payload: entry.payload,
+    }, code, clientId);
+    sendEnvelope(ws, MESSAGE.CHAR_REFRESH, {
+      commandId: entry.commandId,
+      // Алиас 528: клиенты предыдущей версии ищут spendId.
+      spendId: entry.spendId || entry.commandId,
+      characterId: entry.characterId,
+    }, code, clientId);
+  };
+
   const broadcastMembers = (room, exceptClientId = null) => {
     const members = [...room.members.values()].map((member) => ({
       clientId: member.clientId, name: member.name, role: member.role,
@@ -508,6 +532,11 @@ const attachRoomWebSocketServer = (httpServer, {
             requestId: payload.requestId || null,
           }, canonical, clientId);
           broadcastMembers(result.room, clientId);
+          // Патч 528: вкладка оператора могла уйти до публикации листа.
+          // Повторяем обе команды — клиент дедуплицирует по spendId.
+          for (const pending of registry.pendingCommandsForClient(canonical, clientId)) {
+            sendCharacterCommand(ws, canonical, clientId, pending);
+          }
           break;
         }
 
@@ -742,6 +771,33 @@ const attachRoomWebSocketServer = (httpServer, {
           // Патч 516: взлом привязанного терминала открывает точки с
           // необязательным ключом.
           broadcastKeyAccessState(result.room, clientId);
+          // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
+          // Никакой правки room.lastSnapshots здесь больше нет.
+          if (result.pinsToSpend > 0) {
+            const entry = registry.registerCharacterCommand({
+              code: canonical,
+              characterId: result.characterId || payload.characterId,
+              clientId,
+              commandId: `pin-${crypto.randomBytes(8).toString('hex')}`,
+              kind: 'item.spend',
+              payload: { itemId: 'item_bobby_pin', count: result.pinsToSpend },
+            });
+            sendCharacterCommand(ws, canonical, clientId, entry);
+          }
+          // Патч 529: журнал «Программиста» тоже меняет лист — значит, тоже
+          // команда клиенту, а не правка room.lastSnapshots.
+          if (result.digestCommand) {
+            const digest = result.digestCommand;
+            const entry = registry.registerCharacterCommand({
+              code: canonical,
+              characterId: digest.characterId,
+              clientId,
+              commandId: `mag-${crypto.randomBytes(8).toString('hex')}`,
+              kind: digest.kind,
+              payload: digest.payload,
+            });
+            sendCharacterCommand(ws, canonical, clientId, entry);
+          }
           break;
         }
 

@@ -1,0 +1,1423 @@
+diff --git a/__tests__/room/char-spend-commands-528.test.js b/__tests__/room/char-spend-commands-528.test.js
+index 26eb998..b0518ae 100644
+--- a/__tests__/room/char-spend-commands-528.test.js
++++ b/__tests__/room/char-spend-commands-528.test.js
+@@ -40,11 +40,14 @@ describe('528: протокол команд списания', () => {
+     const entry = registry.registerPinSpend({
+       code, characterId: 'ch1', clientId: 'p1', count: 1, spendId: 'pin-a1',
+     });
++    // Патч 529: команда стала универсальной (kind + payload), spendId — алиас.
+     expect(entry).toMatchObject({
+-      spendId: 'pin-a1', characterId: 'ch1', clientId: 'p1', count: 1, itemId: 'item_bobby_pin',
++      commandId: 'pin-a1', spendId: 'pin-a1', characterId: 'ch1', clientId: 'p1',
++      kind: 'item.spend', payload: { itemId: 'item_bobby_pin', count: 1 },
+     });
+-    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(1);
++    expect(registry.pendingCommandsForClient(code, 'p1')).toHaveLength(1);
+     expect(registry.pendingSpendsForClient(code, 'another-tab')).toHaveLength(0);
++    expect(registry.getState(code).pendingCommands).toHaveLength(1);
+     expect(registry.getState(code).pendingSpends).toHaveLength(1);
+     // Обычная публикация листа (вторая команда) снимает неподтверждённые.
+     registry.putSnapshot({
+@@ -52,8 +55,8 @@ describe('528: протокол команд списания', () => {
+       snapshot: { items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } } },
+       fromClientId: 'p1', fromName: 'Игрок',
+     });
+-    expect(registry.getState(code).pendingSpends).toHaveLength(0);
+-    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(0);
++    expect(registry.getState(code).pendingCommands).toHaveLength(0);
++    expect(registry.pendingCommandsForClient(code, 'p1')).toHaveLength(0);
+   });
+ 
+   it('сервер больше не правит чужой снимок', () => {
+@@ -61,13 +64,14 @@ describe('528: протокол команд списания', () => {
+     const serverSource = read('server/roomServer.js');
+     expect(registrySource).not.toContain('consumeBobbyPins(');
+     expect(registrySource).toContain('pinsToSpend');
+-    expect(serverSource).toContain('sendPinSpendCommands');
+-    expect(serverSource).toContain('MESSAGE.CHAR_SPEND');
++    expect(serverSource).toContain('sendCharacterCommand');
++    expect(serverSource).toContain('MESSAGE.CHAR_COMMAND');
+     expect(serverSource).toContain('MESSAGE.CHAR_REFRESH');
++    expect(serverSource).not.toContain('MESSAGE.CHAR_SPEND');
+   });
+ });
+ 
+-describe('528: клиент применяет команды в строгом порядке', () => {
++describe('529: клиент применяет команды в строгом порядке', () => {
+   const deps = (overrides = {}) => {
+     const spend = vi.fn(async () => 1);
+     const publish = vi.fn(async () => true);
+@@ -75,7 +79,7 @@ describe('528: клиент применяет команды в строгом
+       spend,
+       publish,
+       d: {
+-        spendBobbyPins: spend,
++        executionDeps: { spendBobbyPins: spend },
+         publish,
+         getCharacterId: () => 'ch1',
+         isApplied: async () => false,
+@@ -85,23 +89,27 @@ describe('528: клиент применяет команды в строгом
+       },
+     };
+   };
++  const command = (commandId, payload = {}) => ({
++    type: CLIENT_MESSAGE.CHAR_COMMAND,
++    payload: {
++      commandId, characterId: 'ch1', kind: 'item.spend',
++      payload: { itemId: 'item_bobby_pin', count: 1, ...payload },
++    },
++  });
+ 
+-  it('char.spend списывает штатным вызовом и НЕ публикует лист сам', async () => {
++  it('char.command(item.spend) списывает штатным вызовом и НЕ публикует лист сам', async () => {
+     const { spend, d } = deps();
+-    const result = await applyCharSpendCommand({
+-      type: CLIENT_MESSAGE.CHAR_SPEND,
+-      payload: { spendId: 's1', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
+-    }, new Map(), d);
+-    expect(result).toMatchObject({ ok: true, started: true });
++    const result = await applyCharSpendCommand(command('s1'), new Map(), d);
++    expect(result).toMatchObject({ ok: true, started: true, kind: 'item.spend' });
+     expect(spend).toHaveBeenCalledWith(1, { characterId: 'ch1', publish: false });
+   });
+ 
+-  it('char.refresh ждёт окончания списания и только потом обновляет снимок', async () => {
++  it('char.refresh ждёт окончания исполнения и только потом обновляет снимок', async () => {
+     let resolveSpend;
+     const spend = vi.fn(() => new Promise((resolve) => { resolveSpend = resolve; }));
+     const publish = vi.fn(async () => true);
+     const d = {
+-      spendBobbyPins: spend,
++      executionDeps: { spendBobbyPins: spend },
+       publish,
+       getCharacterId: () => 'ch1',
+       isApplied: async () => false,
+@@ -109,11 +117,8 @@ describe('528: клиент применяет команды в строгом
+       log: vi.fn(),
+     };
+     const jobs = new Map();
+-    const base = { spendId: 's2', characterId: 'ch1' };
+-    await applyCharSpendCommand({
+-      type: CLIENT_MESSAGE.CHAR_SPEND,
+-      payload: { ...base, itemId: 'item_bobby_pin', count: 1 },
+-    }, jobs, d);
++    const base = { commandId: 's2', characterId: 'ch1' };
++    await applyCharSpendCommand(command('s2'), jobs, d);
+     const refreshing = applyCharSpendCommand({
+       type: CLIENT_MESSAGE.CHAR_REFRESH, payload: base,
+     }, jobs, d);
+@@ -124,27 +129,21 @@ describe('528: клиент применяет команды в строгом
+     expect(jobs.has('s2')).toBe(false);
+   });
+ 
+-  it('повтор команды после реконнекта не списывает заколку дважды', async () => {
++  it('повтор команды после реконнекта не применяет изменение дважды', async () => {
+     const { spend, d } = deps({ isApplied: async () => true });
+-    const result = await applyCharSpendCommand({
+-      type: CLIENT_MESSAGE.CHAR_SPEND,
+-      payload: { spendId: 's3', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
+-    }, new Map(), d);
++    const result = await applyCharSpendCommand(command('s3'), new Map(), d);
+     expect(result.duplicate).toBe(true);
+     expect(spend).not.toHaveBeenCalled();
+   });
+ 
+-  it('команда для другого персонажа или другого предмета игнорируется', async () => {
++  it('команда для другого персонажа игнорируется, а чужой предмет не исполняется', async () => {
+     const { spend, d } = deps({ getCharacterId: () => 'ch2' });
+-    expect((await applyCharSpendCommand({
+-      type: CLIENT_MESSAGE.CHAR_SPEND,
+-      payload: { spendId: 's4', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
+-    }, new Map(), d)).reason).toBe('other-character');
+-    const wrongItem = await applyCharSpendCommand({
+-      type: CLIENT_MESSAGE.CHAR_SPEND,
+-      payload: { spendId: 's5', characterId: 'ch1', itemId: 'caps', count: 1 },
+-    }, new Map(), deps().d);
+-    expect(wrongItem.reason).toBe('wrong-item');
++    expect((await applyCharSpendCommand(command('s4'), new Map(), d)).reason).toBe('other-character');
++    const { spend: spend2, d: d2 } = deps();
++    const foreign = command('s5', { itemId: 'caps' });
++    const result = await applyCharSpendCommand(foreign, new Map(), d2);
++    expect(result.started).toBe(true); // команда принята, но исполнитель её отверг
++    expect(spend2).not.toHaveBeenCalled(); // белый список предметов
+     expect(spend).not.toHaveBeenCalled();
+   });
+ 
+diff --git a/__tests__/room/gm-snapshot-law-529.test.js b/__tests__/room/gm-snapshot-law-529.test.js
+new file mode 100644
+index 0000000..325540a
+--- /dev/null
++++ b/__tests__/room/gm-snapshot-law-529.test.js
+@@ -0,0 +1,226 @@
++// Патч 529 — ЗАКОН СНИМКА владельца:
++// «Снапшот юзера не трогаем, если надо что-то изменить у пользователя —
++// посылаем команду, которую исполнит клиент. По нему должно работать всё
++// пространство мастера. Снапшот нужен для наблюдением за изменением состояния
++// пользователя без вмешательства даже между сессиями».
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync, readdirSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { MESSAGE as SERVER_MESSAGE } from '../../server/protocol.js';
++import { ROOM_MESSAGE as CLIENT_MESSAGE } from '../../src/room/roomProtocol';
++import {
++  CHAR_COMMAND_KIND,
++  CHAR_COMMAND_KINDS,
++  normalizeCharacterCommand,
++  applyCharacterCommand,
++} from '../../components/gm/charCommands.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const serverFiles = readdirSync(path.join(ROOT, 'server'))
++  .filter((f) => f.endsWith('.js'))
++  .map((f) => `server/${f}`);
++
++const sheet = (pins = 5) => ({
++  characterName: 'Сталкер',
++  data: {
++    attributes: [{ name: 'PER', value: 10 }, { name: 'LCK', value: 4 }],
++    skills: [{ name: 'LOCKPICK', value: 0 }],
++    equipment: { items: [{ id: 'pin', weaponId: 'item_bobby_pin', name: 'Заколка', quantity: pins }] },
++  },
++});
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 't' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1, snapshot: sheet(5),
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  return { registry, code };
++};
++
++describe('529: закон снимка зафиксирован в документах и протоколе', () => {
++  it('канон закона существует и содержит три формулировки владельца', () => {
++    const law = read('docs/gm-snapshot-law.md');
++    expect(law).toContain('не трогаем');
++    expect(law).toContain('команду');
++    expect(law).toContain('наблюд');
++    expect(law).toContain('между сессиями');
++    expect(read('docs/roadmap.md')).toContain('gm-snapshot-law.md');
++  });
++
++  it('char.command зеркально есть на сервере и клиенте', () => {
++    expect(SERVER_MESSAGE.CHAR_COMMAND).toBe('char.command');
++    expect(CLIENT_MESSAGE.CHAR_COMMAND).toBe('char.command');
++    expect(CLIENT_MESSAGE.CHAR_REFRESH).toBe('char.refresh');
++    expect(read('src/room/roomStore.ts')).toContain('ROOM_MESSAGE.CHAR_COMMAND');
++    expect(read('App.js')).toContain('<CharSpendCommandHost />');
++  });
++});
++
++describe('529: сервер НЕ пишет в снимок игрока', () => {
++  it('единственный_writer lastSnapshots — putSnapshot (обычный char.publish)', () => {
++    const writes = [];
++    for (const file of serverFiles) {
++      const text = read(file);
++      const matches = [...text.matchAll(/lastSnapshots\.set\(/g)];
++      matches.forEach((m) => writes.push({ file, index: m.index }));
++    }
++    expect(writes).toHaveLength(1);
++    expect(writes[0].file).toBe('server/roomRegistry.js');
++    const registrySource = read('server/roomRegistry.js');
++    const start = registrySource.indexOf('const putSnapshot = (');
++    const end = registrySource.indexOf('const isOwner =', start);
++    expect(start).toBeGreaterThan(-1);
++    expect(writes[0].index).toBeGreaterThan(start);
++    expect(writes[0].index).toBeLessThan(end);
++  });
++
++  it('журнал «Программиста» больше не правит лист на сервере', () => {
++    const registrySource = read('server/roomRegistry.js');
++    expect(registrySource).not.toContain('usedMagazineEffects =');
++    expect(registrySource).not.toContain('snapshot: nextSnapshot');
++    expect(registrySource).toContain('digestCommand');
++    expect(read('server/roomServer.js')).toContain("kind: digest.kind");
++  });
++
++  it('ни один серверный модуль не поднимает ревизию листа самовольно', () => {
++    for (const file of serverFiles) {
++      const text = read(file);
++      expect(text).not.toContain('published.revision + 1');
++    }
++  });
++
++  it('всё пространство Мастера ссылается на снимок только через реестр', () => {
++    // gm.directive исполняется клиентом; склад/сессии — состояние Мастера,
++    // а не лист игрока; читать/писать lastSnapshots может только реестр.
++    for (const file of serverFiles) {
++      if (file === 'server/roomRegistry.js') continue;
++      const code = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++      expect(code).not.toMatch(/lastSnapshots\.(set|get|delete|clear)\(/);
++    }
++    expect(read('components/gm/PlayerDirectiveOverlay.js')).toContain('applyDirectiveToLiveCharacterStore');
++  });
++});
++
++describe('529: снимок — наблюдение между сессиями', () => {
++  it('лист виден в room.state, когда ни одна сессия не открыта', () => {
++    const { registry, code } = setup();
++    const state = registry.getState(code);
++    expect(state.activeSession).toBeNull();
++    expect(state.snapshots).toHaveLength(1);
++    expect(state.snapshots[0].characterId).toBe('ch1');
++    expect(state.snapshots[0].snapshot.data.equipment.items[0].quantity).toBe(5);
++  });
++
++  it('открытие и закрытие сессии НЕ очищает снимки игроков', () => {
++    const { registry, code } = setup();
++    const opened = registry.openSession({
++      code, clientId: 'gm',
++      session: { name: 'Бункер', kind: 'hub', targetType: 'room', nodes: [] },
++    });
++    expect(opened.error).toBeUndefined();
++    expect(registry.getState(code).snapshots).toHaveLength(1);
++    registry.closeSession({ code, clientId: 'gm', sessionId: null });
++    expect(registry.getState(code).activeSession).toBeNull();
++    expect(registry.getState(code).snapshots).toHaveLength(1);
++    expect(registry.getState(code).snapshots[0].snapshot).toEqual(sheet(5));
++  });
++
++  it('только сам клиент может удалить свою запись (removed / snapshot:null)', () => {
++    const { registry, code } = setup();
++    const room = registry._rooms.get(code);
++    expect(room.lastSnapshots.has('ch1')).toBe(true);
++    registry.putSnapshot({ code, characterId: 'ch1', revision: 9, removed: true, fromClientId: 'p1' });
++    expect(room.lastSnapshots.has('ch1')).toBe(false);
++  });
++});
++
++describe('529: единая команда char.command во всём пространстве Мастера', () => {
++  it('реестр хранит команды любых kind и повторяет их после реконнекта', () => {
++    const { registry, code } = setup();
++    const pin = registry.registerCharacterCommand({
++      code, characterId: 'ch1', clientId: 'p1', commandId: 'c1',
++      kind: CHAR_COMMAND_KIND.ITEM_SPEND, payload: { itemId: 'item_bobby_pin', count: 1 },
++    });
++    const magazine = registry.registerCharacterCommand({
++      code, characterId: 'ch1', clientId: 'p1', commandId: 'c2',
++      kind: CHAR_COMMAND_KIND.MAGAZINE_USE, payload: { magazineId: 'mag_programmers_digest' },
++    });
++    expect(pin.kind).toBe('item.spend');
++    expect(magazine.kind).toBe('magazine.use');
++    const state = registry.getState(code);
++    expect(state.pendingCommands).toHaveLength(2);
++    expect(state.pendingSpends).toHaveLength(1); // алиас 528
++    expect(registry.pendingCommandsForClient(code, 'p1')).toHaveLength(2);
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 4, snapshot: sheet(4), fromClientId: 'p1',
++    });
++    expect(registry.getState(code).pendingCommands).toHaveLength(0);
++  });
++
++  it('char.spend 528 нормализуется в item.spend 529 (совместимость)', () => {
++    const normalized = normalizeCharacterCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { spendId: 'legacy-1', characterId: 'ch1', itemId: 'item_bobby_pin', count: 2 },
++    }, CLIENT_MESSAGE);
++    expect(normalized).toMatchObject({
++      commandId: 'legacy-1', characterId: 'ch1', kind: 'item.spend', legacy: true,
++    });
++    expect(normalized.payload).toEqual({ itemId: 'item_bobby_pin', count: 2 });
++  });
++
++  it('char.command с kind и payload нормализуется без легаси-флага', () => {
++    const normalized = normalizeCharacterCommand({
++      type: CLIENT_MESSAGE.CHAR_COMMAND,
++      payload: {
++        commandId: 'c3', characterId: 'ch1', kind: 'magazine.use',
++        payload: { magazineId: 'mag_programmers_digest' },
++      },
++    }, CLIENT_MESSAGE);
++    expect(normalized).toMatchObject({ commandId: 'c3', kind: 'magazine.use', legacy: false });
++    expect(normalized.payload.magazineId).toBe('mag_programmers_digest');
++  });
++
++  it('item.spend исполняется штатным spendBobbyPins без публикации', async () => {
++    const spendBobbyPins = vi.fn(async () => 1);
++    const result = await applyCharacterCommand({
++      kind: CHAR_COMMAND_KIND.ITEM_SPEND, characterId: 'ch1',
++      payload: { itemId: 'item_bobby_pin', count: 2 },
++    }, { spendBobbyPins });
++    expect(result).toEqual({ ok: true, spent: 1 });
++    expect(spendBobbyPins).toHaveBeenCalledWith(2, { characterId: 'ch1', publish: false });
++  });
++
++  it('magazine.use исполняется штатным markMagazineEffectUsed + saveCharacter', async () => {
++    const markMagazineEffectUsed = vi.fn();
++    const saveCharacter = vi.fn(async () => 'ch1');
++    const result = await applyCharacterCommand({
++      kind: CHAR_COMMAND_KIND.MAGAZINE_USE, characterId: 'ch1',
++      payload: { magazineId: 'mag_programmers_digest' },
++    }, { markMagazineEffectUsed, saveCharacter, getCharacterName: () => 'Сталкер' });
++    expect(result).toEqual({ ok: true, magazineId: 'mag_programmers_digest' });
++    expect(markMagazineEffectUsed).toHaveBeenCalledWith('mag_programmers_digest');
++    expect(saveCharacter).toHaveBeenCalledWith('Сталкер');
++  });
++
++  it('неизвестный kind и чужой предмет не исполняются (белый список)', async () => {
++    expect(CHAR_COMMAND_KINDS).toEqual(['item.spend', 'magazine.use']);
++    const spendBobbyPins = vi.fn(async () => 1);
++    expect((await applyCharacterCommand({ kind: 'sheet.delete', payload: {} }, { spendBobbyPins })).reason)
++      .toBe('unknown-kind');
++    expect((await applyCharacterCommand({
++      kind: CHAR_COMMAND_KIND.ITEM_SPEND, payload: { itemId: 'caps', count: 1 },
++    }, { spendBobbyPins })).reason).toBe('unsupported-item');
++    expect((await applyCharacterCommand({
++      kind: CHAR_COMMAND_KIND.MAGAZINE_USE, payload: {},
++    }, {})).reason).toBe('no-magazine');
++    expect(spendBobbyPins).not.toHaveBeenCalled();
++  });
++});
+diff --git a/components/gm/charCommands.js b/components/gm/charCommands.js
+new file mode 100644
+index 0000000..4a91fd5
+--- /dev/null
++++ b/components/gm/charCommands.js
+@@ -0,0 +1,108 @@
++/**
++ * Патч 529 — ЗАКОН СНИМКА (канон исполнения команд Мастера на клиенте).
++ *
++ * «Снапшот юзера не трогаем, если надо что-то изменить у пользователя —
++ * посылаем команду, которую исполнит клиент. По нему должно работать всё
++ * пространство мастера. Снапшот нужен для наблюдения за изменением состояния
++ * пользователя без вмешательства даже между сессиями».
++ *
++ * Здесь живут ТОЛЬКО исполнители команд: они меняют живой лист штатными
++ * действиями characterStore и сохраняют его обычным saveCharacter(). Никакой
++ * правки room.lastSnapshots, никакого «поднять ревизию» на сервере. Публикацию
++ * свежего листа делает вторая команда char.refresh (см. CharSpendCommandHost).
++ *
++ * Модуль чистый относительно сети: deps подменяются в тестах.
++ */
++
++import useCharacterStore from '../../src/store/characterStore';
++import { debugLog } from '../../src/debug/falloutDebug';
++import { spendBobbyPins } from '../lootTrade/spendBobbyPins';
++
++export const CHAR_COMMAND_KIND = Object.freeze({
++  ITEM_SPEND: 'item.spend',
++  MAGAZINE_USE: 'magazine.use',
++});
++
++/** Жёсткий белый список: клиент не исполняет произвольные команды сервера. */
++export const CHAR_COMMAND_KINDS = Object.freeze(Object.values(CHAR_COMMAND_KIND));
++
++/**
++ * Привести кадр протокола к единому виду команды.
++ * char.command — общий кадр 529; char.spend — специализированный алиас 528,
++ * оставлен для совместимости с сервером предыдущей версии.
++ */
++export const normalizeCharacterCommand = (message, ROOM_MESSAGE) => {
++  const payload = message?.payload || {};
++  const legacy = message?.type === ROOM_MESSAGE.CHAR_SPEND;
++  const commandId = String(payload.commandId || payload.spendId || '').trim();
++  const kind = legacy
++    ? CHAR_COMMAND_KIND.ITEM_SPEND
++    : String(payload.kind || '').trim();
++  const commandPayload = legacy
++    ? { itemId: String(payload.itemId || 'item_bobby_pin'), count: payload.count }
++    : (payload.payload && typeof payload.payload === 'object' ? payload.payload : {});
++  return {
++    commandId,
++    characterId: String(payload.characterId || '').trim(),
++    kind,
++    payload: commandPayload,
++    legacy,
++  };
++};
++
++const applyItemSpend = async (command, deps) => {
++  const itemId = String(command.payload?.itemId || 'item_bobby_pin');
++  if (itemId !== 'item_bobby_pin') return { ok: false, reason: 'unsupported-item' };
++  const count = Math.max(1, Math.floor(Number(command.payload?.count) || 1));
++  const spent = await deps.spendBobbyPins(count, {
++    characterId: command.characterId,
++    publish: false,
++  });
++  return { ok: true, spent };
++};
++
++const applyMagazineUse = async (command, deps) => {
++  const magazineId = String(command.payload?.magazineId || '').trim();
++  if (!magazineId) return { ok: false, reason: 'no-magazine' };
++  // Штатное действие стора (идемпотентно) + обычное сохранение листа.
++  deps.markMagazineEffectUsed(magazineId);
++  const name = deps.getCharacterName();
++  await deps.saveCharacter(name);
++  return { ok: true, magazineId };
++};
++
++/** Исполнить команду штатными средствами клиента. */
++export const applyCharacterCommand = async (command, deps = {}) => {
++  const {
++    spendBobbyPins: spend = spendBobbyPins,
++    markMagazineEffectUsed = (id) => useCharacterStore.getState().markMagazineEffectUsed?.(id),
++    getCharacterName = () => useCharacterStore.getState().characterName || '—',
++    saveCharacter = async (name) => {
++      const { saveCharacter: save } = await import('../../src/saves/characterSaves');
++      return save(name);
++    },
++    log = debugLog,
++  } = deps;
++  const handlers = {
++    [CHAR_COMMAND_KIND.ITEM_SPEND]: applyItemSpend,
++    [CHAR_COMMAND_KIND.MAGAZINE_USE]: applyMagazineUse,
++  };
++  const handler = handlers[command?.kind];
++  if (!handler) {
++    log('gm.charCommand:unknownKind', { kind: command?.kind });
++    return { ok: false, reason: 'unknown-kind' };
++  }
++  try {
++    return await handler(command, {
++      spendBobbyPins: spend,
++      markMagazineEffectUsed,
++      getCharacterName,
++      saveCharacter,
++    });
++  } catch (error) {
++    log('gm.charCommand:failed', { kind: command?.kind, message: error?.message });
++    return { ok: false, reason: 'failed' };
++  }
++};
++
++export default applyCharacterCommand;
+diff --git a/components/lootTrade/CharSpendCommandHost.js b/components/lootTrade/CharSpendCommandHost.js
+index 93258a1..3598e1a 100644
+--- a/components/lootTrade/CharSpendCommandHost.js
++++ b/components/lootTrade/CharSpendCommandHost.js
+@@ -1,19 +1,22 @@
+ /**
+- * Патч 528: штатное списание заколки по команде сервера.
++ * Патч 528/529: ЗАКОН СНИМКА — исполнитель команд изменения листа.
+  *
+- * Сервер больше НЕ уменьшает quantity в опубликованном снимке листа. При
+- * поломке он шлёт оператору две команды подряд (порядок кадров WebSocket
+- * гарантирован):
++ * «Снапшот юзера не трогаем, если надо что-то изменить у пользователя —
++ * посылаем команду, которую исполнит клиент. По нему должно работать всё
++ * пространство мастера. Снапшот нужен для наблюдения за изменением состояния
++ * пользователя без вмешательства даже между сессиями».
+  *
+- *   1. `char.spend`   — «спиши заколку из инвентаря штатными средствами»;
+- *   2. `char.refresh` — «после списания обнови снимок» (обычный char.publish).
++ * Сервер шлёт оператору два кадра подряд (порядок WebSocket гарантирован):
+  *
+- * Здесь команды применяются последовательно: вторая всегда дожидается первой.
+- * Списание идёт через общий `spendItemStacks` + `saveCharacter`, публикация —
+- * через штатный `pushSavedCharacterToBoundRoomIfAny`. `spendId` дедуплицирует
+- * повтор команды после реконнекта, чтобы не списать заколку дважды.
++ *   1. `char.command` (528-алиас `char.spend`) — { commandId, characterId,
++ *      kind, payload }. Исполнители — `components/gm/charCommands.js`: только
++ *      штатные действия characterStore + saveCharacter, белый список kind.
++ *   2. `char.refresh` — «после исполнения обнови снимок»: обычный char.publish
++ *      через `pushSavedCharacterToBoundRoomIfAny`.
+  *
+- * Монтируется один раз в App.js: игрок мог уже закрыть окно мини-игры, а лист
++ * `commandId` дедуплицируется (память + AsyncStorage), поэтому повтор команды
++ * после реконнекта не применит изменение дважды. Монтируется один раз в App.js
++ * поверх ВСЕХ экранов: окно мини-игры/终端а могло быть уже закрыто, а лист
+  * всё равно должен обновиться. Компонент ничего не рисует.
+  */
+ 
+@@ -24,9 +27,12 @@ import { onRoomCharSpend } from '../../src/room/roomStore';
+ import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
+ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
+ import { debugLog } from '../../src/debug/falloutDebug';
+-import { spendBobbyPins } from './spendBobbyPins';
++import {
++  normalizeCharacterCommand,
++  applyCharacterCommand,
++} from '../gm/charCommands';
+ 
+-const APPLIED_KEY = 'positronium_applied_pin_spends_v1';
++const APPLIED_KEY = 'positronium_applied_char_commands_v1';
+ const MAX_APPLIED = 200;
+ const applied = new Set();
+ let hydrated = false;
+@@ -41,11 +47,11 @@ const hydrateOnce = async () => {
+   } catch { /* нет хранилища — дедуплицируем в памяти сессии */ }
+ };
+ 
+-const markApplied = async (spendId) => {
+-  applied.add(spendId);
++const markApplied = async (commandId) => {
++  applied.add(commandId);
+   try {
+     await AsyncStorage.setItem(APPLIED_KEY, JSON.stringify([...applied].slice(-MAX_APPLIED)));
+-  } catch { /* не блокируем списание */ }
++  } catch { /* не блокируем исполнение */ }
+ };
+ 
+ /** Точка сброса для тестов. */
+@@ -57,57 +63,55 @@ export const resetAppliedPinSpendsForTests = () => {
+ /** Чистый обработчик кадра — экспортирован для приёмочных тестов. */
+ export const applyCharSpendCommand = async (message, jobs, deps = {}) => {
+   const {
+-    spendBobbyPins: spend = spendBobbyPins,
++    execute = applyCharacterCommand,
+     publish = pushSavedCharacterToBoundRoomIfAny,
+     getCharacterId = () => useCharacterStore.getState().currentCharacterId,
+     isApplied = async (id) => { await hydrateOnce(); return applied.has(id); },
+     setApplied = markApplied,
+     log = debugLog,
++    executionDeps = {},
+   } = deps;
+   const type = message?.type;
+   const payload = message?.payload || {};
+-  const spendId = String(payload.spendId || '').trim();
+-  if (!spendId) return { ok: false, reason: 'no-spend-id' };
+ 
+-  if (type === ROOM_MESSAGE.CHAR_SPEND) {
+-    if (await isApplied(spendId)) return { ok: true, duplicate: true };
+-    const characterId = String(payload.characterId || '').trim();
+-    if (!characterId) return { ok: false, reason: 'no-character' };
++  if (type === ROOM_MESSAGE.CHAR_COMMAND || type === ROOM_MESSAGE.CHAR_SPEND) {
++    const command = normalizeCharacterCommand(message, ROOM_MESSAGE);
++    const commandId = command.commandId;
++    if (!commandId) return { ok: false, reason: 'no-command-id' };
++    if (await isApplied(commandId)) return { ok: true, duplicate: true };
++    if (!command.characterId) return { ok: false, reason: 'no-character' };
+     const current = getCharacterId();
+-    if (current && current !== characterId) {
++    if (current && current !== command.characterId) {
+       // Другая вкладка/персонаж: команда адресована не этому листу.
+       return { ok: false, reason: 'other-character' };
+     }
+-    if (String(payload.itemId || 'item_bobby_pin') !== 'item_bobby_pin') {
+-      return { ok: false, reason: 'wrong-item' };
+-    }
+     const job = (async () => {
+-      const spent = await spend(Math.max(1, Math.floor(Number(payload.count) || 1)), {
+-        characterId,
+-        publish: false, // публикация — вторая команда char.refresh
+-      });
+-      await setApplied(spendId);
+-      return spent;
++      const result = await execute(command, executionDeps);
++      if (!result?.ok) return 0;
++      await setApplied(commandId);
++      return 1;
+     })().catch((error) => {
+-      log('lock.charSpend:failed', { spendId, message: error?.message });
++      log('gm.charCommand:jobFailed', { commandId, message: error?.message });
+       return 0;
+     });
+-    jobs.set(spendId, job);
+-    return { ok: true, started: true };
++    jobs.set(commandId, job);
++    return { ok: true, started: true, kind: command.kind };
+   }
+ 
+   if (type === ROOM_MESSAGE.CHAR_REFRESH) {
+-    // Вторая команда приходит сразу за первой, но списание асинхронно:
++    const commandId = String(payload.commandId || payload.spendId || '').trim();
++    if (!commandId) return { ok: false, reason: 'no-command-id' };
++    // Вторая команда приходит сразу за первой, но исполнение асинхронно:
+     // явно ждём его, чтобы в комнату ушёл УЖЕ обновлённый лист.
+-    const job = jobs.get(spendId) || Promise.resolve(0);
++    const job = jobs.get(commandId) || Promise.resolve(0);
+     await job;
+     const characterId = String(payload.characterId || '').trim();
+     if (characterId) {
+       try { await publish(characterId); } catch (error) {
+-        log('lock.charRefresh:failed', { spendId, message: error?.message });
++        log('gm.charRefresh:failed', { commandId, message: error?.message });
+       }
+     }
+-    jobs.delete(spendId);
++    jobs.delete(commandId);
+     return { ok: true, refreshed: true };
+   }
+   return { ok: false, reason: 'unknown-type' };
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index f2eea3a..0df027d 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -172,6 +172,11 @@ ${tLootTrade('terminal.retryMessage')}`,
+         value,
+         ownerToken,
+       });
++      // Патч 529 (ЗАКОН СНИМКА): сервер 529 присылает char.command с
++      // kind=magazine.use, его исполняет CharSpendCommandHost. Эта ветка —
++      // локальный резерв для сервера 528 без общего кадра команд; действие
++      // стора идемпотентно, поэтому двойного эффекта нет. Снимок на сервере
++      // не правит никто: лист публикует сам клиент.
+       if (action === 'useDigest' && updated?.game?.digestUsed) {
+         markMagazineEffectUsed?.('mag_programmers_digest');
+         if (characterId) {
+diff --git a/components/lootTrade/spendBobbyPins.js b/components/lootTrade/spendBobbyPins.js
+index 82be62c..fda8b25 100644
+--- a/components/lootTrade/spendBobbyPins.js
++++ b/components/lootTrade/spendBobbyPins.js
+@@ -4,11 +4,11 @@ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacter
+ import engine from '../../server/lockPicking';
+ 
+ /**
+- * Патч 527: сломанная заколка должна ИСЧЕЗНУТЬ из инвентаря, а не только из
+- * счётчика мини-игры. Сервер уже уменьшил quantity в опубликованном снимке;
+- * здесь зеркально списываем заколку из живого стора персонажа, сохраняем лист
+- * и переопубликовываем его в комнату Мастера (включая локальный резерв, где
+- * серверного терминала нет и доска живёт целиком на клиенте).
++ * Патч 527/528/529: сломанная заколка должна ИСЧЕЗНУТЬ из инвентаря, а не
++ * только из счётчика мини-игры. По закону снимка (патч 529) сервер НЕ трогает
++ * лист: он шлёт команду char.command(kind=item.spend), а этот модуль штатно
++ * списывает заколку из живого стора и сохраняет лист. Публикацию делает вторая
++ * команда char.refresh. Локальный резерв старого сервера публикует сам.
+  *
+  * Основной путь — общая атомарная операция стора spendItemStacks (respects
+  * моды/состояние, не трогает надетое и запертое по правилу 522). Резерв для
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a726c3f..05fc24e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,62 @@
+ # Changelog
+ ---
++## Snapshot law: commands instead of editing the sheet (patch 529)
++
++> **Owner's words:** "don't touch the user's snapshot; if something must change
++> for the user, send a command that the client executes. The whole Game Master
++> space must obey it. The snapshot is for observing the user's state without
++> interference, even between sessions."
++
++The canon is `docs/gm-snapshot-law.md`. This is a law for the whole GM space,
++not a one-off fix.
++
++### 1. The snapshot is observation only
++
++`room.lastSnapshots` lives on the room, not on a session: the GM sees the
++player's sheet when no loot/trade session is open, and it is not cleared when a
++location opens/closes or on «Leave location». The only writer is the client's
++own `char.publish`; only the client can remove its entry. The server no longer
++writes, clears or bumps a revision on someone else's sheet.
++
++### 2. A single command frame
++
++`char.command` `{ commandId, characterId, kind, payload }` → the client executes
++the change with **standard tools** (`useCharacterStore` + `saveCharacter`) →
++`char.refresh` awaits it → ordinary `char.publish`. The whitelist of executors
++lives in `components/gm/charCommands.js`:
++
++- `item.spend` — a broken bobby pin (former 528 `char.spend`, `spendItemStacks`);
++- `magazine.use` — the Programmer's Digest magazine (`markMagazineEffectUsed`).
++
++**The last loophole is closed:** the server used to write
++`usedMagazineEffects` and `terminalHacking` into the published sheet when
++«Use magazine» was pressed. It now returns `digestCommand`, the network layer
++sends `char.command(magazine.use)`, and the client edits and publishes its own
++sheet. The branch in `TerminalHackingModal` remains as an idempotent fallback
++for a 528 server.
++
++`commandId` is deduplicated (memory + AsyncStorage); `pendingCharCommands`
++replays commands on `room.join` and clears them in `putSnapshot`. Unknown
++`kind`, another character and items outside the whitelist are not executed.
++
++### 3. What is preserved
++
++State owned by the Game Master (sessions, `terminalStates`, `accessEvents`,
++`partyStorage`, directives, keys) is still server canon — the law is about the
++player's sheet. Message caps, roles, validation and atomicity are intact.
++Laws 520–528 (terminal balance, four attempts, explicit player attempts, light
++palette, the «Заколка» canon, the red pause, spend commands) are unchanged.
++
++### Checks
++
++`npm run typecheck`, `npm run build`, `npm test` (258 files, 2334 tests),
++`git apply --check`, installer from the exact `a62ec71` base and from version
++528 with byte comparison, live WS probe. Acceptance tests:
++`__tests__/room/gm-snapshot-law-529.test.js` (static guard "one
++lastSnapshots.set and only in putSnapshot", snapshots between sessions, kind
++whitelist, deduplication); the 528 tests were updated for the unified
++`char.command` frame.
++
+ ## Spend commands and a pause before the colours update (patch 528)
+ 
+ The owner clarified the patch 527 architecture: "Bobby pins are removed not
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 99e1b9a..6d4daf5 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,61 @@
+ # История изменений
+ 
+ ---
++## Закон снимка: команды вместо правки листа (патч 529)
++
++> **Слово владельца:** «снапшот юзера не трогаем, если надо что-то изменить у
++> пользователя — посылаем команду, которую исполнит клиент. По нему должно
++> работать всё пространство мастера. Снапшот нужен для наблюдением за
++> изменением состояния пользователя без вмешательства даже между сессиями».
++
++Канон — `docs/gm-snapshot-law.md`. Это закон для всего пространства Мастера,
++а не точечное исправление.
++
++### 1. Снимок — только наблюдение
++
++`room.lastSnapshots` живёт на комнате, а не на сессии: Мастер видит лист игрока,
++когда ни одна сессия добычи/торговли не открыта, и лист не очищается при
++открытии/закрытии локации и «Покинуть локацию». Единственный писатель — сам
++клиент сообщением `char.publish`; удалить запись тоже может только клиент.
++Сервер больше не пишет, не чистит и не «поднимает ревизию» чужого листа.
++
++### 2. Единый кадр команды
++
++`char.command` `{ commandId, characterId, kind, payload }` → клиент исполняет
++изменение **штатными средствами** (`useCharacterStore` + `saveCharacter`) →
++`char.refresh` дожидается исполнения → обычный `char.publish`. Белый список
++исполнителей в `components/gm/charCommands.js`:
++
++- `item.spend` — сломанная заколка (бывший `char.spend` 528, `spendItemStacks`);
++- `magazine.use` — журнал «Программиста» (`markMagazineEffectUsed`).
++
++**Последняя лазейка закрыта:** раньше сервер сам писал `usedMagazineEffects` и
++`terminalHacking` в опубликованный снимок при нажатии «Использовать журнал».
++Теперь он возвращает `digestCommand`, сетевой слой шлёт `char.command(
++magazine.use)`, а лист меняет и публикует клиент. Ветка в
++`TerminalHackingModal` оставлена как идемпотентный резерв для сервера 528.
++
++`commandId` дедуплицируется (память + AsyncStorage), `pendingCharCommands`
++повторяет команды при `room.join` и снимает их в `putSnapshot`. Неизвестный
++`kind`, чужой персонаж и предмет вне белого списка не исполняются.
++
++### 3. Что сохраняется
++
++Состояние, которым владеет Мастер (сессии, `terminalStates`, `accessEvents`,
++`partyStorage`, директивы, ключи), по-прежнему канон сервера — закон про лист
++игрока. Защита сообщений, ролей, валидация и атомарность не ослаблены.
++Законы 520–528 (баланс терминала, четыре попытки, явные подходы, светлая гамма,
++канон «Заколка», пауза перед сбросом красного, команды списания) не менялись.
++
++### Проверки
++
++`npm run typecheck`, `npm run build`, `npm test` (258 файлов, 2334 теста),
++`git apply --check`, установщик от точной базы `a62ec71` и от версии 528 с
++побайтовым сравнением, живая WS-проба. Приёмочные тесты:
++`__tests__/room/gm-snapshot-law-529.test.js` (статический страж «одна запись
++в lastSnapshots и только в putSnapshot», снимки между сессиями, белый список
++`kind`, дедупликация), тесты 528 обновлены под единый кадр `char.command`.
++
+ ## Команды списания и пауза перед сбросом цветов (патч 528)
+ 
+ Владелец уточнил архитектуру патча 527: «Заколки удаляются не из снапшота, а
+diff --git a/docs/gm-snapshot-law.md b/docs/gm-snapshot-law.md
+new file mode 100644
+index 0000000..dccf303
+--- /dev/null
++++ b/docs/gm-snapshot-law.md
+@@ -0,0 +1,97 @@
++# Закон снимка (патч 529)
++
++> **Слово владельца:** «снапшот юзера не трогаем, если надо что-то изменить у
++> пользователя — посылаем команду, которую исполнит клиент. По нему должно
++> работать всё пространство мастера. Снапшот нужен для наблюдением за
++> изменением состояния пользователя без вмешательства даже между сессиями».
++
++Это **закон**, а не отдельное исправление: он действует на весь код «Добычи /
++Торговли», комнатного сервера, мини-игр, директив Мастера, склада и будущих
++функций пространства Мастера. Патч 528 ввёл его для заколок, патч 529
++распространил на всё пространство и убрал последнюю лазейку.
++
++## 1. Что такое снимок
++
++`room.lastSnapshots` (реестр комнат) — **канал наблюдения**. Мастер видит
++текущее состояние листа игрока: атрибуты, навыки, инвентарь, эффекты, ревизию.
++Снимок живёт на комнате, а **не на сессии**: он доступен, когда ни одна
++сессия добычи/торговли не открыта, и не очищается при открытии/закрытии сессии,
++при «Покинуть локацию» и при выходе игрока из локации. Комната — единственный
++владелец снимка; пока комната жива, наблюдение между сессиями работает.
++
++**Сервер не вмешивается:** не пишет, не чистит, не «поднимает ревизию»,
++не добавляет эффекты, не списывает предметы. Единственный писатель — сам
++клиент сообщением `char.publish` (`putSnapshot` в `server/roomRegistry.js`).
++Даже удаление записи (`removed` / `snapshot: null`) приходит от клиента.
++
++## 2. Как менять состояние пользователя
++
++Любое изменение оформляется **командой**, которую исполняет клиент:
++
++| Шаг | Кадр | Кто | Что делает |
++| --- | --- | --- | --- |
++| 1 | `char.command` `{ commandId, characterId, kind, payload }` | сервер → клиент | сообщает намерение |
++| 2 | — | клиент | исполняет **штатными средствами**: действие `useCharacterStore` + `saveCharacter()` (+ облачная синхронизация) |
++| 3 | `char.refresh` `{ commandId, spendId?, characterId }` | сервер → клиент | дожидается шага 2 и публикует лист |
++| 4 | `char.publish` | клиент → сервер | обычная публикация обновлённого снимка |
++
++Порядок кадров WebSocket гарантирован; в `CharSpendCommandHost` вторая команда
++**явно** `await`ит исполнение первой. `commandId` дедуплицируется (память +
++`AsyncStorage`): повтор после реконнекта не применит изменение дважды.
++Неподтверждённые команды живут в `room.pendingCharCommands`, попадают в
++`room.state.pendingCommands`, повторяются при `room.join` и снимаются
++`putSnapshot`, когда свежий лист уже пришёл.
++
++Исполнители — `components/gm/charCommands.js`, жёсткий белый список `kind`:
++
++| `kind` | Штатное действие клиента | Где используется |
++| --- | --- | --- |
++| `item.spend` | `spendItemStacks` (`spendBobbyPins`, с резервом для легаси-сейвов) | сломанная заколка (528) |
++| `magazine.use` | `markMagazineEffectUsed` + `saveCharacter` | журнал «Программиста» (529) |
++
++Неизвестный `kind`, чужая роль персонажа и предмет вне белого списка не
++исполняются. `char.spend` 528 остаётся алиасом `item.spend` на приёмной
++стороне — клиент 529 понимает сервер 528.
++
++## 3. Что НЕ считается нарушением
++
++Закон — про **лист пользователя**. Состояние, которым владеет Мастер, сервер
++ведёт сам, и это канон:
++
++- `activeSession` / узлы локаций, `terminalStates`, `accessEvents`,
++  `partyStorage`, `directives`, ключи на складе, `pinLedger` (диагностика),
++  `pendingCharCommands`;
++- рассылка `session.state`, `terminal.state`, `storage.state`, `access.state`;
++- мандатные проверки: лимит сообщения, роль/владелец/членство, валидация JSON,
++  целые положительные количества, атомарность переноса (не ослаблять).
++
++Если состояние Мастера **содержит предмет игрока** (выдача добычи, перенос из
++склада, торговля), оно не редактирует снимок: игрок получает команду/событие и
++сам применяет изменение к своему инвентарю, после чего публикует лист.
++
++## 4. Как это проверяется
++
++- `__tests__/room/gm-snapshot-law-529.test.js`: статический страж — во всех
++  `server/*.js` ровно одна запись `lastSnapshots.set(...)` и она внутри
++  `putSnapshot`; нет `published.revision + 1`, нет серверной правки
++  `usedMagazineEffects`; `room.state` отдаёт снимки при закрытых сессиях и
++  после `openSession`/`closeSession`; только клиент может удалить запись.
++- `__tests__/room/char-spend-commands-528.test.js` (обновлён под закон):
++  зеркало протокола, строгий порядок `char.command → char.refresh`,
++  дедупликация `commandId`, белый список исполнителей.
++- Живая WS-проба: `/version.json`, пара команд, снимок сервера **не меняется**
++  до `char.publish`, после публикации новая доска читает уже обновлённый лист.
++
++## 5. История
++
++- **527** — сервер сам уменьшал `quantity` в опубликованном снимке при поломке
++  заколки. Работало, но нарушало владение листом.
++- **528** — по слову владельца списание переведено на команды
++  `char.spend` → `char.refresh` → `char.publish`.
++- **529** — закон распространён на всё пространство Мастера: единый кадр
++  `char.command` с `kind`, последняя серверная правка листа (эффект журнала
++  «Программиста») заменена командой `magazine.use`, снимки зафиксированы как
++  канал наблюдения между сессиями.
++
++Связанные документы: `docs/lockpicking-mini-game-design.md` (§14–15),
++`docs/location-hierarchy-design.md`, `docs/roadmap.md`.
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 230507c..9ac53a1 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -356,3 +356,17 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ Регрессии: явные подходы 526, светлая гамма 525, канон «Заколка» и область
+ стрелок 527, четыре попытки терминала, `shouldBlockLock()`, защита сервера —
+ без изменений.
++
++## 15. Закон снимка 529 обязателен и для мини-игр
++
++Патч 529 обобщает правило раздела 14 на всё пространство Мастера:
++**`room.lastSnapshots` — только наблюдение**, единственный писатель — сам
++клиент через `char.publish`. Любое изменение листа (заколка, эффект журнала,
++будущие награды за взлом) оформляется `char.command` с `kind`, исполняется
++клиентом штатными действиями `useCharacterStore` + `saveCharacter`, и только
++после `char.refresh` публикуется. Канон — `docs/gm-snapshot-law.md`.
++
++Для мини-игр это значит: `pinsToSpend` и `digestCommand` — лишь намерения
++сервера, команды уходят оператору; `pinLedger` — диагностика; `spentPins`
++при сборке доски `0`, а число заколок берётся из листа, который игрок сам
++опубликовал после списания. `breakHighlight` и пауза 528 не затрагиваются.
+diff --git a/docs/patch-529-install.md b/docs/patch-529-install.md
+new file mode 100644
+index 0000000..ec48cbc
+--- /dev/null
++++ b/docs/patch-529-install.md
+@@ -0,0 +1,93 @@
++# Установка патча 529: закон снимка на всё пространство Мастера
++
++Патч подготовлен от состояния **версии 528** (коммит `0e0132e`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–529
++цепочкой. Файл установки: `patchs/529-gm-snapshot-law.patch`.
++
++> **Слово владельца:** «снапшот юзера не трогаем, если надо что-то изменить у
++> пользователя — посылаем команду, которую исполнит клиент. По нему должно
++> работать всё пространство мастера. Снапшот нужен для наблюдением за
++> изменением состояния пользователя без вмешательства даже между сессиями».
++
++Канон закона — `docs/gm-snapshot-law.md`; он обязателен для всех следующих
++патчей, включая оставшиеся пункты тезиса 13.
++
++## Что изменено
++
++### 1. Снимок больше не редактируется сервером
++
++- `server/roomRegistry.js`: удалена **последняя** серверная правка листа —
++  эффект журнала «Программиста» (`usedMagazineEffects`, `terminalHacking`).
++  Вместо неё `terminalAction()` возвращает `digestCommand`. Теперь во всех
++  `server/*.js` ровно одна запись `lastSnapshots.set(...)` — внутри
++  `putSnapshot` (обычный `char.publish` клиента).
++- Сервер не поднимает ревизию листа, не чистит и не дописывает эффекты.
++  `room.lastSnapshots` живёт на комнате, а не на сессии: `room.state` отдаёт
++  листы игроков, когда ни одна сессия не открыта, и `openSession` /
++  `closeSession` / «Покинуть локацию» их не очищают. Удалить запись может
++  только сам клиент (`removed` / `snapshot: null`).
++
++### 2. Единый кадр команды для всего пространства Мастера
++
++- `server/protocol.js`, `src/room/roomProtocol.ts`: `CHAR_COMMAND`
++  (`char.command`). `CHAR_SPEND` 528 остаётся совместимым алиасом на приёме.
++- `server/roomServer.js`: `sendCharacterCommand()` шлёт пару
++  `char.command { commandId, characterId, kind, payload }` → `char.refresh
++  { commandId, spendId?, characterId }`. Порядок кадров WebSocket
++  гарантирован; при `room.join` неподтверждённые команды повторяются из
++  `registry.pendingCommandsForClient()`.
++- `server/roomRegistry.js`: `registerCharacterCommand()` (универсальный
++  `kind` + `payload`), `pendingCommandsForClient()`, `pendingCommands` в
++  `room.state`. `registerPinSpend()` и `pendingSpendsForClient()` сохранены как
++  алиасы 528. `putSnapshot()` снимает команды после публикации свежего листа.
++- `src/room/roomStore.ts`: подписка `onRoomCharSpend` принимает и
++  `char.command`.
++
++### 3. Исполнители команд на клиенте
++
++- `components/gm/charCommands.js` (новый): `CHAR_COMMAND_KIND` — жёсткий белый
++  список `item.spend` / `magazine.use`; `normalizeCharacterCommand()` сводит
++  `char.command` и legacy `char.spend` к одному виду; `applyCharacterCommand()`
++  исполняет изменение **штатными средствами**:
++  - `item.spend` → `spendItemStacks` через `spendBobbyPins(..., publish:false)`;
++  - `magazine.use` → `markMagazineEffectUsed` + обычный `saveCharacter()`.
++- `components/lootTrade/CharSpendCommandHost.js`: обобщён на любой `kind`,
++  дедуплицирует `commandId` (память + AsyncStorage), вторая команда явно
++  ждёт первую, затем публикует лист штатным
++  `pushSavedCharacterToBoundRoomIfAny()`. Монтирован в `App.js` поверх всех
++  экранов.
++- `components/lootTrade/TerminalHackingModal.js`: локальная ветка `useDigest`
++  оставлена как идемпотентный резерв для сервера 528 (без `char.command`).
++  `components/lootTrade/spendBobbyPins.js`: уточнён комментарий 527.
++
++## Что сохранено
++
++- Состояние, которым владеет Мастер (`activeSession`, `terminalStates`,
++  `accessEvents`, `partyStorage`, `directives`, ключи, `pinLedger`), остаётся
++  серверным каноном: закон касается листа игрока.
++- Защита сервера: лимиты сообщений, роли/владелец/членство, валидация JSON,
++  целые положительные количества, атомарность переносов — без послаблений.
++- Законы 520–528: PER/Удача/LOCKPICK, четыре попытки терминала, сколько угодно
++  явных подходов, запрет авторестарта после ACCESS GRANTED, «Да/Нет» Мастера
++  только для терминала, `shouldBlockLock()`, светлая гамма 525, канон
++  «Заколка», стрелки и подсказка 527, пауза перед сбросом красного 528.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор: 258 файлов,
++  2334 теста).
++- `git apply --check patchs/529-gm-snapshot-law.patch` от дерева 528.
++- `./apply-patch.sh 529` от версии 528 и полная цепочка 493–529 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Приёмочные тесты: `__tests__/room/gm-snapshot-law-529.test.js` — канон
++  закона, зеркало протокола, **статический страж** «одна запись lastSnapshots
++  и только в putSnapshot», отсутствие `published.revision + 1`, снимки при
++  закрытых сессиях и после `openSession`/`closeSession`, удаление записи
++  только клиентом, белый список `kind`, дедупликация команд. Тесты
++  `__tests__/room/char-spend-commands-528.test.js` обновлены под единый кадр.
++- Живой сервер комнат: `/version.json` = 529/4/109+109 и WS-проба с парой
++  `char.command` → `char.refresh`, неизменённым снимком сервера до публикации
++  и обновлённым листом после `char.publish`.
++- После установки на боевой площадке перезапустить процесс сервера комнат,
++  чтобы подхватить обновлённые файлы `server/`.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 505ab85..f738157 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **528**.
++Дата ревизии: 2026-11-04. Текущая версия: **529**.
+ 
+ ## Тезисы
+ 
+@@ -30,12 +30,14 @@
+ | 16 | Подходы игрока без «билета»: сколько угодно явных попыток по своему усмотрению (купил отмычки / прокачался), без автоматического рестарта после победы; терминал после блокировки — по решению Мастера, замки пока не блокируются с заделом под будущее условие | ✅ сделано | **526** |
+ | 17 | Исправление мини-игры замка: русское имя предмета «Заколка» (не шпилька/отмычка/булавка), затемнённая область стрелок с крупными разведёнными стрелками и точной подсказкой под счётчиком, списание сломанных заколок из настоящего инвентаря, красный «?» при ошибке | ✅ сделано | **527** |
+ | 18 | Списание заколки командами клиенту (`char.spend` → `char.refresh` → штатный `char.publish`), сервер не правит чужой снимок; пауза перед обновлением цветов на поломке, красный остаётся если заколка цела | ✅ сделано | **528** |
++| 19 | **Закон снимка на всё пространство Мастера:** сервер не трогает лист игрока, изменения — команды `char.command` → `char.refresh` → `char.publish`; снимок как наблюдение между сессиями; эффект журнала «Программиста» переведён на команду | ✅ сделано | **529** |
+ 
+-## Осталось после патча 528
++## Осталось после патча 529
+ 
+-Патчи 524–528 закрыли сбой мини-игры замка, окна локации, входа в игру,
++Патчи 524–529 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+-красную ошибку и паузу перед её сбросом — не меняя порядок тринадцатого
++красную ошибку, паузу перед её сбросом и закрепили закон снимка для всего
++пространства Мастера — не меняя порядок тринадцатого
+ тезиса: граф, граница видимости, адресный взлом, общие ресурсы и одна сессия
+ из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+@@ -68,7 +70,9 @@
+ узлы без замка открыты; запрет повторного источника) приняты в 523 и записаны
+ в спецификации — владелец может поправить их следующим обновлением.
+ Спецификация — `docs/location-hierarchy-design.md`, мини-игры —
+-`docs/lockpicking-mini-game-design.md`.
++`docs/lockpicking-mini-game-design.md`. **Закон снимка (529) —
++`docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
++пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+ ## Граф пространств (реализовано в 523)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 061324a..52acc34 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "528"
++  "baseline": "529"
+ }
+diff --git a/public/version.json b/public/version.json
+index 1102d9c..b6cd655 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "528",
++  "version": "529",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Заведён закон снимка: сервер не трогает лист игрока. Любое изменение оформляется командой char.command, которую исполняет клиент штатными средствами, а затем сам публикует обновлённый снимок.",
++      "Закон действует на всё пространство Мастера: списание заколок, эффект журнала «Программиста», директивы, добыча, переносы и торговля не правят снимок на сервере.",
++      "Снимок остаётся каналом наблюдения за состоянием игрока без вмешательства: он виден Мастеру, когда ни одна сессия не открыта, и не очищается при открытии/закрытии локации.",
++      "Команды стали универсальными (kind + payload), дедуплицируются по commandId и повторяются при переподключении; char.spend 528 остаётся совместимым алиасом.",
+       "Сломанная заколка теперь списывается штатными средствами самого игрока: сервер больше не правит снимок чужого листа, а посылает команды «спиши предмет» и «обнови снимок».",
+       "Сначала клиент списывает заколку из инвентаря и сохраняет лист, и только после этого публикует обновлённый снимок в комнату Мастера.",
+       "Если на нажатии заколка сломалась, красный «?» остаётся видимым ещё мгновение и лишь потом гаснет; если заколка не сломалась, красный остаётся до следующего нажатия.",
+@@ -110,6 +114,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Introduced the snapshot law: the server never edits a player's sheet. Every change is a char.command that the client executes with its standard tools, after which the client publishes the updated snapshot itself.",
++      "The law covers the whole Game Master space: pin spending, the Programmer's Digest magazine effect, directives, loot, storage transfers and trading no longer mutate the snapshot on the server.",
++      "The snapshot stays an observation channel for the player's state without interference: the GM sees it when no session is open, and it is not cleared when a location opens or closes.",
++      "Commands are now generic (kind + payload), deduplicated by commandId and replayed on reconnect; the 528 char.spend remains a compatible alias.",
+       "A broken bobby pin is now spent by the player's own standard inventory tools: the server no longer edits the published sheet, it sends a «spend item» command and then a «refresh snapshot» command.",
+       "The client first removes the pin from the inventory and saves the sheet, and only then publishes the updated snapshot to the Game Master's room.",
+       "When a pin breaks on a press, the red «?» stays visible for a short pause before the colours update; if the pin did not break, the red mark stays until the next press.",
+diff --git a/server/protocol.js b/server/protocol.js
+index 9c40715..9885ce3 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -25,6 +25,9 @@ const MESSAGE = Object.freeze({
+   // затем «обнови снимок» (клиент публикует лист обычным char.publish).
+   CHAR_SPEND: 'char.spend',
+   CHAR_REFRESH: 'char.refresh',
++  // Патч 529: единая команда изменения листа. kind задаёт исполнителя на
++  // клиенте (item.spend / magazine.use); за ней всегда идёт char.refresh.
++  CHAR_COMMAND: 'char.command',
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 4d44ef2..a275fdb 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -194,17 +194,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+     accessEvents: new Map(),
+-    // Патч 520/527/528: диагностический счётчик сломанных заколок. С 528
+-    // сервер НЕ правит опубликованный снимок листа: он шлёт клиенту команду
+-    // char.spend (списать предмет штатными средствами) и char.refresh
+-    // (обновить снимок), а снимок меняется только обычным char.publish.
++    // Патч 520/527/528/529: диагностический счётчик сломанных заколок.
++    // ЗАКОН СНИМКА (529): lastSnapshots — ТОЛЬКО наблюдение. Единственный
++    // писатель — сам клиент через char.publish (putSnapshot). Любое изменение
++    // листа оформляется командой char.command + char.refresh, которую клиент
++    // исполняет штатными средствами (characterStore + saveCharacter).
+     pinLedger: new Map(),
+-    // Неподтверждённые команды списания: до публикации свежего листа. Нужны,
+-    // чтобы повторить команду при переподключении вкладки оператора.
+-    pendingPinSpends: new Map(),
++    // Неподтверждённые команды изменения листа: до публикации свежего листа.
++    // Нужны, чтобы повторить команду при переподключении вкладки оператора.
++    pendingCharCommands: new Map(),
+     partyStorage: emptyStorage(),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+     recentTerminalWords: [],
++    // Алиас 528: тот же Map, чтобы старые обращения не теряли команды.
++    get pendingPinSpends() { return this.pendingCharCommands; },
+     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+     directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
+     createdAt: now(),
+@@ -243,8 +246,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       fromName: entry.fromName,
+     })),
+     activeSession: room.activeSession || null,
+-    // Патч 528: команды, которые клиент обязан применить после реконнекта.
+-    pendingSpends: [...(room.pendingPinSpends?.values() || [])].map((entry) => ({ ...entry })),
++    // Патч 529: команды, которые клиент обязан применить после реконнекта.
++    // Снимки листов летят ВСЕГДА, даже когда ни одна сессия не открыта:
++    // Мастер наблюдает состояние игрока между сессиями, не вмешиваясь в него.
++    pendingCommands: [...(room.pendingCharCommands?.values() || [])].map((entry) => ({ ...entry })),
++    pendingSpends: [...(room.pendingCharCommands?.values() || [])]
++      .filter((entry) => entry.kind === 'item.spend')
++      .map((entry) => ({ ...entry })),
+     terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
+       id,
+       terminalPublic(id, entry),
+@@ -426,8 +434,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     });
+     // Патч 528: свежий лист уже учёл списание — повторять команду не надо.
+     // Это же снимает гонку, если char.refresh/char.spendAck потерялся.
+-    for (const [spendId, pending] of room.pendingPinSpends || []) {
+-      if (pending.characterId === characterId) room.pendingPinSpends.delete(spendId);
++    for (const [commandId, pending] of room.pendingCharCommands || []) {
++      if (pending.characterId === characterId) room.pendingCharCommands.delete(commandId);
+     }
+     return { room, stored: true, currentRevision: Number(revision) || 0 };
+   };
+@@ -822,21 +830,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       const fresh = entry.game.wordRanges.map((range) => range.word);
+       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
+     }
++    // Патч 529 (ЗАКОН СНИМКА): раньше здесь сервер сам писал
++    // usedMagazineEffects / terminalHacking в опубликованный лист. Теперь он
++    // только сообщает сетевому слою «нужна команда magazine.use»: клиент
++    // исполнит её штатным markMagazineEffectUsed + saveCharacter, и сам же
++    // опубликует свежий лист. Снимок остаётся каналом НАБЛЮДЕНИЯ.
++    let digestCommand = null;
+     if (entry.config?.kind !== 'lock' && result.usedDigest) {
+-      const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
+-      const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
+-        ? nextSnapshot.data
+-        : nextSnapshot;
+-      const used = new Set(Array.isArray(snapshotData.usedMagazineEffects) ? snapshotData.usedMagazineEffects : []);
+-      used.add('mag_programmers_digest');
+-      snapshotData.usedMagazineEffects = [...used];
+-      snapshotData.terminalHacking = { ...(snapshotData.terminalHacking || {}), hasProgrammersDigest: true, digestUsed: true };
+-      room.lastSnapshots.set(charId, {
+-        ...published,
+-        snapshot: nextSnapshot,
+-        revision: published.revision + 1,
+-        updatedAt: now(),
+-      });
++      digestCommand = {
++        kind: 'magazine.use',
++        payload: { magazineId: 'mag_programmers_digest' },
++        characterId: charId,
++        clientId,
++      };
+     }
+     entry.updatedAt = now();
+     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+@@ -847,6 +853,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       terminal: terminalPublic(id, entry),
+       usedDigest: Boolean(result.usedDigest),
+       pinsToSpend,
++      digestCommand,
+       characterId: charId,
+       clientId,
+     };
+@@ -1416,35 +1423,58 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+    * Патч 528: зарегистрировать команду списания заколки для оператора.
+    * Возвращает её идентификатор; команда живёт до публикации свежего листа.
+    */
+-  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => {
++  const registerCharacterCommand = ({
++    code, characterId, clientId, commandId, kind, payload = {},
++  }) => {
+     const room = rooms.get(code);
+-    if (!room || !spendId || !characterId) return null;
++    if (!room || !commandId || !characterId || !kind) return null;
+     const entry = {
+-      spendId: String(spendId),
++      commandId: String(commandId),
++      // Алиас 528: старые клиенты ищут spendId.
++      spendId: String(commandId),
+       characterId: String(characterId),
+       clientId: String(clientId || ''),
+-      count: Math.max(1, Math.floor(Number(count) || 1)),
+-      itemId: 'item_bobby_pin',
++      kind: String(kind),
++      payload: { ...payload },
+       at: now(),
+     };
+-    room.pendingPinSpends.set(entry.spendId, entry);
++    room.pendingCharCommands.set(entry.commandId, entry);
+     return entry;
+   };
+ 
++  /** Алиас 528: команда списания заколки — частный случай char.command. */
++  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => (
++    registerCharacterCommand({
++      code, characterId, clientId,
++      commandId: spendId,
++      kind: 'item.spend',
++      payload: {
++        itemId: 'item_bobby_pin',
++        count: Math.max(1, Math.floor(Number(count) || 1)),
++      },
++    })
++  );
++
+   /** Команды, которые надо повторить конкретному клиенту после реконнекта. */
+-  const pendingSpendsForClient = (code, clientId, characterId = null) => {
++  const pendingCommandsForClient = (code, clientId, characterId = null) => {
+     const room = rooms.get(code);
+     if (!room) return [];
+-    return [...(room.pendingPinSpends?.values() || [])]
++    return [...(room.pendingCharCommands?.values() || [])]
+       .filter((entry) => entry.clientId === clientId
+         || (characterId && entry.characterId === characterId))
+       .map((entry) => ({ ...entry }));
+   };
++  const pendingSpendsForClient = (code, clientId, characterId = null) => (
++    pendingCommandsForClient(code, clientId, characterId)
++      .filter((entry) => entry.kind === 'item.spend')
++  );
+ 
+   return {
+     createRoom,
+     joinRoom,
+     registerPinSpend,
++    registerCharacterCommand,
++    pendingCommandsForClient,
+     pendingSpendsForClient,
+     leaveRoom,
+     putSnapshot,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index a532a25..7b8b99b 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -278,21 +278,24 @@ const attachRoomWebSocketServer = (httpServer, {
+   };
+ 
+   /**
+-   * Патч 528: две команды оператору. Порядок кадров WebSocket гарантирует,
+-   * что клиент сначала спишет заколку штатным spendItemStacks + saveCharacter,
+-   * и ТОЛЬКО ПОСЛЕ этого опубликует свежий снимок (char.publish).
+-   * Сервер сам никогда не правит чужой инвентарь.
++   * Патч 529 (ЗАКОН СНИМКА): две команды оператору. Порядок кадров WebSocket
++   * гарантирует, что клиент сначала ИСПОЛНИТ изменение штатными средствами
++   * (characterStore + saveCharacter) и ТОЛЬКО ПОСЛЕ этого опубликует свежий
++   * снимок (char.publish). Сервер сам никогда не правит чужой лист: ни
++   * инвентарь, ни журнал журналов, ни эффекты, ни ревизию.
+    */
+-  const sendPinSpendCommands = (ws, code, clientId, entry) => {
++  const sendCharacterCommand = (ws, code, clientId, entry) => {
+     if (!entry) return;
+-    sendEnvelope(ws, MESSAGE.CHAR_SPEND, {
+-      spendId: entry.spendId,
++    sendEnvelope(ws, MESSAGE.CHAR_COMMAND, {
++      commandId: entry.commandId,
+       characterId: entry.characterId,
+-      itemId: entry.itemId,
+-      count: entry.count,
++      kind: entry.kind,
++      payload: entry.payload,
+     }, code, clientId);
+     sendEnvelope(ws, MESSAGE.CHAR_REFRESH, {
+-      spendId: entry.spendId,
++      commandId: entry.commandId,
++      // Алиас 528: клиенты предыдущей версии ищут spendId.
++      spendId: entry.spendId || entry.commandId,
+       characterId: entry.characterId,
+     }, code, clientId);
+   };
+@@ -531,8 +534,8 @@ const attachRoomWebSocketServer = (httpServer, {
+           broadcastMembers(result.room, clientId);
+           // Патч 528: вкладка оператора могла уйти до публикации листа.
+           // Повторяем обе команды — клиент дедуплицирует по spendId.
+-          for (const pending of registry.pendingSpendsForClient(canonical, clientId)) {
+-            sendPinSpendCommands(ws, canonical, clientId, pending);
++          for (const pending of registry.pendingCommandsForClient(canonical, clientId)) {
++            sendCharacterCommand(ws, canonical, clientId, pending);
+           }
+           break;
+         }
+@@ -771,14 +774,29 @@ const attachRoomWebSocketServer = (httpServer, {
+           // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
+           // Никакой правки room.lastSnapshots здесь больше нет.
+           if (result.pinsToSpend > 0) {
+-            const entry = registry.registerPinSpend({
++            const entry = registry.registerCharacterCommand({
+               code: canonical,
+               characterId: result.characterId || payload.characterId,
+               clientId,
+-              count: result.pinsToSpend,
+-              spendId: `pin-${crypto.randomBytes(8).toString('hex')}`,
++              commandId: `pin-${crypto.randomBytes(8).toString('hex')}`,
++              kind: 'item.spend',
++              payload: { itemId: 'item_bobby_pin', count: result.pinsToSpend },
+             });
+-            sendPinSpendCommands(ws, canonical, clientId, entry);
++            sendCharacterCommand(ws, canonical, clientId, entry);
++          }
++          // Патч 529: журнал «Программиста» тоже меняет лист — значит, тоже
++          // команда клиенту, а не правка room.lastSnapshots.
++          if (result.digestCommand) {
++            const digest = result.digestCommand;
++            const entry = registry.registerCharacterCommand({
++              code: canonical,
++              characterId: digest.characterId,
++              clientId,
++              commandId: `mag-${crypto.randomBytes(8).toString('hex')}`,
++              kind: digest.kind,
++              payload: digest.payload,
++            });
++            sendCharacterCommand(ws, canonical, clientId, entry);
+           }
+           break;
+         }
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 913f620..1772ec2 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -20,6 +20,8 @@ export const ROOM_MESSAGE = {
+   // Патч 528: команды списания заколки и последующего обновления снимка.
+   CHAR_SPEND: 'char.spend',
+   CHAR_REFRESH: 'char.refresh',
++  // Патч 529: единая команда изменения листа (закон снимка).
++  CHAR_COMMAND: 'char.command',
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index a80313b..97d285b 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -309,7 +309,7 @@ export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) =>
+   return () => { storageListeners.delete(listener); };
+ };
+ 
+-/** Патч 528: подписка на char.spend / char.refresh для штатного списания заколки. */
++/** Патч 528/529: подписка на команды изменения листа и char.refresh. */
+ export const onRoomCharSpend = (listener: (message: RoomEnvelope) => void) => {
+   charSpendListeners.add(listener);
+   return () => { charSpendListeners.delete(listener); };
+@@ -470,11 +470,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     ) {
+       applyDirectiveEnvelopeToStore(message);
+     }
+-    // Патч 528: сервер НЕ правит снимок — он командует клиенту списать
+-    // заколку, а затем обновить лист. Обработчик намеренно вызывается до
+-    // разбора requestId: у этих кадров его нет и они ни с чем не сопоставляются.
++    // Патч 529 (ЗАКОН СНИМКА): сервер НЕ правит снимок — он посылает команду
++    // изменения листа, затем команду его обновления. Обработчик намеренно
++    // вызывается до разбора requestId: у этих кадров его нет.
+     if (
+-      message.type === ROOM_MESSAGE.CHAR_SPEND
++      message.type === ROOM_MESSAGE.CHAR_COMMAND
++      || message.type === ROOM_MESSAGE.CHAR_SPEND
+       || message.type === ROOM_MESSAGE.CHAR_REFRESH
+     ) {
+       charSpendListeners.forEach((listener) => {

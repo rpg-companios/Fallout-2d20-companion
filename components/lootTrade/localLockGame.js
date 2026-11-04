@@ -8,11 +8,11 @@ import engine from '../../server/lockPicking';
  * Резерв включается автоматически, когда сервер ещё не обновлён и не знает
  * `terminal.issue` / `terminal.action`: у терминала такой fallback уже был с
  * патча 498, у замка его не было, поэтому «Взломать» сразу показывало
- * «Действие не выполнено» и пустую доску без отмычек.
+ * «Действие не выполнено» и пустую доску без заколок.
  *
  * Никакого видимого «локального режима» в интерфейсе нет (правило 498):
  * решение о резерве принимает клиент по `capabilities` комнаты, а игрок видит
- * обычные ячейки, стрелки и счётчик отмычек.
+ * обычные ячейки, стрелки и счётчик заколок.
  */
 
 export const LOCAL_LOCK_OPERATOR = 'local-lock-player';
@@ -80,14 +80,17 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
       characterSnapshot,
       now,
       rng,
-      spentPins: carried,
+      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
+      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
+      // `carried` остаётся диагностическим счётчиком сломанных заколок.
+      spentPins: 0,
     });
     fresh.operatorName = characterSnapshot.characterName || game.operatorName || '';
     return finish(fresh, carried);
   }
 
   // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
-  // сервера: свежая доска по текущему листу, потраченные отмычки не
+  // сервера: свежая доска по текущему листу, сломанные заколки не
   // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
   if (action === 'newAttempt') {
     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
@@ -99,7 +102,10 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
       characterSnapshot,
       now,
       rng,
-      spentPins: carried,
+      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
+      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
+      // `carried` остаётся диагностическим счётчиком сломанных заколок.
+      spentPins: 0,
     });
     fresh.operatorName = characterSnapshot.characterName || '';
     return finish(fresh, carried);
@@ -119,7 +125,10 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
       characterSnapshot,
       now,
       rng,
-      spentPins: carried,
+      // Патч 527: заколки списываются из живого инвентаря клиента, поэтому
+      // следующий снимок уже содержит меньше заколок. Двойной вычет не нужен;
+      // `carried` остаётся диагностическим счётчиком сломанных заколок.
+      spentPins: 0,
     });
     game.operatorName = characterSnapshot.characterName || '';
     if (action === 'start') return finish(game, carried);
@@ -137,7 +146,7 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
     value,
     now,
     rng,
-    spentPins: carried,
+    spentPins: 0,
   });
   if (result.error) return finish(game, carried, result.error);
   const delta = Math.max(0, Number(result.game?.brokenPins || 0) - brokenBefore);

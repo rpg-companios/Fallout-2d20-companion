@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -23,6 +24,7 @@ import {
   buildLocalLockSnapshot,
 } from './localLockGame';
 import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
+import { spendBobbyPins } from './spendBobbyPins';
 
 const styles = lockLightStyles;
 
@@ -48,7 +50,7 @@ const CELL_ICON = {
 };
 
 // Патч 524: повторный start, «уже закрыт», «ждём Мастера» и отсутствие
-// отмычек — штатные состояния доски, а не «Действие не выполнено».
+// заколок — штатные состояния доски, а не «Действие не выполнено».
 const SILENT_ERRORS = new Set([
   'ROOM_TIMEOUT',
   'LOCK_NOT_ACTIVE',
@@ -72,8 +74,11 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   const [busy, setBusy] = useState(false);
   const [localState, setLocalState] = useState(initialLocalLockState);
   const [forceLocal, setForceLocal] = useState(false);
+  // Патч 528: красный «?» на поломке живёт недолго, потом гаснет.
+  const [breakRedFaded, setBreakRedFaded] = useState(false);
   const autoStartRef = useRef('');
   const republishRef = useRef(false);
+  const brokenPinsRef = useRef(null);
 
   const containerId = String(lock?.containerId || '').trim();
   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
@@ -97,6 +102,53 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     && game?.status === 'playing' && isOperator && !busy,
   );
   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+
+  // Патч 527: каждая сломанная заколка уходит из РЕАЛЬНОГО инвентаря.
+  // Первое наблюдение за доской лишь запоминает базу (иначе перезагрузка
+  // страницы с уже сломанными заколками списала бы их повторно). Спектаторы
+  // чужие заколки не списывают — только оператор доски.
+  useEffect(() => {
+    brokenPinsRef.current = null;
+  }, [containerId, visible]);
+
+  useEffect(() => {
+    if (!visible || !game) return;
+    const broken = Math.max(0, Number(game.brokenPins) || 0);
+    const previous = brokenPinsRef.current;
+    brokenPinsRef.current = broken;
+    // Патч 528: в сетевом режиме списание делает CharSpendCommandHost по
+    // командам char.spend → char.refresh; здесь остаётся ТОЛЬКО локальный
+    // резерв старого сервера, иначе заколка списалась бы дважды.
+    if (!localMode) return;
+    if (previous === null || broken <= previous || !isOperator) return;
+    void spendBobbyPins(broken - previous, { characterId });
+  }, [game?.brokenPins, isOperator, visible, containerId, characterId, localMode]);
+
+  // Патч 528: если на этом нажатии заколка сломалась, сервер помечает доску
+  // breakHighlight. Держим красный «?» видимым durationMs, затем локально
+  // гасим его (цвета обновляются). Если поломки НЕ было, breakHighlight нет —
+  // красный остаётся до следующего нажатия, как просил владелец.
+  useEffect(() => {
+    if (!visible || !game?.breakHighlight) {
+      setBreakRedFaded(false);
+      return undefined;
+    }
+    setBreakRedFaded(false);
+    const ms = Math.max(0, Number(game.breakHighlight.durationMs) || 650);
+    const timer = setTimeout(() => setBreakRedFaded(true), ms);
+    return () => clearTimeout(timer);
+  }, [visible, game?.revision, game?.breakHighlight?.durationMs]);
+
+  const displayCells = useMemo(() => {
+    const cells = game?.cells || [];
+    if (!breakRedFaded) return cells;
+    return cells.map((cell) => (cell?.state === CELL_STATE.RED
+      ? { arrow: null, state: CELL_STATE.HIDDEN }
+      : cell));
+  }, [game?.cells, breakRedFaded]);
+  // На время паузы не перескакиваем в панель «Подход завершён»: игрок должен
+  // увидеть именно красную ячейку, даже если это была последняя заколка.
+  const holdBoard = Boolean(game?.breakHighlight) && !breakRedFaded;
 
   const localStep = (state, action, value) => {
     const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
@@ -212,7 +264,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   }, [visible, autoStart, freshAttempt, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
 
   const rows = useMemo(() => {
-    const cells = game?.cells || [];
+    const cells = displayCells;
     const sizes = game?.rows || [cells.length];
     const out = [];
     let at = 0;
@@ -221,7 +273,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       at += size;
     }
     return out;
-  }, [game?.cells, game?.rows]);
+  }, [displayCells, game?.rows]);
 
   const resultLabel = {
     'PIN BROKEN': 'lock.pinBroken',
@@ -263,12 +315,12 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       testID={`lock-arrow-${arrow}`}
       accessibilityRole="button"
       accessibilityLabel={tLootTrade(ARROW_KEY[arrow])}
-      style={[
-        modalStyles.btn,
-        modalStyles.saveBtn,
-        styles.arrowButton,
-        !canPress && styles.arrowButtonDisabled,
-      ]}
+      // Патч 531: вернули начертание стрелок из версии ДО светлой темы.
+      // Базовые стили формы (modalStyles.btn/saveBtn) добавляли рамку и
+      // paddingVertical без justifyContent — иконка «прилипала» к верху, а
+      // линии рамки проходили прямо через стрелку. Теперь кнопка — отдельный
+      // самодостаточный стиль с явным центрированием, как в 520–524.
+      style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}
       disabled={!canPress}
       onPress={() => void doAction('press', arrow)}
     >
@@ -314,10 +366,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             </Text>
           ) : null}
 
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.statusRow}>
-            <View>
+            <View style={styles.statusLeft}>
               <Text testID="lock-pins-count" style={styles.pinCount}>
                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+              </Text>
+              <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
+                {tLootTrade('lock.arrowsHint')}
               </Text>
               <Text style={styles.statText}>
                 {game?.cellCount
@@ -348,16 +408,16 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
-          ) : isClosed ? (
+          ) : (isClosed && !holdBoard) ? (
             <View style={styles.accessPanel}>
               <Text style={styles.closedText}>{tLootTrade('lock.approachFinished')}</Text>
               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
-          ) : awaitingGm ? (
+          ) : (awaitingGm && !holdBoard) ? (
             // Патч 526: замки не блокируются. Вместо «Ожидание решения
             // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
-            // начать ли новый (купил отмычки, прокачал PER/LOCKPICK).
+            // начать ли новый (купил заколки, прокачал PER/LOCKPICK).
             <View style={styles.accessPanel} testID="lock-approach-finished">
               <Text style={styles.awaitingText}>{tLootTrade('lock.approachFinished')}</Text>
               {resultLabel ? (
@@ -388,16 +448,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                 ))}
               </View>
 
-              <View style={styles.crossArea}>
-                <View style={styles.crossRow}>
-                  <View style={styles.arrowSpacer} />
-                  {arrowButton('up')}
-                  <View style={styles.arrowSpacer} />
-                </View>
-                <View style={styles.crossRow}>
-                  {arrowButton('left')}
-                  {arrowButton('down')}
-                  {arrowButton('right')}
+              <View style={styles.arrowPad} testID="lock-arrow-pad">
+                <View style={styles.crossArea}>
+                  <View style={styles.crossRow}>
+                    <View style={styles.arrowSpacer} />
+                    {arrowButton('up')}
+                    <View style={styles.arrowSpacer} />
+                  </View>
+                  <View style={styles.crossRow}>
+                    {arrowButton('left')}
+                    {arrowButton('down')}
+                    {arrowButton('right')}
+                  </View>
                 </View>
               </View>
 
@@ -407,17 +469,18 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               {viewOnly ? (
                 <Text style={styles.spectatorNotice}>{tLootTrade('lock.viewOnly')}</Text>
               ) : null}
-              {game.cells?.some((c) => c.state === CELL_STATE.GREY) ? (
+              {displayCells.some((c) => c.state === CELL_STATE.GREY) ? (
                 <Text style={styles.statusHint}>{tLootTrade('lock.greyHint')}</Text>
               ) : null}
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('lock.progress'), {
-                  done: game.cells.filter((c) => c.state === CELL_STATE.GREEN).length,
+                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
                   total: game.cellCount,
                 })}
               </Text>
             </>
           )}
+          </ScrollView>
         </View>
       </View>
     </Modal>
