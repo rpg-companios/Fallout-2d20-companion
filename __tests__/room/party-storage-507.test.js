@@ -72,9 +72,11 @@ describe('508: хранилище Мастера + снапшот игрокам
       .toBe(false);
   });
 
-  it('Мастер может положить, но не забрать чужое; плохие данные отклоняются', () => {
+  it('Мастер не вносит и не забирает вещи (решение владельца, патч 518); игрок может', () => {
     const { registry, room } = setup();
-    const dep = registry.depositToPartyStorage({ code: room.code, clientId: 'gm-1', item: ITEM, quantity: 1 });
+    expect(registry.depositToPartyStorage({ code: room.code, clientId: 'gm-1', item: ITEM, quantity: 1 }).error)
+      .toBe(ERROR_CODE.STORAGE_FORBIDDEN);
+    const dep = registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 1 });
     expect(dep.error).toBeUndefined();
     expect(registry.withdrawFromPartyStorage({ code: room.code, clientId: 'gm-1', entryId: dep.entry.entryId }).error)
       .toBe(ERROR_CODE.STORAGE_FORBIDDEN);

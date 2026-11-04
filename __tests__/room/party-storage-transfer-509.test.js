@@ -95,11 +95,11 @@ describe('509: мультиплатформенный сейв и UI', () => {
     expect(modal).toContain('testID="storage-import-button"');
     expect(modal).toContain('saveCharacter');
     expect(modal).toContain('loadCharacter');
-    expect(modal).toContain('room.role === \'gm\'');
+    expect(modal).toContain('const isGm = gmView || room?.role ===');
     expect(modal).toContain('restorePartyStorage');
     expect(modal).toContain('saveRoomStorage');
     // Окно находится и для комнаты Мастера, не только игрока.
-    expect(modal).toContain("value.role === 'player') || candidates[0]");
+    expect(modal).toContain('gmView ? value.role ===');
   });
 
   it('парные RU/EN подписи', () => {

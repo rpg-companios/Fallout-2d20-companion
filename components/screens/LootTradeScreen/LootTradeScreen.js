@@ -37,8 +37,13 @@ import {
   addOrMergeContainerItem,
   analyzeHubDeletion,
   buildHubSessionNodes,
+  buildLocationSessionNodes,
+  effectiveLocationRoomCodes,
   buildStandaloneTerminalSessionNode,
+  buildStandaloneLockSessionNode,
   decodeTerminalNodeMarker,
+  decodeLockNodeMarker,
+  normalizeLinkedCheckIds,
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
   getHubIdsContainingChild,
@@ -78,6 +83,8 @@ import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
 import KeyItemCardCell from '../../lootTrade/KeyItemCardCell';
+import StorageCardCell from '../../lootTrade/StorageCardCell';
+import PartyStorageModal from '../../lootTrade/PartyStorageModal';
 import KeyItemFormModal from './modals/KeyItemFormModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
@@ -133,6 +140,7 @@ const ContainerCardCell = ({
   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
   const isHub = container.kind === CONTAINER_KIND.HUB;
   const isTerminal = container.kind === CONTAINER_KIND.TERMINAL;
+  const isLock = container.kind === CONTAINER_KIND.LOCK;
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
 
@@ -193,7 +201,7 @@ const ContainerCardCell = ({
   const hubLockedCount = (container.links || []).filter((l) => l.locked).length;
   const heroIconName = isHub
     ? 'map-marker-multiple'
-    : (isTerminal ? 'console' : (isMerchant ? 'sack' : 'treasure-chest'));
+    : (isLock ? 'lock' : (isTerminal ? 'console' : (isMerchant ? 'sack' : 'treasure-chest')));
 
   return (
     <TouchableOpacity
@@ -254,9 +262,11 @@ const ContainerCardCell = ({
               </Text>
             )}
           </>
-        ) : isTerminal ? (
+        ) : isTerminal || isLock ? (
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty })}
+            {formatLootTrade(tLootTrade(isLock ? 'card.lockKindLabel' : 'card.terminalDifficulty'), {
+              difficulty: container.difficulty,
+            })}
           </Text>
         ) : (
           <>
@@ -272,19 +282,24 @@ const ContainerCardCell = ({
         )}
       </View>
 
-      {Boolean(container.linkedCheckId) && (
-        <Text
-          testID={`card-gate-${container.id}`}
-          style={styles.cardMeta}
-          numberOfLines={1}
-        >
-          {formatLootTrade(tLootTrade('card.gateAfter'), {
-            name: gateSourceNames[container.linkedCheckId] || container.linkedCheckId,
-          })}
-          {' · '}
-          {tLootTrade(gateEvents[container.linkedCheckId] ? 'card.gateOpen' : 'card.gatePending')}
-        </Text>
-      )}
+      {normalizeLinkedCheckIds(container).map((sourceId, idx) => (
+        <View key={sourceId}>
+          {idx > 0 && (
+            <Text style={styles.cardMeta} numberOfLines={1}>{tLootTrade('card.gateOr')}</Text>
+          )}
+          <Text
+            testID={idx === 0 ? `card-gate-${container.id}` : `card-gate-${container.id}-${idx}`}
+            style={styles.cardMeta}
+            numberOfLines={1}
+          >
+            {formatLootTrade(tLootTrade('card.gateAfter'), {
+              name: gateSourceNames[sourceId] || sourceId,
+            })}
+            {' · '}
+            {tLootTrade(gateEvents[sourceId] ? 'card.gateOpen' : 'card.gatePending')}
+          </Text>
+        </View>
+      ))}
 
       {containerCanRequireKey(container.kind) && Boolean(container.requiredKeyItemId) && (
         <Text
@@ -397,6 +412,7 @@ export default function LootTradeScreen() {
   // Патч 511: ключевые записи — такие же карточки на сетке, как контейнеры.
   const [keyItems, setKeyItems] = useState([]);
   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
+  const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
@@ -496,7 +512,8 @@ export default function LootTradeScreen() {
     [containers, activeContainerId],
   );
   const activeTerminalStates = useMemo(() => {
-    if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL) return [];
+    if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL
+      && activeContainer?.kind !== CONTAINER_KIND.LOCK) return [];
     return Object.entries(roomRooms || {})
       .map(([code, room]) => ({ code, terminal: room?.terminalStates?.[activeContainer.id] }))
       .filter((entry) => entry.terminal);
@@ -638,7 +655,7 @@ export default function LootTradeScreen() {
 
     // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
     const liveEntries = getActiveLiveEntriesForContainer(saved);
-    if (saved.kind === CONTAINER_KIND.TERMINAL) {
+    if (saved.kind === CONTAINER_KIND.TERMINAL || saved.kind === CONTAINER_KIND.LOCK) {
       for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
         const registered = Boolean(roomEntry?.terminalStates?.[saved.id]);
         const liveSession = roomEntry?.activeSession;
@@ -657,9 +674,11 @@ export default function LootTradeScreen() {
                 name: saved.name,
                 description: saved.description,
                 difficulty: saved.difficulty,
+                kind: saved.kind,
                 requiredKeyItemId: saved.requiredKeyItemId || '',
                 keyRequirement: saved.keyRequirement || 'none',
                 linkedCheckId: saved.linkedCheckId || '',
+                linkedCheckIds: normalizeLinkedCheckIds(saved),
               },
             });
           } else if (terminalNode) {
@@ -670,10 +689,15 @@ export default function LootTradeScreen() {
               sessionId: liveSession.sessionId,
               nodes: (liveSession.nodes || []).map((n) => (
                 n.containerId === saved.id
-                  ? buildStandaloneTerminalSessionNode(saved, {
-                      locked: n.locked,
-                      lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
-                    })
+                  ? (saved.kind === CONTAINER_KIND.LOCK
+                      ? buildStandaloneLockSessionNode(saved, {
+                          locked: n.locked,
+                          lockLabel: decodeLockNodeMarker(n.lockLabel)?.label || n.lockLabel,
+                        })
+                      : buildStandaloneTerminalSessionNode(saved, {
+                          locked: n.locked,
+                          lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
+                        }))
                   : n
               )),
             });
@@ -691,7 +715,7 @@ export default function LootTradeScreen() {
             sessionId: live.sessionId,
             name: saved.name,
             description: saved.description,
-            nodes: buildHubSessionNodes(saved, freshList),
+            nodes: buildLocationSessionNodes(saved, freshList),
           });
         } else {
           await useRoomStore.getState().updateRoomSessionRates({
@@ -1141,7 +1165,7 @@ export default function LootTradeScreen() {
     }
 
     if (container.kind === CONTAINER_KIND.HUB) {
-      const resolvedNodes = buildHubSessionNodes(container, containers);
+      const resolvedNodes = buildLocationSessionNodes(container, containers);
       if (resolvedNodes.length === 0) {
         showRawAlert({ title: tLootTrade('detail.hubIssueEmptyWarn') });
         return;
@@ -1173,7 +1197,9 @@ export default function LootTradeScreen() {
       const freshAllContainers = await db.getGmContainersList();
       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
       const terminalProtocol = roomSupportsTerminalProtocol(effectiveRoomCode);
-      if (freshSource.kind === CONTAINER_KIND.TERMINAL && terminalProtocol) {
+      const isCheckSource = freshSource.kind === CONTAINER_KIND.TERMINAL
+        || freshSource.kind === CONTAINER_KIND.LOCK;
+      if (isCheckSource && terminalProtocol) {
         await useRoomStore.getState().issueTerminal({
           code: effectiveRoomCode,
           reissue: true,
@@ -1183,12 +1209,14 @@ export default function LootTradeScreen() {
             name: freshSource.name,
             description: freshSource.description,
             difficulty: freshSource.difficulty,
+            kind: freshSource.kind,
             requiredKeyItemId: freshSource.requiredKeyItemId || '',
             keyRequirement: freshSource.keyRequirement || 'none',
             linkedCheckId: freshSource.linkedCheckId || '',
+            linkedCheckIds: normalizeLinkedCheckIds(freshSource),
           },
         });
-      } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+      } else if (isCheckSource) {
         // Сервер комнат ещё не обновлён: terminal.issue он не поддерживает.
         // Выдаём одиночный терминал как локацию с одним узлом — маркер в
         // lockLabel переживёт серверную нормализацию и игрок откроет модалку.
@@ -1204,7 +1232,9 @@ export default function LootTradeScreen() {
             targetCharacterId,
             targetCharacterName,
             items: [],
-            nodes: [buildStandaloneTerminalSessionNode(freshSource)],
+            nodes: [freshSource.kind === CONTAINER_KIND.LOCK
+              ? buildStandaloneLockSessionNode(freshSource)
+              : buildStandaloneTerminalSessionNode(freshSource)],
           },
         });
       } else {
@@ -1224,7 +1254,16 @@ export default function LootTradeScreen() {
             buyDepreciationPercent: freshSource.buyDepreciationPercent,
             characterOverrides: {},
             items: isHub ? [] : freshSource.items,
-            ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
+            ...(isHub ? {
+              nodes: buildLocationSessionNodes(freshSource, freshAllContainers || containers),
+              // Патч 523: коды комнат задают видимость групп; состояние и
+              // ресурсы локации общи для всех привязанных комнат.
+              roomCodes: effectiveLocationRoomCodes(freshSource, freshAllContainers || containers),
+              requiredKeyItemId: freshSource.requiredKeyItemId || '',
+              keyRequirement: freshSource.keyRequirement || 'none',
+              linkedCheckIds: freshSource.linkedCheckIds || [],
+              linkedCheckId: freshSource.linkedCheckId || '',
+            } : {}),
           },
         });
       }
@@ -1292,6 +1331,12 @@ export default function LootTradeScreen() {
         id: pickedItem.id || pickedItem.weaponId,
         weaponId: pickedItem.weaponId || pickedItem.id,
         itemType: pickedItem.itemType || 'misc',
+        // Патч 522: снимок хранит цену и вес с учётом модов — при выдаче игроку
+        // и при обратной продаже числа не откатываются к базовому каталогу.
+        cost: baseCost,
+        weight,
+        effectiveCost: baseCost,
+        effectiveWeight: weight,
       },
     });
 
@@ -1400,6 +1445,32 @@ export default function LootTradeScreen() {
           });
         } catch (error) {
           debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
+        }
+      }
+    }
+  };
+
+  /**
+   * Патч 523: «заблокировать всё» на любом узле с детьми. Верхнего родителя
+   * как структуры нет — команда доступна на каждой точке графа, у которой
+   * есть потомки. Блокируются только запираемые узлы.
+   */
+  const handleLockAll = async (containerId) => {
+    if (!activeContainer) return;
+    const targetId = String(containerId || activeContainer.id || '').trim();
+    if (!targetId) return;
+    const liveEntries = getActiveLiveEntriesForContainer(activeContainer);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
+      if (live && live.kind === CONTAINER_KIND.HUB) {
+        try {
+          await ensureGmRoomConnected(liveCode);
+          await useRoomStore.getState().updateRoomSessionRates({
+            code: liveCode,
+            sessionId: live.sessionId,
+            lockAll: targetId,
+          });
+        } catch (error) {
+          debugLog('lootTrade.lockAll:failed', { message: error?.message });
         }
       }
     }
@@ -1569,9 +1640,15 @@ export default function LootTradeScreen() {
       .map((c) => ({
         id: c.id,
         name: c.name,
+        kind: c.kind,
+        difficulty: c.difficulty || 0,
         kindLabel: c.kind === CONTAINER_KIND.HUB
           ? tLootTrade('card.hubKind')
-          : (c.kind === CONTAINER_KIND.TERMINAL ? tLootTrade('form.linkedCheckTerminal') : ''),
+          : (c.kind === CONTAINER_KIND.TERMINAL
+            ? `${tLootTrade('form.linkedCheckTerminal')} ${formatLootTrade(tLootTrade('form.linkedCheckLevel'), { difficulty: c.difficulty || 0 })}`
+            : (c.kind === CONTAINER_KIND.LOCK
+              ? `${tLootTrade('form.linkedCheckLock')} ${formatLootTrade(tLootTrade('form.linkedCheckLevel'), { difficulty: c.difficulty || 0 })}`
+              : '')),
       })),
     [containers, formModal?.initialContainer?.id],
   );
@@ -1606,7 +1683,9 @@ export default function LootTradeScreen() {
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
+    { type: 'createLock', id: '__create_lock__' },
     { type: 'createKeyItem', id: '__create_key_item__' },
+    { type: 'storage', id: '__storage_card__' },
     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
     // Патч 511: сохранённые ключи и записки лежат прямо на сетке экрана.
     // Патч 514: вложенные в локацию/контейнер/торговца уходят с корня.
@@ -1765,6 +1844,17 @@ export default function LootTradeScreen() {
                         />
                       );
                     }
+                    if (cell.type === 'createLock') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="lock"
+                          label={tLootTrade('actions.createLock')}
+                          testID="create-lock-cell"
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOCK, initialContainer: null })}
+                        />
+                      );
+                    }
                     if (cell.type === 'createKeyItem') {
                       return (
                         <ActionCell
@@ -1773,6 +1863,19 @@ export default function LootTradeScreen() {
                           label={tLootTrade('actions.createKeyItem')}
                           testID="create-key-item-cell"
                           onPress={() => setKeyItemForm({ initialKeyItem: null })}
+                        />
+                      );
+                    }
+                    if (cell.type === 'storage') {
+                      const storageEntry = Object.entries(roomRooms || {})
+                        .find(([, value]) => value?.role === 'gm');
+                      const storageItems = (storageEntry?.[1]?.partyStorage?.entries || [])
+                        .filter((entry) => entry?.kind !== 'keyItem').length;
+                      return (
+                        <StorageCardCell
+                          key={cell.id}
+                          itemCount={storageItems}
+                          onOpen={() => setStorageModalVisible(true)}
                         />
                       );
                     }
@@ -1915,7 +2018,9 @@ export default function LootTradeScreen() {
                 name={
                   activeContainer.kind === CONTAINER_KIND.HUB
                     ? 'map-marker-multiple'
-                    : (activeContainer.kind === CONTAINER_KIND.TERMINAL ? 'console' : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest'))
+                    : (activeContainer.kind === CONTAINER_KIND.LOCK ? 'lock'
+                      : (activeContainer.kind === CONTAINER_KIND.TERMINAL ? 'console'
+                        : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest')))
                 }
                 size={22}
                 color="#f0e68c"
@@ -1941,7 +2046,8 @@ export default function LootTradeScreen() {
               <Text style={styles.detailDescText}>{activeContainer.description}</Text>
             )}
 
-            {activeContainer.kind === CONTAINER_KIND.TERMINAL && (
+            {(activeContainer.kind === CONTAINER_KIND.TERMINAL
+              || activeContainer.kind === CONTAINER_KIND.LOCK) && (
               <View style={styles.terminalAdminPanel}>
                 <Text style={styles.terminalAdminText}>
                   {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
@@ -1949,18 +2055,26 @@ export default function LootTradeScreen() {
                   })}
                 </Text>
                 {activeTerminalStates.map(({ code, terminal }) => {
-                  const closed = Boolean(terminal.closed || terminal.locked);
-                  const awaiting = !closed && Boolean(
+                  // Патч 526: замки пока не блокируются — Мастер не видит
+                  // «ЗАКРЫТ» и вопрос «Да/Нет», а игрок сам начинает новый
+                  // подход. У терминала блокировка после провала сохранена.
+                  const isLockState = terminal?.config?.kind === 'lock';
+                  const outOfPins = isLockState
+                    && terminal.game?.status === 'awaitingRetry';
+                  const closed = !isLockState && Boolean(terminal.closed || terminal.locked);
+                  const awaiting = !isLockState && !closed && Boolean(
                     terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
                   );
                   // Патч 505: успех виден и в админ-панели. Повторная
                   // трансляция — единственный способ начать новую партию
-                  // после ACCESS GRANTED (доска сама больше не пересобирается).
+                  // терминала после ACCESS GRANTED (доска сама не пересобирается).
                   const won = !closed && !awaiting && terminal.game?.status === 'won';
-                  const stateLabel = closed
-                    ? tLootTrade('terminal.stateClosed')
-                    : (awaiting ? tLootTrade('terminal.stateAwaiting')
-                      : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')));
+                  const stateLabel = outOfPins
+                    ? tLootTrade('lock.stateOutOfPins')
+                    : (closed
+                      ? tLootTrade('terminal.stateClosed')
+                      : (awaiting ? tLootTrade('terminal.stateAwaiting')
+                        : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady'))));
                   const decide = (value) => useRoomStore.getState().actOnTerminal({
                     code,
                     containerId: activeContainer.id,
@@ -1989,7 +2103,7 @@ export default function LootTradeScreen() {
                           </TouchableOpacity>
                         </View>
                       )}
-                      {(closed || won) && (
+                      {(closed || won || outOfPins) && (
                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
                         </TouchableOpacity>
@@ -2042,6 +2156,13 @@ export default function LootTradeScreen() {
               {activeLiveSession.kind === CONTAINER_KIND.HUB && Array.isArray(activeLiveSession.nodes) && (
                 <>
                   <Text style={styles.liveScopeLabel}>{tLootTrade('livePanel.hubLiveLocksLabel')}</Text>
+                  <TouchableOpacity
+                    testID="live-lock-all-button"
+                    style={styles.scopeChip}
+                    onPress={() => { void handleLockAll(activeLiveSession.containerId); }}
+                  >
+                    <Text style={styles.scopeChipText}>{tLootTrade('livePanel.lockAll')}</Text>
+                  </TouchableOpacity>
                   <View style={styles.scopeChipsRow}>
                     {activeLiveSession.nodes.map((node) => (
                       <TouchableOpacity
@@ -2251,7 +2372,7 @@ export default function LootTradeScreen() {
                 {(() => {
                   const linked = (activeContainer.links || [])
                     .map((link) => containers.find((c) => c.id === link.containerId))
-                    .filter((child) => child?.linkedCheckId);
+                    .filter((child) => normalizeLinkedCheckIds(child).length > 0);
                   if (linked.length === 0) {
                     return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
                   }
@@ -2259,10 +2380,12 @@ export default function LootTradeScreen() {
                     <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
                       <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
                       <Text style={styles.hubKeyRowName} numberOfLines={1}>
-                        {`${child.name} ← ${gateSourceNames[child.linkedCheckId] || child.linkedCheckId}`}
+                        {`${child.name} ← ${normalizeLinkedCheckIds(child)
+                          .map((id) => gateSourceNames[id] || id)
+                          .join(` ${tLootTrade('detail.hubGateOr')} `)}`}
                       </Text>
                       <Text style={styles.hubKeyDetachText}>
-                        {tLootTrade(gateEvents[child.linkedCheckId]
+                        {tLootTrade(normalizeLinkedCheckIds(child).some((id) => gateEvents[id])
                           ? 'detail.hubGatePassed'
                           : 'detail.hubGatePending')}
                       </Text>
@@ -2300,7 +2423,9 @@ export default function LootTradeScreen() {
                             <View style={styles.itemRowMain}>
                               <View style={styles.itemRowTitleLine}>
                                 <MaterialCommunityIcons
-                                  name={child.kind === CONTAINER_KIND.TERMINAL ? 'console' : (childIsMerch ? 'sack' : 'treasure-chest')}
+                                  name={child.kind === CONTAINER_KIND.LOCK ? 'lock'
+                                    : (child.kind === CONTAINER_KIND.TERMINAL ? 'console'
+                                      : (childIsMerch ? 'sack' : 'treasure-chest'))}
                                   size={18}
                                   color="#2b2b2b"
                                 />
@@ -2390,7 +2515,8 @@ export default function LootTradeScreen() {
                 )}
               </ScrollView>
             </>
-          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? null : (
+          ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
+            || activeContainer.kind === CONTAINER_KIND.LOCK) ? null : (
             <>
               <TouchableOpacity
                 style={styles.addItemPrimaryBtn}
@@ -2493,6 +2619,11 @@ export default function LootTradeScreen() {
       )}
 
       {/* Модалки создания/правки, ключевых записей, локации и выдачи */}
+      <PartyStorageModal
+        visible={storageModalVisible}
+        gmView
+        onClose={() => setStorageModalVisible(false)}
+      />
       <KeyItemFormModal
         visible={Boolean(keyItemForm)}
         initialKeyItem={keyItemForm?.initialKeyItem || null}
@@ -2559,7 +2690,7 @@ export default function LootTradeScreen() {
           void ensureGmRoomConnected(code).catch(() => {});
         }}
         onConfirmIssue={handleConfirmIssue}
-        roomWideOnly={issueTargetContainer?.kind === CONTAINER_KIND.TERMINAL || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL))}
+        roomWideOnly={[CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(issueTargetContainer?.kind) || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL || node.kind === CONTAINER_KIND.LOCK))}
         onClose={() => setIssueTargetContainer(null)}
       />
 

@@ -32,7 +32,7 @@ const HubChildPickerModal = ({
       .filter((c) => (
         c
         && c.id !== hub.id
-        && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind)
+        && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind)
         && !linkedIds.has(c.id)
       ))
       .sort((a, b) => {

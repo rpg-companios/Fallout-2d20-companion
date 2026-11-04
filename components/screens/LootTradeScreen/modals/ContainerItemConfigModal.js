@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
+import itemStacking from '../../../../domain/itemStacking.js';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
 import IconText, { CdIcon, withCdToken } from '../../../lootTrade/LootTradeIconText';
 import {
@@ -78,7 +79,7 @@ const ContainerItemConfigModal = ({
   };
 
   const numericCount = Math.max(1, parseInt(count, 10) || 1);
-  const baseCost = Math.max(0, Number(item.cost ?? item.price ?? 0) || 0);
+  const baseCost = itemStacking.effectiveItemCost(item);
   const parsedMarkup = normalizeSaleMarkupPercent(markupPercent, 0);
   const previewPrice = computeMerchantSellPriceToPlayer(
     { cost: baseCost, markupPercent: parsedMarkup },

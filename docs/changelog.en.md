@@ -1,5 +1,275 @@
 # Changelog
 ---
+## Player attempts and the Game Master's decision (patch 526)
+
+The owner clarified the meaning of the 506 report: "That was a bug report.
+When, after a successful hack, the hack started again. The user may make as
+many attempts to crack a terminal or lock as they want. But only at their own
+discretion. Say the bobby pins ran out, the user bought new ones and returned
+to hacking. Or leveled up, improved stats and decided to try again." And:
+"A terminal can start a new configuration, lockpicking cannot. After a
+failure a terminal gets the 'blocked' status, and whether it may be hacked
+again AFTER THE BLOCK is up to the Game Master... Locks are not to be blocked
+for now, but they will be in the future, once I come up with a blocking
+condition".
+
+- **The one-hack ticket is gone.** `usedTerminalAccess` / `markTerminalAccess`
+  and the «ACCESS USED» mark no longer block «Hack»: the player decides when
+  to return to the point. Closing the window becomes an «Open» pill instead
+  of burning the access.
+- **Automatic restart after ACCESS GRANTED is still forbidden.** That was the
+  actual 506 bug: `shouldAutoStart` / `shouldAutoStartLock` do not send
+  `start` in final states, and the server rejects `start` on `won` / an
+  active board.
+- **An explicit new attempt.** The `newAttempt` action (server, client and
+  local fallback) builds a fresh board from the CURRENT published sheet: new
+  bobby pins, new PER/LOCKPICK, new difficulty and cell count. Spent pins
+  (`pinLedger`) are not refunded, the `hacked` access event is not revoked,
+  `accessId` does not change — this is not a new broadcast by the GM.
+- **Locks are not blocked for now.** Instead of «Waiting for the Game
+  Master» with Yes/No, the window shows «Attempt finished», the result and an
+  «Another attempt» button. The GM is not asked about locks, «No» cannot
+  close them, and the admin panel shows «Out of bobby pins» without blocking
+  controls. The GM's hack notification for locks is kept with its own text.
+- **Hook for the future condition.** `LOCK_BLOCK_POLICY` / `shouldBlockLock()`
+  in `server/lockPicking.js` is the single place where the future lock
+  blocking condition will live; the server, local fallback and registry
+  already consult it. The policy is currently disabled.
+- **Terminals are unchanged.** After a failure they become «blocked» and the
+  GM gets «Allow another hack? Yes/No»; «Yes» starts a new configuration with
+  current settings, «No» closes it until a re-broadcast. `newAttempt` is
+  rejected for terminals — the block cannot be bypassed.
+
+Server protection was not weakened: the new action passes the same role,
+membership, published-sheet and key-requirement checks. The 520–525 laws
+(bobby pins, cells, one `start`, the entry modal, the light palette) are kept.
+
+## Two-step mini-game entry and the light lock window (patch 525)
+
+The owner: "The hacking mini-game should not appear right away. Right now the
+interface looks like the game has started, but then you have to press 'Hack'
+inside it before the game loads. Also the lockpicking palette should be light,
+not like the terminal... For the hack game, first show a modal like for a
+location, with 'Hack' buttons, just without the 'Leave location' button".
+
+- **A point window comes first.** A standalone lock or terminal no longer opens
+  the mini-game immediately. `StandaloneCheckModal` follows the location
+  window structure: a point card, difficulty, «View» and «Hack» buttons. The
+  «Leave location» and «Minimize» buttons are gone — a standalone point is not
+  a location.
+- **The board only after «Hack».** The press mounts the mini-game with
+  `autoStart`: the board, bobby pins and arrows arrive already built. There is
+  no second «Hack» button inside the board window and no empty "as if
+  running" layout; a clear hint is shown instead.
+- **One hack per broadcast kept.** «Hack» consumes the access immediately,
+  «View» does not; after the board is closed the entry window shows
+  «ACCESS USED». The Game Master's session stays active.
+- **Light palette.** `lockPickingStyles.js` reuses the `lootTradeFormStyles`
+  skeleton and `ADMIN_MODAL_PALETTE`: light card, dark text, light cells and
+  buttons. The green terminal look is gone for locks; `TerminalHackingModal`
+  keeps its own palette.
+- **No duplicated skeleton.** Base keys (`overlay`, `card`, `title`, `label`,
+  `footer`, `btn`, `saveBtn`, `cancelBtn`) are not redefined — the rule in
+  `docs/ui-modals-rules.md`; the new module holds only cells, arrows, the
+  status row and the point card.
+
+Patch 520 rules (PER, bobby pins, cells, the GM's Yes/No), the 522/523 laws
+and the 524 fixes (one `start`, pin detection, legacy-server fallback, working
+«Leave location» in a real location) are preserved.
+
+## Lockpicking and the location window: fixes (patch 524)
+
+The owner reported: "pressed Hack — immediately 'Action failed', no bobby
+pins found, no cells, arrows do nothing. 'Leave location' is shown in the
+modal for some reason and does not work". All causes are fixed without
+weakening server protection, mini-game rules, or patches 520–523.
+
+- **One Hack press — one board.** The auto-start key no longer depends on the
+  room's `accessId` arriving late, so a second `start` is not sent. Normal
+  server replies (`TERMINAL_ALREADY_ACTIVE`, `TERMINAL_AWAITING_RETRY`,
+  `LOCK_NO_PINS`, etc.) no longer show «Action failed».
+- **Bobby pins are found.** The counter understands every inventory shape:
+  an item dictionary keyed by instance id, `equipment.items` arrays,
+  `itemId`, `catalogId`, `weaponId`, `code`, nested item snapshots and
+  quantity in different fields. One instance is never counted twice.
+- **With no bobby pins** the window plainly says to add them instead of
+  showing an empty board and a generic failure.
+- **If the character sheet has not reached the room yet**, the client
+  publishes it once and retries the hack; a clear hint replaces the generic
+  error if that also fails.
+- **Legacy room server.** Locks now have the same automatic local board
+  fallback terminals have had since patch 498: cells, pins, arrows, pin
+  breaks and the GM's Yes/No work without `terminal.action`. There is still
+  no visible «local mode» switch.
+- **The location window no longer overlaps the mini-game.** While a board is
+  open the location window is hidden, so its buttons cannot show through the
+  backdrop and appear dead.
+- **«Leave location» works immediately.** The window closes locally on tap
+  without waiting for the server; the Game Master's session stays active for
+  everyone else.
+- **A standalone lock** no longer pretends to be a location: the player goes
+  straight to the mini-game, with no point list and no «Leave location» button.
+
+## Space hierarchy: the location graph (patch 523)
+
+The first step of plan item 13. Every owner decision is recorded in
+`docs/location-hierarchy-design.md`; server protection, keys and mini-games
+were not weakened.
+
+- **A graph, not a tree.** Locations inside locations and containers inside
+  containers, multiple parents and cycles are allowed. Traversals are
+  cycle-safe. Room codes are inherited as the union of the node's codes and
+  every parent's codes.
+- **One set of resources for all bound rooms.** A location session is a single
+  object: edits, loot picks, trades and closing are visible in every room from
+  `roomCodes`. A room whose code is not listed sees nothing.
+- **A lock is a visibility boundary.** The player sees the locked point itself,
+  but the server hides all of its descendants; the Game Master sees everything.
+- **«Lock everything»** works on any node with children, not just on a
+  «topmost parent». Only lockable descendants are blocked.
+- **Addressable hacking.** Exactly one point opens; the transitive A → B → C
+  cascade is gone, while explicit OR references to already-created points still
+  work. A key can still be assigned to many points, pointwise.
+- **One session.** Players walk nested locations with a «Back» button; the
+  session survives returning to a parent and ends only on «Leave location» or
+  when the Game Master closes it.
+
+## One item everywhere (patch 522)
+
+The owner clarified: "There are no weight or quantity limits, an item in the
+inventory is the same item in storage... Items must not lose properties when
+they change where they are kept. The same goes for traders... price and weight
+are calculated from the mods." The limits from the previous update are gone —
+that gameplay rule was wrong. Server protection was not weakened anywhere.
+
+- **No gameplay limits.** Storage has no weight cap, no row cap, no stack cap
+  and no per-operation quantity cap. The "storage full" message and the
+  `STORAGE_FULL` code are removed. Only technical safeguards remain: the
+  WebSocket message size, integer positive quantity checks, the number of
+  operations in one message, sanitizing incoming item snapshots and atomic
+  transfers. An imported snapshot of any size is accepted, while malformed data
+  is rejected before any room state changes.
+- **One domain module.** The stacking law now lives in `server/itemStacking.js`
+  with `domain/itemStacking.js` as the client entry point. Inventory, shared
+  storage and traders all use it instead of duplicating rules. Different mods,
+  charges, durability, current HP, unique qualities and base names produce
+  separate stacks everywhere; placement-only service fields do not affect the
+  comparison.
+- **No field stripping.** Depositing to storage, granting to a player and
+  selling to a trader now carry the whole item: `appliedMods`, `charges`,
+  `durability`, `hpCurrent`, `uniqQualities`, `uniqueId`, `stackKey` and
+  `baseName` survive. Only placement state and the operation's quantity change.
+- **Price and weight from mods.** Player sales and the item card take their
+  numbers from the enriched item (`resolveItem` already adds `mod.cost` and
+  `mod.weight`) instead of the bare catalog row. Effective `cost`/`weight`
+  travel with the snapshot and survive on the server, so a modified weapon no
+  longer loses its value when it changes hands.
+- **The window is unchanged.** Two panes, a buffer and the «Transfer» button;
+  no prices, applying, equipping or settings. Keys remain read-only, the Game
+  Master still broadcasts them and sees «Add to storage», and file export/import
+  still works for both the Game Master and players.
+
+## Shared storage polish (patch 521)
+
+The last item of the live plan is done. Two of the three small bits already
+worked: deleting a key template does not erase a found record (514), and a found
+key opens a point without a mini-game or a Game Master notice (516). Stacking
+and size limits were the remaining work.
+
+- **Stacking.** Two identical machine guns with different `uniqueId` now share
+  one row: `server/partyStorageRules.js` compares an item snapshot without
+  per-instance service fields and regardless of field order. Key records never
+  stack, and anything above 999 items goes to a new row instead of vanishing.
+- **Limits.** 200 rows per storage (keys included), 999 items per stack, 50
+  operations per transfer and 999 items per operation. `STORAGE_FULL` is
+  returned **before** the room state changes, so "nothing moves until Transfer
+  is pressed" still holds on overflow.
+- **For players.** A clear localized message replaces the raw error code, and
+  an oversized imported snapshot is rejected as a whole.
+- **Plan.** Item 12 is closed; the next stage is the space hierarchy and access
+  rules from the owner's clarifications (item 13 in `docs/roadmap.md`).
+
+## Lockpicking mini-game and OR-gates (patch 520)
+
+The owner described a separate game: a "Bobby pins: n" line counting the
+hacker's inventory pins, a row of cells with grey question marks and a four-arrow
+d-pad; the server generates a random arrow sequence that must be repeated
+position by position. He also clarified: "a lock and a terminal must not block
+a location together — treat those requirements as OR".
+
+- **Fifth card.** A lock gets its own creation tile with a lock icon, can be
+  issued standalone or live inside a location, can be dragged into one, and can
+  gate a location, chest or trader. Its form mirrors the terminal (difficulty
+  1…5); level 0 comes only from perk/magazine reductions.
+- **Cells.** `N = 12 − PER + 2·D`: PER 10 / difficulty 1 → 4 cells, PER 4 /
+  difficulty 5 → 18, two rows when `N > 8`. The owner chose Perception (the
+  canonical `LOCKPICK` attribute), not Agility.
+- **Turn.** A positional match turns the cell green and advances; a miss shows a
+  red `?`, keeps the position and hides which arrow was pressed. One pin in hand
+  survives `S` misses (`S` = `LOCKPICK` rank 0…6); Luck 4…10 gives a 5…20%
+  chance to save it at the moment it should break. On a break the sequence is
+  unchanged and solved arrows stay visible in grey.
+- **OR gates.** The second requirement row now holds up to two sources
+  (`linkedCheckIds`); either `hacked` event is enough. The form, the card and
+  the locked point show two lines "Terminal lvl 3" / "Lock lvl 5" joined by
+  "or". Both sources are hidden from players, as terminals were in patch 519.
+- **Shared registry.** Locks reuse the room's terminal states: operator, one
+  hack per broadcast, GM Yes/No, shared access events. The secret sequence never
+  reaches the client; spent pins are tracked per character in room memory.
+- **Design.** `LockPickingModal` reuses the terminal mini-game shell extracted
+  into `terminalHackingStyles.js`, per `docs/ui-modals-rules.md`; RU/EN strings
+  are paired.
+
+## Terminal as a chest lock (patch 519)
+
+The owner built a location, put a chest in it, linked a terminal in the chest
+and broadcast it to players. Both the chest and the terminal showed up in the
+location, the chest opened immediately and the terminal sat unused. Fixed per
+the owner's words: "the terminal should not be visible, and trying to open the
+chest should open the terminal".
+
+- **Hiding.** A terminal referenced by another point as its gate is marked by
+  the server and removed from the location node list **for players**. The GM
+  still sees every card, and the mini-game state for the hidden terminal is
+  still created on the room as usual.
+- **Lock instead of neighbour.** A locked chest with a gate now has "View"
+  and "Hack" buttons opening the mini-game of exactly that terminal. Players
+  see no separate terminal card.
+- **Loot after the hack.** Until the terminal is hacked, the chest stays
+  locked and its contents are not exposed. After a win the shared access event
+  opens the chest automatically and the loot can be taken. A found key still
+  opens it immediately, with no mini-game.
+- **Mandatory keys cannot be bypassed.** With a mandatory key in the first
+  row there is no hack button: the point stays closed until the record is
+  found.
+
+## Shared storage: two panels and transfer on button press (patch 518)
+
+The owner's full description arrived, replacing the short one from patch 514:
+
+> "The GM has a separate card, players have a button in the inventory. The GM
+> can broadcast keys to shared storage and view it as an inventory-style list,
+> but with no action buttons and no parameters. They cannot withdraw or deposit
+> items. A player opening shared storage sees a two-panel modal styled like the
+> merchant ... until the button is pressed, nothing is transferred".
+
+- **GM.** A separate "Shared storage" card on the Loot / Trade grid. The
+  window lists items with no buttons and no parameters, shows issued keys and
+  offers a record catalog with "Add to storage". Depositing and withdrawing
+  are now blocked on the server for both messages.
+- **Player.** The inventory button opens a **two-panel window styled like the
+  merchant**: personal inventory on the left, storage on the right. No prices,
+  markups, caps or settings — rows, buffer and commit button styles are
+  imported from the merchant overlay (rule in `docs/ui-modals-rules.md`).
+- **Buffer.** Tapping an item adds it to a pending list; tapping a buffer row
+  returns it. Until "Transfer" is pressed neither the server nor the local
+  inventory changes. The button sends one atomic request with all deposits and
+  withdrawals; any invalid line cancels the whole operation. The local
+  inventory updates only after the server replies.
+
+Keys still cannot be withdrawn into a personal inventory; snapshot
+export/import is preserved.
+
 ## Gates between points (patch 517)
 
 Plan item 9. Previously the linked check could only look at a win in the

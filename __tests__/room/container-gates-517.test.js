@@ -81,7 +81,9 @@ describe('517: сервер ведёт общий журнал событий', 
 
     const events = registry.getAccessEvents(room.code);
     expect(events.a).toMatchObject({ containerId: 'a', kind: 'hacked' });
-    expect(events.b).toMatchObject({ containerId: 'b', kind: 'hacked' });
+    // Патч 523: взлом адресный, без каскада. Точка B открыта ЯВНОЙ ссылкой
+    // на A, но сама не становится новым источником события для следующей точки.
+    expect(events.b).toBeUndefined();
     expect(registry.getState(room.code).accessEvents.a).toBeTruthy();
   });
 
@@ -148,7 +150,7 @@ describe('517: связи видны Мастеру и план обновлён
   it('roadmap обновлён до 517 и тезис ворот закрыт', () => {
     const plan = read('docs/roadmap.md');
     expect(plan).toContain('517');
-    expect(plan).toContain('Осталось после патча 517');
+    expect(plan).toContain('Осталось после патча');
     expect(plan).not.toContain('| 9 | ⏳');
     expect(plan).toContain('две панели');
     expect(plan).toContain('Мини-игра взлома замков');

@@ -37,6 +37,10 @@ export const findPending = (rooms, clientId = null) => {
     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
       if (terminal?.game?.status !== 'awaitingRetry') continue;
       if (terminal?.closed) continue;
+      // Патч 526: замки пока не блокируются — вопрос Мастеру «Разрешить
+      // повторный взлом?» для них не задаётся. Игрок сам начинает новый
+      // подход; awaitingRetry у замка означает просто «подход завершён».
+      if (terminal?.config?.kind === 'lock') continue;
       pending.push({
         code,
         containerId,
@@ -74,6 +78,7 @@ export const findCompleted = (rooms, clientId = null) => {
         name: terminal?.config?.name || containerId,
         difficulty: terminal?.config?.difficulty ?? 0,
         operatorName: terminal?.game?.operatorName || '',
+        isLock: terminal?.config?.kind === 'lock',
       });
     }
   }

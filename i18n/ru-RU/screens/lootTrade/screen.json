@@ -7,7 +7,9 @@
     "createHub": "Создать\nлокацию",
     "syncCloud": "Синхронизация с облаком",
     "createTerminal": "Терминал взлома",
-    "createKeyItem": "Создать ключ / записку"
+    "createKeyItem": "Создать ключ / записку",
+    "openStorage": "Общее хранилище",
+    "createLock": "Создать\nзамок"
   },
   "card": {
     "lootBadge": "Добыча",
@@ -37,7 +39,11 @@
     "lootKind": "контейнер",
     "gateAfter": "После: {name}",
     "gateOpen": "ворота пройдены",
-    "gatePending": "ворота закрыты"
+    "gatePending": "ворота закрыты",
+    "lockKind": "замок",
+    "terminalKindLabel": "Терминал ур. {difficulty}",
+    "lockKindLabel": "Замок ур. {difficulty}",
+    "gateOr": "или"
   },
   "form": {
     "createLootTitle": "Новый контейнер добычи",
@@ -83,8 +89,15 @@
     "linkedCheckLabel": "Ворота: событие другой точки",
     "linkedCheckSearchPlaceholder": "Поиск точки",
     "linkedCheckEmpty": "Других точек пока нет",
-    "linkedCheckTerminal": "источник события",
-    "linkedCheckHint": "Пока выбранная точка не дала событие (взлом, ключ или решение Мастера), доступ закрыт. Событие общее на всю комнату."
+    "linkedCheckTerminal": "Терминал",
+    "linkedCheckHint": "Можно выбрать до двух точек: терминал ИЛИ замок. Достаточно любой пройденной проверки — вместе они точку не блокируют. Событие общее на всю комнату.",
+    "createLockTitle": "Создать замок",
+    "editLockTitle": "Настройки замка",
+    "linkedCheckOr": "или",
+    "linkedCheckLock": "Замок",
+    "linkedCheckLevel": "ур. {difficulty}",
+    "linkedCheckSelected": "Выбрано: {count} из 2",
+    "lockPinEstimate": "Ориентировочно {count} отмычек при навыке 0"
   },
   "detail": {
     "backToList": "← К списку контейнеров",
@@ -141,7 +154,8 @@
     "hubGatesTitle": "Ворота между точками",
     "hubGatesEmpty": "Связей между точками пока нет",
     "hubGatePassed": "пройдено",
-    "hubGatePending": "ожидает"
+    "hubGatePending": "ожидает",
+    "hubGateOr": "или"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",
@@ -205,7 +219,8 @@
     "saleMarkupControl": "% продажи",
     "buyDeprControl": "% обесценивания скупки",
     "merchantCapsControl": "Касса {CAP}",
-    "applyRates": "Применить"
+    "applyRates": "Применить",
+    "lockAll": "🔒 Заблокировать всё"
   },
   "player": {
     "minimizedLoot": "📦 Добыча: {name}",
@@ -259,7 +274,15 @@
     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
     "tradeSuccess": "Сделка успешно завершена!",
     "keyRequiredError": "Нужен ключ: без него точка закрыта",
-    "hubNodeKeyUnlockedBadge": "Открыт ключом"
+    "hubNodeKeyUnlockedBadge": "Открыт ключом",
+    "gateTerminal": "Замок точки",
+    "gateOptionsTitle": "Открыть одним из способов:",
+    "gateOr": "или",
+    "gateTerminalLabel": "Терминал ур. {difficulty}",
+    "gateLockLabel": "Замок ур. {difficulty}",
+    "backToParent": "← Назад",
+    "checkEntryHint": "Нажмите «Взломать», чтобы начать партию; «Смотреть» показывает уже идущую.",
+    "checkWaitingBoard": "Доска появится после нажатия «Взломать»"
   },
   "keyItems": {
     "title": "Ключи и записки",
@@ -335,5 +358,42 @@
     "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера.",
     "keyUnlockedBadge": "ОТКРЫТ КЛЮЧОМ",
     "keyRequiredError": "Нужен ключ или привязанная проверка"
+  },
+  "lock": {
+    "title": "Взлом замка",
+    "pins": "Отмычки: {count} шт",
+    "noPins": "Отмычки закончились",
+    "skill": "Навык {skill} · Восприятие {per} · Удача {luck}",
+    "difficulty": "Сложность {difficulty} · {count} ячеек",
+    "view": "Смотреть",
+    "hack": "Взломать",
+    "close": "Закрыть",
+    "won": "ДОСТУП РАЗРЕШЁН",
+    "pinBroken": "Отмычка сломалась",
+    "pinHeld": "Отмычка уцелела",
+    "wrong": "Не подходит",
+    "awaiting": "Ожидание решения Мастера",
+    "closed": "Замок закрыт",
+    "retryPrompt": "Разрешить повторный взлом?",
+    "retryYes": "Да",
+    "retryNo": "Нет",
+    "viewOnly": "Другой игрок уже взламывает",
+    "selectCharacter": "Выберите персонажа",
+    "actionFailed": "Действие не выполнено",
+    "newAttempt": "Ещё подход",
+    "approachFinished": "Подход завершён",
+    "newAttemptHint": "Начните новый подход, когда купите отмычки или улучшите характеристики.",
+    "stateOutOfPins": "Нет отмычек",
+    "hackedTitle": "Замок взломан",
+    "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Игрок может начать новый подход сам.",
+    "noPinsHint": "В инвентаре персонажа нет отмычек: добавьте предмет «Отмычка» и обновите лист в комнате.",
+    "sessionNotPublished": "Лист персонажа ещё не передан в комнату. Откройте персонажа и повторите взлом.",
+    "ready": "Замок готов к взлому",
+    "progress": "Отгадано {done} из {total}",
+    "greyHint": "Серые стрелки нужно повторить",
+    "arrowLeft": "Влево",
+    "arrowUp": "Вверх",
+    "arrowRight": "Вправо",
+    "arrowDown": "Вниз"
   }
 }

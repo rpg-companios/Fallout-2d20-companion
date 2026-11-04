@@ -44,7 +44,8 @@ describe('патч 498: только сложность, без длин пар�
     expect(FORM).not.toContain('{value} · {value + 4}');
     expect(FORM).toContain('useState(1)');
     expect(FORM).toContain('Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1))');
-    expect(FORM).toContain("difficulty: isTerminal ? Math.max(1, difficulty) : 0");
+    // Патч 520: сложность появилась и у замка — та же шкала 1…5.
+    expect(FORM).toContain("difficulty: isTerminal || isLock ? Math.max(1, difficulty) : 0");
   });
 });
 
@@ -52,7 +53,7 @@ describe('патч 498: служебные тексты и читаемый цв
   it('длинная подсказка не выводится ни в форме, ни в админ-панели', () => {
     expect(FORM).not.toContain('terminalDifficultyHint');
     expect(SCREEN).not.toContain('terminalDifficultyHint');
-    expect(SCREEN).toContain('activeContainer.kind === CONTAINER_KIND.TERMINAL ? null');
+    expect(SCREEN).toContain('|| activeContainer.kind === CONTAINER_KIND.LOCK) ? null');
   });
 
   it('строка про локальный режим убрана из модалки', () => {

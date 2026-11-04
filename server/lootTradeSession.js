@@ -6,7 +6,31 @@
 // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
 
 const { ERROR_CODE } = require('./protocol');
+const {
+  itemStackKey,
+  effectiveItemCost,
+  effectiveItemWeight,
+} = require('./itemStacking.js');
+const locationGraph = require('./locationGraph.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+
+const normalizeLinkedCheckIds = (raw) => {
+  const ids = [
+    ...(Array.isArray(raw?.linkedCheckIds) ? raw.linkedCheckIds : []),
+    raw?.linkedCheckId,
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const value of ids) {
+    const id = String(value || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length === 2) break;
+  }
+  return out;
+};
 
 const clampNumber = (val, min, max, fallback = 0) => {
   const num = Number(val);
@@ -32,16 +56,8 @@ const normalizeCapsAmount = (value, fallback = 0) =>
 const makeEntryId = (now = Date.now(), idx = 0) =>
   `ent_${now}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
 
-const snapshotMergeSignature = (snapshot) => {
-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
-    : '';
-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
-  return `${mods}|${dur}|${charges}|${hp}`;
-};
+// Патч 522: один закон стака для инвентаря, склада и торговцев.
+const snapshotMergeSignature = (snapshot) => itemStackKey(snapshot);
 
 const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
@@ -57,8 +73,8 @@ const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
     itemId: itemId || name,
     itemType,
     name: name || 'Крышки',
-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
+    cost: effectiveItemCost(raw),
+    weight: effectiveItemWeight(raw),
     quantity,
     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
@@ -136,13 +152,22 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
   // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
   const marker = decodeTerminalNodeMarker(raw.lockLabel);
+  const lockMarker = decodeLockNodeMarker(raw.lockLabel);
   const explicitTerminal = raw.kind === 'terminal';
-  const kind = raw.kind === 'merchant' ? 'merchant' : (explicitTerminal || marker ? 'terminal' : 'loot');
-  const items = kind === 'terminal' ? [] : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+  const explicitLock = raw.kind === 'lock';
+  const kind = raw.kind === 'merchant' ? 'merchant'
+    : (raw.kind === 'hub' ? 'hub'
+      : (explicitTerminal || marker ? 'terminal'
+        : (explicitLock || lockMarker ? 'lock' : 'loot')));
+  const items = kind === 'terminal' || kind === 'lock' || kind === 'hub'
+    ? []
+    : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
   return {
     containerId,
     kind,
-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : (kind === 'terminal' ? 'Терминал' : 'Контейнер')),
+    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец'
+      : (kind === 'hub' ? 'Локация'
+        : (kind === 'terminal' ? 'Терминал' : (kind === 'lock' ? 'Замок' : 'Контейнер')))),
     description: String(raw.description || '').trim(),
     locked: Boolean(raw.locked),
     // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
@@ -158,14 +183,34 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
       ? (marker && !explicitTerminal
           ? marker.difficulty
           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
-      : 0,
+      : (kind === 'lock'
+          ? (lockMarker && !explicitLock
+              ? lockMarker.difficulty
+              : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+          : 0),
     items,
     // Патч 516: требование ключа у вложенной точки доступа.
     requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
     keyRequirement: String(raw.keyRequirement || 'none'),
+    linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
+    // Патч 519: терминал, привязанный к другой точке как замок, не должен
+    // торчать отдельной карточкой в локации у игроков.
+    hiddenForPlayers: Boolean(raw.hiddenForPlayers),
+    // Патч 523: граф пространств. Несколько родителей, глубина, дети и
+    // эффективные коды комнат (объединение кодов всех родителей).
+    parentIds: Array.isArray(raw.parentIds)
+      ? [...new Set(raw.parentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [],
+    childIds: Array.isArray(raw.childIds)
+      ? [...new Set(raw.childIds.map((id) => String(id || '').trim()).filter(Boolean))]
+      : [],
+    depth: Math.max(0, Math.floor(Number(raw.depth) || 0)),
+    roomCodes: Array.isArray(raw.roomCodes)
+      ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
+      : [],
   };
 };
 
@@ -179,7 +224,18 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
     seen.add(node.containerId);
     out.push(node);
   });
-  return out;
+  // Патч 519: если точка ссылается на терминал как на ворота, этот терминал
+  // становится «замком» точки и скрывается из списка локации у игроков.
+  // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
+  // скрытого терминала состояние мини-игры (syncTerminalNodes).
+  const referenced = new Set(
+    out.flatMap((n) => normalizeLinkedCheckIds(n)),
+  );
+  return out.map((node) => (
+    (node.kind === 'terminal' || node.kind === 'lock') && referenced.has(node.containerId)
+      ? { ...node, hiddenForPlayers: true }
+      : node
+  ));
 };
 
 /**
@@ -188,9 +244,21 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
  */
 const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   if (!session || isGm || session.kind !== 'hub') return session;
+  const nodes = session.nodes || [];
+  // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
+  // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
+  const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
+  const lockedIds = nodes.filter((node) => node.locked).map((node) => node.containerId);
+  const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
+    lockedIds,
+    isGm,
+    rootId: session.containerId,
+  }));
   return {
     ...session,
-    nodes: (session.nodes || []).map((node) => {
+    nodes: nodes
+      .filter((node) => !node.hiddenForPlayers && !hidden.has(node.containerId))
+      .map((node) => {
       if (!node.locked) return node;
       return {
         ...node,
@@ -201,7 +269,7 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
         characterOverrides: {},
         hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
       };
-    }),
+      }),
   };
 };
 
@@ -216,6 +284,7 @@ const applyKeyAccessToSession = (session, resolve) => {
     const decision = resolve({
       requiredKeyItemId: target.requiredKeyItemId,
       keyRequirement: target.keyRequirement,
+      linkedCheckIds: target.linkedCheckIds,
       linkedCheckId: target.linkedCheckId,
     });
     const state = decision?.state || 'none';
@@ -247,7 +316,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
   // Терминальные игры всегда общие для всей комнаты, даже если мастер передал
   // локацию с терминалом как персональную раздачу.
-  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal')) targetType = 'room';
+  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal' || node.kind === 'lock')) targetType = 'room';
   const targetCharacterId = targetType === 'character' && raw.targetCharacterId
     ? String(raw.targetCharacterId)
     : null;
@@ -275,13 +344,20 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
-    difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
+    difficulty: kind === 'terminal' || kind === 'lock'
+      ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0)))
+      : 0,
     items,
     nodes,
     // Патч 516: требование ключа у самой выданной точки.
     requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
     keyRequirement: String(raw.keyRequirement || 'none'),
+    linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+    // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
+    roomCodes: Array.isArray(raw.roomCodes)
+      ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
+      : [],
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
     closedByClientIds,
@@ -317,7 +393,7 @@ const computeMerchantSellPriceToPlayer = (
   entry,
   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
+  const baseCost = effectiveItemCost(entry);
   if (baseCost <= 0) return 0;
 
   const itemMarkup = Number(entry?.markupPercent) || 0;
@@ -335,7 +411,7 @@ const computeMerchantBuybackPriceFromPlayer = (
   item,
   { buyDepreciationPercent = 50, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(item?.cost ?? item?.price ?? 0) || 0);
+  const baseCost = effectiveItemCost(item);
   if (baseCost <= 0) return 0;
 
   const depreciation = normalizeBuyDepreciationPercent(buyDepreciationPercent, 50);
@@ -397,6 +473,52 @@ const applyMerchantRatePatch = (target, payload = {}) => {
 };
 
 /**
+ * Патч 523: «заблокировать всё» на ЛЮБОМ узле с детьми. Блокируются только
+ * запираемые потомки; сам узел-инициатор остаётся как есть.
+ */
+const applySessionLockAll = (session, containerId) => {
+  if (!session || session.kind !== 'hub') return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  const targetId = String(containerId || '').trim();
+  const graph = locationGraph.buildGraphFromSession(session.containerId, session.nodes || []);
+  if (targetId && targetId !== session.containerId && !graph.byId.has(targetId)) {
+    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  }
+  const targets = new Set(locationGraph.lockAllTargets(graph, targetId || session.containerId));
+  if (targets.size === 0) return { session };
+  return {
+    session: {
+      ...session,
+      nodes: (session.nodes || []).map((node) => (
+        targets.has(node.containerId) ? { ...node, locked: true } : node
+      )),
+      revision: session.revision + 1,
+      updatedAt: Date.now(),
+    },
+  };
+};
+
+/**
+ * Патч 523: адресный взлом. Открывается РОВНО одна точка, каскада по детям и
+ * по воротам нет. Ключ при этом может быть назначен многим точкам — каждая
+ * открывается им независимо («поточечно»).
+ */
+const applySessionUnlock = (session, containerId) => {
+  if (!session || session.kind !== 'hub') return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  const targetId = String(containerId || '').trim();
+  if (!targetId) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  const found = (session.nodes || []).some((node) => node.containerId === targetId);
+  if (!found) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  return {
+    session: {
+      ...session,
+      nodes: locationGraph.addressableUnlock(session.nodes, targetId),
+      revision: session.revision + 1,
+      updatedAt: Date.now(),
+    },
+  };
+};
+
+/**
  * Живое обновление процентов/кассы/содержимого/замков открытой сессии Мастером.
  */
 const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
@@ -424,6 +546,17 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
   };
 
   if (next.kind === 'hub') {
+    // Патч 523: команды Мастера «заблокировать всё» и адресное открытие.
+    if (payload.lockAll !== undefined) {
+      const result = applySessionLockAll(next, payload.lockAll);
+      if (result.error) return result;
+      return { session: result.session };
+    }
+    if (payload.unlock !== undefined) {
+      const result = applySessionUnlock(next, payload.unlock);
+      if (result.error) return result;
+      return { session: result.session };
+    }
     if (payload.name !== undefined && String(payload.name).trim()) {
       next.name = String(payload.name).trim();
     }
@@ -463,7 +596,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         if (payload.nodeDescription !== undefined) {
           targetNode.description = String(payload.nodeDescription || '').trim();
         }
-        if (targetNode.kind === 'terminal') {
+        if (targetNode.kind === 'terminal' || targetNode.kind === 'lock') {
           if (payload.nodeDifficulty !== undefined) {
             targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
           }
@@ -477,6 +610,12 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         if (targetNode.kind === 'terminal') {
           const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
           targetNode.lockLabel = encodeTerminalNodeMarker({
+            difficulty: targetNode.difficulty,
+            label: previousMarker ? previousMarker.label : targetNode.lockLabel,
+          });
+        } else if (targetNode.kind === 'lock') {
+          const previousMarker = decodeLockNodeMarker(targetNode.lockLabel);
+          targetNode.lockLabel = encodeLockNodeMarker({
             difficulty: targetNode.difficulty,
             label: previousMarker ? previousMarker.label : targetNode.lockLabel,
           });
@@ -801,6 +940,8 @@ module.exports = {
   computeMerchantSellPriceToPlayer,
   computeMerchantBuybackPriceFromPlayer,
   applySessionUpdate,
+  applySessionLockAll,
+  applySessionUnlock,
   applyAtomicLootTake,
   applyAtomicTradeCommit,
   applyKeyAccessToSession,

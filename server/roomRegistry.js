@@ -28,6 +28,15 @@ const {
   createGame,
   applyGameAction,
 } = require('./terminalHacking');
+const {
+  createLockGame,
+  keyWonLockGame,
+  syncLockGameConfig,
+  publicLockGameState,
+  closeLockGame,
+  applyLockAction,
+  shouldBlockLock,
+} = require('./lockPicking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
 
@@ -35,7 +44,16 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
+const {
+  PROTOCOL_MAX_TRANSFER_OPERATIONS,
+  applyStorageDeposits,
+  sanitizeItemSnapshot,
+  isValidQuantity,
+} = require('./partyStorageRules');
+
 const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+  // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
+  const lockRandom = rng ? () => rng(1000) / 1000 : Math.random;
   const rooms = new Map(); // code -> room
   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
@@ -51,9 +69,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   // поднимает его в комнату сообщением `storage.restore` при подключении.
   let storageEntryCounter = 0;
   const emptyStorage = () => ({ revision: 0, entries: [] });
+  // Патч 522: импорт снимка приходит по сети — не даём строке/объекту
+  // притвориться массивом записей и уронить комнату.
   const cloneStorage = (storage) => ({
     revision: Number(storage?.revision) || 0,
-    entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
+    entries: (Array.isArray(storage?.entries) ? storage.entries : [])
+      .map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
   });
   const isGmOnline = (room) => Boolean(room.ownerClientId && room.members.has(room.ownerClientId));
   const storageSnapshot = (room) => ({
@@ -66,7 +87,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
    * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
    * Мастер сам создал ключ, связал его с точкой и выдал.
    */
-  const keyWonGame = (config, at) => ({
+  const keyWonGame = (config, at) => (config?.kind === 'lock' ? keyWonLockGame(config, at) : ({
     status: 'won',
     result: 'ACCESS GRANTED',
     scrollUp: true,
@@ -80,7 +101,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     hackedByKey: true,
     revision: 1,
     updatedAt: at,
-  });
+  }));
 
   const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
     const id = String(containerId || '').trim();
@@ -100,25 +121,26 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!room) return;
     const resolve = resolveForRoom(room);
 
-    // Патч 517: открытая точка сама становится источником события для
-    // следующих ворот. Событие идемпотентно и общее на всю комнату.
+    // Патч 523: взлом АДРЕСНЫЙ. Событие порождает только та точка, которая
+    // реально открыта ключом или своей мини-игрой. Точка, открытая чужим
+    // событием через явную ссылку («ИЛИ»), НЕ становится новым источником —
+    // транзитивного каскада A → B → C больше нет. Ключ при этом может быть
+    // назначен многим точкам: каждая открывается им независимо, поточечно.
     const recordFromSession = (session) => {
       let added = false;
-      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
-        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
+      if (session.keyUnlocked && session.containerId) {
+        if (recordAccessEvent(room, session.containerId, 'hacked', 'key')) added = true;
       }
       for (const node of session.nodes || []) {
-        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
-          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
+        if (node.keyUnlocked && node.containerId) {
+          if (recordAccessEvent(room, node.containerId, 'hacked', 'key')) added = true;
         }
       }
       return added;
     };
 
-    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
-    // появившиеся события открывают следующую точку. Ограничение защищает
-    // от циклических ссылок, заданных Мастером.
-    for (let pass = 0; pass < 4; pass += 1) {
+    // Один проход: явные ссылки на уже созданные точки работают, цепочка — нет.
+    for (let pass = 0; pass < 1; pass += 1) {
       let added = false;
       if (room.activeSession) {
         room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
@@ -129,6 +151,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           requiredKeyItemId: entry.config?.requiredKeyItemId,
           keyRequirement: entry.config?.keyRequirement,
           linkedCheckId: entry.config?.linkedCheckId,
+          linkedCheckIds: entry.config?.linkedCheckIds,
         });
         entry.keyAccessState = decision.state;
         entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
@@ -171,6 +194,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
     accessEvents: new Map(),
+    // Патч 520: потраченные отмычки по персонажу. Снимок персонажа приходит
+    // с полным инвентарём, поэтому без этого счётчика каждый новый замок
+    // «находил» бы отмычки заново. Живёт в памяти комнаты, без файлов.
+    pinLedger: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
@@ -226,7 +253,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Признак обновлённого сервера: клиент включает синхронизированную игру,
     // а при отсутствии поля запускает мини-игру локально (старый сервер комнат
     // не знает terminal.issue/terminal.action и превращал терминал в сундук).
-    capabilities: { terminalHacking: true },
+    capabilities: { terminalHacking: true, lockPicking: true },
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -419,6 +446,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     room.emptySince = null;
   };
 
+  /**
+   * Патч 523: локация, привязанная к нескольким серверным комнатам, имеет
+   * ОДНО состояние и ОДНИ ресурсы. Коды комнат задают только видимость групп:
+   * взлом/покупка/касса в партии 1 сразу видны партии 2, а партия 3 не видит
+   * ничего, пока её код не добавят. Объект сессии общий для всех комнат.
+   */
+  const boundRoomsForSession = (session, fallbackCode = '') => {
+    if (!session || session.kind !== 'hub') return [];
+    const codes = Array.isArray(session.roomCodes) && session.roomCodes.length
+      ? session.roomCodes
+      : [fallbackCode].filter(Boolean);
+    const out = [];
+    const seen = new Set();
+    for (const raw of codes) {
+      const code = String(raw || '').trim().toUpperCase();
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      const target = rooms.get(code);
+      if (target) out.push(target);
+    }
+    return out;
+  };
+
+  const propagateSharedSession = (session, fallbackCode = '') => {
+    const bound = boundRoomsForSession(session, fallbackCode);
+    for (const target of bound) target.activeSession = session;
+    return bound;
+  };
+
+  const withBoundRooms = (result, session, fallbackCode = '') => {
+    const bound = session ? propagateSharedSession(session, fallbackCode) : [];
+    return { ...result, boundRooms: bound.length ? bound : [result.room] };
+  };
+
   /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
   const openSession = ({ code, clientId, session, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
@@ -434,7 +495,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
     syncTerminalNodes(room, normalized, { reissue: true });
     room.lastClosedSession = null;
-    return { room, session: room.activeSession || normalized };
+    // Привязанные комнаты видят ТУ ЖЕ сессию (общие ресурсы локации).
+    return withBoundRooms(
+      { room, session: room.activeSession || normalized },
+      room.activeSession || normalized,
+      code,
+    );
   };
 
   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
@@ -448,7 +514,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = result.session;
     syncTerminalNodes(room, result.session);
-    return { room, session: result.session };
+    return withBoundRooms({ room, session: result.session }, result.session, code);
   };
 
   const terminalPublic = (terminalId, entry) => ({
@@ -459,15 +525,23 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     closed: Boolean(entry.closed),
     locked: Boolean(entry.closed),
     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
-    awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
+    // Патч 526: для замков вопрос не задаётся — замки пока не блокируются,
+    // игрок сам начинает новый подход; awaitingRetry у замка означает
+    // «подход завершён» (например, кончились отмычки).
+    awaitingGm: Boolean(
+      entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
+    ),
     standaloneIssued: Boolean(entry.standaloneIssued),
-    // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
-    // открыть терминал один раз за трансляцию, даже если закрыл окно.
+    // Патч 506/526: стабильный идентификатор текущей трансляции. Раньше
+    // служил «билетом» на один взлом; с 526 игрок сам решает, сколько
+    // подходов сделать, — поле остаётся для диагностики и совместимости.
     accessId: entry.accessId || null,
     // Патч 516: состояние требования ключа для карточки терминала.
     keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
     keyUnlocked: Boolean(entry.keyUnlocked),
-    game: publicGameState(entry.game),
+    game: entry.config?.kind === 'lock'
+      ? publicLockGameState(entry.game)
+      : publicGameState(entry.game),
     updatedAt: entry.updatedAt,
   });
 
@@ -491,7 +565,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Активную доску не пересобираем на ходу: игрок не теряет прогресс из-за
     // того, что Мастер поправил карточку. Новая сложность вступит в силу при
     // следующей новой партии — «Да» Мастера или «Взломать» другого игрока.
-    let game = previous.game ? syncGameConfig(previous.game, config) : null;
+    let game = previous.game
+      ? (config.kind === 'lock'
+          ? syncLockGameConfig(previous.game, config)
+          : syncGameConfig(previous.game, config))
+      : null;
     if (reissue && game?.status === 'closed') game = null;
     return {
       ...previous,
@@ -508,12 +586,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const syncTerminalNodes = (room, session, options = {}) => {
     if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
     for (const node of session.nodes) {
-      if (node?.kind !== 'terminal') continue;
+      // Патч 520: замки живут в том же реестре состояний проверок, что и
+      // терминалы — оператор, «Да/Нет» Мастера и общий журнал событий достаются
+      // без дублирования сетевого кода.
+      if (node?.kind !== 'terminal' && node?.kind !== 'lock') continue;
       const config = normalizeTerminalConfig({
         containerId: node.containerId,
         name: node.name,
         description: node.description,
         difficulty: node.difficulty,
+        kind: node.kind,
+        requiredKeyItemId: node.requiredKeyItemId,
+        keyRequirement: node.keyRequirement,
+        linkedCheckId: node.linkedCheckId,
+        linkedCheckIds: node.linkedCheckIds,
       });
       if (!config.containerId || !config.name) continue;
       const previous = room.terminalStates.get(config.containerId);
@@ -553,6 +639,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
       if (action === 'retry') {
+        // Патч 526: замки пока не блокируются, решение Мастера «Да/Нет»
+        // относится только к терминалу. Владелец добавит условие блокировки
+        // позже — then shouldBlockLock() включится и здесь.
+        if (entry.config?.kind === 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
         if (entry.game?.status !== 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
         const decision = value === 'yes' || value === true ? 'yes'
           : (value === 'no' || value === false ? 'no' : null);
@@ -560,7 +650,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         if (decision === 'no') {
           // «Нет» — карточка остаётся visible, но ни взломать, ни посмотреть
           // её нельзя до новой трансляции Мастером.
-          entry.game = closeGame(entry.game, { now: now() });
+          entry.game = entry.config?.kind === 'lock'
+            ? closeLockGame(entry.game, { now: now() })
+            : closeGame(entry.game, { now: now() });
           entry.closed = true;
           entry.updatedAt = now();
           return { room, terminal: terminalPublic(id, entry) };
@@ -575,14 +667,24 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         // Сохраняем лист оператора: иначе новая доска собралась бы под
         // дефолтные ИНТ/Науку/Удачу и «Да» незаметно поменяло бы условия.
         const operatorSnapshot = entry.operatorSnapshot || published?.snapshot || {};
-        const fresh = createGame({
-          config: entry.config,
-          operatorClientId,
-          operatorCharacterId,
-          characterSnapshot: operatorSnapshot,
-          now: now(),
-          excludeWords: room.recentTerminalWords || [],
-        });
+        const fresh = entry.config?.kind === 'lock'
+          ? createLockGame({
+              config: entry.config,
+              operatorClientId,
+              operatorCharacterId,
+              characterSnapshot: operatorSnapshot,
+              now: now(),
+              rng: lockRandom,
+              spentPins: room.pinLedger?.get(operatorCharacterId) || 0,
+            })
+          : createGame({
+              config: entry.config,
+              operatorClientId,
+              operatorCharacterId,
+              characterSnapshot: operatorSnapshot,
+              now: now(),
+              excludeWords: room.recentTerminalWords || [],
+            });
         fresh.operatorName = operatorName;
         entry.game = fresh;
         entry.closed = false;
@@ -603,7 +705,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     }
     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
     // не запускается вообще — игрок получает понятный отказ.
-    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
+    if ((action === 'start' || action === 'newAttempt') && (entry.keyAccessState === KEY_ACCESS.DENIED
       || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
       return { error: ERROR_CODE.KEY_REQUIRED };
     }
@@ -612,6 +714,37 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const charId = String(characterId || '').trim();
     const published = room.lastSnapshots.get(charId);
     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+    // Патч 501: весь опубликованный конверт. Движок сам снимает обёртку data
+    // и понимает legacy-массивы [{ name, value }] из сохранения. Объявление
+    // вынесено выше: новый подход (526) читает тот же текущий снимок листа.
+    const snapshot = published.snapshot || {};
+    // Патч 526: игрок сам начинает новый подход (купил отмычки, прокачал
+    // PER/LOCKPICK). Это НЕ автоперезапуск после победы: действие приходит
+    // только по нажатию «Взломать»/«Ещё подход», а `start` по-прежнему
+    // запрещён при won/playing. Терминал после блокировки может открыть
+    // только Мастер («Да» или reissue) — для него новый подход недоступен.
+    if (action === 'newAttempt') {
+      if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+      if (shouldBlockLock({ game: entry.game, config: entry.config })) {
+        return { error: ERROR_CODE.LOCK_BLOCKED };
+      }
+      const fresh = createLockGame({
+        config: entry.config,
+        operatorClientId: clientId,
+        operatorCharacterId: charId,
+        characterSnapshot: snapshot,
+        now: now(),
+        rng: lockRandom,
+        spentPins: room.pinLedger?.get(charId) || 0,
+      });
+      fresh.operatorName = String(published.fromName || snapshot?.name || '').trim();
+      entry.game = fresh;
+      entry.closed = false;
+      entry.operatorSnapshot = published.snapshot || {};
+      entry.updatedAt = now();
+      refreshKeyAccess(room);
+      return { room, terminal: terminalPublic(id, entry) };
+    }
     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
     // Патч 505: взломанный терминал не переходит к другому оператору и не
@@ -635,30 +768,44 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       // чужого состояния: число слов, скобки и удача берутся из нового листа.
       entry.game = null;
     }
-    // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
-    // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
-    // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
-    const snapshot = published.snapshot || {};
-    const result = applyGameAction({
-      game: entry.game || entry.config,
-      config: entry.config,
-      action,
-      clientId,
-      characterId: charId,
-      characterSnapshot: snapshot,
-      value,
-      now: now(),
-      excludeWords: room.recentTerminalWords || [],
-    });
+    const result = entry.config?.kind === 'lock'
+      ? applyLockAction({
+          game: entry.game,
+          config: entry.config,
+          action,
+          clientId,
+          characterId: charId,
+          characterSnapshot: snapshot,
+          value,
+          now: now(),
+          rng: lockRandom,
+          spentPins: room.pinLedger?.get(charId) || 0,
+        })
+      : applyGameAction({
+          game: entry.game || entry.config,
+          config: entry.config,
+          action,
+          clientId,
+          characterId: charId,
+          characterSnapshot: snapshot,
+          value,
+          now: now(),
+          excludeWords: room.recentTerminalWords || [],
+        });
     if (result.error) return { error: ERROR_CODE[result.error] || result.error };
     if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
+    const brokenBefore = Number(entry.game?.brokenPins || 0);
     entry.game = result.game;
-    if (action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+    if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
+      const delta = result.game.brokenPins - brokenBefore;
+      room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
+    }
+    if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
       // Держим слова последних трёх досок (по 12–20 слов каждая).
       const fresh = entry.game.wordRanges.map((range) => range.word);
       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
     }
-    if (result.usedDigest) {
+    if (entry.config?.kind !== 'lock' && result.usedDigest) {
       const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
       const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
         ? nextSnapshot.data
@@ -692,11 +839,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (sessionId && previous && previous.sessionId !== String(sessionId)) {
       return { room, session: previous };
     }
+    const bound = previous ? boundRoomsForSession(previous, code) : [];
+    for (const target of bound) target.activeSession = null;
     room.activeSession = null;
     if (previous) {
       room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
     }
-    return { room, session: null, closedSession: previous };
+    return {
+      room,
+      session: null,
+      closedSession: previous,
+      boundRooms: bound.length ? bound : [room],
+    };
   };
 
   /**
@@ -817,6 +971,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           session: null,
           closedSession,
           autoClosedReason: 'loot_emptied',
+          boundRooms: boundRoomsForSession(closedSession, code),
         };
       }
       const updatedSession = {
@@ -824,20 +979,23 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         closedByClientIds: [...closedSet],
       };
       room.activeSession = updatedSession;
-      return {
-        room,
-        granted: result.granted,
-        session: updatedSession,
-      };
+      const updated = withBoundRooms(
+        { room, granted: result.granted, session: updatedSession },
+        updatedSession,
+        code,
+      );
+      room.activeSession = updatedSession;
+      return updated;
     }
 
-    room.activeSession = result.session;
-    return {
+    const finalResult = withBoundRooms({
       room,
       granted: result.granted,
       emptiedNodeContainerId: result.emptiedNodeContainerId || null,
       session: result.session,
-    };
+    }, result.session, code);
+    room.activeSession = result.session;
+    return finalResult;
   };
 
   /** Атомарная бартерная сделка игрока с торговцем. */
@@ -847,7 +1005,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const result = applyAtomicTradeCommit(room.activeSession, payload, now());
     if (result.error) return result;
     room.activeSession = result.session;
-    return { room, committed: result.committed, session: result.session };
+    return withBoundRooms(
+      { room, committed: result.committed, session: result.session },
+      result.session,
+      code,
+    );
   };
 
   /** Отправить команду Мастера группе или выбранному персонажу (с очередью для офлайн-телефонов). */
@@ -1004,27 +1166,118 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Без Мастера в сети хранилище доступно только для просмотра.
     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
     const qty = Math.floor(Number(quantity));
-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     }
-    let plain;
-    try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
+    const plain = sanitizeItemSnapshot(item);
+    if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     const member = room.members.get(clientId);
-    const entry = {
-      entryId: `st_${now()}_${++storageEntryCounter}`,
-      item: plain,
-      name: String(plain.name || name || '').trim() || 'Предмет',
-      itemType: String(plain.itemType || 'misc'),
-      quantity: qty,
-      depositedBy: clientId,
-      depositedByName: String(member?.name || name || '').trim(),
-      at: now(),
-    };
+    // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
+    // Он только смотрит список и транслирует ключи.
+    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
     const storage = room.partyStorage || emptyStorage();
-    storage.entries = [...storage.entries, entry];
+    // Патч 521: одинаковые предметы ложатся в одну строку, а переполнение
+    // склада возвращает ошибку ДО изменения состояния комнаты.
+    const applied = applyStorageDeposits({
+      entries: storage.entries,
+      deposits: [{ item: plain, quantity: qty, name: String(plain.name || name || '').trim() || 'Предмет' }],
+      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
+        entryId: `st_${now()}_${++storageEntryCounter}`,
+        item: putItem,
+        name: putName,
+        itemType: String(putItem.itemType || 'misc'),
+        quantity,
+        depositedBy: clientId,
+        depositedByName: String(member?.name || putName || '').trim(),
+        at,
+      }),
+      at: now(),
+    });
+    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+    storage.entries = applied.entries;
     storage.revision += 1;
     room.partyStorage = storage;
-    return { room, storage: storageSnapshot(room), entry: { ...entry } };
+    const entry = applied.added[applied.added.length - 1] || null;
+    return { room, storage: storageSnapshot(room), entry: entry ? { ...entry } : null };
+  };
+
+  /**
+   * Патч 518: одна кнопка «Перенести» применяет ВСЕ отложенные операции
+   * буфера атомарно. Пока кнопка не нажата, сервер ничего не меняет.
+   */
+  const transferPartyStorage = ({ code, clientId, deposits = [], withdrawals = [] }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+    const member = room.members.get(clientId);
+    // Мастер не вносит и не забирает предметы — только смотрит и выдаёт ключи.
+    if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+    const putList = Array.isArray(deposits) ? deposits : [];
+    const takeList = Array.isArray(withdrawals) ? withdrawals : [];
+    if (putList.length === 0 && takeList.length === 0) {
+      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    }
+    if (putList.length + takeList.length > PROTOCOL_MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+
+    const storage = room.partyStorage || emptyStorage();
+    const original = storage.entries;
+    // 1) Проверяем ВСЁ до единого изменения.
+    const plannedTakes = [];
+    for (const req of takeList) {
+      const entryId = String(req?.entryId || '').trim();
+      const qty = Math.floor(Number(req?.quantity));
+      const entry = original.find((e) => e.entryId === entryId);
+      if (!entry || entry.kind === 'keyItem' || !isValidQuantity(qty)) {
+        return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
+      }
+      if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      plannedTakes.push({ entry, qty });
+    }
+    const plannedPuts = [];
+    for (const req of putList) {
+      const qty = Math.floor(Number(req?.quantity));
+      const item = req?.item;
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
+        return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      }
+      const plain = sanitizeItemSnapshot(item);
+      if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      if (plain.kind === 'keyItem') return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+      plannedPuts.push({ plain, qty, name: String(req?.name || plain.name || '').trim() || 'Предмет' });
+    }
+    // 2) Применяем целиком: сначала списания, затем поступления.
+    let entries = [...original];
+    const withdrawn = [];
+    for (const { entry, qty } of plannedTakes) {
+      const rest = Number(entry.quantity) - qty;
+      withdrawn.push({ item: entry.item, name: entry.name, quantity: qty });
+      entries = rest > 0
+        ? entries.map((e) => (e.entryId === entry.entryId ? { ...e, quantity: rest } : e))
+        : entries.filter((e) => e.entryId !== entry.entryId);
+    }
+    // Патч 521: поступления склеиваются с существующими строками. Проверка
+    // лимита идёт здесь же, до единого изменения room.partyStorage.
+    const applied = applyStorageDeposits({
+      entries,
+      deposits: plannedPuts,
+      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
+        entryId: `st_${now()}_${++storageEntryCounter}`,
+        item: putItem,
+        name: putName,
+        itemType: String(putItem.itemType || 'misc'),
+        quantity,
+        depositedBy: clientId,
+        depositedByName: String(member?.name || '').trim(),
+        at,
+      }),
+      at: now(),
+    });
+    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+    storage.entries = applied.entries;
+    storage.revision += 1;
+    room.partyStorage = storage;
+    const deposited = applied.added.map((entry) => ({ ...entry }));
+    return { room, storage: storageSnapshot(room), withdrawn, deposited };
   };
 
   /** Патч 510: ключевая запись попадает на склад, но не уходит в инвентарь. */
@@ -1104,6 +1357,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const restorePartyStorage = ({ code, clientId, ownerToken = null, storage }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!storage || typeof storage !== 'object' || Array.isArray(storage)
+      || !Array.isArray(storage.entries)) {
+      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    }
     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
     const incoming = cloneStorage(storage);
@@ -1152,6 +1409,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ackDirective,
     depositToPartyStorage,
     withdrawFromPartyStorage,
+    transferPartyStorage,
     getPartyStorage,
     getAccessEvents: (code) => Object.fromEntries(
       (rooms.get(code)?.accessEvents || new Map()).entries(),

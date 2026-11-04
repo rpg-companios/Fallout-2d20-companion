@@ -1,0 +1,1645 @@
+diff --git a/__tests__/lootTrade/lock-entry-light-525.test.js b/__tests__/lootTrade/lock-entry-light-525.test.js
+new file mode 100644
+index 0000000..f6ecb71
+--- /dev/null
++++ b/__tests__/lootTrade/lock-entry-light-525.test.js
+@@ -0,0 +1,168 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 900, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import StandaloneCheckModal from '../../components/lootTrade/StandaloneCheckModal';
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import { showRawAlert } from '../../components/alerts/alertService';
++
++const CHECK = {
++  containerId: 'lock-1', kind: 'lock', name: 'Замок', description: 'Дверь ангара',
++  difficulty: 2,
++};
++
++const character = () => ({
++  currentCharacterId: 'ch1',
++  characterName: 'Сталкер',
++  attributes: { PER: { base: 9 }, LCK: { base: 5 } },
++  skills: { LOCKPICK: { base: 4 } },
++  selectedSkills: [],
++  selectedPerks: [],
++  usedMagazineEffects: [],
++  items: { pin1: { id: 'pin1', weaponId: 'item_bobby_pin', quantity: 9 } },
++  equipment: { items: [] },
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState(character());
++  useRoomStore.setState({
++    clientId: 'client-1',
++    rooms: { ROOM1: { terminalStates: {}, activeSession: null } },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++
++describe('525: входная модалка отдельной точки проверки', () => {
++  it('показывает «Взломать»/«Смотреть» и не содержит «Покинуть локацию»', async () => {
++    const onHack = vi.fn();
++    const onView = vi.fn();
++    const onClose = vi.fn();
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <StandaloneCheckModal
++          visible
++          check={CHECK}
++          isLock
++          onHack={onHack}
++          onView={onView}
++          onClose={onClose}
++        />,
++      );
++      await Promise.resolve();
++    });
++    expect(renderer.root.findAllByType('Modal').length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'check-hack-button' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'check-view-button' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'check-entry-hint' }).length).toBeGreaterThan(0);
++    const texts = renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? ''));
++    expect(texts.some((t) => /Покинуть локацию|Leave location/.test(t))).toBe(false);
++    // Локаль в тестовом окружении может быть и RU, и EN.
++    expect(texts.some((t) => /Взломать|Hack|lock\.hack/.test(t))).toBe(true);
++    await act(async () => renderer.root.findAllByProps({ testID: 'check-hack-button' })[0].props.onPress());
++    expect(onHack).toHaveBeenCalledTimes(1);
++    await act(async () => renderer.root.findAllByProps({ testID: 'check-view-button' })[0].props.onPress());
++    expect(onView).toHaveBeenCalledTimes(1);
++    await act(async () => renderer.unmount());
++  });
++
++  it('светлая палитра: карточка точки построена на каркасе формы модалок', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <StandaloneCheckModal visible check={CHECK} onHack={() => {}} onView={() => {}} onClose={() => {}} />,
++      );
++      await Promise.resolve();
++    });
++    // modalStyles.card/footer/saveBtn/cancelBtn приходят из lootTradeFormStyles.
++    const point = renderer.root.findAllByProps({ testID: 'check-entry-point' })[0];
++    // Светлая палитра модалок: белая поднятая поверхность, а не тёмный терминал.
++    expect(point.props.style.backgroundColor).toBe('#ffffff');
++    expect(point.props.style.borderColor).toBe('#b7b7b7');
++    const actions = renderer.root.findAllByProps({ testID: 'check-entry-actions' })[0];
++    expect(actions).toBeTruthy();
++    const hackButton = renderer.root.findAllByProps({ testID: 'check-hack-button' })[0];
++    expect(hackButton.props.style.some((style) => style?.backgroundColor === '#e8f0fb')).toBe(true);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('525: окно доски не притворяется запущенной игрой', () => {
++  it('без доски нет ячеек, стрелок и внутренней кнопки «Взломать»', async () => {
++    useRoomStore.setState({
++      clientId: 'client-1',
++      rooms: { ROOM1: {
++        terminalStates: {},
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession: null,
++      } },
++      actOnTerminal: vi.fn(async () => ({ game: null })),
++    });
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <LockPickingModal visible lock={CHECK} roomCode="ROOM1" onClose={() => {}} />,
++      );
++      await Promise.resolve();
++    });
++    expect(renderer.root.findAllByProps({ testID: 'lock-waiting-board' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-cells-board' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-arrow-up' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-hack-button' })).toHaveLength(0);
++    expect(showRawAlert).not.toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++
++  it('по autoStart доска сразу с ячейками и нажимаемыми стрелками, без второго «Взломать»', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <LockPickingModal visible autoStart lock={CHECK} roomCode="ROOM1" onClose={() => {}} />,
++      );
++      await Promise.resolve();
++      await Promise.resolve();
++    });
++    expect(renderer.root.findAllByProps({ testID: 'lock-cells-board' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-cell-0' }).length).toBeGreaterThan(0);
++    const arrow = renderer.root.findAllByProps({ testID: 'lock-arrow-up' })[0];
++    expect(arrow.props.disabled).toBe(false);
++    expect(renderer.root.findAllByProps({ testID: 'lock-hack-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-waiting-board' })).toHaveLength(0);
++    expect(useRoomStore.getState().actOnTerminal).not.toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/lootTrade/player-lock-overlay-524.test.js b/__tests__/lootTrade/player-lock-overlay-524.test.js
+index ab09f44..d24ee9a 100644
+--- a/__tests__/lootTrade/player-lock-overlay-524.test.js
++++ b/__tests__/lootTrade/player-lock-overlay-524.test.js
+@@ -49,6 +49,11 @@ vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
+     containerId: terminal?.containerId, visible, autoStart,
+   }),
+ }));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
++    visible, onHack, onView,
++  }),
++}));
+ 
+ import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -141,11 +146,15 @@ describe('524: окно локации и «Покинуть локацию»',
+     await act(async () => renderer.unmount());
+   });
+ 
+-  it('одиночный замок, выданный как локация, открывается сразу мини-игрой без «Покинуть локацию»', async () => {
++  it('отдельный замок сначала даёт входную модалку, доска — только по «Взломать» (525)', async () => {
+     const renderer = await mount(standaloneLock());
+     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    const entry = renderer.root.findByType('StandaloneCheckModal');
++    expect(entry.props.visible).toBe(true);
++    await act(async () => { entry.props.onHack(); await Promise.resolve(); });
+     const modal = renderer.root.findByType('LockPickingModal');
+-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true });
++    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
+     const texts = renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? ''));
+     expect(texts.some((t) => t.includes('Покинуть локацию'))).toBe(false);
+     await act(async () => renderer.unmount());
+diff --git a/__tests__/lootTrade/standalone-direct-525.test.js b/__tests__/lootTrade/standalone-direct-525.test.js
+new file mode 100644
+index 0000000..4209cbd
+--- /dev/null
++++ b/__tests__/lootTrade/standalone-direct-525.test.js
+@@ -0,0 +1,133 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    Image: mk('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible, autoStart }) => React.createElement('LockPickingModal', {
++    containerId: lock?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
++    visible, onHack, onView,
++  }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++
++const CHECK = {
++  containerId: 'lock-1', kind: 'lock', name: 'Замок', description: '', difficulty: 2,
++};
++
++const room = () => ({
++  joined: true,
++  members: [{ clientId: 'player-client', role: 'player' }],
++  activeSession: null,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    'lock-1': {
++      containerId: 'lock-1',
++      standaloneIssued: true,
++      accessId: 'broadcast-1',
++      config: CHECK,
++      game: null,
++      closed: false,
++      locked: false,
++    },
++  },
++});
++
++const mount = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++describe('525: отдельно выданный замок через terminal.issue', () => {
++  beforeEach(() => {
++    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++    useCharacterStore.setState({
++      currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
++    });
++    useRoomStore.setState({
++      clientId: 'player-client',
++      status: 'online',
++      rooms: { ROOM1: room() },
++    });
++  });
++
++  it('сначала входная модалка, мини-игры ещё нет и «Покинуть локацию» нет', async () => {
++    const renderer = await mount();
++    const entry = renderer.root.findByType('StandaloneCheckModal');
++    expect(entry.props.visible).toBe(true);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++
++  it('«Взломать» монтирует доску с autoStart, входная модалка скрыта', async () => {
++    const renderer = await mount();
++    const entry = renderer.root.findByType('StandaloneCheckModal');
++    await act(async () => { entry.props.onHack(); await Promise.resolve(); });
++    const modal = renderer.root.findByType('LockPickingModal');
++    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
++    expect(renderer.root.findByType('StandaloneCheckModal').props.visible).toBe(false);
++    await act(async () => renderer.unmount());
++  });
++
++  it('«Смотреть» открывает окно доски без автозапуска партии', async () => {
++    const renderer = await mount();
++    const entry = renderer.root.findByType('StandaloneCheckModal');
++    await act(async () => { entry.props.onView(); await Promise.resolve(); });
++    const modal = renderer.root.findByType('LockPickingModal');
++    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: false });
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/lock-entry-light-525.test.js b/__tests__/room/lock-entry-light-525.test.js
+new file mode 100644
+index 0000000..7b23b17
+--- /dev/null
++++ b/__tests__/room/lock-entry-light-525.test.js
+@@ -0,0 +1,117 @@
++// Приёмочный тест патча 525: «Мини-игра на взлом не должна сразу показываться…
++// сначала будет модалка, как для локации и кнопками "взломать", только без
++// "покинуть локацию"; гамму интерфейса взлома замка изменить на светлую».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++describe('525: двухшаговый вход в мини-игру', () => {
++  it('входная модалка точки есть, «Покинуть локацию» в ней нет', () => {
++    const entry = read('components/lootTrade/StandaloneCheckModal.js');
++    expect(entry).toContain('check-hack-button');
++    expect(entry).toContain('check-view-button');
++    expect(entry).toContain('check-entry-point');
++    expect(entry).not.toContain('leaveHub');
++    expect(entry).not.toContain("tLootTrade('player.leaveHub')");
++    expect(entry).not.toContain('leave-hub-button');
++    expect(entry).toContain('modalStyles.footer');
++    expect(entry).toContain('modalStyles.saveBtn');
++    expect(entry).toContain('modalStyles.cancelBtn');
++  });
++
++  it('оверлей монтирует мини-игру только после выбора из входной модалки', () => {
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlay).toContain("import StandaloneCheckModal from './StandaloneCheckModal'");
++    expect(overlay).toContain('<StandaloneCheckModal');
++    expect(overlay).toContain('visible={!selection}');
++    expect(overlay).toContain('autoStart={Boolean(selection.autoStart)}');
++    expect(overlay).toContain('visible={!directSelection}');
++    expect(overlay).toContain('autoStart={Boolean(directSelection.autoStart)}');
++    // Повторная выдача точки с новым accessId снова начинается с входной модалки.
++    expect(overlay).toContain('terminalSelection?.accessKey === directAccessKey');
++    expect(overlay).toContain('terminalSelection?.accessKey === accessKey');
++    // Патч 524 не откатывается: окно локации по-прежнему уходит под доску,
++    // а «Покинуть локацию» закрывает окно локально и не гасит сессию Мастера.
++    expect(overlay).toContain('visible={!terminalSelection}');
++    expect(overlay).toContain('markSessionClosedLocally(session.sessionId)');
++    expect(overlay).toContain("tLootTrade('player.leaveHub')");
++  });
++
++  it('окно доски без игры не рисует пустые ячейки, стрелки и второй «Взломать»', () => {
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain('lock-waiting-board');
++    expect(modal).toContain("tLootTrade('player.checkWaitingBoard')");
++    expect(modal).not.toContain('lock-hack-button');
++    expect(modal).not.toContain("tLootTrade('lock.hack')");
++    expect(modal).toContain('lock-cells-board');
++    expect(modal).toContain('lock-arrow-');
++  });
++});
++
++describe('525: светлая гамма вместо терминальной', () => {
++  it('каркас импортируется из lootTradeFormStyles, базовые ключи не дублируются', () => {
++    const shared = read('components/lootTrade/lockPickingStyles.js');
++    expect(shared).toContain('lootTradeFormStyles');
++    expect(shared).toContain('ADMIN_MODAL_PALETTE');
++    expect(shared).not.toContain('  overlay: {');
++    expect(shared).not.toContain('  card: {');
++    expect(shared).not.toContain('  saveBtn: {');
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain("from './lockPickingStyles'");
++    expect(modal).toContain('modalStyles.card');
++    expect(modal).toContain('LOCK_PALETTE');
++    expect(modal).not.toContain('terminalHackingStyles');
++    expect(modal).not.toContain('StyleSheet.create');
++    // Терминал не перекрашивался.
++    expect(read('components/lootTrade/TerminalHackingModal.js'))
++      .toContain('const styles = terminalHackingStyles;');
++    expect(read('docs/ui-modals-rules.md')).toContain('525');
++  });
++
++  it('парные RU/EN подписи входа и ожидания доски', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json');
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json');
++    expect(Object.keys(ru.player).sort()).toEqual(Object.keys(en.player).sort());
++    expect(Object.keys(ru.lock).sort()).toEqual(Object.keys(en.lock).sort());
++    expect(ru.player.checkEntryHint).toContain('Взломать');
++    expect(en.player.checkEntryHint).toContain('Hack');
++    expect(ru.player.checkWaitingBoard).toContain('Взломать');
++    expect(en.player.checkWaitingBoard).toContain('Hack');
++  });
++});
++
++describe('525: регрессии и доставка', () => {
++  it('механика 520/524 и защита сервера не тронуты', () => {
++    const core = read('server/lockPicking.js');
++    expect(core).toContain('countBobbyPins');
++    expect(core).toContain('pinsTotal');
++    expect(read('components/lootTrade/localLockGame.js')).toContain('applyLocalLockAction');
++    expect(read('components/lootTrade/lockAutoStart.js')).toContain('shouldAutoStartLock');
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain('SESSION_FORBIDDEN');
++    expect(modal).toContain('UNKNOWN_TYPE');
++    expect(modal).toContain('roomHasTerminalProtocol');
++    expect(read('server/itemStacking.js')).toContain('itemTransferSnapshot');
++    expect(read('server/locationGraph.js')).toContain('buildLocationGraph');
++  });
++
++  it('версия, отсечка, заметки, журналы, план и файл установки', () => {
++    const version = json('public/version.json');
++    expect(Number(version.version)).toBeGreaterThanOrEqual(525);
++    expect(version.release).toBe(4);
++    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(95);
++    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(95);
++    expect(Number(json('patchs/baseline.json').baseline)).toBeGreaterThanOrEqual(525);
++    expect(read('docs/changelog.ru.md')).toContain('525');
++    expect(read('docs/changelog.en.md')).toContain('525');
++    expect(read('docs/roadmap.md')).toContain('525');
++    expect(read('docs/patch-525-install.md')).toContain('525');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('525');
++    expect(read('patchs/525-lock-entry-light.patch')).toContain('StandaloneCheckModal.js');
++  });
++});
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index bc4827a..3aa8a96 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -342,11 +342,18 @@ describe('520: пятая карточка и документы', () => {
+     expect(overlay).toContain('CONTAINER_KIND.LOCK');
+   });
+ 
+-  it('модалка замка берёт каркас терминальной, а не свой набор базовых стилей', () => {
++  it('модалка замка берёт светлый каркас модалок, а не гамму терминала (525)', () => {
+     const modal = read('components/lootTrade/LockPickingModal.js');
+-    expect(modal).toContain("from './terminalHackingStyles'");
+-    expect(modal).toContain('terminalHackingStyles.window');
+-    expect(modal).not.toContain('backdrop: {');
++    // Владелец в 525 отказался от зелёного «терминала»: замок теперь светлый
++    // и переиспользует lootTradeFormStyles, а не рисует базовые стили заново.
++    expect(modal).toContain("from './lockPickingStyles'");
++    expect(modal).toContain('modalStyles.card');
++    expect(modal).not.toContain('terminalHackingStyles');
++    expect(modal).not.toContain('StyleSheet.create');
++    const shared = read('components/lootTrade/lockPickingStyles.js');
++    expect(shared).toContain('lootTradeFormStyles');
++    expect(shared).toContain('ADMIN_MODAL_PALETTE');
++    // Терминал остался при своей гамме — менялась только мини-игра замка.
+     expect(read('components/lootTrade/TerminalHackingModal.js'))
+       .toContain('const styles = terminalHackingStyles;');
+     expect(modal).toContain('lock-pins-count');
+diff --git a/__tests__/room/lock-picking-fix-524.test.js b/__tests__/room/lock-picking-fix-524.test.js
+index da81b2f..0c2a16f 100644
+--- a/__tests__/room/lock-picking-fix-524.test.js
++++ b/__tests__/room/lock-picking-fix-524.test.js
+@@ -201,9 +201,12 @@ describe('524: документы, строки и регрессионные з
+ 
+   it('окно локации скрыто под мини-игрой, выход работает локально', () => {
+     const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
+-    expect(overlay).toContain('visible={!terminalSelection && !standaloneCheck}');
++    expect(overlay).toContain('visible={!terminalSelection}');
+     expect(overlay).toContain('markSessionClosedLocally(session.sessionId)');
+     expect(overlay).toContain('standaloneCheckSession');
++    // Патч 525: отдельная точка сначала показывает входную модалку.
++    expect(overlay).toContain('<StandaloneCheckModal');
++    expect(read('components/lootTrade/StandaloneCheckModal.js')).toContain('check-hack-button');
+     expect(overlay).toContain("tLootTrade('player.leaveHub')");
+   });
+ 
+@@ -218,7 +221,7 @@ describe('524: документы, строки и регрессионные з
+     expect(read('docs/roadmap.md')).toContain('524');
+     expect(read('docs/changelog.ru.md')).toContain('524');
+     expect(read('docs/changelog.en.md')).toContain('524');
+-    expect(read('patchs/baseline.json')).toContain('524');
++    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(524);
+     expect(read('docs/patch-524-install.md')).toContain('524');
+   });
+ });
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 254075b..cb7fa34 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -1,7 +1,6 @@
+ import React, { useEffect, useMemo, useRef, useState } from 'react';
+ import {
+   Modal,
+-  StyleSheet,
+   Text,
+   TouchableOpacity,
+   View,
+@@ -13,7 +12,10 @@ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacter
+ import { useLocale } from '../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import { showRawAlert } from '../alerts/alertService';
+-import { terminalHackingStyles } from './terminalHackingStyles';
++// Патч 525: светлая гамма модалок, а не зелёный «терминал». Каркас окна
++// (overlay/card/title/кнопки/подписи) импортируется из lootTradeFormStyles,
++// ниже — только уникальные для замка ячейки и крестовина стрелок.
++import { modalStyles, lockLightStyles, LOCK_PALETTE } from './lockPickingStyles';
+ import { CELL_STATE } from './lockPickingConstants';
+ import {
+   initialLocalLockState,
+@@ -22,43 +24,7 @@ import {
+ } from './localLockGame';
+ import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
+ 
+-// Патч 520: каркас окна (backdrop/window/header/statusRow/кнопки/бейджи)
+-// целиком берётся у TerminalHackingModal. Здесь только то, чего у терминала
+-// нет: ячейки комбинации и крестовина стрелок.
+-const styles = StyleSheet.create({
+-  pinCount: { color: '#c8efb8', fontSize: 17, fontWeight: '800', fontFamily: 'monospace' },
+-  statText: { color: '#8da38b', fontSize: 11, marginTop: 4, fontFamily: 'monospace' },
+-  board: { marginTop: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#1b3822', backgroundColor: '#030805' },
+-  cellRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginVertical: 5 },
+-  cell: {
+-    width: 38, height: 38, borderWidth: 1.5, borderRadius: 4,
+-    alignItems: 'center', justifyContent: 'center',
+-    borderColor: '#3a5c3d', backgroundColor: '#0c160e',
+-  },
+-  cellHidden: { borderColor: '#3a5c3d' },
+-  cellGreen: { borderColor: '#8fd06a', backgroundColor: 'rgba(80,150,55,0.18)' },
+-  cellRed: { borderColor: '#d05a5a', backgroundColor: 'rgba(150,45,45,0.22)' },
+-  cellGrey: { borderColor: '#5a5a5a', backgroundColor: 'rgba(90,90,90,0.14)' },
+-  cellText: { color: '#8b9a87', fontSize: 20, fontWeight: '800', fontFamily: 'monospace' },
+-  cellTextGreen: { color: '#a9f07d' },
+-  cellTextRed: { color: '#ff6b6b' },
+-  cellTextGrey: { color: '#9a9a9a' },
+-  crossArea: { alignItems: 'center', marginTop: 14, marginBottom: 6 },
+-  crossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+-  arrowButton: {
+-    width: 52, height: 44, borderRadius: 4, borderWidth: 1,
+-    borderColor: '#88bf70', backgroundColor: '#1a2c19',
+-    alignItems: 'center', justifyContent: 'center',
+-  },
+-  arrowButtonDisabled: { opacity: 0.4 },
+-  arrowSpacer: { width: 52, height: 44 },
+-  resultText: { color: '#e2c477', fontSize: 12, marginTop: 9, textAlign: 'center', fontFamily: 'monospace', letterSpacing: 1 },
+-  footerRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 14 },
+-  ghostButton: { borderWidth: 1, borderColor: '#507052', borderRadius: 4, paddingHorizontal: 18, paddingVertical: 9 },
+-  ghostButtonText: { color: '#c9ddb9', fontFamily: 'monospace', fontWeight: '700' },
+-  retryActions: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 12 },
+-  hintText: { color: '#d7c68e', fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: 'monospace' },
+-});
++const styles = lockLightStyles;
+ 
+ const ARROW_ICON = {
+   left: 'arrow-left-bold',
+@@ -211,9 +177,9 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+     }
+   };
+ 
+-  // «Взломать» из карточки сразу собирает доску под текущий лист персонажа.
+-  // Патч 524: ключ дедупликации не зависит от accessId — приход состояния
+-  // комнаты больше не порождает второй start и ложное «Действие не выполнено».
++  // «Взломать» из карточки точки сразу собирает доску под текущий лист
++  // персонажа. Патч 524: ключ дедупликации не зависит от accessId — приход
++  // состояния комнаты больше не порождает второй start и ложный отказ.
+   useEffect(() => {
+     const allowed = shouldAutoStartLock({
+       visible,
+@@ -272,7 +238,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+       <View key={`${idx}-${cell?.state}`} testID={`lock-cell-${idx}`} style={[styles.cell, stateStyle]}>
+         {shown ? (
+           <MaterialCommunityIcons name={CELL_ICON[cell.arrow]} size={22} color={
+-            cell.state === CELL_STATE.GREEN ? '#a9f07d' : '#9a9a9a'
++            cell.state === CELL_STATE.GREEN ? '#1b5e20' : LOCK_PALETTE.mutedText
+           } />
+         ) : (
+           <Text style={[styles.cellText, textStyle]}>?</Text>
+@@ -287,42 +253,48 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+       testID={`lock-arrow-${arrow}`}
+       accessibilityRole="button"
+       accessibilityLabel={tLootTrade(ARROW_KEY[arrow])}
+-      style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}
++      style={[
++        modalStyles.btn,
++        modalStyles.saveBtn,
++        styles.arrowButton,
++        !canPress && styles.arrowButtonDisabled,
++      ]}
+       disabled={!canPress}
+       onPress={() => void doAction('press', arrow)}
+     >
+-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color="#c8efb8" />
++      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
+     </TouchableOpacity>
+   );
+ 
++  const hasBoard = Boolean(game && rows.length > 0);
++
+   return (
+     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
+-      <View style={terminalHackingStyles.backdrop}>
+-        <View style={terminalHackingStyles.window}>
+-          <View style={terminalHackingStyles.header}>
+-            <View style={terminalHackingStyles.heading}>
+-              <MaterialCommunityIcons name="lock" size={22} color="#93d17a" />
+-              <Text numberOfLines={1} style={terminalHackingStyles.title}>
+-                {lock?.name || terminalState?.config?.name || tLootTrade('lock.title')}
+-              </Text>
+-            </View>
++      <View style={modalStyles.overlay}>
++        <View style={modalStyles.card}>
++          <View style={styles.headerRow}>
++            <MaterialCommunityIcons name="lock" size={22} color={LOCK_PALETTE.text} />
++            <Text numberOfLines={1} style={[modalStyles.title, styles.headerTitle]}>
++              {lock?.name || terminalState?.config?.name || tLootTrade('lock.title')}
++            </Text>
+             <TouchableOpacity
+               accessibilityRole="button"
+               accessibilityLabel={tLootTrade('lock.close')}
+-              style={terminalHackingStyles.closeButton}
++              testID="lock-close-button"
++              style={styles.closeButton}
+               onPress={onClose}
+             >
+-              <MaterialCommunityIcons name="close" size={20} color="#bdc8b7" />
++              <MaterialCommunityIcons name="close" size={20} color={LOCK_PALETTE.mutedText} />
+             </TouchableOpacity>
+           </View>
+ 
+           {(lock?.description || terminalState?.config?.description) ? (
+-            <Text style={terminalHackingStyles.description}>
++            <Text style={modalStyles.hintText}>
+               {lock?.description || terminalState?.config?.description}
+             </Text>
+           ) : null}
+ 
+-          <View style={terminalHackingStyles.statusRow}>
++          <View style={styles.statusRow}>
+             <View>
+               <Text testID="lock-pins-count" style={styles.pinCount}>
+                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+@@ -336,8 +308,8 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+                   : tLootTrade('lock.ready')}
+               </Text>
+             </View>
+-            <View style={terminalHackingStyles.operatorBox}>
+-              <Text style={terminalHackingStyles.statusLabel}>LOCKPICK</Text>
++            <View style={{ alignItems: 'flex-end', maxWidth: '48%' }}>
++              <Text style={styles.statusLabel}>LOCKPICK</Text>
+               {game ? (
+                 <Text style={styles.statText}>
+                   {formatLootTrade(tLootTrade('lock.skill'), {
+@@ -349,21 +321,21 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+           </View>
+ 
+           {won ? (
+-            <View style={terminalHackingStyles.successPanel}>
+-              <Text accessibilityRole="alert" style={terminalHackingStyles.accessGranted}>
++            <View style={styles.accessPanel}>
++              <Text accessibilityRole="alert" style={styles.wonText}>
+                 {tLootTrade('lock.won')}
+               </Text>
+-              <Text style={terminalHackingStyles.statusHint}>{tLootTrade('terminal.stateWon')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.stateWon')}</Text>
+             </View>
+           ) : isClosed ? (
+-            <View style={terminalHackingStyles.accessPanel}>
+-              <Text style={terminalHackingStyles.closedBadge}>{tLootTrade('lock.closed')}</Text>
+-              <Text style={terminalHackingStyles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
++            <View style={styles.accessPanel}>
++              <Text style={styles.closedText}>{tLootTrade('lock.closed')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
+             </View>
+           ) : awaitingGm ? (
+-            <View style={terminalHackingStyles.accessPanel}>
+-              <Text style={terminalHackingStyles.retryWaiting}>{tLootTrade('lock.awaiting')}</Text>
+-              <Text style={terminalHackingStyles.statusHint} testID="lock-retry-prompt">
++            <View style={styles.accessPanel}>
++              <Text style={styles.awaitingText}>{tLootTrade('lock.awaiting')}</Text>
++              <Text style={styles.statusHint} testID="lock-retry-prompt">
+                 {tLootTrade('lock.retryPrompt')}
+               </Text>
+               {game?.result === 'OUT OF PINS' ? (
+@@ -374,32 +346,35 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+               <View style={styles.retryActions}>
+                 <TouchableOpacity
+                   testID="lock-retry-yes"
+-                  style={[terminalHackingStyles.primaryButton, { marginTop: 4 }]}
++                  style={[modalStyles.btn, modalStyles.saveBtn]}
+                   onPress={() => void doAction('retry', 'yes')}
+                 >
+-                  <Text style={terminalHackingStyles.primaryButtonText}>{tLootTrade('lock.retryYes')}</Text>
++                  <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.retryYes')}</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity
+                   testID="lock-retry-no"
+-                  style={styles.ghostButton}
++                  style={[modalStyles.btn, modalStyles.cancelBtn]}
+                   onPress={() => void doAction('retry', 'no')}
+                 >
+-                  <Text style={styles.ghostButtonText}>{tLootTrade('lock.retryNo')}</Text>
++                  <Text style={modalStyles.cancelBtnText}>{tLootTrade('lock.retryNo')}</Text>
+                 </TouchableOpacity>
+               </View>
+             </View>
++          ) : !hasBoard ? (
++            // Патч 525: окно мини-игры больше не притворяется запущенной игрой.
++            // Доска появляется только после «Взломать» во входной модалке точки.
++            <View style={styles.idlePanel} testID="lock-waiting-board">
++              <Text style={styles.idleText}>{tLootTrade('player.checkWaitingBoard')}</Text>
++              <Text style={styles.hintText}>{tLootTrade('player.checkEntryHint')}</Text>
++            </View>
+           ) : (
+             <>
+               <View style={styles.board} testID="lock-cells-board">
+-                {rows.length > 0 ? rows.map((row, rowIdx) => (
++                {rows.map((row, rowIdx) => (
+                   <View key={`row-${rowIdx}`} style={styles.cellRow}>
+                     {row.map(renderCell)}
+                   </View>
+-                )) : (
+-                  <View style={terminalHackingStyles.idlePanel}>
+-                    <Text style={terminalHackingStyles.idleText}>{tLootTrade('lock.ready')}</Text>
+-                  </View>
+-                )}
++                ))}
+               </View>
+ 
+               <View style={styles.crossArea}>
+@@ -419,30 +394,17 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+                 <Text testID="lock-result" style={styles.resultText}>{tLootTrade(resultLabel)}</Text>
+               ) : null}
+               {viewOnly ? (
+-                <Text style={terminalHackingStyles.spectatorNotice}>{tLootTrade('lock.viewOnly')}</Text>
++                <Text style={styles.spectatorNotice}>{tLootTrade('lock.viewOnly')}</Text>
+               ) : null}
+-              {game && game.cells?.some((c) => c.state === CELL_STATE.GREY) ? (
+-                <Text style={terminalHackingStyles.statusHint}>{tLootTrade('lock.greyHint')}</Text>
++              {game.cells?.some((c) => c.state === CELL_STATE.GREY) ? (
++                <Text style={styles.statusHint}>{tLootTrade('lock.greyHint')}</Text>
+               ) : null}
+-              {game && game.cellCount ? (
+-                <Text style={terminalHackingStyles.statusHint}>
+-                  {formatLootTrade(tLootTrade('lock.progress'), {
+-                    done: game.cells.filter((c) => c.state === CELL_STATE.GREEN).length,
+-                    total: game.cellCount,
+-                  })}
+-                </Text>
+-              ) : null}
+-
+-              <View style={styles.footerRow}>
+-                <TouchableOpacity
+-                  testID="lock-hack-button"
+-                  style={[terminalHackingStyles.primaryButton, !characterId && terminalHackingStyles.disabledButton]}
+-                  disabled={!characterId || Boolean(game?.status === 'playing')}
+-                  onPress={() => void doAction('start')}
+-                >
+-                  <Text style={terminalHackingStyles.primaryButtonText}>{tLootTrade('lock.hack')}</Text>
+-                </TouchableOpacity>
+-              </View>
++              <Text style={styles.statusHint}>
++                {formatLootTrade(tLootTrade('lock.progress'), {
++                  done: game.cells.filter((c) => c.state === CELL_STATE.GREEN).length,
++                  total: game.cellCount,
++                })}
++              </Text>
+             </>
+           )}
+         </View>
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 900c08e..1d0f963 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -43,6 +43,7 @@ import {
+ import { showRawAlert } from '../alerts/alertService';
+ import TerminalHackingModal from './TerminalHackingModal';
+ import LockPickingModal from './LockPickingModal';
++import StandaloneCheckModal from './StandaloneCheckModal';
+ import {
+   terminalAccessKey,
+   canHackTerminal,
+@@ -370,7 +371,11 @@ export default function PlayerLootTradeOverlay() {
+       accessId: directTerminalContext.terminalState?.accessId,
+     });
+     const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
+-    if (dismissedTerminalId === config.containerId || directUsed) {
++    const directSelection = terminalSelection?.node?.containerId === config.containerId
++      && terminalSelection?.accessKey === directAccessKey
++      ? terminalSelection
++      : null;
++    if ((dismissedTerminalId === config.containerId || directUsed) && !directSelection) {
+       return (
+         <View style={styles.floatingBar} pointerEvents="box-none">
+           <TouchableOpacity
+@@ -386,29 +391,50 @@ export default function PlayerLootTradeOverlay() {
+         </View>
+       );
+     }
+-    if (config.kind === CONTAINER_KIND.LOCK) {
+-      return (
+-        <LockPickingModal
+-          visible
+-          lock={config}
+-          roomCode={directTerminalContext.roomCode}
++    // Патч 525: сначала входная модалка точки (как окно локации, но без
++    // «Покинуть локацию»), и только по «Взломать» монтируется мини-игра с
++    // уже собранной доской. Пустой «как бы запущенной» игры больше нет.
++    const directKind = config.kind === CONTAINER_KIND.LOCK
++      ? CONTAINER_KIND.LOCK
++      : CONTAINER_KIND.TERMINAL;
++    const openDirect = (autoStart) => {
++      if (autoStart) markTerminalAccess(directAccessKey);
++      setTerminalSelection({ node: config, kind: directKind, autoStart, accessKey: directAccessKey });
++    };
++    return (
++      <>
++        <StandaloneCheckModal
++          visible={!directSelection}
++          check={config}
++          isLock={directKind === CONTAINER_KIND.LOCK}
++          blocked={directUsed}
++          badge={directUsed ? tLootTrade('terminal.accessUsed') : null}
++          onView={() => openDirect(false)}
++          onHack={() => openDirect(true)}
+           onClose={() => {
+             markTerminalAccess(directAccessKey);
+             setDismissedTerminalId(config.containerId);
++            setTerminalSelection(null);
+           }}
+         />
+-      );
+-    }
+-    return (
+-      <TerminalHackingModal
+-        visible
+-        terminal={config}
+-        roomCode={directTerminalContext.roomCode}
+-        onClose={() => {
+-          markTerminalAccess(directAccessKey);
+-          setDismissedTerminalId(config.containerId);
+-        }}
+-      />
++        {directSelection ? (directSelection.kind === CONTAINER_KIND.LOCK ? (
++          <LockPickingModal
++            visible
++            lock={config}
++            roomCode={directTerminalContext.roomCode}
++            autoStart={Boolean(directSelection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        ) : (
++          <TerminalHackingModal
++            visible
++            terminal={config}
++            roomCode={directTerminalContext.roomCode}
++            autoStart={Boolean(directSelection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        )) : null}
++      </>
+     );
+   }
+   if (!matchedContext || !activeSession) return null;
+@@ -460,41 +486,83 @@ export default function PlayerLootTradeOverlay() {
+     );
+   }
+ 
+-  // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
+-  if (isHubSession && !viewTarget) {
+-    // Патч 524: одиночная проверка, выданная как локация, сразу открывает
+-    // мини-игру. Ни списка точек, ни «Покинуть локацию» игрок не видит.
+-    // Мини-игра остаётся СОСЕДОМ окна локации (правило пача 493), а само
+-    // окно в этом случае не рендерится.
+-    const standaloneCheck = (() => {
+-      if (!standaloneCheckSession) return null;
+-      const roomCode = matchedContext.roomCode;
+-      const state = rooms?.[roomCode]?.terminalStates?.[standaloneCheckSession.node.containerId];
+-      const config = {
+-        ...standaloneCheckSession.node,
+-        ...(state?.config || {}),
+-        containerId: standaloneCheckSession.node.containerId,
++  // ── Патч 525: отдельно выданная проверка (замок / терминал) ───────────────
++  // Это НЕ локация: сначала входная модалка точки с «Взломать»/«Смотреть»
++  // и без «Покинуть локацию», и только по «Взломать» монтируется мини-игра
++  // с уже собранной доской. Пустая «как бы запущенная» игра убрана.
++  if (standaloneCheckSession && matchedContext) {
++    const roomCode = matchedContext.roomCode;
++    const node = standaloneCheckSession.node;
++    const state = rooms?.[roomCode]?.terminalStates?.[node.containerId];
++    const config = {
++      ...node,
++      ...(state?.config || {}),
++      containerId: node.containerId,
++      kind: standaloneCheckSession.kind,
++    };
++    const accessKey = terminalAccessKey({
++      roomCode,
++      containerId: config.containerId,
++      accessId: state?.accessId || activeSession.sessionId,
++    });
++    const closed = Boolean(state?.closed || state?.locked || state?.game?.status === 'closed');
++    const used = Boolean(usedTerminalAccess[accessKey]);
++    const isLock = standaloneCheckSession.kind === CONTAINER_KIND.LOCK;
++    const selection = terminalSelection?.node?.containerId === config.containerId
++      && terminalSelection?.accessKey === accessKey
++      ? terminalSelection
++      : null;
++    const badge = closed
++      ? tLootTrade('terminal.closedBadge')
++      : (used ? tLootTrade('terminal.accessUsed') : null);
++    const openStandalone = (autoStart) => {
++      if (autoStart) markTerminalAccess(accessKey);
++      setTerminalSelection({
++        node: config,
+         kind: standaloneCheckSession.kind,
+-      };
+-      const accessKey = terminalAccessKey({
+-        roomCode,
+-        containerId: config.containerId,
+-        accessId: state?.accessId || activeSession.sessionId,
+-      });
+-      return {
+-        roomCode,
+-        config,
++        autoStart,
+         accessKey,
+-        closed: Boolean(state?.closed || state?.locked || state?.game?.status === 'closed'),
+-        used: Boolean(usedTerminalAccess[accessKey]),
+-      };
+-    })();
+-    const closeStandalone = () => {
+-      if (!standaloneCheck) return;
+-      markTerminalAccess(standaloneCheck.accessKey);
+-      markSessionClosedLocally(activeSession.sessionId);
++      });
+     };
++    return (
++      <>
++        <StandaloneCheckModal
++          visible={!selection}
++          check={config}
++          isLock={isLock}
++          blocked={closed || used}
++          badge={badge}
++          onView={() => openStandalone(false)}
++          onHack={() => openStandalone(true)}
++          onClose={() => {
++            markTerminalAccess(accessKey);
++            markSessionClosedLocally(activeSession.sessionId);
++            setTerminalSelection(null);
++          }}
++        />
++        {selection ? (selection.kind === CONTAINER_KIND.LOCK ? (
++          <LockPickingModal
++            visible
++            lock={config}
++            roomCode={roomCode}
++            autoStart={Boolean(selection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        ) : (
++          <TerminalHackingModal
++            visible
++            terminal={config}
++            roomCode={roomCode}
++            autoStart={Boolean(selection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        )) : null}
++      </>
++    );
++  }
+ 
++  // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
++  if (isHubSession && !viewTarget) {
+     const rootId = activeSession.containerId || '';
+     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
+     // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
+@@ -508,7 +576,7 @@ export default function PlayerLootTradeOverlay() {
+     return (
+       <>
+         <Modal
+-          visible={!terminalSelection && !standaloneCheck}
++          visible={!terminalSelection}
+           transparent
+           animationType="slide"
+           onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+@@ -877,34 +945,6 @@ export default function PlayerLootTradeOverlay() {
+             </View>
+           </View>
+         </Modal>
+-        {standaloneCheck ? (
+-          standaloneCheck.closed || standaloneCheck.used ? (
+-            <View style={styles.floatingBar} pointerEvents="box-none">
+-              <View style={styles.floatingPill}>
+-                <Text style={styles.floatingPillTitle}>
+-                  {standaloneCheck.config.name || tLootTrade('lock.title')}
+-                </Text>
+-                <Text style={styles.floatingClosedLabel}>
+-                  {tLootTrade(standaloneCheck.closed ? 'terminal.closedBadge' : 'terminal.accessUsed')}
+-                </Text>
+-              </View>
+-            </View>
+-          ) : (standaloneCheck.config.kind === CONTAINER_KIND.LOCK ? (
+-            <LockPickingModal
+-              visible
+-              lock={standaloneCheck.config}
+-              roomCode={standaloneCheck.roomCode}
+-              onClose={closeStandalone}
+-            />
+-          ) : (
+-            <TerminalHackingModal
+-              visible
+-              terminal={standaloneCheck.config}
+-              roomCode={standaloneCheck.roomCode}
+-              onClose={closeStandalone}
+-            />
+-          ))
+-        ) : null}
+         {terminalSelection ? (
+           terminalSelection.kind === CONTAINER_KIND.LOCK ? (
+             <LockPickingModal
+diff --git a/components/lootTrade/StandaloneCheckModal.js b/components/lootTrade/StandaloneCheckModal.js
+new file mode 100644
+index 0000000..97445d1
+--- /dev/null
++++ b/components/lootTrade/StandaloneCheckModal.js
+@@ -0,0 +1,120 @@
++import React from 'react';
++import {
++  Modal,
++  Text,
++  TouchableOpacity,
++  View,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { useLocale } from '../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
++import { modalStyles, lockLightStyles, LOCK_PALETTE } from './lockPickingStyles';
++
++/**
++ * Патч 525: входная модалка отдельно выданной точки проверки.
++ *
++ * По структуре это окно локации (карточка точки + кнопки «Смотреть» /
++ * «Взломать»), но без «Покинуть локацию» и без «Свернуть»: отдельный замок
++ * или терминал не является локацией. Мини-игра вообще не монтируется, пока
++ * игрок не нажмёт «Взломать» — поэтому пустая «как бы запущенная» доска
++ * больше не показывается.
++ *
++ * Гамма — светлая палитра модалок (`ADMIN_MODAL_PALETTE` через
++ * `lootTradeFormStyles`), а не зелёный терминал. Каркас окна, подписи и
++ * кнопки импортированы, своих базовых стилей нет (docs/ui-modals-rules.md).
++ */
++
++const styles = lockLightStyles;
++
++const StandaloneCheckModal = ({
++  visible,
++  check,
++  isLock = true,
++  blocked = false,
++  badge = null,
++  onView,
++  onHack,
++  onClose,
++}) => {
++  useLocale();
++  const title = check?.name || tLootTrade(isLock ? 'lock.title' : 'terminal.title');
++  const icon = isLock ? 'lock' : 'console';
++  const viewLabel = tLootTrade(isLock ? 'lock.view' : 'terminal.view');
++  const hackLabel = tLootTrade(isLock ? 'lock.hack' : 'terminal.hack');
++  const difficulty = Math.max(0, Math.floor(Number(check?.difficulty) || 0));
++
++  return (
++    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={modalStyles.overlay}>
++        <View style={modalStyles.card}>
++          <View style={styles.headerRow}>
++            <MaterialCommunityIcons name={icon} size={22} color={LOCK_PALETTE.text} />
++            <Text numberOfLines={1} style={[modalStyles.title, styles.headerTitle]}>
++              {title}
++            </Text>
++            <TouchableOpacity
++              testID="check-entry-close"
++              accessibilityRole="button"
++              accessibilityLabel={tLootTrade('lock.close')}
++              style={styles.closeButton}
++              onPress={onClose}
++            >
++              <MaterialCommunityIcons name="close" size={20} color={LOCK_PALETTE.mutedText} />
++            </TouchableOpacity>
++          </View>
++
++          {Boolean(check?.description) ? (
++            <Text style={modalStyles.hintText}>{check.description}</Text>
++          ) : null}
++
++          <View style={styles.pointCard} testID="check-entry-point">
++            <MaterialCommunityIcons name={icon} size={26} color={LOCK_PALETTE.text} />
++            <View style={styles.pointBody}>
++              <Text style={modalStyles.label}>{title}</Text>
++              <Text style={modalStyles.hintText}>
++                {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty })}
++              </Text>
++            </View>
++          </View>
++
++          {badge ? <Text style={styles.badgeText}>{badge}</Text> : null}
++
++          <View style={modalStyles.footer} testID="check-entry-actions">
++            <TouchableOpacity
++              testID="check-view-button"
++              accessibilityRole="button"
++              disabled={blocked}
++              style={[
++                modalStyles.btn,
++                modalStyles.cancelBtn,
++                blocked && styles.buttonDisabled,
++              ]}
++              onPress={onView}
++            >
++              <Text style={modalStyles.cancelBtnText}>{viewLabel}</Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              testID="check-hack-button"
++              accessibilityRole="button"
++              disabled={blocked}
++              style={[
++                modalStyles.btn,
++                modalStyles.saveBtn,
++                blocked && styles.buttonDisabled,
++              ]}
++              onPress={onHack}
++            >
++              <Text style={modalStyles.saveBtnText}>{hackLabel}</Text>
++            </TouchableOpacity>
++          </View>
++
++          <Text style={styles.hintText} testID="check-entry-hint">
++            {tLootTrade('player.checkEntryHint')}
++          </Text>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++export default StandaloneCheckModal;
+diff --git a/components/lootTrade/lockPickingStyles.js b/components/lootTrade/lockPickingStyles.js
+new file mode 100644
+index 0000000..64821fc
+--- /dev/null
++++ b/components/lootTrade/lockPickingStyles.js
+@@ -0,0 +1,127 @@
++import { StyleSheet } from 'react-native';
++import { ADMIN_MODAL_PALETTE } from '../admin/adminModalTheme';
++// Патч 525: светлый каркас берём у ближайшего образца — формы создания
++// карточки «Добыча / Торговля» (правило docs/ui-modals-rules.md). Базовые ключи
++// overlay/card/title/label/footer/btn/saveBtn/cancelBtn НЕ описываем заново:
++// они приходят из lootTradeFormStyles. Ниже только то, чего у формы нет —
++// ячейки, стрелки, строка статуса и карточка точки входа.
++import { lootTradeFormStyles } from '../screens/LootTradeScreen/modals/ContainerFormModal';
++
++export const modalStyles = lootTradeFormStyles;
++export const LOCK_PALETTE = ADMIN_MODAL_PALETTE;
++
++export const lockLightStyles = StyleSheet.create({
++  headerRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 9,
++    borderBottomWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    paddingBottom: 9,
++    marginBottom: 10,
++  },
++  headerTitle: {
++    flex: 1,
++    textAlign: 'left',
++    marginBottom: 0,
++  },
++  closeButton: { padding: 5 },
++
++  pointCard: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 12,
++    paddingVertical: 12,
++    paddingHorizontal: 12,
++    marginTop: 12,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  pointBody: { flex: 1 },
++  badgeText: {
++    color: ADMIN_MODAL_PALETTE.danger,
++    fontSize: 12,
++    fontWeight: '700',
++    textAlign: 'center',
++    marginTop: 10,
++  },
++  buttonDisabled: { opacity: 0.5 },
++
++  statusRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    gap: 10,
++    paddingVertical: 8,
++    borderBottomWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++  },
++  pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
++  statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
++  statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
++
++  board: {
++    marginTop: 12,
++    paddingVertical: 10,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  cellRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginVertical: 5 },
++  cell: {
++    width: 38,
++    height: 38,
++    borderWidth: 1.5,
++    borderRadius: 5,
++    alignItems: 'center',
++    justifyContent: 'center',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++  },
++  cellHidden: {},
++  cellGreen: { borderColor: '#2e7d32', backgroundColor: '#dff0d8' },
++  cellRed: { borderColor: ADMIN_MODAL_PALETTE.danger, backgroundColor: '#fdecea' },
++  cellGrey: { borderColor: '#888888', backgroundColor: '#e3e3e3' },
++  cellText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 20, fontWeight: '800' },
++  cellTextGreen: { color: '#1b5e20' },
++  cellTextRed: { color: ADMIN_MODAL_PALETTE.danger },
++  cellTextGrey: { color: ADMIN_MODAL_PALETTE.mutedText },
++
++  crossArea: { alignItems: 'center', marginTop: 14, marginBottom: 6 },
++  crossRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
++  arrowButton: { width: 52, height: 44, flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
++  arrowButtonDisabled: { opacity: 0.45 },
++  arrowSpacer: { width: 52, height: 44 },
++
++  resultText: {
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 12,
++    marginTop: 9,
++    textAlign: 'center',
++    fontWeight: '700',
++  },
++  hintText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, textAlign: 'center', marginTop: 8 },
++  statusHint: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, textAlign: 'center', marginTop: 8 },
++  spectatorNotice: {
++    color: ADMIN_MODAL_PALETTE.mutedText,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++    borderRadius: 5,
++    padding: 8,
++    marginTop: 8,
++    fontSize: 12,
++    textAlign: 'center',
++  },
++
++  accessPanel: { minHeight: 150, justifyContent: 'center', alignItems: 'center' },
++  wonText: { color: '#1b5e20', fontSize: 23, fontWeight: '800', textAlign: 'center', letterSpacing: 1 },
++  closedText: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 21, fontWeight: '800', textAlign: 'center' },
++  awaitingText: { color: '#8a6100', fontSize: 15, fontWeight: '800', textAlign: 'center' },
++  idlePanel: { paddingVertical: 26, alignItems: 'center' },
++  idleText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15, fontWeight: '700' },
++  retryActions: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 12 },
++});
++
++export default lockLightStyles;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5532fd3..19f9667 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,38 @@
+ # Changelog
+ ---
++## Two-step mini-game entry and the light lock window (patch 525)
++
++The owner: "The hacking mini-game should not appear right away. Right now the
++interface looks like the game has started, but then you have to press 'Hack'
++inside it before the game loads. Also the lockpicking palette should be light,
++not like the terminal... For the hack game, first show a modal like for a
++location, with 'Hack' buttons, just without the 'Leave location' button".
++
++- **A point window comes first.** A standalone lock or terminal no longer opens
++  the mini-game immediately. `StandaloneCheckModal` follows the location
++  window structure: a point card, difficulty, «View» and «Hack» buttons. The
++  «Leave location» and «Minimize» buttons are gone — a standalone point is not
++  a location.
++- **The board only after «Hack».** The press mounts the mini-game with
++  `autoStart`: the board, bobby pins and arrows arrive already built. There is
++  no second «Hack» button inside the board window and no empty "as if
++  running" layout; a clear hint is shown instead.
++- **One hack per broadcast kept.** «Hack» consumes the access immediately,
++  «View» does not; after the board is closed the entry window shows
++  «ACCESS USED». The Game Master's session stays active.
++- **Light palette.** `lockPickingStyles.js` reuses the `lootTradeFormStyles`
++  skeleton and `ADMIN_MODAL_PALETTE`: light card, dark text, light cells and
++  buttons. The green terminal look is gone for locks; `TerminalHackingModal`
++  keeps its own palette.
++- **No duplicated skeleton.** Base keys (`overlay`, `card`, `title`, `label`,
++  `footer`, `btn`, `saveBtn`, `cancelBtn`) are not redefined — the rule in
++  `docs/ui-modals-rules.md`; the new module holds only cells, arrows, the
++  status row and the point card.
++
++Patch 520 rules (PER, bobby pins, cells, the GM's Yes/No), the 522/523 laws
++and the 524 fixes (one `start`, pin detection, legacy-server fallback, working
++«Leave location» in a real location) are preserved.
++
+ ## Lockpicking and the location window: fixes (patch 524)
+ 
+ The owner reported: "pressed Hack — immediately 'Action failed', no bobby
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7c7f82f..f58e562 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,38 @@
+ # История изменений
+ 
+ ---
++## Двухшаговый вход в мини-игру и светлый замок (патч 525)
++
++Владелец: «Мини-игра на взлом не должна сразу показываться. А то сейчас
++интерфейс как-бы игры запустился, а потом надо в нём нажать "взломать" и уже
++загружается игра. Плюс гамму интерфейса взлома замка надо изменить на светлую,
++не под терминал... Для взлома игры пусть сначала будет модалка, как для локации
++и кнопками "взломать", только без "покинуть локацию" кнопки».
++
++- **Сначала окно точки.** Отдельно выданный замок или терминал больше не
++  открывает мини-игру сразу. `StandaloneCheckModal` повторяет структуру окна
++  локации: карточка точки, сложность, кнопки «Смотреть» и «Взломать». Кнопки
++  «Покинуть локацию» и «Свернуть» убраны — отдельная точка не локация.
++- **Доска — только по «Взломать».** Нажатие монтирует мини-игру с
++  `autoStart`: доска, отмычки и стрелки приходят уже собранными. Внутри окна
++  доски больше нет второй кнопки «Взломать» и пустой «как бы запущенной»
++  раскладки; до нажатия показывается понятная подсказка.
++- **Один взлом на трансляцию сохранён.** «Взломать» отмечает доступ сразу,
++  «Смотреть» не расходует его; после закрытия доски входное окно показывает
++  «ДОСТУП ИСПОЛЬЗОВАН». Сессия Мастера не гаснет.
++- **Светлая гамма.** `lockPickingStyles.js` берёт каркас
++  `lootTradeFormStyles` и палитру `ADMIN_MODAL_PALETTE`: светлая карточка,
++  тёмный текст, светлые ячейки и кнопки. Зелёный «терминал» у замка больше не
++  используется, `TerminalHackingModal` остался при своей гамме.
++- **Без дублей каркаса.** Базовые ключи (`overlay`, `card`, `title`, `label`,
++  `footer`, `btn`, `saveBtn`, `cancelBtn`) не описываются заново — правило
++  `docs/ui-modals-rules.md`; в новом модуле только ячейки, стрелки, строка
++  статуса и карточка точки.
++
++Правила 520 (PER, отмычки, ячейки, «Да/Нет» Мастера), законы 522/523 и
++исправления 524 (один `start`, поиск отмычек, локальный резерв старого
++сервера, работающий «Покинуть локацию» в настоящей локации) сохранены.
++
+ ## Взлом замка и окно локации: исправление (патч 524)
+ 
+ Владелец сообщил: «нажал взлом — сходу надпись "действие не выполнено",
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 44a1505..2d0c2a7 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -229,3 +229,19 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+   сервер комнаты не знает `terminal.action`, — как у терминала с пача 498.
+   Видимого переключателя «локальный режим» нет. На обновлённом сервере
+   источник истины по-прежнему `terminalStates` комнаты.
++
++## 11. Уточнение 525: вход в игру и светлая гамма
++
++- **Сначала модалка точки.** Отдельно выданный замок (и терминал) открывает
++  `StandaloneCheckModal`: карточка точки, сложность, «Смотреть» и «Взломать»,
++  без «Покинуть локацию». Мини-игра не монтируется до нажатия.
++- **Доска сразу готова.** «Взломать» передаёт `autoStart`; ячейки, отмычки и
++  стрелки приходят собранными. Внутри окна доски нет второй кнопки «Взломать» и нет
++  пустой «как бы запущенной» раскладки — до партии показывается подсказка
++  `player.checkWaitingBoard`.
++- **Светлая палитра.** Общий модуль `lockPickingStyles.js` переиспользует
++  `lootTradeFormStyles` и `ADMIN_MODAL_PALETTE`: светлая карточка, тёмный
++  текст, светлые ячейки/стрелки. Терминал не перекрашивался.
++- **Регрессии.** PER/отмычки/«Да-Нет» из 520, один `start`, поиск отмычек и
++  локальный резерв из 524, а также одноразовый доступ на трансляцию — без
++  изменений.
+diff --git a/docs/patch-525-install.md b/docs/patch-525-install.md
+new file mode 100644
+index 0000000..9c39e8a
+--- /dev/null
++++ b/docs/patch-525-install.md
+@@ -0,0 +1,82 @@
++# Установка патча 525: входная модалка точки и светлый замок
++
++Патч подготовлен от состояния **версии 524** (коммит `91d0000`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–525
++цепочкой. Файл установки: `patchs/525-lock-entry-light.patch`.
++
++> Владелец: «Мини-игра на взлом не должна сразу показываться. А то сейчас
++> интерфейс как-бы игры запустился, а потом надо в нём нажать "взломать" и
++> уже загружается игра. Плюс гамму интерфейса взлома замка надо изменить на
++> светлую, не под терминал. Можно за основу взять гамму модалок. Для взлома
++> игры пусть сначала будет модалка, как для локации и кнопками "взломать",
++> только без "покинуть локацию" кнопки».
++
++## Что изменено
++
++### 1. Сначала — окно точки, потом доска
++
++`components/lootTrade/StandaloneCheckModal.js` (новый файл): по структуре
++повторяет окно локации — карточка точки со сложностью, кнопки «Смотреть» и
++«Взломать» в футере. Кнопок «Покинуть локацию» и «Свернуть» нет: отдельно
++выданная точка проверки не является локацией.
++
++`PlayerLootTradeOverlay.js`:
++
++- для отдельно выданной проверки через `terminal.issue` (`directTerminalContext`)
++  и для резервной выдачи как одиночной сессии-локации (`standaloneCheckSession`)
++  мини-игра больше не монтируется сразу;
++- «Взломать» ставит `terminalSelection` с `autoStart: true` — окно доски
++  появляется уже с собранными ячейками, отмычками и стрелками;
++- «Смотреть» открывает доску без автозапуска (наблюдение за чужой партией);
++- «Взломать» сразу отмечает одноразовый доступ на трансляцию (патч 506),
++  «Смотреть» его не расходует; после закрытия доски входная модалка показывает
++  «ДОСТУП ИСПОЛЬЗОВАН». Сессия Мастера остаётся активной.
++- Выбор точки привязан к `accessKey`: новая выдача Мастера с новым `accessId`
++  снова начинается с входной модалки, а не с «залипшей» старой доски.
++
++`LockPickingModal.js`: убрана внутренняя кнопка «Взломать» и пустая
++«как бы запущенная» раскладка. Пока доски нет, окно показывает подсказку
++`player.checkWaitingBoard` / `player.checkEntryHint`, а не пустые ячейки и
++неактивные стрелки.
++
++### 2. Светлая гамма
++
++`components/lootTrade/lockPickingStyles.js` (новый файл) — общий каркас для
++входной модалки и окна доски. Импортирует `lootTradeFormStyles` из
++`ContainerFormModal.js` и `ADMIN_MODAL_PALETTE` из `adminModalTheme.js`
++(правило `docs/ui-modals-rules.md`): базовые `overlay/card/title/label/footer/
++btn/saveBtn/cancelBtn` не дублируются, в новом модуле только ячейки, стрелки,
++строка статуса и карточка точки. Цвета светлые (`#f4f4f4`, `#ffffff`, тёмный
++текст), состояния ячеек — светло-зелёный / светло-красный / серый.
++
++`terminalHackingStyles.js` и `TerminalHackingModal.js` не тронуты: зелёная
++гамма осталась у терминала.
++
++### 3. Что сохранено
++
++- Мини-игра 520: `N = 12 − PER + 2·D`, отмычки, позиционные ячейки, четыре
++  стрелки, спас-бросок Удачи, «Да/Нет» Мастера, один взлом на `accessId`.
++- Исправления 524: один `start` на открытие, поиск отмычек во всех формах
++  инвентаря, автоматический локальный резерв для старого сервера, адресные
++  отказы вместо «Действие не выполнено», скрытое окно локации под мини-игрой.
++- «Покинуть локацию» в **настоящей** локации на месте, закрывает окно с
++  первого нажатия и не гасит сессию Мастера.
++- Законы 522 (единый предмет, без игровых лимитов) и 523 (граф, граница
++  видимости, адресный взлом, общие ресурсы) не изменились; защита сервера,
++  проверки ролей и валидация сообщений не ослаблены.
++- Парные RU/EN строки: добавлены `player.checkEntryHint` и
++  `player.checkWaitingBoard`.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор).
++- `git apply --check patchs/525-lock-entry-light.patch` от дерева 524.
++- `./apply-patch.sh 525` от версии 524 и полная цепочка 493–525 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Рендер-тесты: входная модалка без «Покинуть локацию», доска не монтируется
++  до «Взломать», по `autoStart` сразу есть ячейки и активные стрелки, внутри
++  окна доски нет второй кнопки «Взломать».
++- Живой сервер комнат: `/version.json` = 525/4/95+95 и WS-проба взлома.
++- После установки на боевой площадке перезапустить процесс сервера комнат,
++  чтобы подхватить обновлённую статику и файлы `server/`.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 3f23e3a..2bb6149 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **524**.
++Дата ревизии: 2026-11-04. Текущая версия: **525**.
+ 
+ ## Тезисы
+ 
+@@ -25,13 +25,17 @@
+ | 11 | **Мини-игра взлома замков:** пятая карточка, отдельно / в локации / как преграда, отмычки и ячейки по PER, терминал **ИЛИ** замок в требованиях, нейтральное событие `hacked` | ✅ сделано | **520** |
+ | 12 | Мелочи склада и единый предмет: без игровых лимитов веса/количества, один закон стаканья для инвентаря/склада/торговцев, поля не обрезаются, цена и вес считаются с модов; поведение при удалении записи-шаблона и тихое срабатывание ключа | ✅ сделано | **521–522** |
+ | 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | 🔧 в работе | **523–…** |
+-| 14 | Исправление взлома замка: одна доска на нажатие, отмычки из любого инвентаря, локальный резерв старого сервера, понятные отказы; окно локации не перекрывает мини-игру, «Покинуть локацию» работает сразу, отдельный замок без лишней кнопки выхода | ✅ сделано | **524** |
++| 14 | Исправление взлома замка: одна доска на нажатие, отмычки из любого инвентаря, локальный резерв старого сервера, понятные отказы; окно локации не перекрывает мини-игру, «Покинуть локацию» работает сразу | ✅ сделано | **524** |
++| 15 | Двухшаговый вход в мини-игру: сначала модалка точки по образцу локации с «Взломать»/«Смотреть» и без «Покинуть локацию», доска монтируется уже готовой; светлая гамма взлома замка из палитры модалок | ✅ сделано | **525** |
+ 
+-## Осталось после патча 524
++## Осталось после патча 525
+ 
+-Патч 524 закрыл сбой мини-игры замка и окна локации, не меняя порядок
+-тринадцатого тезиса: граф, граница видимости, адресный взлом, общие ресурсы
+-и одна сессия из 523 остаются регрессионными инвариантами.
++Патчи 524 и 525 закрыли сбой мини-игры замка, окна локации и входа в игру,
++не меняя порядок тринадцатого тезиса: граф, граница видимости, адресный
++взлом, общие ресурсы и одна сессия из 523 остаются регрессионными
++инвариантами. «Покинуть локацию» по-прежнему есть в настоящей локации и
++работает с первого нажатия; в отдельно выданной точке её нет по слову
++владельца.
+ 
+ 1. **Иерархия пространств и доступ** (в работе, первый шаг сделан в 523) —
+    все уточнения владельца одним этапом: граф локаций с циклами и несколькими
+@@ -136,6 +140,7 @@
+ - `docs/lockpicking-mini-game-design.md` — спецификация мини-игры взлома замков (к пачу 520).
+ - `docs/patch-522-install.md` — установка обновления 522 и его проверки.
+ - `docs/patch-524-install.md` — установка исправления 524 и его проверки.
++- `docs/patch-525-install.md` — установка обновления 525 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/docs/ui-modals-rules.md b/docs/ui-modals-rules.md
+index e47feed..b0b39c7 100644
+--- a/docs/ui-modals-rules.md
++++ b/docs/ui-modals-rules.md
+@@ -85,3 +85,15 @@
+ Патч 512 заменил всё это импортом `lootTradeFormStyles` и общими стилями
+ меню карточки; правило зафиксировано здесь, в `docs/agents/README.md`,
+ `docs/architecture/engine-charter.md` и `replit.md`.
++
++## Уточнение 525: светлая гамма мини-игры замка
++
++Владелец отделил внешний вид окна взлома замка от терминала: «гамму
++интерфейса взлома замка надо изменить на светлую, не под терминал. Можно за
++основу взять гамму модалок». `LockPickingModal.js` и новая входная модалка
++`StandaloneCheckModal.js` берут `lootTradeFormStyles` и `ADMIN_MODAL_PALETTE`
++через общий модуль `components/lootTrade/lockPickingStyles.js`; свои
++`StyleSheet.create` с базовыми ключами у них отсутствуют. Зелёная
++`terminalHackingStyles` остаётся только у терминала. Входная модалка по
++структуре повторяет окно локации (карточка точки + «Смотреть»/«Взломать»), но
++не содержит «Покинуть локацию»: отдельная точка проверки не является локацией.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index b320012..024ce8a 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -280,7 +280,9 @@
+     "gateOr": "or",
+     "gateTerminalLabel": "Terminal lvl {difficulty}",
+     "gateLockLabel": "Lock lvl {difficulty}",
+-    "backToParent": "← Back"
++    "backToParent": "← Back",
++    "checkEntryHint": "Press «Hack» to start a round; «View» shows one already in progress.",
++    "checkWaitingBoard": "The board appears after pressing «Hack»"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 5fd262a..3579721 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -280,7 +280,9 @@
+     "gateOr": "или",
+     "gateTerminalLabel": "Терминал ур. {difficulty}",
+     "gateLockLabel": "Замок ур. {difficulty}",
+-    "backToParent": "← Назад"
++    "backToParent": "← Назад",
++    "checkEntryHint": "Нажмите «Взломать», чтобы начать партию; «Смотреть» показывает уже идущую.",
++    "checkWaitingBoard": "Доска появится после нажатия «Взломать»"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 698943a..0f89a1f 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "524"
++  "baseline": "525"
+ }
+diff --git a/public/version.json b/public/version.json
+index bd0d60d..e3a120a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "524",
++  "version": "525",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
++      "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
+       "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
+       "Окно локации больше не выглядывает из-под мини-игры: «Покинуть локацию» работает с первого нажатия, а отдельно выданный замок открывается сразу своей мини-игрой без лишней кнопки выхода.",
+       "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
+@@ -98,6 +100,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
++      "The lockpicking window now uses the light modal palette: light cells and arrows instead of the green terminal look.",
+       "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",
+       "The location window no longer shows through the mini-game: «Leave location» works on the first tap, and a standalone lock opens straight into its mini-game with no stray exit button.",
+       "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",

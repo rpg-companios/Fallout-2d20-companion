@@ -45,6 +45,7 @@ import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
+import itemStacking from '../../../domain/itemStacking.js';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
@@ -291,40 +292,9 @@ const InventoryScreen = () => {
     return 'misc';
   };
   const isWeaponItem = (item) => getItemType(item) === 'weapon';
-  const getModsSignature = (item) => {
-    const applied = item?.appliedMods || {};
-    const modIds = Object.values(applied).filter(Boolean).sort();
-    return modIds.length ? modIds.join('|') : 'none';
-  };
-  const getStackKey = (item) => {
-    // Ядерный Блок: блоки с разным зарядом лежат отдельными стопками (§2 плана).
-    // Ветка ПЕРВАЯ: блок — разновидность ammo, но его подпись строится по зарядам.
-    if (isFusionCoreItem(item)) return fusionCoreStackKey(item.charges);
-    if (item?.itemType === 'powerArmor') {
-      // Каталожный id у стор-предмета живёт в weaponId, у свежего из каталога — в id.
-      const catalogId = item.weaponId || item.id;
-      if (isPowerArmorFrame(item)) {
-        // Пакет: подпись считает домен по составу установленных частей и заряду блока.
-        return powerArmorFrameStackKey({ ...item, id: catalogId });
-      }
-      return powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent });
-    }
-    const itemType = getItemType(item);
-    if (itemType === 'weapon') {
-      // Середина ключа — СТОРОВЫЙ стек-ключ (id + прочие параметры + имя),
-      // чтобы точное совпадение в findUnequippedStoreItemByStackKey не путало
-      // бритву с ножом (у них одинаковый истинный id).
-      const storeKey = item?.stackKey || generateStackKey(
-        item?.weaponId || item?.id || getItemName(item),
-        item?.appliedMods,
-        item?.baseName,
-        item?.durabilityTracked ? item?.durability : undefined,
-        item?.uniqQualities,
-      );
-      return `weapon:${storeKey}:mods:${getModsSignature(item)}`;
-    }
-    return `${itemType}:${getItemCatalogId(item)}`;
-  };
+  // Патч 522: закон стака вынесен в domain/itemStacking.js — им же пользуются
+  // общее хранилище и торговцы. Локальный дубль удалён.
+  const getStackKey = itemStacking.itemStackKey;
   const createWeaponInstanceId = () => `weapon-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const createArmorInstanceId = () => `armor-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const getArmorInstanceKey = (item, slot, type) =>

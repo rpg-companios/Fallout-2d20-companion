@@ -1,0 +1,1580 @@
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index e3184b9..bc4827a 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -371,6 +371,8 @@ describe('520: пятая карточка и документы', () => {
+     expect(plan).toContain('520');
+     expect(plan).toContain('Осталось после патча');
+     expect(read('docs/lockpicking-mini-game-design.md')).toContain('ИЛИ');
+-    expect(json('public/version.json').version).toBe('520');
++    // Номер версии растёт дальше: исторический тест не стопорит цепочку.
++    const version = Number(json('public/version.json').version);
++    expect(version).toBeGreaterThanOrEqual(520);
+   });
+ });
+diff --git a/__tests__/room/storage-polish-521.test.js b/__tests__/room/storage-polish-521.test.js
+new file mode 100644
+index 0000000..4e7093a
+--- /dev/null
++++ b/__tests__/room/storage-polish-521.test.js
+@@ -0,0 +1,191 @@
++// Приёмочный тест 521: «мелочи склада» — лимиты, стаканье и два уже
++// решённых вопроса (удаление шаблона, тихое срабатывание ключа).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++import { ROOM_ERROR } from '../../src/room/roomProtocol.ts';
++import {
++  STORAGE_LIMITS,
++  storageStackKey,
++  applyStorageDeposits,
++} from '../../server/partyStorageRules.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const ITEM = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
++const OTHER = { id: 'w2', name: 'Дробовик', itemType: 'weapon', weight: 8, cost: 180 };
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол', ownerToken: 'token-1' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  return { registry, room };
++};
++
++const fill = (registry, room, count = STORAGE_LIMITS.MAX_ENTRIES) => {
++  const entries = Array.from({ length: count }, (_, index) => ({
++    entryId: `fill_${index}`,
++    item: { id: `fill_${index}`, name: `Предмет ${index}`, itemType: 'misc' },
++    name: `Предмет ${index}`,
++    itemType: 'misc',
++    quantity: 1,
++  }));
++  const restored = registry.restorePartyStorage({
++    code: room.code, clientId: 'gm-1', storage: { revision: 10, entries },
++  });
++  expect(restored.applied).toBe(true);
++  return entries;
++};
++
++describe('521: стаканье и лимиты «Общего хранилища»', () => {
++  it('ключ стаканья не зависит от служебных полей экземпляра и порядка полей', () => {
++    const a = { uniqueId: 'a', equipped: true, locked: false, quantity: 7, name: 'Пулемёт', id: 'w1' };
++    const b = { id: 'w1', name: 'Пулемёт', quantity: 1, uniqueId: 'b', stackKey: 'x' };
++    expect(storageStackKey(a)).toBe(storageStackKey(b));
++    expect(storageStackKey(a)).not.toBe(storageStackKey({ ...a, name: 'Дробовик' }));
++  });
++
++  it('чистый слой склеивает поступление с существующей строкой', () => {
++    const entries = [{
++      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon', quantity: 2,
++    }];
++    const applied = applyStorageDeposits({
++      entries,
++      deposits: [{ item: ITEM, quantity: 3, name: 'Пулемёт' }],
++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
++    });
++    expect(applied.error).toBeNull();
++    expect(applied.entries).toHaveLength(1);
++    expect(applied.entries[0].quantity).toBe(5);
++    expect(entries[0].quantity).toBe(2); // вход не мутируется
++  });
++
++  it('переполненный стек порождает новую строку, а не теряет предметы', () => {
++    const entries = [{
++      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon',
++      quantity: STORAGE_LIMITS.MAX_STACK_QUANTITY,
++    }];
++    const applied = applyStorageDeposits({
++      entries,
++      deposits: [{ item: ITEM, quantity: 2, name: 'Пулемёт' }],
++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
++    });
++    expect(applied.error).toBeNull();
++    expect(applied.entries).toHaveLength(2);
++    expect(applied.entries[1].quantity).toBe(2);
++  });
++
++  it('лимит строк возвращает ошибку и не меняет исходный массив', () => {
++    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES }, (_, i) => ({
++      entryId: `e${i}`, item: { id: `x${i}` }, name: `X${i}`, quantity: 1,
++    }));
++    const applied = applyStorageDeposits({
++      entries,
++      deposits: [{ item: { id: 'fresh' }, quantity: 1, name: 'Новый' }],
++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
++    });
++    expect(applied.error).toBe('STORAGE_FULL');
++    expect(applied.entries).toEqual(entries);
++    expect(applied.added).toHaveLength(0);
++  });
++
++  it('сервер: два одинаковых предмета — одна строка, разные — две', () => {
++    const { registry, room } = setup();
++    registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 2 });
++    const second = registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 3 });
++    expect(second.error).toBeUndefined();
++    expect(second.storage.entries).toHaveLength(1);
++    expect(second.storage.entries[0].quantity).toBe(5);
++
++    registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: OTHER, quantity: 1 });
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(2);
++  });
++
++  it('сервер: переполнение склада — понятный код ошибки, состояние не меняется', () => {
++    const { registry, room } = setup();
++    fill(registry, room);
++    const before = registry.getState(room.code).partyStorage;
++    const dep = registry.depositToPartyStorage({
++      code: room.code, clientId: 'p1', item: OTHER, quantity: 1,
++    });
++    expect(dep.error).toBe(ERROR_CODE.STORAGE_FULL);
++    expect(ROOM_ERROR.STORAGE_FULL).toBe(ERROR_CODE.STORAGE_FULL);
++    const after = registry.getState(room.code).partyStorage;
++    expect(after.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
++    expect(after.revision).toBe(before.revision);
++  });
++
++  it('атомарный перенос: списание освобождает место, без списания — отказ', () => {
++    const { registry, room } = setup();
++    const entries = fill(registry, room);
++    const rejected = registry.transferPartyStorage({
++      code: room.code, clientId: 'p1',
++      deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
++      withdrawals: [],
++    });
++    expect(rejected.error).toBe(ERROR_CODE.STORAGE_FULL);
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
++
++    const accepted = registry.transferPartyStorage({
++      code: room.code, clientId: 'p1',
++      deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
++      withdrawals: [{ entryId: entries[0].entryId, quantity: 1 }],
++    });
++    expect(accepted.error).toBeUndefined();
++    expect(accepted.storage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
++    expect(accepted.storage.entries.some((e) => e.name === 'Дробовик')).toBe(true);
++  });
++
++  it('ключевые записи не стакаются, не дублируются и занимают место', () => {
++    const { registry, room } = setup();
++    const first = registry.addKeyItemToStorage({
++      code: room.code, clientId: 'gm-1', keyItemId: 'k1', name: 'Ключ', description: '',
++    });
++    const duplicate = registry.addKeyItemToStorage({
++      code: room.code, clientId: 'gm-1', keyItemId: 'k1', name: 'Ключ', description: '',
++    });
++    expect(first.added).toBe(true);
++    expect(duplicate.added).toBe(false);
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(1);
++
++    fill(registry, room, STORAGE_LIMITS.MAX_ENTRIES - 1);
++    expect(registry.addKeyItemToStorage({
++      code: room.code, clientId: 'gm-1', keyItemId: 'k2', name: 'Второй', description: '',
++    }).error).toBeUndefined();
++    expect(registry.addKeyItemToStorage({
++      code: room.code, clientId: 'gm-1', keyItemId: 'k3', name: 'Третий', description: '',
++    }).error).toBe(ERROR_CODE.STORAGE_FULL);
++  });
++
++  it('импорт снимка сверх лимита отклоняется', () => {
++    const { registry, room } = setup();
++    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES + 1 }, (_, i) => ({
++      entryId: `e${i}`, name: `X${i}`, item: { id: `x${i}` }, quantity: 1,
++    }));
++    expect(registry.restorePartyStorage({
++      code: room.code, clientId: 'gm-1', storage: { revision: 20, entries },
++    }).error).toBe(ERROR_CODE.STORAGE_FULL);
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(0);
++  });
++
++  it('две прежние «мелочи» уже закрыты: тихий ключ и удаление шаблона', () => {
++    expect(read('server/roomRegistry.js')).toContain('уведомление Мастеру не шлём');
++    expect(read('docs/changelog.ru.md')).toContain('удаление шаблона не гасит уже добытую запись');
++    expect(read('components/lootTrade/PartyStorageModal.js')).toContain('screen.storage.full');
++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json'));
++    expect(ru.storage.full).toBeTruthy();
++    expect(en.storage.full).toBeTruthy();
++  });
++
++  it('план и версия ведут на 521', () => {
++    expect(read('docs/roadmap.md')).toContain('521');
++    expect(JSON.parse(read('public/version.json')).version).toBe('521');
++    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('521');
++    expect(read('docs/roadmap.md')).toContain('Иерархия');
++  });
++});
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 9821fbc..9ffa2cd 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -149,7 +149,12 @@ const PartyStorageModal = ({
+       setGiveBuffer({});
+       setTakeBuffer({});
+     } catch (error) {
+-      showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
++      // Патч 521: переполнение склада — отдельная, понятная причина отказа.
++      const full = String(error?.message || '').includes('STORAGE_FULL');
++      showRawAlert({
++        title: tInventory(full ? 'screen.storage.full' : 'screen.storage.failed'),
++        message: full ? undefined : error?.message,
++      });
+     } finally {
+       setBusy(false);
+     }
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 3131e6d..34b865f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,25 @@
+ # Changelog
+ ---
++## Shared storage polish (patch 521)
++
++The last item of the live plan is done. Two of the three small bits already
++worked: deleting a key template does not erase a found record (514), and a found
++key opens a point without a mini-game or a Game Master notice (516). Stacking
++and size limits were the remaining work.
++
++- **Stacking.** Two identical machine guns with different `uniqueId` now share
++  one row: `server/partyStorageRules.js` compares an item snapshot without
++  per-instance service fields and regardless of field order. Key records never
++  stack, and anything above 999 items goes to a new row instead of vanishing.
++- **Limits.** 200 rows per storage (keys included), 999 items per stack, 50
++  operations per transfer and 999 items per operation. `STORAGE_FULL` is
++  returned **before** the room state changes, so "nothing moves until Transfer
++  is pressed" still holds on overflow.
++- **For players.** A clear localized message replaces the raw error code, and
++  an oversized imported snapshot is rejected as a whole.
++- **Plan.** Item 12 is closed; the next stage is the space hierarchy and access
++  rules from the owner's clarifications (item 13 in `docs/roadmap.md`).
++
+ ## Lockpicking mini-game and OR-gates (patch 520)
+ 
+ The owner described a separate game: a "Bobby pins: n" line counting the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9cfd00f..6065696 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,26 @@
+ # История изменений
+ 
+ ---
++## Мелочи «Общего хранилища» (патч 521)
++
++Последний тезис живого плана закрыт. Две из трёх «мелочей» уже работали:
++удалённый шаблон ключа не гасит добытую запись (514), а найденный ключ
++открывает точку без мини-игры и без уведомления Мастеру (516). Оставались
++стаканье и ограничения размера — они сделаны здесь.
++
++- **Стаканье.** Два одинаковых пулемёта с разными `uniqueId` теперь лежат одной
++  строкой: `server/partyStorageRules.js` сравнивает снимок предмета без
++  служебных полей экземпляра и без учёта порядка полей. Ключевые записи не
++  стакаются, излишек сверх 999 предметов уходит в новую строку.
++- **Лимиты.** 200 строк на складе, 999 предметов в стеке, 50 операций за один
++  перенос, 999 предметов за операцию. Отказ `STORAGE_FULL` приходит **до**
++  изменения состояния комнаты, так что «пока не нажата «Перенести», вещи не
++  перенесены» остаётся верным и при переполнении.
++- **Игроку.** Вместо технического кода ошибки — понятная строка в окне склада
++  на двух языках; снимок из файла сверх лимита отклоняется целиком.
++- **План.** Тезис 12 закрыт; следующий этап — иерархия пространств и доступ
++  по уточнениям владельца (тезис 13 `docs/roadmap.md`).
++
+ ## Мини-игра взлома замков и «ИЛИ» между проверками (патч 520)
+ 
+ Владелец описал отдельную игру: строка «Отмычки: n шт» считает шпильки в
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 71843cd..207a634 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -589,8 +589,9 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+   позволяют поднять его заново.
+ - **Не делаем (решение владельца):** счётчик на плашке и лог операций —
+   «предметы есть на складе или нет, игроки сами смотрят».
+-- **Осталось:** лимиты и стаканье; поведение при удалении записи-шаблона;
+-  тихое срабатывание ключа.
++- **Реализовано в 521:** лимиты и стаканье (`server/partyStorageRules.js`);
++  удаление записи-шаблона не гасит уже добытую запись (514); тихое
++  срабатывание ключа без уведомления Мастеру (516).
+ - Шаг 2 ✅ реализован в 510–512. Патч 513 зафиксировал контракт без кода,
+   патч 514 реализовал поля/формы/вложенность шага 3. Остались: серверная
+   проверка ключа, ворота между контейнерами, мини-игра взлома замков,
+diff --git a/docs/patch-521-install.md b/docs/patch-521-install.md
+new file mode 100644
+index 0000000..2e037e0
+--- /dev/null
++++ b/docs/patch-521-install.md
+@@ -0,0 +1,68 @@
++# Установка патча 521: мелочи «Общего хранилища»
++
++Патч подготовлен от состояния **версии 520** (коммит `e68831c`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–521
++цепочкой.
++
++> Владелец: «Прошлые уточнения запустить после работы над складом». Последний
++> тезис живого плана — «Мелочи склада: лимиты и стаканье, поведение при
++> удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру».
++
++## Что добавлено
++
++### 1. Стаканье одинаковых предметов
++
++Новый чистый модуль `server/partyStorageRules.js`. Ключ стаканья строится по
++снимку предмета без служебных полей экземпляра (`uniqueId`,
++`equipInstanceId`, `stackKey`, `equipped`, `locked`, `appliedMods`,
++`quantity`) и не зависит от порядка полей. Два одинаковых предмета, положенные
++в разное время и разными игроками, теперь лежат одной строкой; ключевые записи
++не стакаются. Когда стек заполнен (999), излишек уходит в новую строку, а не
++пропадает. Правило работает и в старом сообщении `storage.deposit`, и в
++атомарном `storage.transfer`.
++
++### 2. Лимиты склада
++
++| Ограничение | Значение |
++| --- | --- |
++| Строк на складе, включая ключи | 200 |
++| Предметов в одном стеке | 999 |
++| Операций в одном переносе | 50 |
++| Предметов за одну операцию | 999 |
++
++Превышение возвращает новый код `STORAGE_FULL` (зеркало в
++`src/room/roomProtocol.ts`) **до** единого изменения `room.partyStorage`, так
++что перенос остаётся атомарным и при переполнении. Импорт снимка из файла сверх
++лимита отклоняется целиком. В окне склада вместо технического кода игрок видит
++парную строку на русском и английском.
++
++### 3. Два правила, которые уже работали
++
++- Удаление записи-шаблона не гасит уже добытую запись (514): привязка хранится
++  в родителе.
++- Найденный ключ открывает точку без мини-игры и без уведомления Мастеру (516):
++  `keyWonGame` в `server/roomRegistry.js` явно не шлёт уведомление.
++
++Оба закрыты приёмочным тестом `__tests__/room/storage-polish-521.test.js`,
++чтобы не потеряться при будущих правках.
++
++## Проверка
++
++```bash
++./apply-patch.sh            # или ./apply-patch.sh --status
++cat public/version.json     # "version": "521"
++npm run typecheck
++npm test
++npm run build
++npm run serve:app           # перезапустить комнатный сервер
++```
++
++`patchs/baseline.json` = `521`, заметки релиза парные (87 / 87), `dist/`
++пересобран. Живой план — `docs/roadmap.md`: тезис 12 закрыт, следующий этап —
++иерархия пространств и доступ (тезис 13).
++
++## Важно
++
++Мини-игры, ворота, ключи и вложенность локаций **не менялись**. Все уточнения
++владельца по иерархии перенесены в следующий этап и в код не попали.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 31c2768..4418450 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **520**.
++Дата ревизии: 2026-11-04. Текущая версия: **521**.
+ 
+ ## Тезисы
+ 
+@@ -23,17 +23,40 @@
+ | 9а | **Терминал как замок точки:** привязанный терминал скрыт из локации у игроков, нажатие на запертый сундук открывает его мини-игру, добыча доступна только после взлома/ключа | ✅ сделано | **519** |
+ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
+ | 11 | **Мини-игра взлома замков:** пятая карточка, отдельно / в локации / как преграда, отмычки и ячейки по PER, терминал **ИЛИ** замок в требованиях, нейтральное событие `hacked` | ✅ сделано | **520** |
+-| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
++| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ✅ сделано | **521** |
++| 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | ⏳ осталось | — |
+ 
+-## Осталось после патча 520
++## Осталось после патча 521
+ 
+-1. **Мелочи склада** — лимиты и стаканье, удаление записи-шаблона, тихое срабатывание ключа без уведомления Мастеру.
++1. **Иерархия пространств и доступ** — все уточнения владельца, зафиксированные
++   в обсуждении, одним следующим этапом: граф локаций с циклами и несколькими
++   родителями, локация в локации и контейнер в контейнере; замок как граница
++   видимости; взлом локации даёт вход, взлом контейнера — содержимое; взлом
++   адресный, без каскада; ключ не знает область, точка знает свой ключ;
++   «заблокировать всё» на любом узле с детьми; одна сессия до выхода из
++   родительской локации; коды комнат задают видимость групп, а состояние
++   локации общее для всех привязанных комнат.
+ 
+ Открытая развилка: вторая строка «проверка» ссылается на уже созданные точки
+ в той же комнате (до двух, через «ИЛИ»), а не создаёт новую из формы. Мастер
+ по-прежнему может открыть доступ вручную, сняв блокировку узла локации.
+ Спецификация мини-игры — `docs/lockpicking-mini-game-design.md`.
+ 
++## Мелочи склада (реализовано в 521)
++
++- **Стаканье.** Одинаковые предметы ложатся в одну строку; служебные поля
++  экземпляра (`uniqueId`, `equipInstanceId`, `stackKey`, `equipped`, `locked`,
++  `appliedMods`, `quantity`) и порядок полей не влияют на сравнение. Ключевые
++  записи не стакаются. Излишек сверх 999 предметов уходит в новую строку, а не
++  теряется.
++- **Лимиты.** 200 строк на складе (включая ключи), 999 предметов в стеке,
++  50 операций в одном переносе и 999 предметов за операцию. Превышение
++  возвращает `STORAGE_FULL` **до** единого изменения состояния комнаты, поэтому
++  перенос остаётся атомарным; импорт снимка сверх лимита отклоняется.
++- **Уже работало раньше.** Удаление записи-шаблона не гасит добытую запись
++  (514, привязка хранится в родителе); ключ открывает точку без мини-игры и без
++  уведомления Мастеру (516). Оба правила закрыты приёмочным тестом.
++
+ ## Описание склада со стороны пользователя (реализовано в 518)
+ 
+ Слово владельца (патч 518, развёрнутое описание пришло вместо краткого):
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 90b8eb8..00a4420 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -101,7 +101,8 @@
+     "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
+     "issueKey": "Add to storage",
+     "issuedKey": "Record added to shared storage",
+-    "noKeyItems": "No keys yet"
++    "noKeyItems": "No keys yet",
++    "full": "Shared storage is full: withdraw some items or free a slot before depositing more."
+   },
+   "labels": {
+     "leftArm": "Left bracer",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 150388d..6954724 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -101,7 +101,8 @@
+     "gmNoActions": "Мастер смотрит состав склада, но не вносит и не забирает предметы",
+     "issueKey": "Выдать на склад",
+     "issuedKey": "Запись выдана в общее хранилище",
+-    "noKeyItems": "Ключей пока нет"
++    "noKeyItems": "Ключей пока нет",
++    "full": "Общее хранилище заполнено: уберите часть предметов или освободите место, прежде чем класть новые."
+   },
+   "labels": {
+     "leftArm": "Левый наруч",
+diff --git a/patchs/521-storage-polish.patch b/patchs/521-storage-polish.patch
+new file mode 100644
+index 0000000..7e20e20
+--- /dev/null
++++ b/patchs/521-storage-polish.patch
+@@ -0,0 +1,787 @@
++diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
++index e3184b9..bc4827a 100644
++--- a/__tests__/room/lock-picking-520.test.js
+++++ b/__tests__/room/lock-picking-520.test.js
++@@ -371,6 +371,8 @@ describe('520: пятая карточка и документы', () => {
++     expect(plan).toContain('520');
++     expect(plan).toContain('Осталось после патча');
++     expect(read('docs/lockpicking-mini-game-design.md')).toContain('ИЛИ');
++-    expect(json('public/version.json').version).toBe('520');
+++    // Номер версии растёт дальше: исторический тест не стопорит цепочку.
+++    const version = Number(json('public/version.json').version);
+++    expect(version).toBeGreaterThanOrEqual(520);
++   });
++ });
++diff --git a/__tests__/room/storage-polish-521.test.js b/__tests__/room/storage-polish-521.test.js
++new file mode 100644
++index 0000000..4e7093a
++--- /dev/null
+++++ b/__tests__/room/storage-polish-521.test.js
++@@ -0,0 +1,191 @@
+++// Приёмочный тест 521: «мелочи склада» — лимиты, стаканье и два уже
+++// решённых вопроса (удаление шаблона, тихое срабатывание ключа).
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import path from 'node:path';
+++import { fileURLToPath } from 'node:url';
+++import { createRoomRegistry } from '../../server/roomRegistry.js';
+++import { ERROR_CODE } from '../../server/protocol.js';
+++import { ROOM_ERROR } from '../../src/room/roomProtocol.ts';
+++import {
+++  STORAGE_LIMITS,
+++  storageStackKey,
+++  applyStorageDeposits,
+++} from '../../server/partyStorageRules.js';
+++
+++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+++const ITEM = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
+++const OTHER = { id: 'w2', name: 'Дробовик', itemType: 'weapon', weight: 8, cost: 180 };
+++
+++const setup = () => {
+++  const registry = createRoomRegistry({ now: () => 1000 });
+++  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол', ownerToken: 'token-1' });
+++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
+++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
+++  return { registry, room };
+++};
+++
+++const fill = (registry, room, count = STORAGE_LIMITS.MAX_ENTRIES) => {
+++  const entries = Array.from({ length: count }, (_, index) => ({
+++    entryId: `fill_${index}`,
+++    item: { id: `fill_${index}`, name: `Предмет ${index}`, itemType: 'misc' },
+++    name: `Предмет ${index}`,
+++    itemType: 'misc',
+++    quantity: 1,
+++  }));
+++  const restored = registry.restorePartyStorage({
+++    code: room.code, clientId: 'gm-1', storage: { revision: 10, entries },
+++  });
+++  expect(restored.applied).toBe(true);
+++  return entries;
+++};
+++
+++describe('521: стаканье и лимиты «Общего хранилища»', () => {
+++  it('ключ стаканья не зависит от служебных полей экземпляра и порядка полей', () => {
+++    const a = { uniqueId: 'a', equipped: true, locked: false, quantity: 7, name: 'Пулемёт', id: 'w1' };
+++    const b = { id: 'w1', name: 'Пулемёт', quantity: 1, uniqueId: 'b', stackKey: 'x' };
+++    expect(storageStackKey(a)).toBe(storageStackKey(b));
+++    expect(storageStackKey(a)).not.toBe(storageStackKey({ ...a, name: 'Дробовик' }));
+++  });
+++
+++  it('чистый слой склеивает поступление с существующей строкой', () => {
+++    const entries = [{
+++      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon', quantity: 2,
+++    }];
+++    const applied = applyStorageDeposits({
+++      entries,
+++      deposits: [{ item: ITEM, quantity: 3, name: 'Пулемёт' }],
+++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
+++    });
+++    expect(applied.error).toBeNull();
+++    expect(applied.entries).toHaveLength(1);
+++    expect(applied.entries[0].quantity).toBe(5);
+++    expect(entries[0].quantity).toBe(2); // вход не мутируется
+++  });
+++
+++  it('переполненный стек порождает новую строку, а не теряет предметы', () => {
+++    const entries = [{
+++      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon',
+++      quantity: STORAGE_LIMITS.MAX_STACK_QUANTITY,
+++    }];
+++    const applied = applyStorageDeposits({
+++      entries,
+++      deposits: [{ item: ITEM, quantity: 2, name: 'Пулемёт' }],
+++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
+++    });
+++    expect(applied.error).toBeNull();
+++    expect(applied.entries).toHaveLength(2);
+++    expect(applied.entries[1].quantity).toBe(2);
+++  });
+++
+++  it('лимит строк возвращает ошибку и не меняет исходный массив', () => {
+++    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES }, (_, i) => ({
+++      entryId: `e${i}`, item: { id: `x${i}` }, name: `X${i}`, quantity: 1,
+++    }));
+++    const applied = applyStorageDeposits({
+++      entries,
+++      deposits: [{ item: { id: 'fresh' }, quantity: 1, name: 'Новый' }],
+++      makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
+++    });
+++    expect(applied.error).toBe('STORAGE_FULL');
+++    expect(applied.entries).toEqual(entries);
+++    expect(applied.added).toHaveLength(0);
+++  });
+++
+++  it('сервер: два одинаковых предмета — одна строка, разные — две', () => {
+++    const { registry, room } = setup();
+++    registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 2 });
+++    const second = registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: ITEM, quantity: 3 });
+++    expect(second.error).toBeUndefined();
+++    expect(second.storage.entries).toHaveLength(1);
+++    expect(second.storage.entries[0].quantity).toBe(5);
+++
+++    registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: OTHER, quantity: 1 });
+++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(2);
+++  });
+++
+++  it('сервер: переполнение склада — понятный код ошибки, состояние не меняется', () => {
+++    const { registry, room } = setup();
+++    fill(registry, room);
+++    const before = registry.getState(room.code).partyStorage;
+++    const dep = registry.depositToPartyStorage({
+++      code: room.code, clientId: 'p1', item: OTHER, quantity: 1,
+++    });
+++    expect(dep.error).toBe(ERROR_CODE.STORAGE_FULL);
+++    expect(ROOM_ERROR.STORAGE_FULL).toBe(ERROR_CODE.STORAGE_FULL);
+++    const after = registry.getState(room.code).partyStorage;
+++    expect(after.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+++    expect(after.revision).toBe(before.revision);
+++  });
+++
+++  it('атомарный перенос: списание освобождает место, без списания — отказ', () => {
+++    const { registry, room } = setup();
+++    const entries = fill(registry, room);
+++    const rejected = registry.transferPartyStorage({
+++      code: room.code, clientId: 'p1',
+++      deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
+++      withdrawals: [],
+++    });
+++    expect(rejected.error).toBe(ERROR_CODE.STORAGE_FULL);
+++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+++
+++    const accepted = registry.transferPartyStorage({
+++      code: room.code, clientId: 'p1',
+++      deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
+++      withdrawals: [{ entryId: entries[0].entryId, quantity: 1 }],
+++    });
+++    expect(accepted.error).toBeUndefined();
+++    expect(accepted.storage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+++    expect(accepted.storage.entries.some((e) => e.name === 'Дробовик')).toBe(true);
+++  });
+++
+++  it('ключевые записи не стакаются, не дублируются и занимают место', () => {
+++    const { registry, room } = setup();
+++    const first = registry.addKeyItemToStorage({
+++      code: room.code, clientId: 'gm-1', keyItemId: 'k1', name: 'Ключ', description: '',
+++    });
+++    const duplicate = registry.addKeyItemToStorage({
+++      code: room.code, clientId: 'gm-1', keyItemId: 'k1', name: 'Ключ', description: '',
+++    });
+++    expect(first.added).toBe(true);
+++    expect(duplicate.added).toBe(false);
+++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(1);
+++
+++    fill(registry, room, STORAGE_LIMITS.MAX_ENTRIES - 1);
+++    expect(registry.addKeyItemToStorage({
+++      code: room.code, clientId: 'gm-1', keyItemId: 'k2', name: 'Второй', description: '',
+++    }).error).toBeUndefined();
+++    expect(registry.addKeyItemToStorage({
+++      code: room.code, clientId: 'gm-1', keyItemId: 'k3', name: 'Третий', description: '',
+++    }).error).toBe(ERROR_CODE.STORAGE_FULL);
+++  });
+++
+++  it('импорт снимка сверх лимита отклоняется', () => {
+++    const { registry, room } = setup();
+++    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES + 1 }, (_, i) => ({
+++      entryId: `e${i}`, name: `X${i}`, item: { id: `x${i}` }, quantity: 1,
+++    }));
+++    expect(registry.restorePartyStorage({
+++      code: room.code, clientId: 'gm-1', storage: { revision: 20, entries },
+++    }).error).toBe(ERROR_CODE.STORAGE_FULL);
+++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(0);
+++  });
+++
+++  it('две прежние «мелочи» уже закрыты: тихий ключ и удаление шаблона', () => {
+++    expect(read('server/roomRegistry.js')).toContain('уведомление Мастеру не шлём');
+++    expect(read('docs/changelog.ru.md')).toContain('удаление шаблона не гасит уже добытую запись');
+++    expect(read('components/lootTrade/PartyStorageModal.js')).toContain('screen.storage.full');
+++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json'));
+++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json'));
+++    expect(ru.storage.full).toBeTruthy();
+++    expect(en.storage.full).toBeTruthy();
+++  });
+++
+++  it('план и версия ведут на 521', () => {
+++    expect(read('docs/roadmap.md')).toContain('521');
+++    expect(JSON.parse(read('public/version.json')).version).toBe('521');
+++    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('521');
+++    expect(read('docs/roadmap.md')).toContain('Иерархия');
+++  });
+++});
++diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
++index 9821fbc..9ffa2cd 100644
++--- a/components/lootTrade/PartyStorageModal.js
+++++ b/components/lootTrade/PartyStorageModal.js
++@@ -149,7 +149,12 @@ const PartyStorageModal = ({
++       setGiveBuffer({});
++       setTakeBuffer({});
++     } catch (error) {
++-      showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
+++      // Патч 521: переполнение склада — отдельная, понятная причина отказа.
+++      const full = String(error?.message || '').includes('STORAGE_FULL');
+++      showRawAlert({
+++        title: tInventory(full ? 'screen.storage.full' : 'screen.storage.failed'),
+++        message: full ? undefined : error?.message,
+++      });
++     } finally {
++       setBusy(false);
++     }
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 3131e6d..34b865f 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -1,5 +1,25 @@
++ # Changelog
++ ---
+++## Shared storage polish (patch 521)
+++
+++The last item of the live plan is done. Two of the three small bits already
+++worked: deleting a key template does not erase a found record (514), and a found
+++key opens a point without a mini-game or a Game Master notice (516). Stacking
+++and size limits were the remaining work.
+++
+++- **Stacking.** Two identical machine guns with different `uniqueId` now share
+++  one row: `server/partyStorageRules.js` compares an item snapshot without
+++  per-instance service fields and regardless of field order. Key records never
+++  stack, and anything above 999 items goes to a new row instead of vanishing.
+++- **Limits.** 200 rows per storage (keys included), 999 items per stack, 50
+++  operations per transfer and 999 items per operation. `STORAGE_FULL` is
+++  returned **before** the room state changes, so "nothing moves until Transfer
+++  is pressed" still holds on overflow.
+++- **For players.** A clear localized message replaces the raw error code, and
+++  an oversized imported snapshot is rejected as a whole.
+++- **Plan.** Item 12 is closed; the next stage is the space hierarchy and access
+++  rules from the owner's clarifications (item 13 in `docs/roadmap.md`).
+++
++ ## Lockpicking mini-game and OR-gates (patch 520)
++ 
++ The owner described a separate game: a "Bobby pins: n" line counting the
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 9cfd00f..6065696 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,26 @@
++ # История изменений
++ 
++ ---
+++## Мелочи «Общего хранилища» (патч 521)
+++
+++Последний тезис живого плана закрыт. Две из трёх «мелочей» уже работали:
+++удалённый шаблон ключа не гасит добытую запись (514), а найденный ключ
+++открывает точку без мини-игры и без уведомления Мастеру (516). Оставались
+++стаканье и ограничения размера — они сделаны здесь.
+++
+++- **Стаканье.** Два одинаковых пулемёта с разными `uniqueId` теперь лежат одной
+++  строкой: `server/partyStorageRules.js` сравнивает снимок предмета без
+++  служебных полей экземпляра и без учёта порядка полей. Ключевые записи не
+++  стакаются, излишек сверх 999 предметов уходит в новую строку.
+++- **Лимиты.** 200 строк на складе, 999 предметов в стеке, 50 операций за один
+++  перенос, 999 предметов за операцию. Отказ `STORAGE_FULL` приходит **до**
+++  изменения состояния комнаты, так что «пока не нажата «Перенести», вещи не
+++  перенесены» остаётся верным и при переполнении.
+++- **Игроку.** Вместо технического кода ошибки — понятная строка в окне склада
+++  на двух языках; снимок из файла сверх лимита отклоняется целиком.
+++- **План.** Тезис 12 закрыт; следующий этап — иерархия пространств и доступ
+++  по уточнениям владельца (тезис 13 `docs/roadmap.md`).
+++
++ ## Мини-игра взлома замков и «ИЛИ» между проверками (патч 520)
++ 
++ Владелец описал отдельную игру: строка «Отмычки: n шт» считает шпильки в
++diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
++index 71843cd..207a634 100644
++--- a/docs/key-items-and-gates-design.md
+++++ b/docs/key-items-and-gates-design.md
++@@ -589,8 +589,9 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
++   позволяют поднять его заново.
++ - **Не делаем (решение владельца):** счётчик на плашке и лог операций —
++   «предметы есть на складе или нет, игроки сами смотрят».
++-- **Осталось:** лимиты и стаканье; поведение при удалении записи-шаблона;
++-  тихое срабатывание ключа.
+++- **Реализовано в 521:** лимиты и стаканье (`server/partyStorageRules.js`);
+++  удаление записи-шаблона не гасит уже добытую запись (514); тихое
+++  срабатывание ключа без уведомления Мастеру (516).
++ - Шаг 2 ✅ реализован в 510–512. Патч 513 зафиксировал контракт без кода,
++   патч 514 реализовал поля/формы/вложенность шага 3. Остались: серверная
++   проверка ключа, ворота между контейнерами, мини-игра взлома замков,
++diff --git a/docs/patch-521-install.md b/docs/patch-521-install.md
++new file mode 100644
++index 0000000..2e037e0
++--- /dev/null
+++++ b/docs/patch-521-install.md
++@@ -0,0 +1,68 @@
+++# Установка патча 521: мелочи «Общего хранилища»
+++
+++Патч подготовлен от состояния **версии 520** (коммит `e68831c`, ветка
+++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
+++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–521
+++цепочкой.
+++
+++> Владелец: «Прошлые уточнения запустить после работы над складом». Последний
+++> тезис живого плана — «Мелочи склада: лимиты и стаканье, поведение при
+++> удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру».
+++
+++## Что добавлено
+++
+++### 1. Стаканье одинаковых предметов
+++
+++Новый чистый модуль `server/partyStorageRules.js`. Ключ стаканья строится по
+++снимку предмета без служебных полей экземпляра (`uniqueId`,
+++`equipInstanceId`, `stackKey`, `equipped`, `locked`, `appliedMods`,
+++`quantity`) и не зависит от порядка полей. Два одинаковых предмета, положенные
+++в разное время и разными игроками, теперь лежат одной строкой; ключевые записи
+++не стакаются. Когда стек заполнен (999), излишек уходит в новую строку, а не
+++пропадает. Правило работает и в старом сообщении `storage.deposit`, и в
+++атомарном `storage.transfer`.
+++
+++### 2. Лимиты склада
+++
+++| Ограничение | Значение |
+++| --- | --- |
+++| Строк на складе, включая ключи | 200 |
+++| Предметов в одном стеке | 999 |
+++| Операций в одном переносе | 50 |
+++| Предметов за одну операцию | 999 |
+++
+++Превышение возвращает новый код `STORAGE_FULL` (зеркало в
+++`src/room/roomProtocol.ts`) **до** единого изменения `room.partyStorage`, так
+++что перенос остаётся атомарным и при переполнении. Импорт снимка из файла сверх
+++лимита отклоняется целиком. В окне склада вместо технического кода игрок видит
+++парную строку на русском и английском.
+++
+++### 3. Два правила, которые уже работали
+++
+++- Удаление записи-шаблона не гасит уже добытую запись (514): привязка хранится
+++  в родителе.
+++- Найденный ключ открывает точку без мини-игры и без уведомления Мастеру (516):
+++  `keyWonGame` в `server/roomRegistry.js` явно не шлёт уведомление.
+++
+++Оба закрыты приёмочным тестом `__tests__/room/storage-polish-521.test.js`,
+++чтобы не потеряться при будущих правках.
+++
+++## Проверка
+++
+++```bash
+++./apply-patch.sh            # или ./apply-patch.sh --status
+++cat public/version.json     # "version": "521"
+++npm run typecheck
+++npm test
+++npm run build
+++npm run serve:app           # перезапустить комнатный сервер
+++```
+++
+++`patchs/baseline.json` = `521`, заметки релиза парные (87 / 87), `dist/`
+++пересобран. Живой план — `docs/roadmap.md`: тезис 12 закрыт, следующий этап —
+++иерархия пространств и доступ (тезис 13).
+++
+++## Важно
+++
+++Мини-игры, ворота, ключи и вложенность локаций **не менялись**. Все уточнения
+++владельца по иерархии перенесены в следующий этап и в код не попали.
++diff --git a/docs/roadmap.md b/docs/roadmap.md
++index 31c2768..4418450 100644
++--- a/docs/roadmap.md
+++++ b/docs/roadmap.md
++@@ -5,7 +5,7 @@
++ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
++ > ответе владельцу. Этот файл — источник истины для порядка шагов.
++ 
++-Дата ревизии: 2026-11-04. Текущая версия: **520**.
+++Дата ревизии: 2026-11-04. Текущая версия: **521**.
++ 
++ ## Тезисы
++ 
++@@ -23,17 +23,40 @@
++ | 9а | **Терминал как замок точки:** привязанный терминал скрыт из локации у игроков, нажатие на запертый сундук открывает его мини-игру, добыча доступна только после взлома/ключа | ✅ сделано | **519** |
++ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
++ | 11 | **Мини-игра взлома замков:** пятая карточка, отдельно / в локации / как преграда, отмычки и ячейки по PER, терминал **ИЛИ** замок в требованиях, нейтральное событие `hacked` | ✅ сделано | **520** |
++-| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ⏳ осталось | — |
+++| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ✅ сделано | **521** |
+++| 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | ⏳ осталось | — |
++ 
++-## Осталось после патча 520
+++## Осталось после патча 521
++ 
++-1. **Мелочи склада** — лимиты и стаканье, удаление записи-шаблона, тихое срабатывание ключа без уведомления Мастеру.
+++1. **Иерархия пространств и доступ** — все уточнения владельца, зафиксированные
+++   в обсуждении, одним следующим этапом: граф локаций с циклами и несколькими
+++   родителями, локация в локации и контейнер в контейнере; замок как граница
+++   видимости; взлом локации даёт вход, взлом контейнера — содержимое; взлом
+++   адресный, без каскада; ключ не знает область, точка знает свой ключ;
+++   «заблокировать всё» на любом узле с детьми; одна сессия до выхода из
+++   родительской локации; коды комнат задают видимость групп, а состояние
+++   локации общее для всех привязанных комнат.
++ 
++ Открытая развилка: вторая строка «проверка» ссылается на уже созданные точки
++ в той же комнате (до двух, через «ИЛИ»), а не создаёт новую из формы. Мастер
++ по-прежнему может открыть доступ вручную, сняв блокировку узла локации.
++ Спецификация мини-игры — `docs/lockpicking-mini-game-design.md`.
++ 
+++## Мелочи склада (реализовано в 521)
+++
+++- **Стаканье.** Одинаковые предметы ложатся в одну строку; служебные поля
+++  экземпляра (`uniqueId`, `equipInstanceId`, `stackKey`, `equipped`, `locked`,
+++  `appliedMods`, `quantity`) и порядок полей не влияют на сравнение. Ключевые
+++  записи не стакаются. Излишек сверх 999 предметов уходит в новую строку, а не
+++  теряется.
+++- **Лимиты.** 200 строк на складе (включая ключи), 999 предметов в стеке,
+++  50 операций в одном переносе и 999 предметов за операцию. Превышение
+++  возвращает `STORAGE_FULL` **до** единого изменения состояния комнаты, поэтому
+++  перенос остаётся атомарным; импорт снимка сверх лимита отклоняется.
+++- **Уже работало раньше.** Удаление записи-шаблона не гасит добытую запись
+++  (514, привязка хранится в родителе); ключ открывает точку без мини-игры и без
+++  уведомления Мастеру (516). Оба правила закрыты приёмочным тестом.
+++
++ ## Описание склада со стороны пользователя (реализовано в 518)
++ 
++ Слово владельца (патч 518, развёрнутое описание пришло вместо краткого):
++diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
++index 90b8eb8..00a4420 100644
++--- a/i18n/en-EN/screens/inventory/screen.json
+++++ b/i18n/en-EN/screens/inventory/screen.json
++@@ -101,7 +101,8 @@
++     "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
++     "issueKey": "Add to storage",
++     "issuedKey": "Record added to shared storage",
++-    "noKeyItems": "No keys yet"
+++    "noKeyItems": "No keys yet",
+++    "full": "Shared storage is full: withdraw some items or free a slot before depositing more."
++   },
++   "labels": {
++     "leftArm": "Left bracer",
++diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
++index 150388d..6954724 100644
++--- a/i18n/ru-RU/screens/inventory/screen.json
+++++ b/i18n/ru-RU/screens/inventory/screen.json
++@@ -101,7 +101,8 @@
++     "gmNoActions": "Мастер смотрит состав склада, но не вносит и не забирает предметы",
++     "issueKey": "Выдать на склад",
++     "issuedKey": "Запись выдана в общее хранилище",
++-    "noKeyItems": "Ключей пока нет"
+++    "noKeyItems": "Ключей пока нет",
+++    "full": "Общее хранилище заполнено: уберите часть предметов или освободите место, прежде чем класть новые."
++   },
++   "labels": {
++     "leftArm": "Левый наруч",
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++index 42fb2ca..e3bacce 100644
++--- a/patchs/baseline.json
+++++ b/patchs/baseline.json
++@@ -1,3 +1,3 @@
++ {
++-  "baseline": "520"
+++  "baseline": "521"
++ }
++diff --git a/public/version.json b/public/version.json
++index 42aae3b..f42d46a 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,8 +1,9 @@
++ {
++-  "version": "520",
+++  "version": "521",
++   "release": 4,
++   "notes": {
++     "ru-RU": [
+++      "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
++       "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
++       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
++       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
++@@ -91,6 +92,7 @@
++       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++     ],
++     "en-EN": [
+++      "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
++       "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
++       "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
++       "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",
++diff --git a/server/partyStorageRules.js b/server/partyStorageRules.js
++new file mode 100644
++index 0000000..e3028ce
++--- /dev/null
+++++ b/server/partyStorageRules.js
++@@ -0,0 +1,98 @@
+++'use strict';
+++
+++/**
+++ * Патч 521: мелочи «Общего хранилища» — стаканье одинаковых предметов и лимиты.
+++ *
+++ * Модуль чистый: без сети, без состояния комнаты и без React. Все функции
+++ * работают с обычным массивом записей и не мутируют входные данные, поэтому
+++ * сервер может сначала проверить перенос целиком, а уже потом применять его
+++ * (правило «пока кнопка «Перенести» не нажата, предметы не перенесены»).
+++ */
+++
+++const STORAGE_LIMITS = Object.freeze({
+++  /** Максимум строк на складе, включая ключевые записи. */
+++  MAX_ENTRIES: 200,
+++  /** Максимум предметов в одном стеке; излишек уходит в новую строку. */
+++  MAX_STACK_QUANTITY: 999,
+++  /** Максимум операций в одном атомарном переносе. */
+++  MAX_TRANSFER_OPERATIONS: 50,
+++  /** Максимум предметов в одной операции. */
+++  MAX_QUANTITY_PER_OPERATION: 999,
+++});
+++
+++// Служебные поля экземпляра предмета не участвуют в сравнении: два одинаковых
+++// пулемёта с разными uniqueId должны лежать в одной строке склада.
+++const SERVICE_FIELDS = Object.freeze([
+++  'uniqueId', 'equipInstanceId', 'stackKey', 'equipped', 'locked', 'appliedMods', 'quantity',
+++]);
+++
+++const stableStringify = (value) => {
+++  if (value === null || typeof value !== 'object') {
+++    return JSON.stringify(value) === undefined ? 'null' : JSON.stringify(value);
+++  }
+++  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+++  const keys = Object.keys(value)
+++    .filter((key) => !SERVICE_FIELDS.includes(key) && value[key] !== undefined)
+++    .sort();
+++  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+++};
+++
+++/** Ключ стаканья по снимку предмета, устойчивый к порядку полей. */
+++const storageStackKey = (item) => stableStringify(item && typeof item === 'object' ? item : {});
+++
+++/** Индекс первой строки, куда можно доложить предмет. Ключи не стакаются. */
+++const findStackIndex = (entries, item) => {
+++  const key = storageStackKey(item);
+++  for (let index = 0; index < entries.length; index += 1) {
+++    const entry = entries[index];
+++    if (!entry || entry.kind === 'keyItem') continue;
+++    if (Number(entry.quantity) >= STORAGE_LIMITS.MAX_STACK_QUANTITY) continue;
+++    if (storageStackKey(entry.item) !== key) continue;
+++    return index;
+++  }
+++  return -1;
+++};
+++
+++/**
+++ * Применить поступления к уже подготовленному массиву записей (после списаний).
+++ * Принимает `{ item | plain, quantity | qty, name }`.
+++ * Возвращает `{ entries, added, error }`; при `error` исходный массив не меняется.
+++ */
+++const applyStorageDeposits = ({ entries = [], deposits = [], makeEntry, at = Date.now() }) => {
+++  const next = (Array.isArray(entries) ? entries : []).map((entry) => ({ ...entry }));
+++  const added = [];
+++  for (const put of (Array.isArray(deposits) ? deposits : [])) {
+++    const item = put.item || put.plain;
+++    const name = String(put.name || '').trim() || 'Предмет';
+++    let remaining = Math.max(1, Math.floor(Number(put.quantity ?? put.qty) || 1));
+++    while (remaining > 0) {
+++      const index = findStackIndex(next, item);
+++      if (index >= 0) {
+++        const target = next[index];
+++        const free = STORAGE_LIMITS.MAX_STACK_QUANTITY - Number(target.quantity);
+++        const portion = Math.max(1, Math.min(free, remaining));
+++        const merged = { ...target, quantity: Number(target.quantity) + portion };
+++        next[index] = merged;
+++        added.push({ ...merged });
+++        remaining -= portion;
+++        continue;
+++      }
+++      if (next.length >= STORAGE_LIMITS.MAX_ENTRIES) {
+++        return { entries, added: [], error: 'STORAGE_FULL' };
+++      }
+++      const portion = Math.min(remaining, STORAGE_LIMITS.MAX_STACK_QUANTITY);
+++      const entry = makeEntry({ item, name, quantity: portion, at });
+++      next.push(entry);
+++      added.push({ ...entry });
+++      remaining -= portion;
+++    }
+++  }
+++  return { entries: next, added, error: null };
+++};
+++
+++module.exports = {
+++  STORAGE_LIMITS,
+++  storageStackKey,
+++  findStackIndex,
+++  applyStorageDeposits,
+++};
++diff --git a/server/protocol.js b/server/protocol.js
++index 7fc175c..d7cc876 100644
++--- a/server/protocol.js
+++++ b/server/protocol.js
++@@ -84,6 +84,7 @@ const ERROR_CODE = Object.freeze({
++   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
++   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
++   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
+++  STORAGE_FULL: 'STORAGE_FULL',
++   // Патч 520: мини-игра взлома замков.
++   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
++   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',
++diff --git a/server/roomRegistry.js b/server/roomRegistry.js
++index bf1d051..6a3c8e1 100644
++--- a/server/roomRegistry.js
+++++ b/server/roomRegistry.js
++@@ -43,6 +43,8 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
++  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
++  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
++  */
+++const { STORAGE_LIMITS, applyStorageDeposits } = require('./partyStorageRules');
+++
++ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
++   // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
++   const lockRandom = rng ? () => rng(1000) / 1000 : Math.random;
++@@ -1063,7 +1065,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     // Без Мастера в сети хранилище доступно только для просмотра.
++     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
++     const qty = Math.floor(Number(quantity));
++-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+++    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++     }
++     let plain;
++@@ -1072,21 +1074,30 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
++     // Он только смотрит список и транслирует ключи.
++     if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
++-    const entry = {
++-      entryId: `st_${now()}_${++storageEntryCounter}`,
++-      item: plain,
++-      name: String(plain.name || name || '').trim() || 'Предмет',
++-      itemType: String(plain.itemType || 'misc'),
++-      quantity: qty,
++-      depositedBy: clientId,
++-      depositedByName: String(member?.name || name || '').trim(),
++-      at: now(),
++-    };
++     const storage = room.partyStorage || emptyStorage();
++-    storage.entries = [...storage.entries, entry];
+++    // Патч 521: одинаковые предметы ложатся в одну строку, а переполнение
+++    // склада возвращает ошибку ДО изменения состояния комнаты.
+++    const applied = applyStorageDeposits({
+++      entries: storage.entries,
+++      deposits: [{ item: plain, quantity: qty, name: String(plain.name || name || '').trim() || 'Предмет' }],
+++      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
+++        entryId: `st_${now()}_${++storageEntryCounter}`,
+++        item: putItem,
+++        name: putName,
+++        itemType: String(putItem.itemType || 'misc'),
+++        quantity,
+++        depositedBy: clientId,
+++        depositedByName: String(member?.name || putName || '').trim(),
+++        at,
+++      }),
+++      at: now(),
+++    });
+++    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+++    storage.entries = applied.entries;
++     storage.revision += 1;
++     room.partyStorage = storage;
++-    return { room, storage: storageSnapshot(room), entry: { ...entry } };
+++    const entry = applied.added[applied.added.length - 1] || null;
+++    return { room, storage: storageSnapshot(room), entry: entry ? { ...entry } : null };
++   };
++ 
++   /**
++@@ -1105,7 +1116,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     if (putList.length === 0 && takeList.length === 0) {
++       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++     }
++-    if (putList.length + takeList.length > 50) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+++    if (putList.length + takeList.length > STORAGE_LIMITS.MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++ 
++     const storage = room.partyStorage || emptyStorage();
++     const original = storage.entries;
++@@ -1115,7 +1126,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       const entryId = String(req?.entryId || '').trim();
++       const qty = Math.floor(Number(req?.quantity));
++       const entry = original.find((e) => e.entryId === entryId);
++-      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+++      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++         return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
++       }
++       if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++@@ -1126,7 +1137,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++       const qty = Math.floor(Number(req?.quantity));
++       const item = req?.item;
++       if (!item || typeof item !== 'object' || Array.isArray(item)
++-        || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+++        || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++         return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++       }
++       let plain;
++@@ -1144,24 +1155,28 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++         ? entries.map((e) => (e.entryId === entry.entryId ? { ...e, quantity: rest } : e))
++         : entries.filter((e) => e.entryId !== entry.entryId);
++     }
++-    const deposited = [];
++-    for (const { plain, qty, name } of plannedPuts) {
++-      const entry = {
+++    // Патч 521: поступления склеиваются с существующими строками. Проверка
+++    // лимита идёт здесь же, до единого изменения room.partyStorage.
+++    const applied = applyStorageDeposits({
+++      entries,
+++      deposits: plannedPuts,
+++      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
++         entryId: `st_${now()}_${++storageEntryCounter}`,
++-        item: plain,
++-        name,
++-        itemType: String(plain.itemType || 'misc'),
++-        quantity: qty,
+++        item: putItem,
+++        name: putName,
+++        itemType: String(putItem.itemType || 'misc'),
+++        quantity,
++         depositedBy: clientId,
++         depositedByName: String(member?.name || '').trim(),
++-        at: now(),
++-      };
++-      entries = [...entries, entry];
++-      deposited.push({ ...entry });
++-    }
++-    storage.entries = entries;
+++        at,
+++      }),
+++      at: now(),
+++    });
+++    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+++    storage.entries = applied.entries;
++     storage.revision += 1;
++     room.partyStorage = storage;
+++    const deposited = applied.added.map((entry) => ({ ...entry }));
++     return { room, storage: storageSnapshot(room), withdrawn, deposited };
++   };
++ 
++@@ -1171,6 +1186,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     const storage = room.partyStorage || emptyStorage();
++     const cleanId = String(keyItemId).trim();
++     if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
+++    if (storage.entries.length >= STORAGE_LIMITS.MAX_ENTRIES) return null;
++     const entry = {
++       entryId: `key_${now()}_${++storageEntryCounter}`,
++       kind: 'keyItem',
++@@ -1198,6 +1214,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     const member = room.members.get(clientId);
++     if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
++     if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+++    if ((room.partyStorage?.entries || []).length >= STORAGE_LIMITS.MAX_ENTRIES) {
+++      return { error: ERROR_CODE.STORAGE_FULL };
+++    }
++     const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
++     return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
++   };
++@@ -1245,6 +1264,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
++     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
++     const incoming = cloneStorage(storage);
+++    if (incoming.entries.length > STORAGE_LIMITS.MAX_ENTRIES) {
+++      return { error: ERROR_CODE.STORAGE_FULL };
+++    }
++     const current = room.partyStorage || emptyStorage();
++     if (Number(incoming.revision) < Number(current.revision)) {
++       return { room, storage: storageSnapshot(room), applied: false };
++diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
++index 55ec328..49ece5e 100644
++--- a/src/room/roomProtocol.ts
+++++ b/src/room/roomProtocol.ts
++@@ -78,6 +78,7 @@ export const ROOM_ERROR = {
++   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
++   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
++   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
+++  STORAGE_FULL: 'STORAGE_FULL',
++   // Патч 520: мини-игра взлома замков.
++   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
++   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 42fb2ca..e3bacce 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "520"
++  "baseline": "521"
+ }
+diff --git a/public/version.json b/public/version.json
+index 42aae3b..f42d46a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "520",
++  "version": "521",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
+       "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
+       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
+       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
+@@ -91,6 +92,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
+       "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
+       "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
+       "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",
+diff --git a/server/partyStorageRules.js b/server/partyStorageRules.js
+new file mode 100644
+index 0000000..e3028ce
+--- /dev/null
++++ b/server/partyStorageRules.js
+@@ -0,0 +1,98 @@
++'use strict';
++
++/**
++ * Патч 521: мелочи «Общего хранилища» — стаканье одинаковых предметов и лимиты.
++ *
++ * Модуль чистый: без сети, без состояния комнаты и без React. Все функции
++ * работают с обычным массивом записей и не мутируют входные данные, поэтому
++ * сервер может сначала проверить перенос целиком, а уже потом применять его
++ * (правило «пока кнопка «Перенести» не нажата, предметы не перенесены»).
++ */
++
++const STORAGE_LIMITS = Object.freeze({
++  /** Максимум строк на складе, включая ключевые записи. */
++  MAX_ENTRIES: 200,
++  /** Максимум предметов в одном стеке; излишек уходит в новую строку. */
++  MAX_STACK_QUANTITY: 999,
++  /** Максимум операций в одном атомарном переносе. */
++  MAX_TRANSFER_OPERATIONS: 50,
++  /** Максимум предметов в одной операции. */
++  MAX_QUANTITY_PER_OPERATION: 999,
++});
++
++// Служебные поля экземпляра предмета не участвуют в сравнении: два одинаковых
++// пулемёта с разными uniqueId должны лежать в одной строке склада.
++const SERVICE_FIELDS = Object.freeze([
++  'uniqueId', 'equipInstanceId', 'stackKey', 'equipped', 'locked', 'appliedMods', 'quantity',
++]);
++
++const stableStringify = (value) => {
++  if (value === null || typeof value !== 'object') {
++    return JSON.stringify(value) === undefined ? 'null' : JSON.stringify(value);
++  }
++  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
++  const keys = Object.keys(value)
++    .filter((key) => !SERVICE_FIELDS.includes(key) && value[key] !== undefined)
++    .sort();
++  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
++};
++
++/** Ключ стаканья по снимку предмета, устойчивый к порядку полей. */
++const storageStackKey = (item) => stableStringify(item && typeof item === 'object' ? item : {});
++
++/** Индекс первой строки, куда можно доложить предмет. Ключи не стакаются. */
++const findStackIndex = (entries, item) => {
++  const key = storageStackKey(item);
++  for (let index = 0; index < entries.length; index += 1) {
++    const entry = entries[index];
++    if (!entry || entry.kind === 'keyItem') continue;
++    if (Number(entry.quantity) >= STORAGE_LIMITS.MAX_STACK_QUANTITY) continue;
++    if (storageStackKey(entry.item) !== key) continue;
++    return index;
++  }
++  return -1;
++};
++
++/**
++ * Применить поступления к уже подготовленному массиву записей (после списаний).
++ * Принимает `{ item | plain, quantity | qty, name }`.
++ * Возвращает `{ entries, added, error }`; при `error` исходный массив не меняется.
++ */
++const applyStorageDeposits = ({ entries = [], deposits = [], makeEntry, at = Date.now() }) => {
++  const next = (Array.isArray(entries) ? entries : []).map((entry) => ({ ...entry }));
++  const added = [];
++  for (const put of (Array.isArray(deposits) ? deposits : [])) {
++    const item = put.item || put.plain;
++    const name = String(put.name || '').trim() || 'Предмет';
++    let remaining = Math.max(1, Math.floor(Number(put.quantity ?? put.qty) || 1));
++    while (remaining > 0) {
++      const index = findStackIndex(next, item);
++      if (index >= 0) {
++        const target = next[index];
++        const free = STORAGE_LIMITS.MAX_STACK_QUANTITY - Number(target.quantity);
++        const portion = Math.max(1, Math.min(free, remaining));
++        const merged = { ...target, quantity: Number(target.quantity) + portion };
++        next[index] = merged;
++        added.push({ ...merged });
++        remaining -= portion;
++        continue;
++      }
++      if (next.length >= STORAGE_LIMITS.MAX_ENTRIES) {
++        return { entries, added: [], error: 'STORAGE_FULL' };
++      }
++      const portion = Math.min(remaining, STORAGE_LIMITS.MAX_STACK_QUANTITY);
++      const entry = makeEntry({ item, name, quantity: portion, at });
++      next.push(entry);
++      added.push({ ...entry });
++      remaining -= portion;
++    }
++  }
++  return { entries: next, added, error: null };
++};
++
++module.exports = {
++  STORAGE_LIMITS,
++  storageStackKey,
++  findStackIndex,
++  applyStorageDeposits,
++};
+diff --git a/server/protocol.js b/server/protocol.js
+index 7fc175c..d7cc876 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -84,6 +84,7 @@ const ERROR_CODE = Object.freeze({
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
++  STORAGE_FULL: 'STORAGE_FULL',
+   // Патч 520: мини-игра взлома замков.
+   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
+   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index bf1d051..6a3c8e1 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -43,6 +43,8 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
+  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
+  */
++const { STORAGE_LIMITS, applyStorageDeposits } = require('./partyStorageRules');
++
+ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+   // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
+   const lockRandom = rng ? () => rng(1000) / 1000 : Math.random;
+@@ -1063,7 +1065,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Без Мастера в сети хранилище доступно только для просмотра.
+     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+     const qty = Math.floor(Number(quantity));
+-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
++    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+     }
+     let plain;
+@@ -1072,21 +1074,30 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
+     // Он только смотрит список и транслирует ключи.
+     if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+-    const entry = {
+-      entryId: `st_${now()}_${++storageEntryCounter}`,
+-      item: plain,
+-      name: String(plain.name || name || '').trim() || 'Предмет',
+-      itemType: String(plain.itemType || 'misc'),
+-      quantity: qty,
+-      depositedBy: clientId,
+-      depositedByName: String(member?.name || name || '').trim(),
+-      at: now(),
+-    };
+     const storage = room.partyStorage || emptyStorage();
+-    storage.entries = [...storage.entries, entry];
++    // Патч 521: одинаковые предметы ложатся в одну строку, а переполнение
++    // склада возвращает ошибку ДО изменения состояния комнаты.
++    const applied = applyStorageDeposits({
++      entries: storage.entries,
++      deposits: [{ item: plain, quantity: qty, name: String(plain.name || name || '').trim() || 'Предмет' }],
++      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
++        entryId: `st_${now()}_${++storageEntryCounter}`,
++        item: putItem,
++        name: putName,
++        itemType: String(putItem.itemType || 'misc'),
++        quantity,
++        depositedBy: clientId,
++        depositedByName: String(member?.name || putName || '').trim(),
++        at,
++      }),
++      at: now(),
++    });
++    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
++    storage.entries = applied.entries;
+     storage.revision += 1;
+     room.partyStorage = storage;
+-    return { room, storage: storageSnapshot(room), entry: { ...entry } };
++    const entry = applied.added[applied.added.length - 1] || null;
++    return { room, storage: storageSnapshot(room), entry: entry ? { ...entry } : null };
+   };
+ 
+   /**
+@@ -1105,7 +1116,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (putList.length === 0 && takeList.length === 0) {
+       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+     }
+-    if (putList.length + takeList.length > 50) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++    if (putList.length + takeList.length > STORAGE_LIMITS.MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+ 
+     const storage = room.partyStorage || emptyStorage();
+     const original = storage.entries;
+@@ -1115,7 +1126,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       const entryId = String(req?.entryId || '').trim();
+       const qty = Math.floor(Number(req?.quantity));
+       const entry = original.find((e) => e.entryId === entryId);
+-      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > 999) {
++      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+         return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
+       }
+       if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+@@ -1126,7 +1137,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       const qty = Math.floor(Number(req?.quantity));
+       const item = req?.item;
+       if (!item || typeof item !== 'object' || Array.isArray(item)
+-        || !Number.isFinite(qty) || qty < 1 || qty > 999) {
++        || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+         return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+       }
+       let plain;
+@@ -1144,24 +1155,28 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         ? entries.map((e) => (e.entryId === entry.entryId ? { ...e, quantity: rest } : e))
+         : entries.filter((e) => e.entryId !== entry.entryId);
+     }
+-    const deposited = [];
+-    for (const { plain, qty, name } of plannedPuts) {
+-      const entry = {
++    // Патч 521: поступления склеиваются с существующими строками. Проверка
++    // лимита идёт здесь же, до единого изменения room.partyStorage.
++    const applied = applyStorageDeposits({
++      entries,
++      deposits: plannedPuts,
++      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
+         entryId: `st_${now()}_${++storageEntryCounter}`,
+-        item: plain,
+-        name,
+-        itemType: String(plain.itemType || 'misc'),
+-        quantity: qty,
++        item: putItem,
++        name: putName,
++        itemType: String(putItem.itemType || 'misc'),
++        quantity,
+         depositedBy: clientId,
+         depositedByName: String(member?.name || '').trim(),
+-        at: now(),
+-      };
+-      entries = [...entries, entry];
+-      deposited.push({ ...entry });
+-    }
+-    storage.entries = entries;
++        at,
++      }),
++      at: now(),
++    });
++    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
++    storage.entries = applied.entries;
+     storage.revision += 1;
+     room.partyStorage = storage;
++    const deposited = applied.added.map((entry) => ({ ...entry }));
+     return { room, storage: storageSnapshot(room), withdrawn, deposited };
+   };
+ 
+@@ -1171,6 +1186,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const storage = room.partyStorage || emptyStorage();
+     const cleanId = String(keyItemId).trim();
+     if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
++    if (storage.entries.length >= STORAGE_LIMITS.MAX_ENTRIES) return null;
+     const entry = {
+       entryId: `key_${now()}_${++storageEntryCounter}`,
+       kind: 'keyItem',
+@@ -1198,6 +1214,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const member = room.members.get(clientId);
+     if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+     if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++    if ((room.partyStorage?.entries || []).length >= STORAGE_LIMITS.MAX_ENTRIES) {
++      return { error: ERROR_CODE.STORAGE_FULL };
++    }
+     const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
+     return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
+   };
+@@ -1245,6 +1264,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+     const incoming = cloneStorage(storage);
++    if (incoming.entries.length > STORAGE_LIMITS.MAX_ENTRIES) {
++      return { error: ERROR_CODE.STORAGE_FULL };
++    }
+     const current = room.partyStorage || emptyStorage();
+     if (Number(incoming.revision) < Number(current.revision)) {
+       return { room, storage: storageSnapshot(room), applied: false };
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 55ec328..49ece5e 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -78,6 +78,7 @@ export const ROOM_ERROR = {
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
++  STORAGE_FULL: 'STORAGE_FULL',
+   // Патч 520: мини-игра взлома замков.
+   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
+   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',

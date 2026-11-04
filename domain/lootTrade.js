@@ -7,6 +7,8 @@
 // - расчёт двухпанельного буфера обмена с контролем лимита крышек торговца;
 // - дублирование контейнеров и слияние одинаковых позиций.
 
+import itemStacking from './itemStacking.js';
+import locationGraph from './locationGraph.js';
 import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
 import {
   AMMO_FOUND_BY_ID,
@@ -27,13 +29,37 @@ export const CONTAINER_KIND = Object.freeze({
   MERCHANT: 'merchant',
   HUB: 'hub',
   TERMINAL: 'terminal',
+  // Патч 520: мини-игра взлома замков — пятый вид точки. Может выдаваться
+  // отдельно, жить внутри локации и быть преградой для другой точки.
+  LOCK: 'lock',
 });
 
-// Патч 514: «замок» — будущая мини-игра. Вид точки зарезервирован, но пока
-// не создаётся и не нормализуется: серверная проверка ключа (шаг 3.2) и
-// ворота (шаг 4) придут отдельными патчами. Нейтральное событие `hacked`
-// остаётся контрактом из docs/key-items-and-gates-design.md.
-export const RESERVED_LOCK_KIND = 'lock';
+// Патч 514 резервировал имя; патч 520 сделал его полноценным видом точки.
+// Алиас сохранён для старых импортов и тестов.
+export const RESERVED_LOCK_KIND = CONTAINER_KIND.LOCK;
+
+/**
+ * Патч 520: вторая строка требования доступа — список источников через «ИЛИ».
+ * Терминал и замок не блокируют точку одновременно: достаточно любого из них.
+ * `linkedCheckId` остаётся legacy-полем (первый выбранный источник), чтобы
+ * карточки 516–519 продолжали работать без миграции. Максимум две строки.
+ */
+export const normalizeLinkedCheckIds = (raw = {}) => {
+  const ids = [
+    ...(Array.isArray(raw?.linkedCheckIds) ? raw.linkedCheckIds : []),
+    raw?.linkedCheckId,
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const value of ids) {
+    const id = String(value || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length === 2) break;
+  }
+  return out;
+};
 
 /** Обязательность ключа для точки доступа. */
 export const KEY_REQUIREMENT = Object.freeze({
@@ -123,6 +149,66 @@ export const withTerminalNodeMarker = (node) => ({
     label: node?.lockLabel,
   }),
 });
+
+// Патч 520: свой маркер для замка. Старый сервер комнат понижает неизвестный
+// kind до 'loot', но lockLabel сохраняет как есть — этого достаточно, чтобы
+// клиент восстановил тип точки и её сложность. Формат повторяет терминальный.
+export const LOCK_NODE_MARKER = 'F2D20-LOCK:';
+
+export const encodeLockNodeMarker = ({ difficulty = 0, label = '' } = {}) => (
+  `${LOCK_NODE_MARKER}${JSON.stringify({
+    v: 1,
+    d: Math.max(0, Math.min(5, Math.floor(Number(difficulty) || 0))),
+    l: String(label || ''),
+  })}`
+);
+
+export const decodeLockNodeMarker = (value) => {
+  const raw = String(value || '');
+  if (!raw.startsWith(LOCK_NODE_MARKER)) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(LOCK_NODE_MARKER.length));
+    if (!parsed || parsed.v !== 1) return null;
+    return {
+      difficulty: Math.max(0, Math.min(5, Math.floor(Number(parsed.d) || 0))),
+      label: String(parsed.l || ''),
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const withLockNodeMarker = (node) => ({
+  ...node,
+  lockLabel: encodeLockNodeMarker({
+    difficulty: node?.difficulty,
+    label: node?.lockLabel,
+  }),
+});
+
+/** Восстановление узла: терминал, замок или обычная точка. */
+export const resolveCheckSessionNode = (node) => {
+  const terminal = resolveTerminalSessionNode(node);
+  if (terminal.isTerminal) return { ...terminal, isLock: false, checkKind: CONTAINER_KIND.TERMINAL };
+  const marker = decodeLockNodeMarker(node?.lockLabel);
+  if (node?.kind === CONTAINER_KIND.LOCK || marker) {
+    return {
+      node: marker
+        ? {
+            ...node,
+            kind: CONTAINER_KIND.LOCK,
+            difficulty: marker.difficulty,
+            lockLabel: marker.label,
+          }
+        : node,
+      isTerminal: false,
+      isLock: true,
+      checkKind: CONTAINER_KIND.LOCK,
+      marker,
+    };
+  }
+  return { ...terminal, isLock: false, checkKind: null };
+};
 
 /** Восстанавливает узел терминала даже если сервер понизил его до сундука. */
 export const resolveTerminalSessionNode = (node) => {
@@ -342,8 +428,8 @@ export const normalizeContainerItem = (raw, now = Date.now()) => {
     itemId: itemId || name,
     itemType,
     name: name || 'Крышки',
-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
+    cost: itemStacking.effectiveItemCost(raw),
+    weight: itemStacking.effectiveItemWeight(raw),
     quantity,
     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
@@ -406,7 +492,8 @@ export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
   [CONTAINER_KIND.HUB]: 0,
   [CONTAINER_KIND.LOOT]: 1,
   [CONTAINER_KIND.TERMINAL]: 2,
-  [CONTAINER_KIND.MERCHANT]: 3,
+  [CONTAINER_KIND.LOCK]: 3,
+  [CONTAINER_KIND.MERCHANT]: 4,
 });
 
 /**
@@ -476,7 +563,7 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
   );
   const byId = new Map(
     list
-      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
       .map((c) => [c.id, c]),
   );
 
@@ -506,19 +593,8 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
  * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
  */
-export const buildHubSessionNodes = (hub, allContainers = []) => {
-  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
-  const byId = new Map(
-    (Array.isArray(allContainers) ? allContainers : [])
-      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
-      .map((c) => [c.id, c]),
-  );
-  const links = normalizeHubLinks(hub.links);
-  const nodes = [];
-  for (const link of links) {
-    const child = byId.get(link.containerId);
-    if (!child) continue;
-    const node = {
+/** Один узел сессии: одинаковая форма для старого и графового построителя. */
+const makeSessionNode = (child, link = {}) => ({
       containerId: child.id,
       kind: child.kind,
       name: child.name,
@@ -532,23 +608,94 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
       buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
-      difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+      difficulty: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+        ? child.difficulty
+        : 0,
       // Патч 516: требование ключа у вложенной точки доступа.
       requiredKeyItemId: String(child.requiredKeyItemId || '').trim(),
       keyRequirement: String(child.keyRequirement || 'none'),
       linkedCheckId: String(child.linkedCheckId || '').trim(),
+      // Патч 520: до двух источников через «ИЛИ».
+      linkedCheckIds: normalizeLinkedCheckIds(child),
       characterOverrides: {},
-      items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
-        ? child.items.map((entry) => ({
-            ...entry,
-            itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
-          }))
-        : []),
-    };
-    // Маркер переживает нормализацию узла на старом сервере комнат.
-    nodes.push(child.kind === CONTAINER_KIND.TERMINAL ? withTerminalNodeMarker(node) : node);
+  items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+    ? []
+    : (Array.isArray(child.items)
+    ? child.items.map((entry) => ({
+        ...entry,
+        itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+      }))
+    : []),
+});
+
+const stampSessionNode = (node) => {
+  if (node.kind === CONTAINER_KIND.TERMINAL) return withTerminalNodeMarker(node);
+  if (node.kind === CONTAINER_KIND.LOCK) return withLockNodeMarker(node);
+  return node;
+};
+
+/** Прежний построитель: ровно один уровень, только точки выдачи. Сохранён для совместимости. */
+export const buildHubSessionNodes = (hub, allContainers = []) => {
+  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
+  const byId = new Map(
+    (Array.isArray(allContainers) ? allContainers : [])
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
+      .map((c) => [c.id, c]),
+  );
+  const links = normalizeHubLinks(hub.links);
+  const nodes = [];
+  for (const link of links) {
+    const child = byId.get(link.containerId);
+    if (!child) continue;
+    nodes.push(stampSessionNode(makeSessionNode(child, link)));
   }
   return nodes;
+};
+
+/**
+ * Патч 523: графовый построитель сессии. Обходит ВСЮ вложенность
+ * (локация в локации, контейнер в контейнере), переносит несколько родителей
+ * через `parentIds`, не зацикливается и считает эффективные коды комнат как
+ * объединение кодов узла и всех его родителей.
+ */
+export const buildLocationSessionNodes = (root, allContainers = []) => {
+  if (!root || !root.id) return [];
+  const list = Array.isArray(allContainers) ? allContainers : [];
+  const byId = new Map(list.filter((c) => c && c.id).map((c) => [String(c.id), c]));
+  const graph = locationGraph.buildLocationGraph(list);
+  const flat = locationGraph.flattenForSession(graph, String(root.id));
+
+  // Замок на ребре родителя — граница видимости для ребёнка.
+  const linkByChild = new Map();
+  for (const container of list) {
+    for (const link of normalizeHubLinks(container.links)) {
+      const prev = linkByChild.get(link.containerId);
+      if (!prev || (link.locked && !prev.locked)) linkByChild.set(link.containerId, link);
+    }
+  }
+
+  return flat
+    .map((entry) => {
+      const child = byId.get(entry.id);
+      if (!child) return null;
+      const link = linkByChild.get(entry.id) || {};
+      const node = {
+        ...makeSessionNode(child, link),
+        parentIds: entry.parentIds,
+        childIds: entry.childIds,
+        depth: entry.depth,
+        roomCodes: entry.roomCodes,
+        locked: Boolean(link.locked || entry.locked),
+      };
+      return stampSessionNode(node);
+    })
+    .filter(Boolean);
+};
+
+/** Эффективные коды комнат корня: состояние и ресурсы общи для всех привязанных комнат. */
+export const effectiveLocationRoomCodes = (root, allContainers = []) => {
+  const graph = locationGraph.buildLocationGraph(Array.isArray(allContainers) ? allContainers : []);
+  return locationGraph.effectiveRoomCodes(graph, String(root?.id || ''));
 };
 
 const deduplicateContainerItems = (rawItems, now = Date.now()) => {
@@ -576,13 +723,18 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
   else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
   else if (raw.kind === CONTAINER_KIND.TERMINAL) kind = CONTAINER_KIND.TERMINAL;
+  else if (raw.kind === CONTAINER_KIND.LOCK) kind = CONTAINER_KIND.LOCK;
 
-  const items = kind === CONTAINER_KIND.HUB || kind === CONTAINER_KIND.TERMINAL
+  const items = kind === CONTAINER_KIND.HUB
+    || kind === CONTAINER_KIND.TERMINAL
+    || kind === CONTAINER_KIND.LOCK
     ? []
     : deduplicateContainerItems(raw.items, now);
-  const links = kind === CONTAINER_KIND.HUB
-    ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
-    : [];
+  // Патч 523: вложенность разрешена у ЛЮБОГО узла — локация в локации,
+  // контейнер в контейнере. Ссылку на самого себя не держим (цикл из одного
+  // узла не имеет смысла), а циклы из нескольких узлов — разрешены.
+  const links = normalizeHubLinks(raw.links)
+    .filter((lnk) => lnk.containerId !== String(raw.id || ''));
   const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
   const primaryRoomCode = roomCodes[0] || '';
   const inRoot = kind === CONTAINER_KIND.HUB
@@ -598,7 +750,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     roomName: String(raw.roomName || '').trim(),
     inRoot,
     description: String(raw.description || '').trim(),
-    difficulty: kind === CONTAINER_KIND.TERMINAL
+    difficulty: kind === CONTAINER_KIND.TERMINAL || kind === CONTAINER_KIND.LOCK
       ? clampNumber(raw.difficulty, 0, 5, 0)
       : 0,
     caps: kind === CONTAINER_KIND.MERCHANT
@@ -619,24 +771,18 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     keyRequirement: containerCanRequireKey(kind)
       ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
       : KEY_REQUIREMENT.NONE,
+    linkedCheckIds: containerCanRequireKey(kind) ? normalizeLinkedCheckIds(raw) : [],
+    // Legacy-поле: первый источник. Старые карточки и сервер 516–519 читают его.
     linkedCheckId: containerCanRequireKey(kind)
-      ? String(raw.linkedCheckId || '').trim()
+      ? normalizeLinkedCheckIds(raw)[0] || ''
       : '',
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };
 };
 
-const snapshotMergeSignature = (snapshot) => {
-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
-    : '';
-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
-  return `${mods}|${dur}|${charges}|${hp}`;
-};
+// Патч 522: один закон стака для инвентаря, склада и торговцев.
+const snapshotMergeSignature = (snapshot) => itemStacking.itemStackKey(snapshot);
 
 /**
  * Добавляет или объединяет одинаковую позицию в списке контейнера/торговца.
@@ -719,7 +865,7 @@ export const computeMerchantSellPriceToPlayer = (
   entry,
   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
+  const baseCost = itemStacking.effectiveItemCost(entry);
   if (baseCost <= 0) return 0;
 
   const itemMarkup = Number(entry?.markupPercent) || 0;
@@ -745,7 +891,7 @@ export const computeMerchantBuybackPriceFromPlayer = (
 ) => {
   const resolvedBase = catalogCost != null
     ? Number(catalogCost)
-    : Number(item?.cost ?? item?.price ?? 0);
+    : itemStacking.effectiveItemCost(item);
   const baseCost = Math.max(0, Number.isFinite(resolvedBase) ? resolvedBase : 0);
   if (baseCost <= 0) return 0;
 
@@ -1000,3 +1146,19 @@ export const matchHubSuggestions = (
   };
 };
 
+
+/** Патч 520: отдельно выданный замок (без локации). */
+export const buildStandaloneLockSessionNode = (container, { locked = false, lockLabel = '' } = {}) => withLockNodeMarker({
+  containerId: container?.id,
+  kind: CONTAINER_KIND.LOCK,
+  name: container?.name || '',
+  description: container?.description || '',
+  locked,
+  lockLabel,
+  difficulty: container?.difficulty || 0,
+  requiredKeyItemId: String(container?.requiredKeyItemId || '').trim(),
+  keyRequirement: String(container?.keyRequirement || 'none'),
+  linkedCheckId: String(container?.linkedCheckId || '').trim(),
+  linkedCheckIds: normalizeLinkedCheckIds(container),
+  items: [],
+});

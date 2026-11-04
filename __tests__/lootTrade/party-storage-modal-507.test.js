@@ -77,8 +77,10 @@ describe('507: окно «Общее хранилище» в инвентаре'
     expect(all.some((t) => t.includes('Общее хранилище'))).toBe(true);
     expect(all.some((t) => t.includes('Пулемёт'))).toBe(true);
     expect(all.some((t) => t.includes('Аптечка'))).toBe(true);
-    expect(all.some((t) => t.includes('Положить'))).toBe(true);
-    expect(all.some((t) => t.includes('Забрать'))).toBe(true);
+    // Патч 518: предметы сначала ложатся в буфер, перенос — по кнопке.
+    expect(all.some((t) => t.includes('Отдаю на склад'))).toBe(true);
+    expect(all.some((t) => t.includes('Забираю себе'))).toBe(true);
+    expect(all.some((t) => t.includes('Перенести'))).toBe(true);
     // Настройки имени нет.
     expect(all.some((t) => t.toLowerCase().includes('переименовать'))).toBe(false);
     await act(async () => renderer.unmount());

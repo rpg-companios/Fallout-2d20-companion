@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
+import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
 import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
@@ -29,8 +30,11 @@ import {
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
   resolveTerminalSessionNode,
+  resolveCheckSessionNode,
+  normalizeLinkedCheckIds,
 } from '../../domain/lootTrade';
 import { describeItemBasics } from '../../domain/itemBasics';
+import itemStacking from '../../domain/itemStacking.js';
 import {
   applyCommittedMerchantTradeToCharacter,
   getSellablePlayerInventoryItems,
@@ -38,6 +42,8 @@ import {
 } from '../../src/lootTrade/grantCharacterItems';
 import { showRawAlert } from '../alerts/alertService';
 import TerminalHackingModal from './TerminalHackingModal';
+import LockPickingModal from './LockPickingModal';
+import StandaloneCheckModal from './StandaloneCheckModal';
 import {
   terminalAccessKey,
   canHackTerminal,
@@ -84,19 +90,18 @@ export default function PlayerLootTradeOverlay() {
   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
   const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
   const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
+  // Патч 523: стек вложенных локаций. Одна сессия живёт, пока игрок не вышел
+  // из родительской локации или не нажал «Покинуть локацию».
+  const [parentStack, setParentStack] = useState([]);
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
   const [terminalSelection, setTerminalSelection] = useState(null);
   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
-  // Патч 506: одноразовый доступ к терминалу в рамках ОДНОЙ трансляции.
-  // Раньше признак «терминал открыт» жил в модалке: закрыл окно — и кнопка
-  // «Взломать» снова считала терминал свободным, сколько угодно раз.
-  // Ключ содержит accessId сервера: новая трансляция Мастера выдаёт новый.
-  const [usedTerminalAccess, setUsedTerminalAccess] = useState({});
-  const markTerminalAccess = useCallback((key) => {
-    if (!key) return;
-    setUsedTerminalAccess((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
-  }, []);
+  // Патч 526: «билет на один взлом» убран. Владелец уточнил, что баг 506 был
+  // про АВТОМАТИЧЕСКИЙ перезапуск после ACCESS GRANTED, а не про право игрока
+  // на новые подходы: «Юзер может совершать сколько угодно подходов ... Но
+  // только по своему усмотрению». Автоперезапуск по-прежнему запрещён
+  // правилами shouldAutoStart / shouldAutoStartLock и сервером.
 
   // Буферы обмена с торговцем
   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
@@ -186,17 +191,38 @@ export default function PlayerLootTradeOverlay() {
   }, [isGmMode, bindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
+
+  /**
+   * Патч 524: одиночная проверка (терминал/замок), выданная как локация на
+   * старом сервере комнат, — это НЕ локация. Такую сессию показываем сразу
+   * мини-игрой, без списка точек и без кнопки «Покинуть локацию», которая
+   * тут не к месту. Признак: узел ровно один и его id совпадает с id сессии.
+   */
+  const standaloneCheckSession = useMemo(() => {
+    if (!activeSession || activeSession.kind !== CONTAINER_KIND.HUB) return null;
+    const nodes = Array.isArray(activeSession.nodes) ? activeSession.nodes : [];
+    if (nodes.length !== 1) return null;
+    const only = nodes[0];
+    if (!only || only.containerId !== activeSession.containerId) return null;
+    const resolved = resolveCheckSessionNode(only);
+    if (!resolved.checkKind) return null;
+    return { node: resolved.node, kind: resolved.checkKind };
+  }, [activeSession]);
+
   /**
    * Патч 506: «Покинуть локацию». Игрок отключается сам, сессия Мастера
-   * остаётся активной для остальных. Сервер помечает этого участника в
-   * session.closedByClientIds, и matchedContext выше перестаёт показывать
-   * окно — источник правды не локальный useState, а состояние комнаты.
+   * остаётся активной для остальных. Патч 524: окно закрывается сразу по
+   * нажатию — локально, не дожидаясь ответа сервера. Раньше, когда сервер
+   * не поддерживал session.playerClose или окно мини-игры перекрывало
+   * кнопку, нажатие выглядело «не работающим».
    */
   const leaveLocation = async () => {
     const session = matchedContext?.session;
     if (!session || !matchedContext) return;
     setTerminalSelection(null);
     setDismissedTerminalId(null);
+    setParentStack([]);
+    markSessionClosedLocally(session.sessionId);
     try {
       await useRoomStore.getState().playerCloseRoomSession({
         code: matchedContext.roomCode,
@@ -204,7 +230,6 @@ export default function PlayerLootTradeOverlay() {
       });
     } catch (error) {
       debugLog('playerOverlay.leaveLocation:failed', { message: error?.message });
-      markSessionClosedLocally(session.sessionId);
     }
   };
 
@@ -316,9 +341,11 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    // Патч 504: «Нет» Мастера запрещает и взлом, и просмотр до новой
-    // трансляции. Карточка остаётся на экране с отметкой «Закрыт».
-    const directClosed = Boolean(
+    // Патч 504/526: «Нет» Мастера запрещает взлом и просмотр до новой
+    // трансляции — но только для ТЕРМИНАЛА. Замки пока не блокируются:
+    // закрытие доски игрок снимает явным новым подходом.
+    const directIsLockPre = config.kind === CONTAINER_KIND.LOCK;
+    const directClosed = !directIsLockPre && Boolean(
       directTerminalContext.terminalState.closed
       || directTerminalContext.terminalState.locked
       || directTerminalContext.terminalState.game?.status === 'closed',
@@ -334,40 +361,93 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    // Патч 506: та же одноразовость для терминала, выданного напрямую.
-    // Закрыл окно — «Открыть терминал» больше не возвращает к мини-игре.
+    // Патч 526: закрытое окно больше не «сжигает» доступ. Игрок может
+    // вернуться к точке сколько угодно раз — кнопка-пилюля всегда жива.
     const directAccessKey = terminalAccessKey({
       roomCode: directTerminalContext.roomCode,
       containerId: config.containerId,
       accessId: directTerminalContext.terminalState?.accessId,
     });
-    const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
-    if (dismissedTerminalId === config.containerId || directUsed) {
+    const directSelection = terminalSelection?.node?.containerId === config.containerId
+      && terminalSelection?.accessKey === directAccessKey
+      ? terminalSelection
+      : null;
+    if (dismissedTerminalId === config.containerId && !directSelection) {
       return (
         <View style={styles.floatingBar} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.floatingPill}
-            disabled={directUsed}
             onPress={() => setDismissedTerminalId(null)}
           >
             <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
-            <Text style={styles.floatingPillAction}>
-              {directUsed ? tLootTrade('terminal.accessUsed') : tLootTrade('terminal.openTerminal')}
-            </Text>
+            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
           </TouchableOpacity>
         </View>
       );
     }
+    // Патч 525: сначала входная модалка точки (как окно локации, но без
+    // «Покинуть локацию»), и только по «Взломать» монтируется мини-игра с
+    // уже собранной доской. Пустой «как бы запущенной» игры больше нет.
+    const directKind = config.kind === CONTAINER_KIND.LOCK
+      ? CONTAINER_KIND.LOCK
+      : CONTAINER_KIND.TERMINAL;
+    const directIsLock = directKind === CONTAINER_KIND.LOCK;
+    const directAwaiting = !directClosed && Boolean(
+      directTerminalContext.terminalState.awaitingGm
+      || directTerminalContext.terminalState.game?.status === 'awaitingRetry',
+    );
+    // Патч 505: победа терминала не пересобирается, новая доска — только
+    // повторная трансляция Мастера. Замки пока не блокируем вообще.
+    const directWon = !directClosed && directTerminalContext.terminalState.game?.status === 'won';
+    const directBlocked = !directIsLock && (directAwaiting || directWon);
+    const directBadge = !directIsLock
+      ? (directAwaiting ? tLootTrade('terminal.retryWaiting')
+        : (directWon ? tLootTrade('terminal.stateWon') : null))
+      : null;
+    const openDirect = (autoStart) => {
+      setTerminalSelection({
+        node: config,
+        kind: directKind,
+        autoStart,
+        accessKey: directAccessKey,
+        // Замок: явное «Взломать» собирает новую доску по текущему листу.
+        freshAttempt: Boolean(autoStart && directIsLock),
+      });
+    };
     return (
-      <TerminalHackingModal
-        visible
-        terminal={config}
-        roomCode={directTerminalContext.roomCode}
-        onClose={() => {
-          markTerminalAccess(directAccessKey);
-          setDismissedTerminalId(config.containerId);
-        }}
-      />
+      <>
+        <StandaloneCheckModal
+          visible={!directSelection}
+          check={config}
+          isLock={directIsLock}
+          blocked={directBlocked}
+          badge={directBadge}
+          onView={() => openDirect(false)}
+          onHack={() => openDirect(true)}
+          onClose={() => {
+            setDismissedTerminalId(config.containerId);
+            setTerminalSelection(null);
+          }}
+        />
+        {directSelection ? (directSelection.kind === CONTAINER_KIND.LOCK ? (
+          <LockPickingModal
+            visible
+            lock={config}
+            roomCode={directTerminalContext.roomCode}
+            autoStart={Boolean(directSelection.autoStart)}
+            freshAttempt={Boolean(directSelection.freshAttempt)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        ) : (
+          <TerminalHackingModal
+            visible
+            terminal={config}
+            roomCode={directTerminalContext.roomCode}
+            autoStart={Boolean(directSelection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        )) : null}
+      </>
     );
   }
   if (!matchedContext || !activeSession) return null;
@@ -419,13 +499,109 @@ export default function PlayerLootTradeOverlay() {
     );
   }
 
+  // ── Патч 525: отдельно выданная проверка (замок / терминал) ───────────────
+  // Это НЕ локация: сначала входная модалка точки с «Взломать»/«Смотреть»
+  // и без «Покинуть локацию», и только по «Взломать» монтируется мини-игра
+  // с уже собранной доской. Пустая «как бы запущенная» игра убрана.
+  if (standaloneCheckSession && matchedContext) {
+    const roomCode = matchedContext.roomCode;
+    const node = standaloneCheckSession.node;
+    const state = rooms?.[roomCode]?.terminalStates?.[node.containerId];
+    const config = {
+      ...node,
+      ...(state?.config || {}),
+      containerId: node.containerId,
+      kind: standaloneCheckSession.kind,
+    };
+    const accessKey = terminalAccessKey({
+      roomCode,
+      containerId: config.containerId,
+      accessId: state?.accessId || activeSession.sessionId,
+    });
+    const isLock = standaloneCheckSession.kind === CONTAINER_KIND.LOCK;
+    // Замки пока не блокируются: «ЗАКРЫТ» и ожидание Мастера — только терминал.
+    const closed = !isLock && Boolean(
+      state?.closed || state?.locked || state?.game?.status === 'closed',
+    );
+    const awaiting = !isLock && !closed && Boolean(
+      state?.awaitingGm || state?.game?.status === 'awaitingRetry',
+    );
+    const won = !isLock && !closed && state?.game?.status === 'won';
+    const selection = terminalSelection?.node?.containerId === config.containerId
+      && terminalSelection?.accessKey === accessKey
+      ? terminalSelection
+      : null;
+    // Патч 526: замки не блокируются. У терминала «ЗАКРЫТ»/ожидание Мастера
+    // по-прежнему блокируют кнопки до его решения или повторной трансляции.
+    const blocked = !isLock && (closed || awaiting || won);
+    const badge = !isLock
+      ? (closed ? tLootTrade('terminal.closedBadge')
+        : (awaiting ? tLootTrade('terminal.retryWaiting')
+          : (won ? tLootTrade('terminal.stateWon') : null)))
+      : null;
+    const openStandalone = (autoStart) => {
+      setTerminalSelection({
+        node: config,
+        kind: standaloneCheckSession.kind,
+        autoStart,
+        accessKey,
+        freshAttempt: Boolean(autoStart && isLock),
+      });
+    };
+    return (
+      <>
+        <StandaloneCheckModal
+          visible={!selection}
+          check={config}
+          isLock={isLock}
+          blocked={blocked}
+          badge={badge}
+          onView={() => openStandalone(false)}
+          onHack={() => openStandalone(true)}
+          onClose={() => {
+            // Не гасим сессию: игрок может вернуться к точке позже.
+            setMinimizedSessionId(activeSession.sessionId);
+            setTerminalSelection(null);
+          }}
+        />
+        {selection ? (selection.kind === CONTAINER_KIND.LOCK ? (
+          <LockPickingModal
+            visible
+            lock={config}
+            roomCode={roomCode}
+            autoStart={Boolean(selection.autoStart)}
+            freshAttempt={Boolean(selection.freshAttempt)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        ) : (
+          <TerminalHackingModal
+            visible
+            terminal={config}
+            roomCode={roomCode}
+            autoStart={Boolean(selection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        )) : null}
+      </>
+    );
+  }
+
   // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
   if (isHubSession && !viewTarget) {
-    const hubNodes = activeSession.nodes || [];
+    const rootId = activeSession.containerId || '';
+    const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
+    // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
+    // считаются детьми корня. Запертые потомки уже скрыты сервером.
+    const hubNodes = (activeSession.nodes || []).filter((node) => {
+      const parents = Array.isArray(node.parentIds) && node.parentIds.length
+        ? node.parentIds
+        : [rootId];
+      return parents.includes(currentParentId);
+    });
     return (
       <>
         <Modal
-          visible
+          visible={!terminalSelection}
           transparent
           animationType="slide"
           onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
@@ -446,6 +622,15 @@ export default function PlayerLootTradeOverlay() {
                   >
                     <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
                   </TouchableOpacity>
+                  {parentStack.length > 0 && (
+                    <TouchableOpacity
+                      testID="hub-back-button"
+                      style={styles.minimizeBtn}
+                      onPress={() => setParentStack((stack) => stack.slice(0, -1))}
+                    >
+                      <Text style={styles.minimizeBtnText}>{tLootTrade('player.backToParent')}</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     testID="leave-hub-button"
                     accessibilityRole="button"
@@ -474,14 +659,20 @@ export default function PlayerLootTradeOverlay() {
                     // Старый сервер комнат собирает узел заново и понижает
                     // `kind: 'terminal'` до 'loot'. Маркер в lockLabel и реестр
                     // терминалов комнаты восстанавливают настоящий тип узла.
-                    const { node, isTerminal: markedTerminal } = resolveTerminalSessionNode(rawNode);
+                    const { node, isTerminal: markedTerminal, isLock: markedLock } = resolveCheckSessionNode(rawNode);
                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
-                    const nodeIsTerminal = markedTerminal || Boolean(terminalState);
+                    const nodeIsTerminal = markedTerminal || Boolean(terminalState)
+                      || node.kind === CONTAINER_KIND.LOCK;
+                    // Патч 520: видимый (не привязанный как ворота) замок —
+                    // самостоятельная точка локации со своей мини-игрой.
+                    const nodeIsLock = markedLock || node.kind === CONTAINER_KIND.LOCK
+                      || terminalState?.config?.kind === 'lock';
+                    const nodeCheckKind = nodeIsLock ? CONTAINER_KIND.LOCK : CONTAINER_KIND.TERMINAL;
                     const terminalForSelection = {
                       ...node,
                       ...(terminalState?.config || {}),
-                      kind: CONTAINER_KIND.TERMINAL,
+                      kind: nodeCheckKind,
                     };
                     const nodeLocked = Boolean(node.locked);
                     // Патч 504: «Нет» Мастера оставляет карточку visible, но
@@ -493,25 +684,25 @@ export default function PlayerLootTradeOverlay() {
                     const terminalAwaiting = !terminalClosed && Boolean(
                       terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
                     );
-                    // Патч 506: доступ привязан к трансляции, а не к окну.
+                    // Патч 526: accessId — идентификатор трансляции, не «билет».
                     const accessKey = terminalAccessKey({
                       roomCode: matchedContext.roomCode,
                       containerId: node.containerId,
                       accessId: terminalState?.accessId,
                     });
                     const hackAllowed = canHackTerminal({
-                      used: usedTerminalAccess,
                       key: accessKey,
                       game: terminalState?.game,
                       terminalClosed,
                       terminalAwaiting,
+                      isLock: nodeIsLock,
                     });
                     const accessBlockedReason = terminalBlockedReason({
-                      used: usedTerminalAccess,
                       key: accessKey,
                       game: terminalState?.game,
                       terminalClosed,
                       terminalAwaiting,
+                      isLock: nodeIsLock,
                     });
                     const accessBadgeKey = {
                       closed: 'terminal.closedBadge',
@@ -519,8 +710,63 @@ export default function PlayerLootTradeOverlay() {
                       won: 'terminal.stateWon',
                       keyUnlocked: 'terminal.keyUnlockedBadge',
                       finished: 'terminal.accessUsed',
-                      used: 'terminal.accessUsed',
                     }[accessBlockedReason] || null;
+                    // Патч 519: привязанный терминал — это «замок» точки, а не
+                    // отдельная карточка. Патч 520: источников может быть два
+                    // (терминал ИЛИ замок) — они не блокируют точку одновременно.
+                    // Обязательный ключ по-прежнему не обойти взломом.
+                    const gateIds = node.keyAccessState !== 'denied'
+                      ? normalizeLinkedCheckIds(node)
+                      : [];
+                    const gateOptions = nodeLocked
+                      ? gateIds.map((id) => {
+                          const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+                          if (!state) return null;
+                          const kind = state.config?.kind === 'lock'
+                            ? CONTAINER_KIND.LOCK
+                            : CONTAINER_KIND.TERMINAL;
+                          const accessKey = terminalAccessKey({
+                            roomCode: matchedContext.roomCode,
+                            containerId: id,
+                            accessId: state?.accessId,
+                          });
+                          const closed = Boolean(
+                            state.closed || state.locked || state.game?.status === 'closed',
+                          );
+                          const awaiting = Boolean(
+                            state.awaitingGm || state.game?.status === 'awaitingRetry',
+                          );
+                          const hackAllowed = canHackTerminal({
+                            key: accessKey,
+                            game: state?.game,
+                            terminalClosed: closed,
+                            terminalAwaiting: awaiting,
+                            isLock: kind === CONTAINER_KIND.LOCK,
+                          });
+                          const difficulty = state.config?.difficulty ?? 1;
+                          return {
+                            id,
+                            kind,
+                            accessKey,
+                            hackAllowed,
+                            label: formatLootTrade(
+                              tLootTrade(kind === CONTAINER_KIND.LOCK
+                                ? 'player.gateLockLabel'
+                                : 'player.gateTerminalLabel'),
+                              { difficulty },
+                            ),
+                            selection: {
+                              ...(state.config || {}),
+                              containerId: id,
+                              kind,
+                              name: state.config?.name || tLootTrade('player.gateTerminal'),
+                              difficulty,
+                            },
+                          };
+                        }).filter(Boolean)
+                      : [];
+                    const gateAvailable = gateOptions.length > 0;
+                    const gateHackAllowed = gateOptions.some((option) => option.hackAllowed);
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -564,7 +810,9 @@ export default function PlayerLootTradeOverlay() {
                                 ? tLootTrade('terminal.closedBadge')
                                 : (terminalAwaiting
                                   ? tLootTrade('terminal.retryWaiting')
-                                  : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                  : formatLootTrade(tLootTrade(nodeIsLock
+                                      ? 'card.lockKindLabel'
+                                      : 'card.terminalDifficulty'), {
                                       difficulty: terminalForSelection.difficulty || 0,
                                     }))}
                             </Text>
@@ -583,11 +831,62 @@ export default function PlayerLootTradeOverlay() {
 
                         <View style={styles.lootRowBtns}>
                           {nodeLocked ? (
-                            <View style={styles.hubLockedBadge}>
-                              <Text style={styles.hubLockedBadgeText}>
-                                {tLootTrade('player.hubNodeLockedBadge')}
-                              </Text>
-                            </View>
+                            gateAvailable ? (
+                              <View style={styles.terminalButtons}>
+                                {gateOptions.map((option, optionIdx) => (
+                                  <View key={option.id} style={styles.terminalButtons}>
+                                    {optionIdx > 0 && (
+                                      <Text testID={`gate-or-${node.containerId}`} style={styles.hubLockedHintText}>
+                                        {tLootTrade('player.gateOr')}
+                                      </Text>
+                                    )}
+                                    <Text testID={`gate-option-${option.id}`} style={styles.hubLockedHintText}>
+                                      {option.label}
+                                    </Text>
+                                    <View style={styles.terminalButtons}>
+                                      <TouchableOpacity
+                                        testID={optionIdx === 0
+                                          ? `gate-view-button-${node.containerId}`
+                                          : `gate-view-button-${node.containerId}-${option.id}`}
+                                        style={styles.terminalViewButton}
+                                        onPress={() => setTerminalSelection({
+                                          node: option.selection,
+                                          kind: option.kind,
+                                          autoStart: false,
+                                        })}
+                                      >
+                                        <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        testID={optionIdx === 0
+                                          ? `gate-hack-button-${node.containerId}`
+                                          : `gate-hack-button-${node.containerId}-${option.id}`}
+                                        style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
+                                        disabled={!option.hackAllowed}
+                                        onPress={() => {
+                                          setTerminalSelection({
+                                            node: option.selection,
+                                            kind: option.kind,
+                                            autoStart: true,
+                                            freshAttempt: option.kind === CONTAINER_KIND.LOCK,
+                                          });
+                                        }}
+                                      >
+                                        <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            ) : (
+                              <View style={styles.hubLockedBadge}>
+                                <Text style={styles.hubLockedBadgeText}>
+                                  {tLootTrade(node.keyAccessState === 'denied'
+                                    ? 'player.keyRequiredError'
+                                    : 'player.hubNodeLockedBadge')}
+                                </Text>
+                              </View>
+                            )
                           ) : nodeIsTerminal ? (
                             <View style={styles.terminalButtons}>
                               {accessBadgeKey && (
@@ -601,7 +900,9 @@ export default function PlayerLootTradeOverlay() {
                                 disabled={Boolean(accessBlockedReason)}
                                 testID="terminal-view-button"
                                 style={[styles.terminalViewButton, accessBlockedReason && styles.terminalButtonDisabled]}
-                                onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
+                                onPress={() => setTerminalSelection({
+                                  node: terminalForSelection, kind: nodeCheckKind, autoStart: false,
+                                })}
                               >
                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
@@ -612,10 +913,14 @@ export default function PlayerLootTradeOverlay() {
                                 testID="terminal-hack-button"
                                 style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
                                 onPress={() => {
-                                  // Один «Взломать» на трансляцию: даже если
-                                  // игрок закроет окно, кнопка не оживёт.
-                                  markTerminalAccess(accessKey);
-                                  setTerminalSelection({ node: terminalForSelection, autoStart: true });
+                                  // Патч 526: явный подход игрока. У замка
+                                  // он собирает новую доску по текущему листу.
+                                  setTerminalSelection({
+                                    node: terminalForSelection,
+                                    kind: nodeCheckKind,
+                                    autoStart: true,
+                                    freshAttempt: nodeCheckKind === CONTAINER_KIND.LOCK,
+                                  });
                                 }}
                               >
                                 <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
@@ -628,7 +933,17 @@ export default function PlayerLootTradeOverlay() {
                                 setBuyBuffer({});
                                 setSellBuffer({});
                                 setMobileTab('merchant');
-                                setSelectedHubNodeId(node.containerId);
+                                // Патч 523: узел с детьми — это вложенная
+                                // локация/контейнер, входим внутрь, а не
+                                // открываем содержимое сразу.
+                                const hasChildren = Array.isArray(node.childIds)
+                                  ? node.childIds.length > 0
+                                  : node.kind === CONTAINER_KIND.HUB;
+                                if (hasChildren) {
+                                  setParentStack((stack) => [...stack, node.containerId]);
+                                } else {
+                                  setSelectedHubNodeId(node.containerId);
+                                }
                               }}
                             >
                               <Text style={styles.takeAllRowBtnText}>
@@ -657,13 +972,24 @@ export default function PlayerLootTradeOverlay() {
           </View>
         </Modal>
         {terminalSelection ? (
-          <TerminalHackingModal
-            visible
-            terminal={terminalSelection.node}
-            roomCode={matchedContext.roomCode}
-            autoStart={Boolean(terminalSelection.autoStart)}
-            onClose={() => setTerminalSelection(null)}
-          />
+          terminalSelection.kind === CONTAINER_KIND.LOCK ? (
+            <LockPickingModal
+              visible
+              lock={terminalSelection.node}
+              roomCode={matchedContext.roomCode}
+              autoStart={Boolean(terminalSelection.autoStart)}
+              freshAttempt={Boolean(terminalSelection.freshAttempt)}
+              onClose={() => setTerminalSelection(null)}
+            />
+          ) : (
+            <TerminalHackingModal
+              visible
+              terminal={terminalSelection.node}
+              roomCode={matchedContext.roomCode}
+              autoStart={Boolean(terminalSelection.autoStart)}
+              onClose={() => setTerminalSelection(null)}
+            />
+          )
         ) : null}
       </>
     );
@@ -879,16 +1205,31 @@ export default function PlayerLootTradeOverlay() {
         entryId: line.entryId,
         quantity: line.quantity,
       }));
-      const sellItems = barterSummary.sellLines.map((line) => ({
-        clientItemId: line.playerItemId,
-        itemId: line.item.catalogId,
-        itemType: line.item.itemType,
-        name: line.item.name,
-        cost: line.item.cost,
-        weight: line.item.weight,
-        quantity: line.quantity,
-        itemSnapshot: line.item.itemSnapshot,
-      }));
+      // Патч 522: торговцу уходит ПОЛНЫЙ предмет с модами, состоянием и
+      // эффективными ценой/весом. Сервер не пересчитывает их из базового каталога.
+      const sellItems = barterSummary.sellLines.map((line) => {
+        const effectiveCost = itemStacking.effectiveItemCost(line.item);
+        const effectiveWeight = itemStacking.effectiveItemWeight(line.item);
+        const snapshot = line.item.itemSnapshot || {};
+        return {
+          clientItemId: line.playerItemId,
+          itemId: line.item.catalogId,
+          itemType: line.item.itemType,
+          name: line.item.name,
+          cost: effectiveCost,
+          weight: effectiveWeight,
+          effectiveCost,
+          effectiveWeight,
+          quantity: line.quantity,
+          itemSnapshot: {
+            ...snapshot,
+            cost: effectiveCost,
+            weight: effectiveWeight,
+            effectiveCost,
+            effectiveWeight,
+          },
+        };
+      });
 
       const { committed } = await useRoomStore.getState().commitMerchantTrade({
         code: matchedContext.roomCode,
@@ -1448,552 +1789,4 @@ export default function PlayerLootTradeOverlay() {
   );
 }
 
-const styles = StyleSheet.create({
-  floatingBar: {
-    position: 'absolute',
-    bottom: 64,
-    right: 14,
-    left: 14,
-    alignItems: 'flex-end',
-    zIndex: 90,
-  },
-  floatingPill: {
-    backgroundColor: '#1f1f1f',
-    borderWidth: 1.5,
-    borderColor: '#f0e68c',
-    borderRadius: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-  },
-  floatingPillTitle: {
-    color: '#f0e68c',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  floatingPillAction: {
-    color: '#d4af37',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  lootModalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 36,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 36,
-  },
-  backdropWide: {
-    paddingHorizontal: 56,
-    paddingVertical: 46,
-  },
-  lootModalCard: {
-    width: '90%',
-    maxWidth: 540,
-    maxHeight: '78%',
-    backgroundColor: '#1f1f1f',
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#f0e68c',
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-  },
-  merchantModalCard: {
-    width: '92%',
-    maxWidth: 960,
-    height: '80%',
-    maxHeight: 740,
-    backgroundColor: '#1f1f1f',
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#f0e68c',
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 4,
-  },
-  lootHeaderSpacing: {
-    marginBottom: 10,
-  },
-  modalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  modalTitle: {
-    color: '#f0e68c',
-    fontSize: 19,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  headerActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  minimizeBtn: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#777777',
-    backgroundColor: '#2a2a2a',
-  },
-  leaveHubBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#8a5555',
-    backgroundColor: '#2b2222',
-  },
-  leaveHubBtnText: { color: '#e2a3a3', fontSize: 11, fontWeight: '700' },
-  minimizeBtnText: {
-    color: '#e5e5e5',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  closeContainerBtn: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#e57373',
-    backgroundColor: '#4a1f1f',
-  },
-  closeContainerBtnText: {
-    color: '#f5bcbc',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  modalDesc: {
-    color: '#cccccc',
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  lootDescSpacing: {
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  lootScroll: {
-    marginTop: 12,
-    marginBottom: 6,
-    maxHeight: 400,
-  },
-  lootScrollContent: {
-    paddingVertical: 4,
-    gap: 10,
-  },
-  emptyText: {
-    color: '#a3a3a3',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 28,
-    paddingHorizontal: 16,
-  },
-  lootRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#484848',
-    backgroundColor: '#2a2a2a',
-    gap: 12,
-  },
-  lootRowInfo: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  lootRowTitle: {
-    color: '#f0f0f0',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  lootRowSub: {
-    color: '#b0b0b0',
-    fontSize: 12,
-    marginTop: 3,
-  },
-  lootRowBtns: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  takeOneBtn: {
-    backgroundColor: '#333333',
-    borderWidth: 1,
-    borderColor: '#777777',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 5,
-  },
-  takeOneBtnText: {
-    color: '#e8e8e8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  takeAllRowBtn: {
-    backgroundColor: '#3a3a1e',
-    borderWidth: 1,
-    borderColor: '#f0e68c',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 5,
-  },
-  takeAllRowBtnText: {
-    color: '#f0e68c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  terminalButtons: { flexDirection: 'column', gap: 6, minWidth: 82 },
-  terminalViewButton: { backgroundColor: '#213028', borderWidth: 1, borderColor: '#58875d', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
-  terminalViewButtonText: { color: '#c7e1c1', fontSize: 11, fontWeight: '700' },
-  terminalHackButton: { backgroundColor: '#315331', borderWidth: 1, borderColor: '#a4cb77', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
-  terminalHackButtonText: { color: '#e1f5ca', fontSize: 11, fontWeight: '800' },
-  terminalDeniedMeta: { color: '#ff6969', fontWeight: '800' },
-  terminalClosedBadge: { backgroundColor: '#2b2222', borderWidth: 1, borderColor: '#8a5555', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center' },
-  terminalClosedBadgeText: { color: '#e2a3a3', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  terminalButtonDisabled: { opacity: 0.38 },
-  floatingClosedLabel: { color: '#e2a3a3', fontSize: 12, fontWeight: '900', letterSpacing: 1, marginTop: 3 },
-  lootFooter: {
-    marginTop: 18,
-    paddingTop: 4,
-  },
-  primaryActionBtn: {
-    backgroundColor: '#3a3a1e',
-    borderWidth: 1,
-    borderColor: '#f0e68c',
-    paddingVertical: 13,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  primaryActionBtnText: {
-    color: '#f0e68c',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  disabledBtn: {
-    opacity: 0.45,
-  },
 
-  // Стили двухпанельного торговца
-  mobileTabSwitch: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-  },
-  mobileTabBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#5a5a5a',
-    backgroundColor: '#2a2a2a',
-    alignItems: 'center',
-  },
-  mobileTabBtnActive: {
-    backgroundColor: '#f0e68c',
-    borderColor: '#d4af37',
-  },
-  mobileTabText: {
-    color: '#d4d4d4',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  mobileTabTextActive: {
-    color: '#1a1a1a',
-  },
-  twoPanesContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 12,
-  },
-  pane: {
-    flex: 1,
-    backgroundColor: '#242424',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#5a5a5a',
-    overflow: 'hidden',
-  },
-  paneHalf: {
-    width: '50%',
-  },
-  paneHeader: {
-    backgroundColor: '#2d2a1e',
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#d4af37',
-  },
-  paneHeaderTitle: {
-    color: '#f0e68c',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  paneHeaderCaps: {
-    color: '#f0e68c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  paneScroll: {
-    flex: 1,
-  },
-  bufferBox: {
-    backgroundColor: '#1b1b1b',
-    borderBottomWidth: 2,
-    borderBottomColor: '#4d4d4d',
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-  },
-  bufferHeader: {
-    color: '#a3a3a3',
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  bufferRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-    borderTopWidth: 1,
-    borderTopColor: '#333333',
-  },
-  bufferItalicText: {
-    flex: 1,
-    color: '#9e9e9e',
-    fontStyle: 'italic',
-    fontSize: 13,
-    paddingRight: 8,
-  },
-  bufferClearAllBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 5,
-    backgroundColor: '#333333',
-    borderWidth: 1,
-    borderColor: '#666666',
-  },
-  bufferClearAllText: {
-    color: '#d4d4d4',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  tradeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#363636',
-    backgroundColor: '#2a2a2a',
-  },
-  tradeRowInfo: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  tradeRowName: {
-    color: '#f0f0f0',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  tradeRowBasics: {
-    color: '#a8a8a8',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  tradeRowPrice: {
-    color: '#f0e68c',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  tradeRowPriceBuy: {
-    color: '#d4af37',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  tradeRowBtns: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  miniMoveBtn: {
-    backgroundColor: '#3a3a1e',
-    borderWidth: 1,
-    borderColor: '#f0e68c',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 5,
-  },
-  miniMoveAllBtn: {
-    backgroundColor: '#333333',
-    borderWidth: 1,
-    borderColor: '#777777',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 5,
-  },
-  miniMoveBtnText: {
-    color: '#f0e68c',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  barterFooter: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#444444',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  barterBalanceCol: {
-    flex: 1,
-    minWidth: 200,
-  },
-  barterBalanceText: {
-    color: '#f2f2f2',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  barterReceiveText: {
-    color: '#f0e68c',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  barterErrorText: {
-    color: '#e57373',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  barterWarnText: {
-    color: '#d4af37',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  barterFooterBtns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  clearBufBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 5,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1,
-    borderColor: '#777777',
-  },
-  clearBufBtnText: {
-    color: '#e0e0e0',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  commitTradeBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 5,
-    backgroundColor: '#3a3a1e',
-    borderWidth: 1,
-    borderColor: '#f0e68c',
-  },
-  commitTradeBtnText: {
-    color: '#f0e68c',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  backToLocationBtn: {
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1,
-    borderColor: '#666666',
-  },
-  backToLocationBtnText: {
-    color: '#f0e68c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  hubNodeRowLocked: {
-    opacity: 0.78,
-    borderColor: '#5c3434',
-    backgroundColor: '#251e1e',
-  },
-  hubNodeTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  hubNodeTitleLocked: {
-    color: '#d8baba',
-  },
-  hubLockedHintText: {
-    color: '#e59898',
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 3,
-  },
-  hubUnlockedMetaText: {
-    color: '#c9c19c',
-    fontSize: 12,
-    marginTop: 3,
-  },
-  hubLockedBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 5,
-    backgroundColor: '#3f1e1e',
-    borderWidth: 1,
-    borderColor: '#b55b5b',
-  },
-  hubLockedBadgeText: {
-    color: '#f5bcbc',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  hubMasterClosesHint: {
-    color: '#9a9a9a',
-    fontSize: 11,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-});

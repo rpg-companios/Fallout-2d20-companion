@@ -7,7 +7,9 @@
     "createHub": "Create\nLocation",
     "syncCloud": "Cloud sync",
     "createTerminal": "Hacking terminal",
-    "createKeyItem": "Create key / note"
+    "createKeyItem": "Create key / note",
+    "openStorage": "Shared storage",
+    "createLock": "Create\nlock"
   },
   "card": {
     "lootBadge": "Loot",
@@ -37,7 +39,11 @@
     "lootKind": "container",
     "gateAfter": "After: {name}",
     "gateOpen": "gate passed",
-    "gatePending": "gate closed"
+    "gatePending": "gate closed",
+    "lockKind": "lock",
+    "terminalKindLabel": "Terminal lvl {difficulty}",
+    "lockKindLabel": "Lock lvl {difficulty}",
+    "gateOr": "or"
   },
   "form": {
     "createLootTitle": "New Loot Container",
@@ -83,8 +89,15 @@
     "linkedCheckLabel": "Gate: event from another point",
     "linkedCheckSearchPlaceholder": "Search points",
     "linkedCheckEmpty": "No other points yet",
-    "linkedCheckTerminal": "event source",
-    "linkedCheckHint": "Until the chosen point produces an event (hack, key or the GM's decision), access stays closed. The event is shared by the whole room."
+    "linkedCheckTerminal": "Terminal",
+    "linkedCheckHint": "Pick up to two points: a terminal OR a lock. Either passed check is enough — together they never block the point. The event is shared by the whole room.",
+    "createLockTitle": "Create lock",
+    "editLockTitle": "Lock settings",
+    "linkedCheckOr": "or",
+    "linkedCheckLock": "Lock",
+    "linkedCheckLevel": "lvl {difficulty}",
+    "linkedCheckSelected": "Selected: {count} of 2",
+    "lockPinEstimate": "Roughly {count} bobby pins at skill 0"
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -141,7 +154,8 @@
     "hubGatesTitle": "Gates between points",
     "hubGatesEmpty": "No links between points yet",
     "hubGatePassed": "passed",
-    "hubGatePending": "pending"
+    "hubGatePending": "pending",
+    "hubGateOr": "or"
   },
   "catalog": {
     "titleLoot": "Add to Container",
@@ -205,7 +219,8 @@
     "saleMarkupControl": "Sale %",
     "buyDeprControl": "Buyback depr. %",
     "merchantCapsControl": "Register {CAP}",
-    "applyRates": "Apply"
+    "applyRates": "Apply",
+    "lockAll": "🔒 Lock everything"
   },
   "player": {
     "minimizedLoot": "📦 Loot: {name}",
@@ -259,7 +274,15 @@
     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
     "tradeSuccess": "Trade completed!",
     "keyRequiredError": "A key is required: the point stays closed without it",
-    "hubNodeKeyUnlockedBadge": "Opened by key"
+    "hubNodeKeyUnlockedBadge": "Opened by key",
+    "gateTerminal": "Point lock",
+    "gateOptionsTitle": "Open with either check:",
+    "gateOr": "or",
+    "gateTerminalLabel": "Terminal lvl {difficulty}",
+    "gateLockLabel": "Lock lvl {difficulty}",
+    "backToParent": "← Back",
+    "checkEntryHint": "Press «Hack» to start a round; «View» shows one already in progress.",
+    "checkWaitingBoard": "The board appears after pressing «Hack»"
   },
   "keyItems": {
     "title": "Keys and notes",
@@ -335,5 +358,42 @@
     "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
     "keyUnlockedBadge": "OPENED BY KEY",
     "keyRequiredError": "A key or the linked check is required"
+  },
+  "lock": {
+    "title": "Lockpicking",
+    "pins": "Bobby pins: {count}",
+    "noPins": "Out of bobby pins",
+    "skill": "Skill {skill} · Perception {per} · Luck {luck}",
+    "difficulty": "Difficulty {difficulty} · {count} cells",
+    "view": "View",
+    "hack": "Hack",
+    "close": "Close",
+    "won": "ACCESS GRANTED",
+    "pinBroken": "Bobby pin broke",
+    "pinHeld": "Bobby pin held",
+    "wrong": "No match",
+    "awaiting": "Waiting for the GM",
+    "closed": "Lock closed",
+    "retryPrompt": "Allow another attempt?",
+    "retryYes": "Yes",
+    "retryNo": "No",
+    "viewOnly": "Another player is picking this lock",
+    "selectCharacter": "Select a character",
+    "actionFailed": "Action failed",
+    "newAttempt": "Another attempt",
+    "approachFinished": "Attempt finished",
+    "newAttemptHint": "Start a new attempt whenever you buy bobby pins or improve your stats.",
+    "stateOutOfPins": "Out of bobby pins",
+    "hackedTitle": "Lock picked",
+    "hackedMessage": "{name}: access granted. Operator — {operator}. The player can start another attempt on their own.",
+    "noPinsHint": "The character has no bobby pins: add a Bobby Pin item and refresh the sheet in the room.",
+    "sessionNotPublished": "The character sheet has not reached the room yet. Open the character and try again.",
+    "ready": "Lock is ready",
+    "progress": "Solved {done} of {total}",
+    "greyHint": "Repeat the grey arrows",
+    "arrowLeft": "Left",
+    "arrowUp": "Up",
+    "arrowRight": "Right",
+    "arrowDown": "Down"
   }
 }

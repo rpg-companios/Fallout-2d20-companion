@@ -333,9 +333,11 @@ describe('504: lockOnFailure удалён полностью', () => {
     const config = normalizeTerminalConfig({ ...BASE_CONFIG, lockOnFailure: true });
     expect(config).not.toHaveProperty('lockOnFailure');
     // Патч 516: конфигурация терминала несёт ещё и требование ключа.
+    // Патч 520: общий реестр проверок различает терминал и замок и хранит
+    // до двух источников ворот через «ИЛИ».
     expect(Object.keys(config).sort()).toEqual([
-      'containerId', 'description', 'difficulty', 'keyRequirement',
-      'linkedCheckId', 'name', 'requiredKeyItemId',
+      'containerId', 'description', 'difficulty', 'keyRequirement', 'kind',
+      'linkedCheckId', 'linkedCheckIds', 'name', 'requiredKeyItemId',
     ]);
     const game = createGame({
       config, operatorClientId: 'p', operatorCharacterId: 'c',

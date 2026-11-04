@@ -41,6 +41,8 @@ const MESSAGE = Object.freeze({
   STORAGE_WITHDRAW: 'storage.withdraw',
   STORAGE_RESTORE: 'storage.restore',
   STORAGE_ADD_KEY: 'storage.addKey',
+  // Патч 518: атомарный перенос по кнопке «Перенести» в двухпанельном складе.
+  STORAGE_TRANSFER: 'storage.transfer',
   // Патч 517: общие на комнату события доступа (ворота).
   ACCESS_STATE: 'access.state',
   ERROR: 'error',
@@ -82,7 +84,16 @@ const ERROR_CODE = Object.freeze({
   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
+  // Патч 520: мини-игра взлома замков.
+  LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
+  LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',
+  LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
+  LOCK_NO_PINS: 'LOCK_NO_PINS',
+  LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
+  // Патч 526: будущее условие блокировки замка (политика пока выключена).
+  LOCK_BLOCKED: 'LOCK_BLOCKED',
 });
+
 
 const LIMITS = Object.freeze({
   CODE_LENGTH: 6,

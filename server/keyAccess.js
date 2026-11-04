@@ -31,6 +31,29 @@ const hasKeyInStorage = (storage, keyItemId) => {
  * Патч 517: событие живёт на комнате, а не во вкладке игрока. Раньше ворота
  * умели смотреть только на победу в мини-игре терминала.
  */
+const linkedCheckIdsOf = (requirement = {}) => {
+  const ids = [
+    ...(Array.isArray(requirement.linkedCheckIds) ? requirement.linkedCheckIds : []),
+    requirement.linkedCheckId,
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const value of ids) {
+    const id = String(value || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+};
+
+/**
+ * Патч 520: если в требованиях указаны и терминал, и замок, они НЕ блокируют
+ * точку одновременно. Достаточно любого пройденного источника — «ИЛИ».
+ */
+const anyCheckPassed = (options, requirement) => linkedCheckIdsOf(requirement)
+  .some((id) => isCheckPassed(options, id));
+
 const isCheckPassed = (sources, linkedCheckId) => {
   const id = String(linkedCheckId || '').trim();
   if (!id) return false;
@@ -53,11 +76,11 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
   if (!keyItemId) {
     // Патч 517: ворота работают и без требования ключа.
-    const linkedCheckId = String(requirement.linkedCheckId || '').trim();
-    if (!linkedCheckId) {
+    const linkedCheckIds = linkedCheckIdsOf(requirement);
+    if (linkedCheckIds.length === 0) {
       return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
     }
-    return isCheckPassed(options, linkedCheckId)
+    return anyCheckPassed(options, requirement)
       ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
       : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
   }
@@ -67,8 +90,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
   if (requirement.keyRequirement === 'required') {
     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
   }
-  const linkedCheckId = String(requirement.linkedCheckId || '').trim();
-  if (linkedCheckId && isCheckPassed(options, linkedCheckId)) {
+  if (linkedCheckIdsOf(requirement).length > 0 && anyCheckPassed(options, requirement)) {
     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
   }
   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
@@ -88,6 +110,8 @@ module.exports = {
   KEY_ACCESS,
   hasKeyInStorage,
   isCheckPassed,
+  linkedCheckIdsOf,
+  anyCheckPassed,
   resolveKeyAccess,
   isKeyAccessOpen,
   isUnlockedByKey,

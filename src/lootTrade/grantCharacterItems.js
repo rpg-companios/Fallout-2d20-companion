@@ -19,6 +19,7 @@ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../i18n/locale';
 import { resolveItem, findCatalogEntry, getItemPrice, getItemWeight } from '../../domain/resolveItem';
 import { generateStackKey, getItemId } from '../../domain/itemIdentity';
+import itemStacking from '../../domain/itemStacking.js';
 import {
   isFusionCoreItem,
   fusionCoreStackKey,
@@ -292,8 +293,10 @@ const buildRawItemFromContainerEntry = (entry) => {
     weaponId: snapshot.weaponId || catalogId,
     itemType: entry.itemType || snapshot.itemType || 'misc',
     name: entry.name || snapshot.name,
-    cost: Number(entry.cost ?? snapshot.cost ?? 0) || 0,
-    weight: Number(entry.weight ?? snapshot.weight ?? 0) || 0,
+    cost: itemStacking.effectiveItemCost({ ...snapshot, ...entry }),
+    weight: itemStacking.effectiveItemWeight({ ...snapshot, ...entry }),
+    effectiveCost: itemStacking.effectiveItemCost({ ...snapshot, ...entry }),
+    effectiveWeight: itemStacking.effectiveItemWeight({ ...snapshot, ...entry }),
     equipped: false,
     locked: false,
   };
@@ -394,18 +397,25 @@ export const getSellablePlayerInventoryItems = (storeItems, moduleLocale = getCu
         catalogEntry = null;
       }
       const catalogCost = Number(catalogEntry?.cost ?? resolved?.cost ?? item?.cost ?? item?.price ?? 0) || 0;
-      const weight = getItemWeight(resolved) || 0;
+      // Патч 522: resolveItem уже применяет моды (domain/enrichItem.js складывает
+      // mod.cost и mod.weight). Цену берём ОТ МОДИФИЦИРОВАННОГО предмета, а не
+      // из голой каталожной записи, иначе торговец скупает моды бесплатно.
+      const effectiveCost = getItemPrice(resolved) || catalogCost;
+      const weight = itemStacking.effectiveItemWeight({ effectiveWeight: getItemWeight(resolved) });
       const cleanSnapshot = {
         ...item,
         id: catalogId || item.id,
         weaponId: item.weaponId || catalogId || item.id,
         itemType,
-        cost: catalogCost,
+        cost: effectiveCost,
         weight,
+        effectiveCost,
+        effectiveWeight: weight,
         equipped: false,
         locked: false,
       };
-      delete cleanSnapshot.uniqueId;
+      // uniqueId и прочие поля экземпляра НЕ удаляются: предмет не теряет
+      // свойства при смене владельца.
 
       return {
         id: String(item.id),
@@ -413,8 +423,10 @@ export const getSellablePlayerInventoryItems = (storeItems, moduleLocale = getCu
         itemType,
         name: resolved?.name || item?.name || catalogId || '—',
         quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
-        cost: catalogCost,
-        price: getItemPrice(resolved) || catalogCost,
+        cost: effectiveCost,
+        price: effectiveCost,
+        effectiveCost,
+        effectiveWeight: weight,
         weight,
         durability: item.durabilityTracked ? item.durability : null,
         charges: isFusionCoreItem(item) ? item.charges : null,

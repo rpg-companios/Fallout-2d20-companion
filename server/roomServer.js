@@ -338,6 +338,19 @@ const attachRoomWebSocketServer = (httpServer, {
   };
 
   /**
+   * Патч 523: сессия локации привязана к нескольким комнатам — рассылаем
+   * ОДНО состояние всем группам, у которых есть доступ к этой локации.
+   */
+  const broadcastSessionStateForResult = (result, exceptClientId, basePayload) => {
+    const targets = Array.isArray(result?.boundRooms) && result.boundRooms.length
+      ? result.boundRooms
+      : [result.room];
+    for (const target of targets) {
+      if (target) broadcastSessionState(target, exceptClientId, basePayload);
+    }
+  };
+
+  /**
    * Патч 516: ключ мог появиться на складе одновременно с перезаписью
    * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
    * по текущему состоянию комнаты и шлём свежие состояния точек.
@@ -346,7 +359,11 @@ const attachRoomWebSocketServer = (httpServer, {
     const fresh = registry.recomputeKeyAccess(room?.code) || room;
     if (!fresh) return;
     if (fresh.activeSession) {
-      broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
+      // Патч 520: состояние сессии после взлома замка/терминала должно дойти
+      // и до инициатора — именно он стоит у запертого сундука и ждёт, что
+      // добыча откроется. Раньше его исключали, чтобы не дублировать
+      // terminal.state, но session.state — другой конверт.
+      broadcastSessionState(fresh, null, { session: fresh.activeSession });
     }
     broadcastTerminalStates(fresh, exceptClientId);
     // Патч 517: ворота — состояние событий доступа общее на всю комнату,
@@ -747,6 +764,29 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        // Патч 518: двухпанельное окно склада. Буфер применяется одной
+        // атомарной операцией только после нажатия «Перенести».
+        case MESSAGE.STORAGE_TRANSFER: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
+          const result = registry.transferPartyStorage({
+            code: canonical,
+            clientId,
+            deposits: payload.deposits,
+            withdrawals: payload.withdrawals,
+          });
+          if (result.error) { sendError(ws, clientId, result.error, payload.requestId, canonical); break; }
+          const statePayload = {
+            storage: result.storage,
+            withdrawn: result.withdrawn,
+            deposited: result.deposited,
+            requestId: payload.requestId || null,
+          };
+          sendEnvelope(ws, MESSAGE.STORAGE_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.STORAGE_STATE, { storage: result.storage });
+          break;
+        }
+
         case MESSAGE.STORAGE_WITHDRAW: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId); break; }
@@ -834,6 +874,8 @@ const attachRoomWebSocketServer = (httpServer, {
             clientId,
           );
           broadcastKeyAccessState(result.room, clientId);
+          // Патч 523: остальные привязанные комнаты сразу видят ту же локацию.
+          broadcastSessionStateForResult(result, clientId, { session: result.session });
           break;
         }
 
@@ -865,7 +907,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, {
+          broadcastSessionStateForResult(result, clientId, {
             session: result.session,
           });
           broadcastTerminalStates(result.room);
@@ -905,7 +947,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, closePayload);
+          broadcastSessionStateForResult(result, clientId, closePayload);
           break;
         }
 
@@ -942,7 +984,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, {
+          broadcastSessionStateForResult(result, clientId, {
             session: result.session,
             ...closeMeta,
           });
@@ -999,7 +1041,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, null, {
+          broadcastSessionStateForResult(result, null, {
             session: result.session,
             ...closeMeta,
           });
@@ -1054,7 +1096,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, null, {
+          broadcastSessionStateForResult(result, null, {
             session: result.session,
           });
           break;
