@@ -35,28 +35,46 @@ const setup = () => {
   return { registry, room, state, act };
 };
 
-describe('506: одноразовый доступ к терминалу привязан к трансляции', () => {
-  it('чистое правило: один «Взломать» на билет, финальные статусы закрывают обе кнопки', () => {
+describe('506 / 526: доступ к точке по усмотрению игрока', () => {
+  it('«билет» убран; у терминала remained только блокировка после провала', () => {
     const key = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-1' });
     expect(key).toBe('R|t1|broadcast-1');
     expect(terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' })).not.toBe(key);
-    // до первого нажатия доступ есть даже если партия уже идёт
-    expect(canHackTerminal({ used: {}, key, game: { status: 'playing' } })).toBe(true);
-    // после нажатия билет израсходован
-    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(false);
-    // новая трансляция Мастера выдаёт новый билет
-    const freshKey = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' });
-    expect(canHackTerminal({ used: { [key]: true }, key: freshKey, game: null })).toBe(true);
+    // Владелец (526): «Юзер может совершать сколько угодно подходов ...
+    // Но только по своему усмотрению». Закрытое окно/отметка used больше
+    // не запрещают явный подход ни у терминала, ни у замка.
+    expect(canHackTerminal({ key, game: { status: 'playing' } })).toBe(true);
+    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(true);
+    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBeNull();
 
+    // Терминал: после провала «заблокировано», повтор — на усмотрение Мастера.
     for (const status of ['won', 'awaitingRetry', 'closed']) {
-      expect(canHackTerminal({ used: {}, key, game: { status } })).toBe(false);
-      expect(terminalBlockedReason({ used: {}, key, game: { status } })).toBeTruthy();
+      expect(canHackTerminal({ key, game: { status } })).toBe(false);
+      expect(terminalBlockedReason({ key, game: { status } })).toBeTruthy();
     }
-    expect(canHackTerminal({ used: {}, key, terminalClosed: true })).toBe(false);
-    expect(canHackTerminal({ used: {}, key, terminalAwaiting: true })).toBe(false);
-    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBe('used');
-    expect(terminalBlockedReason({ used: {}, key, game: { status: 'won' } })).toBe('won');
-    expect(terminalBlockedReason({ used: {}, key, game: null })).toBeNull();
+    expect(canHackTerminal({ key, terminalClosed: true })).toBe(false);
+    expect(canHackTerminal({ key, terminalAwaiting: true })).toBe(false);
+    expect(terminalBlockedReason({ key, game: { status: 'won' } })).toBe('won');
+    expect(terminalBlockedReason({ key, game: null })).toBeNull();
+
+    // Замок: «пока не блокировать» — ни статус доски, ни закрытие не мешают.
+    expect(canHackTerminal({ key, game: { status: 'awaitingRetry' }, isLock: true })).toBe(true);
+    expect(canHackTerminal({ key, game: { status: 'won' }, isLock: true })).toBe(true);
+    expect(canHackTerminal({ key, terminalClosed: true, isLock: true })).toBe(true);
+    expect(terminalBlockedReason({ key, game: { status: 'awaitingRetry' }, isLock: true })).toBeNull();
+  });
+
+  it('Мастера не спрашивают про замок, но спрашивают про терминал', () => {
+    const gmRoom = (config) => ({
+      R: {
+        role: 'gm',
+        terminalStates: {
+          t1: { config, closed: false, game: { status: 'awaitingRetry', revision: 3 } },
+        },
+      },
+    });
+    expect(findPending(gmRoom({ kind: 'lock', name: 'Замок' }))).toEqual([]);
+    expect(findPending(gmRoom({ kind: 'terminal', name: 'Терминал' }))).toHaveLength(1);
   });
 
   it('accessId стабилен на ходах и при правке карточки, обновляется при повторной трансляции', () => {
@@ -175,7 +193,9 @@ describe('506: игрок сам покидает локацию, сессия �
     expect(overlay).toContain("tLootTrade('player.leaveHub')");
     expect(overlay).toContain("tLootTrade('player.minimize')");
     expect(overlay).toContain('playerCloseRoomSession');
-    expect(overlay).toContain('markTerminalAccess(accessKey)');
+    // Патч 526: «билет» убран — игрок сам решает, когда вернуться к точке.
+    expect(overlay).not.toContain('markTerminalAccess');
+    expect(overlay).toContain('markSessionClosedLocally(session.sessionId)');
     const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
     const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
     expect(ru.player.leaveHub).toBe('Покинуть локацию');

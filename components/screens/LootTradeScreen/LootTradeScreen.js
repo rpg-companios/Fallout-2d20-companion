@@ -2055,18 +2055,26 @@ export default function LootTradeScreen() {
                   })}
                 </Text>
                 {activeTerminalStates.map(({ code, terminal }) => {
-                  const closed = Boolean(terminal.closed || terminal.locked);
-                  const awaiting = !closed && Boolean(
+                  // Патч 526: замки пока не блокируются — Мастер не видит
+                  // «ЗАКРЫТ» и вопрос «Да/Нет», а игрок сам начинает новый
+                  // подход. У терминала блокировка после провала сохранена.
+                  const isLockState = terminal?.config?.kind === 'lock';
+                  const outOfPins = isLockState
+                    && terminal.game?.status === 'awaitingRetry';
+                  const closed = !isLockState && Boolean(terminal.closed || terminal.locked);
+                  const awaiting = !isLockState && !closed && Boolean(
                     terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
                   );
                   // Патч 505: успех виден и в админ-панели. Повторная
                   // трансляция — единственный способ начать новую партию
-                  // после ACCESS GRANTED (доска сама больше не пересобирается).
+                  // терминала после ACCESS GRANTED (доска сама не пересобирается).
                   const won = !closed && !awaiting && terminal.game?.status === 'won';
-                  const stateLabel = closed
-                    ? tLootTrade('terminal.stateClosed')
-                    : (awaiting ? tLootTrade('terminal.stateAwaiting')
-                      : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')));
+                  const stateLabel = outOfPins
+                    ? tLootTrade('lock.stateOutOfPins')
+                    : (closed
+                      ? tLootTrade('terminal.stateClosed')
+                      : (awaiting ? tLootTrade('terminal.stateAwaiting')
+                        : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady'))));
                   const decide = (value) => useRoomStore.getState().actOnTerminal({
                     code,
                     containerId: activeContainer.id,
@@ -2095,7 +2103,7 @@ export default function LootTradeScreen() {
                           </TouchableOpacity>
                         </View>
                       )}
-                      {(closed || won) && (
+                      {(closed || won || outOfPins) && (
                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
                         </TouchableOpacity>

@@ -195,6 +195,7 @@ describe('505: Мастер узнаёт об успехе', () => {
       name: 'Терминал',
       difficulty: 3,
       operatorName: 'Оператор',
+      isLock: false,
     }]);
     expect(findCompleted(roomWith('player', wonTerminal))).toEqual([]);
     expect(findCompleted(roomWith('gm', { ...wonTerminal, closed: true }))).toEqual([]);

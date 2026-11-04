@@ -64,8 +64,13 @@ const TerminalRetryPromptHost = () => {
           if (item.kind === 'won') {
             // eslint-disable-next-line no-await-in-loop
             await showRawAlert({
-              title: tLootTrade('terminal.hackedTitle'),
-              message: formatLootTrade(tLootTrade('terminal.hackedMessage'), {
+              // Патч 526: у замка свой текст — «новую доску создаст только
+              // повторная трансляция» для него больше неверно: игрок сам
+              // начинает новый подход.
+              title: tLootTrade(item.isLock ? 'lock.hackedTitle' : 'terminal.hackedTitle'),
+              message: formatLootTrade(tLootTrade(
+                item.isLock ? 'lock.hackedMessage' : 'terminal.hackedMessage',
+              ), {
                 name: item.name,
                 operator: item.operatorName || '—',
               }),

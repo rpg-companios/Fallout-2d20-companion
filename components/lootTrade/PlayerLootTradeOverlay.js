@@ -97,15 +97,11 @@ export default function PlayerLootTradeOverlay() {
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
   const [terminalSelection, setTerminalSelection] = useState(null);
   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
-  // Патч 506: одноразовый доступ к терминалу в рамках ОДНОЙ трансляции.
-  // Раньше признак «терминал открыт» жил в модалке: закрыл окно — и кнопка
-  // «Взломать» снова считала терминал свободным, сколько угодно раз.
-  // Ключ содержит accessId сервера: новая трансляция Мастера выдаёт новый.
-  const [usedTerminalAccess, setUsedTerminalAccess] = useState({});
-  const markTerminalAccess = useCallback((key) => {
-    if (!key) return;
-    setUsedTerminalAccess((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
-  }, []);
+  // Патч 526: «билет на один взлом» убран. Владелец уточнил, что баг 506 был
+  // про АВТОМАТИЧЕСКИЙ перезапуск после ACCESS GRANTED, а не про право игрока
+  // на новые подходы: «Юзер может совершать сколько угодно подходов ... Но
+  // только по своему усмотрению». Автоперезапуск по-прежнему запрещён
+  // правилами shouldAutoStart / shouldAutoStartLock и сервером.
 
   // Буферы обмена с торговцем
   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
@@ -345,9 +341,11 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    // Патч 504: «Нет» Мастера запрещает и взлом, и просмотр до новой
-    // трансляции. Карточка остаётся на экране с отметкой «Закрыт».
-    const directClosed = Boolean(
+    // Патч 504/526: «Нет» Мастера запрещает взлом и просмотр до новой
+    // трансляции — но только для ТЕРМИНАЛА. Замки пока не блокируются:
+    // закрытие доски игрок снимает явным новым подходом.
+    const directIsLockPre = config.kind === CONTAINER_KIND.LOCK;
+    const directClosed = !directIsLockPre && Boolean(
       directTerminalContext.terminalState.closed
       || directTerminalContext.terminalState.locked
       || directTerminalContext.terminalState.game?.status === 'closed',
@@ -363,30 +361,26 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    // Патч 506: та же одноразовость для терминала, выданного напрямую.
-    // Закрыл окно — «Открыть терминал» больше не возвращает к мини-игре.
+    // Патч 526: закрытое окно больше не «сжигает» доступ. Игрок может
+    // вернуться к точке сколько угодно раз — кнопка-пилюля всегда жива.
     const directAccessKey = terminalAccessKey({
       roomCode: directTerminalContext.roomCode,
       containerId: config.containerId,
       accessId: directTerminalContext.terminalState?.accessId,
     });
-    const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
     const directSelection = terminalSelection?.node?.containerId === config.containerId
       && terminalSelection?.accessKey === directAccessKey
       ? terminalSelection
       : null;
-    if ((dismissedTerminalId === config.containerId || directUsed) && !directSelection) {
+    if (dismissedTerminalId === config.containerId && !directSelection) {
       return (
         <View style={styles.floatingBar} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.floatingPill}
-            disabled={directUsed}
             onPress={() => setDismissedTerminalId(null)}
           >
             <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
-            <Text style={styles.floatingPillAction}>
-              {directUsed ? tLootTrade('terminal.accessUsed') : tLootTrade('terminal.openTerminal')}
-            </Text>
+            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -397,22 +391,40 @@ export default function PlayerLootTradeOverlay() {
     const directKind = config.kind === CONTAINER_KIND.LOCK
       ? CONTAINER_KIND.LOCK
       : CONTAINER_KIND.TERMINAL;
+    const directIsLock = directKind === CONTAINER_KIND.LOCK;
+    const directAwaiting = !directClosed && Boolean(
+      directTerminalContext.terminalState.awaitingGm
+      || directTerminalContext.terminalState.game?.status === 'awaitingRetry',
+    );
+    // Патч 505: победа терминала не пересобирается, новая доска — только
+    // повторная трансляция Мастера. Замки пока не блокируем вообще.
+    const directWon = !directClosed && directTerminalContext.terminalState.game?.status === 'won';
+    const directBlocked = !directIsLock && (directAwaiting || directWon);
+    const directBadge = !directIsLock
+      ? (directAwaiting ? tLootTrade('terminal.retryWaiting')
+        : (directWon ? tLootTrade('terminal.stateWon') : null))
+      : null;
     const openDirect = (autoStart) => {
-      if (autoStart) markTerminalAccess(directAccessKey);
-      setTerminalSelection({ node: config, kind: directKind, autoStart, accessKey: directAccessKey });
+      setTerminalSelection({
+        node: config,
+        kind: directKind,
+        autoStart,
+        accessKey: directAccessKey,
+        // Замок: явное «Взломать» собирает новую доску по текущему листу.
+        freshAttempt: Boolean(autoStart && directIsLock),
+      });
     };
     return (
       <>
         <StandaloneCheckModal
           visible={!directSelection}
           check={config}
-          isLock={directKind === CONTAINER_KIND.LOCK}
-          blocked={directUsed}
-          badge={directUsed ? tLootTrade('terminal.accessUsed') : null}
+          isLock={directIsLock}
+          blocked={directBlocked}
+          badge={directBadge}
           onView={() => openDirect(false)}
           onHack={() => openDirect(true)}
           onClose={() => {
-            markTerminalAccess(directAccessKey);
             setDismissedTerminalId(config.containerId);
             setTerminalSelection(null);
           }}
@@ -423,6 +435,7 @@ export default function PlayerLootTradeOverlay() {
             lock={config}
             roomCode={directTerminalContext.roomCode}
             autoStart={Boolean(directSelection.autoStart)}
+            freshAttempt={Boolean(directSelection.freshAttempt)}
             onClose={() => setTerminalSelection(null)}
           />
         ) : (
@@ -505,23 +518,34 @@ export default function PlayerLootTradeOverlay() {
       containerId: config.containerId,
       accessId: state?.accessId || activeSession.sessionId,
     });
-    const closed = Boolean(state?.closed || state?.locked || state?.game?.status === 'closed');
-    const used = Boolean(usedTerminalAccess[accessKey]);
     const isLock = standaloneCheckSession.kind === CONTAINER_KIND.LOCK;
+    // Замки пока не блокируются: «ЗАКРЫТ» и ожидание Мастера — только терминал.
+    const closed = !isLock && Boolean(
+      state?.closed || state?.locked || state?.game?.status === 'closed',
+    );
+    const awaiting = !isLock && !closed && Boolean(
+      state?.awaitingGm || state?.game?.status === 'awaitingRetry',
+    );
+    const won = !isLock && !closed && state?.game?.status === 'won';
     const selection = terminalSelection?.node?.containerId === config.containerId
       && terminalSelection?.accessKey === accessKey
       ? terminalSelection
       : null;
-    const badge = closed
-      ? tLootTrade('terminal.closedBadge')
-      : (used ? tLootTrade('terminal.accessUsed') : null);
+    // Патч 526: замки не блокируются. У терминала «ЗАКРЫТ»/ожидание Мастера
+    // по-прежнему блокируют кнопки до его решения или повторной трансляции.
+    const blocked = !isLock && (closed || awaiting || won);
+    const badge = !isLock
+      ? (closed ? tLootTrade('terminal.closedBadge')
+        : (awaiting ? tLootTrade('terminal.retryWaiting')
+          : (won ? tLootTrade('terminal.stateWon') : null)))
+      : null;
     const openStandalone = (autoStart) => {
-      if (autoStart) markTerminalAccess(accessKey);
       setTerminalSelection({
         node: config,
         kind: standaloneCheckSession.kind,
         autoStart,
         accessKey,
+        freshAttempt: Boolean(autoStart && isLock),
       });
     };
     return (
@@ -530,13 +554,13 @@ export default function PlayerLootTradeOverlay() {
           visible={!selection}
           check={config}
           isLock={isLock}
-          blocked={closed || used}
+          blocked={blocked}
           badge={badge}
           onView={() => openStandalone(false)}
           onHack={() => openStandalone(true)}
           onClose={() => {
-            markTerminalAccess(accessKey);
-            markSessionClosedLocally(activeSession.sessionId);
+            // Не гасим сессию: игрок может вернуться к точке позже.
+            setMinimizedSessionId(activeSession.sessionId);
             setTerminalSelection(null);
           }}
         />
@@ -546,6 +570,7 @@ export default function PlayerLootTradeOverlay() {
             lock={config}
             roomCode={roomCode}
             autoStart={Boolean(selection.autoStart)}
+            freshAttempt={Boolean(selection.freshAttempt)}
             onClose={() => setTerminalSelection(null)}
           />
         ) : (
@@ -659,25 +684,25 @@ export default function PlayerLootTradeOverlay() {
                     const terminalAwaiting = !terminalClosed && Boolean(
                       terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
                     );
-                    // Патч 506: доступ привязан к трансляции, а не к окну.
+                    // Патч 526: accessId — идентификатор трансляции, не «билет».
                     const accessKey = terminalAccessKey({
                       roomCode: matchedContext.roomCode,
                       containerId: node.containerId,
                       accessId: terminalState?.accessId,
                     });
                     const hackAllowed = canHackTerminal({
-                      used: usedTerminalAccess,
                       key: accessKey,
                       game: terminalState?.game,
                       terminalClosed,
                       terminalAwaiting,
+                      isLock: nodeIsLock,
                     });
                     const accessBlockedReason = terminalBlockedReason({
-                      used: usedTerminalAccess,
                       key: accessKey,
                       game: terminalState?.game,
                       terminalClosed,
                       terminalAwaiting,
+                      isLock: nodeIsLock,
                     });
                     const accessBadgeKey = {
                       closed: 'terminal.closedBadge',
@@ -685,7 +710,6 @@ export default function PlayerLootTradeOverlay() {
                       won: 'terminal.stateWon',
                       keyUnlocked: 'terminal.keyUnlockedBadge',
                       finished: 'terminal.accessUsed',
-                      used: 'terminal.accessUsed',
                     }[accessBlockedReason] || null;
                     // Патч 519: привязанный терминал — это «замок» точки, а не
                     // отдельная карточка. Патч 520: источников может быть два
@@ -713,11 +737,11 @@ export default function PlayerLootTradeOverlay() {
                             state.awaitingGm || state.game?.status === 'awaitingRetry',
                           );
                           const hackAllowed = canHackTerminal({
-                            used: usedTerminalAccess,
                             key: accessKey,
                             game: state?.game,
                             terminalClosed: closed,
                             terminalAwaiting: awaiting,
+                            isLock: kind === CONTAINER_KIND.LOCK,
                           });
                           const difficulty = state.config?.difficulty ?? 1;
                           return {
@@ -840,11 +864,11 @@ export default function PlayerLootTradeOverlay() {
                                         style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
                                         disabled={!option.hackAllowed}
                                         onPress={() => {
-                                          markTerminalAccess(option.accessKey);
                                           setTerminalSelection({
                                             node: option.selection,
                                             kind: option.kind,
                                             autoStart: true,
+                                            freshAttempt: option.kind === CONTAINER_KIND.LOCK,
                                           });
                                         }}
                                       >
@@ -889,11 +913,13 @@ export default function PlayerLootTradeOverlay() {
                                 testID="terminal-hack-button"
                                 style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
                                 onPress={() => {
-                                  // Один «Взломать» на трансляцию: даже если
-                                  // игрок закроет окно, кнопка не оживёт.
-                                  markTerminalAccess(accessKey);
+                                  // Патч 526: явный подход игрока. У замка
+                                  // он собирает новую доску по текущему листу.
                                   setTerminalSelection({
-                                    node: terminalForSelection, kind: nodeCheckKind, autoStart: true,
+                                    node: terminalForSelection,
+                                    kind: nodeCheckKind,
+                                    autoStart: true,
+                                    freshAttempt: nodeCheckKind === CONTAINER_KIND.LOCK,
                                   });
                                 }}
                               >
@@ -952,6 +978,7 @@ export default function PlayerLootTradeOverlay() {
               lock={terminalSelection.node}
               roomCode={matchedContext.roomCode}
               autoStart={Boolean(terminalSelection.autoStart)}
+              freshAttempt={Boolean(terminalSelection.freshAttempt)}
               onClose={() => setTerminalSelection(null)}
             />
           ) : (

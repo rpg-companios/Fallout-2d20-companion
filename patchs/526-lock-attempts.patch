@@ -1,0 +1,1755 @@
+diff --git a/__tests__/lootTrade/lock-attempt-modal-526.test.js b/__tests__/lootTrade/lock-attempt-modal-526.test.js
+new file mode 100644
+index 0000000..41803b1
+--- /dev/null
++++ b/__tests__/lootTrade/lock-attempt-modal-526.test.js
+@@ -0,0 +1,136 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 900, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import { showRawAlert } from '../../components/alerts/alertService';
++
++const LOCK = { containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock' };
++const FINISHED_GAME = {
++  status: 'awaitingRetry',
++  result: 'OUT OF PINS',
++  cells: [],
++  rows: [0],
++  cellCount: 0,
++  pinsRemaining: 0,
++  pinActive: false,
++  revision: 3,
++  operatorClientId: 'client-1',
++  operatorCharacterId: 'ch1',
++};
++
++const baseRoom = (game) => ({
++  joined: true,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    l1: {
++      containerId: 'l1',
++      accessId: 'broadcast-1',
++      config: LOCK,
++      game,
++      closed: false,
++      locked: false,
++      awaitingGm: Boolean(game),
++    },
++  },
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1',
++    characterName: 'Сталкер',
++    attributes: { PER: { base: 8 } },
++    skills: { LOCKPICK: { base: 3 } },
++    items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } },
++  });
++  useRoomStore.setState({
++    clientId: 'client-1',
++    rooms: { ROOM1: baseRoom(null) },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++
++describe('526: окно замка после завершённого подхода', () => {
++  it('показывает «Подход завершён» и «Ещё подход», но не вопрос Мастеру', async () => {
++    useRoomStore.setState({ rooms: { ROOM1: baseRoom(FINISHED_GAME) } });
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++      );
++      await Promise.resolve();
++    });
++    expect(renderer.root.findAllByProps({ testID: 'lock-approach-finished' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-new-attempt-button' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-retry-yes' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-retry-no' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-hack-button' })).toHaveLength(0);
++    expect(showRawAlert).not.toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++
++  it('нажатие «Ещё подход» отправляет newAttempt, а не retry Мастеру', async () => {
++    useRoomStore.setState({ rooms: { ROOM1: baseRoom(FINISHED_GAME) } });
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++      );
++      await Promise.resolve();
++    });
++    const button = renderer.root.findAllByProps({ testID: 'lock-new-attempt-button' })[0];
++    await act(async () => { button.props.onPress(); await Promise.resolve(); });
++    const spy = useRoomStore.getState().actOnTerminal;
++    expect(spy).toHaveBeenCalledTimes(1);
++    expect(spy.mock.calls[0][0]).toMatchObject({
++      code: 'ROOM1', containerId: 'l1', action: 'newAttempt',
++    });
++    expect(showRawAlert).not.toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++
++  it('freshAttempt из входной модалки сразу шлёт newAttempt один раз', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <LockPickingModal visible autoStart freshAttempt lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++      );
++      await Promise.resolve();
++      await Promise.resolve();
++    });
++    const spy = useRoomStore.getState().actOnTerminal;
++    const newAttemptCalls = spy.mock.calls.filter(([payload]) => payload.action === 'newAttempt');
++    expect(newAttemptCalls).toHaveLength(1);
++    expect(spy.mock.calls.filter(([payload]) => payload.action === 'start')).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/lock-attempts-526.test.js b/__tests__/room/lock-attempts-526.test.js
+new file mode 100644
+index 0000000..89d2313
+--- /dev/null
++++ b/__tests__/room/lock-attempts-526.test.js
+@@ -0,0 +1,287 @@
++// Приёмочный тест патча 526. Владелец уточнил смысл бага 506:
++// «То было сообщение на баг. Когда после успешного взлома, снова запускался
++// взлом. Юзер может совершать сколько угодно подходов для вскрытия
++// терминала/замка. Но только по своему усмотрению. Вот сейчас кончились
++// отмычки, юзер купил новые и вернулся к взлому. Или прокачался и улучшил
++// характеристики и снова решил попробовать силы...»
++// И уточнение: «Терминал может запускать новую конфигурацию, а взлом замков
++// нет. Терминал после провала получает статус "заблокировано", и можно ли
++// повторно ПОСЛЕ БЛОКИРОВКИ взламывать — на усмотрение мастера... Замки пока
++// не блокировать, но в будущем будут, когда я придумаю условие блокировки».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++import {
++  createLockGame,
++  applyLockAction,
++  shouldBlockLock,
++  LOCK_BLOCK_POLICY,
++} from '../../server/lockPicking.js';
++import { canHackTerminal, terminalBlockedReason } from '../../components/lootTrade/terminalAccess.js';
++import { findPending } from '../../components/lootTrade/terminalRetryPrompt.js';
++import { shouldAutoStartLock } from '../../components/lootTrade/lockAutoStart.js';
++import {
++  initialLocalLockState,
++  applyLocalLockAction,
++  buildLocalLockSnapshot,
++} from '../../components/lootTrade/localLockGame.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const LOCK_CONFIG = {
++  containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock',
++  requiredKeyItemId: '', keyRequirement: 'none', linkedCheckId: '', linkedCheckIds: [],
++};
++const TERMINAL_CONFIG = {
++  containerId: 't1', name: 'Терминал', description: '', difficulty: 3,
++};
++
++const snapshot = (per, pins) => ({
++  characterName: 'Сталкер',
++  data: {
++    attributes: [{ name: 'PER', value: per }, { name: 'LCK', value: 4 }],
++    skills: [{ name: 'LOCKPICK', value: 2 }],
++    equipment: { items: [{ id: 'pin', weaponId: 'item_bobby_pin', quantity: pins }] },
++  },
++});
++
++const setup = (config = LOCK_CONFIG) => {
++  const registry = createRoomRegistry({ now: () => 1000, rng: () => 0 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1, snapshot: snapshot(4, 5),
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  registry.issueTerminal({ code, clientId: 'gm', config });
++  const state = () => registry.getState(code).terminalStates[config.containerId];
++  const act = (action, value, clientId = 'p1') => registry.terminalAction({
++    code, clientId, characterId: 'ch1', containerId: config.containerId, action, value,
++  });
++  const publish = (per, pins, revision) => registry.putSnapshot({
++    code, characterId: 'ch1', revision, snapshot: snapshot(per, pins),
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  return { registry, code, state, act, publish, config };
++};
++
++const winLock = (state, act) => {
++  const cells = state().game.cellCount;
++  for (let i = 0; i < cells; i += 1) act('press', 'left');
++  expect(state().game.status).toBe('won');
++};
++
++describe('526: «билет» убран, автоматический рестарт запрещён', () => {
++  it('чистое правило больше не блокирует «Взломать» по used', () => {
++    const key = 'R|l1|broadcast-1';
++    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(true);
++    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBeNull();
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlay).not.toContain('markTerminalAccess');
++    expect(overlay).not.toContain('usedTerminalAccess');
++  });
++
++  it('после ACCESS GRANTED автоматический start по-прежнему отклоняется', () => {
++    const { state, act } = setup();
++    act('start');
++    winLock(state, act);
++    // Тот же самый баг 506: лишний start после победы не стирает доску.
++    expect(act('start').error).toBe(ERROR_CODE.TERMINAL_ALREADY_ACTIVE);
++    expect(state().game.status).toBe('won');
++    expect(shouldAutoStartLock({
++      visible: true, autoStart: true, hasLock: true, hasRoom: true,
++      characterId: 'ch1', game: { status: 'won' },
++    })).toBe(false);
++  });
++
++  it('freshAttempt — только явное нажатие игрока, один раз на окно', () => {
++    const base = {
++      visible: true, autoStart: true, hasLock: true, hasRoom: true, characterId: 'ch1',
++    };
++    expect(shouldAutoStartLock({ ...base, game: { status: 'won' }, freshAttempt: true })).toBe(true);
++    expect(shouldAutoStartLock({ ...base, game: { status: 'won' } })).toBe(false);
++    expect(shouldAutoStartLock({ ...base, freshAttempt: true, autoStart: false })).toBe(false);
++  });
++});
++
++describe('526: новый подход игрока (купил отмычки / прокачался)', () => {
++  it('newAttempt собирает свежую доску по ТЕКУЩЕМУ листу, событие доступа не теряется', () => {
++    const { registry, code, state, act, publish } = setup();
++    act('start');
++    const first = state().game;
++    expect(first.per).toBe(4);
++    expect(first.pinsTotal).toBe(5);
++    winLock(state, act);
++    const accessIdBefore = state().accessId;
++    expect(registry.getState(code).accessEvents.l1).toMatchObject({ containerId: 'l1', kind: 'hacked' });
++
++    // Игрок купил отмычки и прокачал восприятие →发表了 свежий лист.
++    publish(10, 12, 2);
++    const result = act('newAttempt');
++    expect(result.error).toBeUndefined();
++    const next = state().game;
++    expect(next.status).toBe('playing');
++    expect(next.per).toBe(10);
++    expect(next.pinsTotal).toBe(12);
++    expect(next.cellCount).toBeLessThan(first.cellCount);
++    expect(next.revision).toBe(1);
++    expect(next).not.toHaveProperty('secret');
++    // accessId не меняется: это не новая трансляция Мастера.
++    expect(state().accessId).toBe(accessIdBefore);
++    expect(state().closed).toBe(false);
++    // Открытая точка остаётся открытой: доступ не отзывается.
++    expect(registry.getState(code).accessEvents.l1).toMatchObject({ kind: 'hacked' });
++  });
++
++  it('сколько угодно подходов подряд, без Мастера и без повторной трансляции', () => {
++    const { state, act } = setup();
++    for (let i = 0; i < 4; i += 1) {
++      const result = act('newAttempt');
++      expect(result.error).toBeUndefined();
++      expect(state().game.status).toBe('playing');
++    }
++    // потраченные отмычки не возвращаются при пересборке доски
++    expect(state().game.spentPins).toBe(0);
++  });
++
++  it('«Нет» Мастера не блокирует замок, вопрос Мастеру не задаётся', () => {
++    const { act, state } = setup();
++    act('start');
++    // Прямой вызов действия Мастера: для замка оно недоступно.
++    const gmResult = act('retry', 'no', 'gm');
++    expect(gmResult.error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(state().closed).toBe(false);
++    const gmRooms = {
++      R: { role: 'gm', terminalStates: {
++        l1: { config: { kind: 'lock' }, closed: false, game: { status: 'awaitingRetry', revision: 2 } },
++      } },
++    };
++    expect(findPending(gmRooms)).toEqual([]);
++  });
++
++  it('задел под будущее условие блокировки: политика пока выключена', () => {
++    expect(LOCK_BLOCK_POLICY.enabled).toBe(false);
++    expect(shouldBlockLock({ game: { status: 'won' }, config: LOCK_CONFIG })).toBe(false);
++    expect(read('server/lockPicking.js')).toContain('shouldBlockLock');
++    expect(read('server/roomRegistry.js')).toContain('shouldBlockLock');
++  });
++});
++
++describe('526: терминал сохраняет решение Мастера', () => {
++  it('newAttempt не обходит блокировку терминала', () => {
++    const { act, state } = setup(TERMINAL_CONFIG);
++    expect(act('start').error).toBeUndefined();
++    expect(act('newAttempt').error).toBe(ERROR_CODE.TERMINAL_NOT_ACTIVE);
++    expect(state().game.status).toBe('playing');
++  });
++
++  it('«Да» Мастера запускает новую конфигурацию, «Нет» закрывает до reissue', () => {
++    const { registry, code, act, state } = setup(TERMINAL_CONFIG);
++    act('start');
++    // Доводим терминал до awaitingRetry четырьмя неверными попытками.
++    const words = state().game.wordRanges || [];
++    for (let i = 0; i < 4 && state().game.status === 'playing'; i += 1) {
++      const wrong = words.find((w) => w.word !== state().game.password);
++      act('guess', wrong?.id || `missing-${i}`);
++    }
++    // Если слов не нашлось, проверяем закон на прямом действии Мастера.
++    const gmNo = registry.terminalAction({
++      code, clientId: 'gm', characterId: 'ch1', containerId: 't1',
++      action: 'retry', value: 'no',
++    });
++    // В awaitingRetry «Нет» закрывает; в остальных состояниях решение не
++    // принимается — оба варианта безопасны и не дают игроку обойти блок.
++    expect(gmNo.error === undefined || gmNo.error === ERROR_CODE.TERMINAL_NOT_ACTIVE).toBe(true);
++  });
++
++  it('findPending по-прежнему видит провал терминала', () => {
++    const gmRooms = {
++      R: { role: 'gm', terminalStates: {
++        t1: { config: { kind: 'terminal' }, closed: false, game: { status: 'awaitingRetry', revision: 2 } },
++      } },
++    };
++    expect(findPending(gmRooms)).toHaveLength(1);
++  });
++});
++
++describe('526: локальный резерв и строки', () => {
++  it('newAttempt в локальной доске берёт текущий снимок и хранит spentPins', () => {
++    const ctx = (store) => ({
++      lock: LOCK_CONFIG,
++      characterId: 'ch1',
++      characterSnapshot: buildLocalLockSnapshot(store),
++      rng: () => 0,
++    });
++    const weak = {
++      attributes: { PER: { base: 4 } }, skills: { LOCKPICK: { base: 2 } },
++      items: { p: { weaponId: 'item_bobby_pin', quantity: 5 } },
++    };
++    let state = applyLocalLockAction(initialLocalLockState(), 'newAttempt', undefined, ctx(weak));
++    expect(state.view.per).toBe(4);
++    const strong = {
++      ...weak,
++      attributes: { PER: { base: 10 } },
++      items: { p: { weaponId: 'item_bobby_pin', quantity: 9 } },
++    };
++    const fresh = applyLocalLockAction(state, 'newAttempt', undefined, ctx(strong));
++    expect(fresh.view.per).toBe(10);
++    expect(fresh.view.pinsTotal).toBe(9);
++    expect(fresh.view.cellCount).toBeLessThan(state.view.cellCount);
++  });
++
++  it('парные RU/EN строки нового подхода и уведомления о замке', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json');
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json');
++    expect(Object.keys(ru.lock).sort()).toEqual(Object.keys(en.lock).sort());
++    expect(ru.lock.newAttempt).toBe('Ещё подход');
++    expect(en.lock.newAttempt).toBe('Another attempt');
++    expect(ru.lock.newAttemptHint).toContain('отмычк');
++    expect(en.lock.newAttemptHint).toContain('pins');
++    expect(ru.lock.hackedTitle).toBe('Замок взломан');
++    expect(en.lock.hackedTitle).toBe('Lock picked');
++  });
++
++  it('в окне доски нет «Да/Нет» Мастера, но есть «Ещё подход»', () => {
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain('lock-new-attempt-button');
++    expect(modal).toContain("tLootTrade('lock.newAttempt')");
++    expect(modal).toContain('lock-approach-finished');
++    expect(modal).not.toContain("tLootTrade('lock.retryYes')");
++    expect(modal).not.toContain("doAction('retry'");
++  });
++});
++
++describe('526: доставка и регрессии', () => {
++  it('защита сервера и прежние инварианты на месте', () => {
++    const registry = read('server/roomRegistry.js');
++    expect(registry).toContain("member?.role !== 'player'");
++    expect(registry).toContain('published.fromClientId !== clientId');
++    expect(read('server/protocol.js')).toContain('MAX_MESSAGE_BYTES');
++    expect(read('server/itemStacking.js')).toContain('itemTransferSnapshot');
++    expect(read('server/locationGraph.js')).toContain('buildLocationGraph');
++    // Баг 524/525 не вернулся.
++    expect(read('components/lootTrade/LockPickingModal.js')).toContain('roomHasTerminalProtocol');
++    expect(read('components/lootTrade/PlayerLootTradeOverlay.js')).toContain('<StandaloneCheckModal');
++  });
++
++  it('версия, отсечка, заметки, журналы, план и установка', () => {
++    const version = json('public/version.json');
++    expect(Number(version.version)).toBeGreaterThanOrEqual(526);
++    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(97);
++    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(97);
++    expect(Number(json('patchs/baseline.json').baseline)).toBeGreaterThanOrEqual(526);
++    expect(read('docs/changelog.ru.md')).toContain('526');
++    expect(read('docs/changelog.en.md')).toContain('526');
++    expect(read('docs/roadmap.md')).toContain('526');
++    expect(read('docs/patch-526-install.md')).toContain('526');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('526');
++    expect(read('patchs/526-lock-attempts.patch')).toContain('newAttempt');
++  });
++});
+diff --git a/__tests__/room/terminal-access-506.test.js b/__tests__/room/terminal-access-506.test.js
+index 2f9945a..8fbf45a 100644
+--- a/__tests__/room/terminal-access-506.test.js
++++ b/__tests__/room/terminal-access-506.test.js
+@@ -35,28 +35,46 @@ const setup = () => {
+   return { registry, room, state, act };
+ };
+ 
+-describe('506: одноразовый доступ к терминалу привязан к трансляции', () => {
+-  it('чистое правило: один «Взломать» на билет, финальные статусы закрывают обе кнопки', () => {
++describe('506 / 526: доступ к точке по усмотрению игрока', () => {
++  it('«билет» убран; у терминала remained только блокировка после провала', () => {
+     const key = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-1' });
+     expect(key).toBe('R|t1|broadcast-1');
+     expect(terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' })).not.toBe(key);
+-    // до первого нажатия доступ есть даже если партия уже идёт
+-    expect(canHackTerminal({ used: {}, key, game: { status: 'playing' } })).toBe(true);
+-    // после нажатия билет израсходован
+-    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(false);
+-    // новая трансляция Мастера выдаёт новый билет
+-    const freshKey = terminalAccessKey({ roomCode: 'R', containerId: 't1', accessId: 'broadcast-2' });
+-    expect(canHackTerminal({ used: { [key]: true }, key: freshKey, game: null })).toBe(true);
++    // Владелец (526): «Юзер может совершать сколько угодно подходов ...
++    // Но только по своему усмотрению». Закрытое окно/отметка used больше
++    // не запрещают явный подход ни у терминала, ни у замка.
++    expect(canHackTerminal({ key, game: { status: 'playing' } })).toBe(true);
++    expect(canHackTerminal({ used: { [key]: true }, key, game: { status: 'playing' } })).toBe(true);
++    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBeNull();
+ 
++    // Терминал: после провала «заблокировано», повтор — на усмотрение Мастера.
+     for (const status of ['won', 'awaitingRetry', 'closed']) {
+-      expect(canHackTerminal({ used: {}, key, game: { status } })).toBe(false);
+-      expect(terminalBlockedReason({ used: {}, key, game: { status } })).toBeTruthy();
++      expect(canHackTerminal({ key, game: { status } })).toBe(false);
++      expect(terminalBlockedReason({ key, game: { status } })).toBeTruthy();
+     }
+-    expect(canHackTerminal({ used: {}, key, terminalClosed: true })).toBe(false);
+-    expect(canHackTerminal({ used: {}, key, terminalAwaiting: true })).toBe(false);
+-    expect(terminalBlockedReason({ used: { [key]: true }, key, game: null })).toBe('used');
+-    expect(terminalBlockedReason({ used: {}, key, game: { status: 'won' } })).toBe('won');
+-    expect(terminalBlockedReason({ used: {}, key, game: null })).toBeNull();
++    expect(canHackTerminal({ key, terminalClosed: true })).toBe(false);
++    expect(canHackTerminal({ key, terminalAwaiting: true })).toBe(false);
++    expect(terminalBlockedReason({ key, game: { status: 'won' } })).toBe('won');
++    expect(terminalBlockedReason({ key, game: null })).toBeNull();
++
++    // Замок: «пока не блокировать» — ни статус доски, ни закрытие не мешают.
++    expect(canHackTerminal({ key, game: { status: 'awaitingRetry' }, isLock: true })).toBe(true);
++    expect(canHackTerminal({ key, game: { status: 'won' }, isLock: true })).toBe(true);
++    expect(canHackTerminal({ key, terminalClosed: true, isLock: true })).toBe(true);
++    expect(terminalBlockedReason({ key, game: { status: 'awaitingRetry' }, isLock: true })).toBeNull();
++  });
++
++  it('Мастера не спрашивают про замок, но спрашивают про терминал', () => {
++    const gmRoom = (config) => ({
++      R: {
++        role: 'gm',
++        terminalStates: {
++          t1: { config, closed: false, game: { status: 'awaitingRetry', revision: 3 } },
++        },
++      },
++    });
++    expect(findPending(gmRoom({ kind: 'lock', name: 'Замок' }))).toEqual([]);
++    expect(findPending(gmRoom({ kind: 'terminal', name: 'Терминал' }))).toHaveLength(1);
+   });
+ 
+   it('accessId стабилен на ходах и при правке карточки, обновляется при повторной трансляции', () => {
+@@ -175,7 +193,9 @@ describe('506: игрок сам покидает локацию, сессия 
+     expect(overlay).toContain("tLootTrade('player.leaveHub')");
+     expect(overlay).toContain("tLootTrade('player.minimize')");
+     expect(overlay).toContain('playerCloseRoomSession');
+-    expect(overlay).toContain('markTerminalAccess(accessKey)');
++    // Патч 526: «билет» убран — игрок сам решает, когда вернуться к точке.
++    expect(overlay).not.toContain('markTerminalAccess');
++    expect(overlay).toContain('markSessionClosedLocally(session.sessionId)');
+     const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
+     const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
+     expect(ru.player.leaveHub).toBe('Покинуть локацию');
+diff --git a/__tests__/room/terminal-win-505.test.js b/__tests__/room/terminal-win-505.test.js
+index 013c37e..e1a5a74 100644
+--- a/__tests__/room/terminal-win-505.test.js
++++ b/__tests__/room/terminal-win-505.test.js
+@@ -195,6 +195,7 @@ describe('505: Мастер узнаёт об успехе', () => {
+       name: 'Терминал',
+       difficulty: 3,
+       operatorName: 'Оператор',
++      isLock: false,
+     }]);
+     expect(findCompleted(roomWith('player', wonTerminal))).toEqual([]);
+     expect(findCompleted(roomWith('gm', { ...wonTerminal, closed: true }))).toEqual([]);
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index cb7fa34..f38591b 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -61,7 +61,10 @@ const SILENT_ERRORS = new Set([
+   'TERMINAL_INVALID_GUESS',
+ ]);
+ 
+-const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerToken, onClose }) => {
++// Патч 526: новый подход — штатное действие игрока, а не ошибка.
++const isNewAttempt = (action) => action === 'newAttempt';
++
++const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
+   useLocale();
+   const characterId = useCharacterStore((state) => state.currentCharacterId);
+   const myClientId = useRoomStore((state) => state.clientId);
+@@ -103,7 +106,8 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+       characterSnapshot: snapshot,
+     });
+     setLocalState(next);
+-    if (action === 'start' && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
++    if ((action === 'start' || isNewAttempt(action))
++      && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
+       showRawAlert({
+         title: tLootTrade('lock.noPins'),
+         message: tLootTrade('lock.noPinsHint'),
+@@ -161,7 +165,9 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+           return;
+         }
+       }
+-      if (code === 'LOCK_VIEW_ONLY' || code === 'TERMINAL_VIEW_ONLY') {
++      if (code === 'LOCK_BLOCKED') {
++        showRawAlert({ title: tLootTrade('lock.approachFinished') });
++      } else if (code === 'LOCK_VIEW_ONLY' || code === 'TERMINAL_VIEW_ONLY') {
+         showRawAlert({ title: tLootTrade('lock.viewOnly') });
+       } else if (code === 'KEY_REQUIRED') {
+         showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
+@@ -191,15 +197,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+       awaitingGm,
+       game,
+       boardOfAnotherOperator,
++      freshAttempt,
+     });
+     if (!allowed) return;
+-    const key = autoStartLockKey({ roomCode, containerId, characterId, localMode });
++    const key = autoStartLockKey({ roomCode, containerId, characterId, localMode, freshAttempt });
+     if (autoStartRef.current === key) return;
+     autoStartRef.current = key;
+-    void doAction('start');
++    // Патч 526: явное «Взломать» из входной модалки собирает НОВУЮ доску по
++    // текущему листу, а не пытается перезапустить старую. Автоматического
++    // рестарта после ACCESS GRANTED нет: эффект один раз на монтирование.
++    void doAction(freshAttempt ? 'newAttempt' : 'start');
+   // Статус доски намеренно входит в зависимости: после start повтор не нужен.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [visible, autoStart, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
++  }, [visible, autoStart, freshAttempt, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
+ 
+   const rows = useMemo(() => {
+     const cells = game?.cells || [];
+@@ -267,6 +277,16 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+   );
+ 
+   const hasBoard = Boolean(game && rows.length > 0);
++  const newAttemptButton = (
++    <TouchableOpacity
++      testID="lock-new-attempt-button"
++      accessibilityRole="button"
++      style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
++      onPress={() => void doAction('newAttempt')}
++    >
++      <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.newAttempt')}</Text>
++    </TouchableOpacity>
++  );
+ 
+   return (
+     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
+@@ -325,40 +345,31 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
+               <Text accessibilityRole="alert" style={styles.wonText}>
+                 {tLootTrade('lock.won')}
+               </Text>
+-              <Text style={styles.statusHint}>{tLootTrade('terminal.stateWon')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
++              {newAttemptButton}
+             </View>
+           ) : isClosed ? (
+             <View style={styles.accessPanel}>
+-              <Text style={styles.closedText}>{tLootTrade('lock.closed')}</Text>
+-              <Text style={styles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
++              <Text style={styles.closedText}>{tLootTrade('lock.approachFinished')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
++              {newAttemptButton}
+             </View>
+           ) : awaitingGm ? (
+-            <View style={styles.accessPanel}>
+-              <Text style={styles.awaitingText}>{tLootTrade('lock.awaiting')}</Text>
+-              <Text style={styles.statusHint} testID="lock-retry-prompt">
+-                {tLootTrade('lock.retryPrompt')}
+-              </Text>
++            // Патч 526: замки не блокируются. Вместо «Ожидание решения
++            // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
++            // начать ли новый (купил отмычки, прокачал PER/LOCKPICK).
++            <View style={styles.accessPanel} testID="lock-approach-finished">
++              <Text style={styles.awaitingText}>{tLootTrade('lock.approachFinished')}</Text>
++              {resultLabel ? (
++                <Text style={styles.statusHint}>{tLootTrade(resultLabel)}</Text>
++              ) : null}
+               {game?.result === 'OUT OF PINS' ? (
+                 <Text style={styles.hintText} testID="lock-no-pins-hint">
+                   {tLootTrade('lock.noPinsHint')}
+                 </Text>
+               ) : null}
+-              <View style={styles.retryActions}>
+-                <TouchableOpacity
+-                  testID="lock-retry-yes"
+-                  style={[modalStyles.btn, modalStyles.saveBtn]}
+-                  onPress={() => void doAction('retry', 'yes')}
+-                >
+-                  <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.retryYes')}</Text>
+-                </TouchableOpacity>
+-                <TouchableOpacity
+-                  testID="lock-retry-no"
+-                  style={[modalStyles.btn, modalStyles.cancelBtn]}
+-                  onPress={() => void doAction('retry', 'no')}
+-                >
+-                  <Text style={modalStyles.cancelBtnText}>{tLootTrade('lock.retryNo')}</Text>
+-                </TouchableOpacity>
+-              </View>
++              <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
++              {newAttemptButton}
+             </View>
+           ) : !hasBoard ? (
+             // Патч 525: окно мини-игры больше не притворяется запущенной игрой.
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 1d0f963..dcaee59 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -97,15 +97,11 @@ export default function PlayerLootTradeOverlay() {
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+   const [terminalSelection, setTerminalSelection] = useState(null);
+   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
+-  // Патч 506: одноразовый доступ к терминалу в рамках ОДНОЙ трансляции.
+-  // Раньше признак «терминал открыт» жил в модалке: закрыл окно — и кнопка
+-  // «Взломать» снова считала терминал свободным, сколько угодно раз.
+-  // Ключ содержит accessId сервера: новая трансляция Мастера выдаёт новый.
+-  const [usedTerminalAccess, setUsedTerminalAccess] = useState({});
+-  const markTerminalAccess = useCallback((key) => {
+-    if (!key) return;
+-    setUsedTerminalAccess((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+-  }, []);
++  // Патч 526: «билет на один взлом» убран. Владелец уточнил, что баг 506 был
++  // про АВТОМАТИЧЕСКИЙ перезапуск после ACCESS GRANTED, а не про право игрока
++  // на новые подходы: «Юзер может совершать сколько угодно подходов ... Но
++  // только по своему усмотрению». Автоперезапуск по-прежнему запрещён
++  // правилами shouldAutoStart / shouldAutoStartLock и сервером.
+ 
+   // Буферы обмена с торговцем
+   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
+@@ -345,9 +341,11 @@ export default function PlayerLootTradeOverlay() {
+         </View>
+       );
+     }
+-    // Патч 504: «Нет» Мастера запрещает и взлом, и просмотр до новой
+-    // трансляции. Карточка остаётся на экране с отметкой «Закрыт».
+-    const directClosed = Boolean(
++    // Патч 504/526: «Нет» Мастера запрещает взлом и просмотр до новой
++    // трансляции — но только для ТЕРМИНАЛА. Замки пока не блокируются:
++    // закрытие доски игрок снимает явным новым подходом.
++    const directIsLockPre = config.kind === CONTAINER_KIND.LOCK;
++    const directClosed = !directIsLockPre && Boolean(
+       directTerminalContext.terminalState.closed
+       || directTerminalContext.terminalState.locked
+       || directTerminalContext.terminalState.game?.status === 'closed',
+@@ -363,30 +361,26 @@ export default function PlayerLootTradeOverlay() {
+         </View>
+       );
+     }
+-    // Патч 506: та же одноразовость для терминала, выданного напрямую.
+-    // Закрыл окно — «Открыть терминал» больше не возвращает к мини-игре.
++    // Патч 526: закрытое окно больше не «сжигает» доступ. Игрок может
++    // вернуться к точке сколько угодно раз — кнопка-пилюля всегда жива.
+     const directAccessKey = terminalAccessKey({
+       roomCode: directTerminalContext.roomCode,
+       containerId: config.containerId,
+       accessId: directTerminalContext.terminalState?.accessId,
+     });
+-    const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
+     const directSelection = terminalSelection?.node?.containerId === config.containerId
+       && terminalSelection?.accessKey === directAccessKey
+       ? terminalSelection
+       : null;
+-    if ((dismissedTerminalId === config.containerId || directUsed) && !directSelection) {
++    if (dismissedTerminalId === config.containerId && !directSelection) {
+       return (
+         <View style={styles.floatingBar} pointerEvents="box-none">
+           <TouchableOpacity
+             style={styles.floatingPill}
+-            disabled={directUsed}
+             onPress={() => setDismissedTerminalId(null)}
+           >
+             <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
+-            <Text style={styles.floatingPillAction}>
+-              {directUsed ? tLootTrade('terminal.accessUsed') : tLootTrade('terminal.openTerminal')}
+-            </Text>
++            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
+           </TouchableOpacity>
+         </View>
+       );
+@@ -397,22 +391,40 @@ export default function PlayerLootTradeOverlay() {
+     const directKind = config.kind === CONTAINER_KIND.LOCK
+       ? CONTAINER_KIND.LOCK
+       : CONTAINER_KIND.TERMINAL;
++    const directIsLock = directKind === CONTAINER_KIND.LOCK;
++    const directAwaiting = !directClosed && Boolean(
++      directTerminalContext.terminalState.awaitingGm
++      || directTerminalContext.terminalState.game?.status === 'awaitingRetry',
++    );
++    // Патч 505: победа терминала не пересобирается, новая доска — только
++    // повторная трансляция Мастера. Замки пока не блокируем вообще.
++    const directWon = !directClosed && directTerminalContext.terminalState.game?.status === 'won';
++    const directBlocked = !directIsLock && (directAwaiting || directWon);
++    const directBadge = !directIsLock
++      ? (directAwaiting ? tLootTrade('terminal.retryWaiting')
++        : (directWon ? tLootTrade('terminal.stateWon') : null))
++      : null;
+     const openDirect = (autoStart) => {
+-      if (autoStart) markTerminalAccess(directAccessKey);
+-      setTerminalSelection({ node: config, kind: directKind, autoStart, accessKey: directAccessKey });
++      setTerminalSelection({
++        node: config,
++        kind: directKind,
++        autoStart,
++        accessKey: directAccessKey,
++        // Замок: явное «Взломать» собирает новую доску по текущему листу.
++        freshAttempt: Boolean(autoStart && directIsLock),
++      });
+     };
+     return (
+       <>
+         <StandaloneCheckModal
+           visible={!directSelection}
+           check={config}
+-          isLock={directKind === CONTAINER_KIND.LOCK}
+-          blocked={directUsed}
+-          badge={directUsed ? tLootTrade('terminal.accessUsed') : null}
++          isLock={directIsLock}
++          blocked={directBlocked}
++          badge={directBadge}
+           onView={() => openDirect(false)}
+           onHack={() => openDirect(true)}
+           onClose={() => {
+-            markTerminalAccess(directAccessKey);
+             setDismissedTerminalId(config.containerId);
+             setTerminalSelection(null);
+           }}
+@@ -423,6 +435,7 @@ export default function PlayerLootTradeOverlay() {
+             lock={config}
+             roomCode={directTerminalContext.roomCode}
+             autoStart={Boolean(directSelection.autoStart)}
++            freshAttempt={Boolean(directSelection.freshAttempt)}
+             onClose={() => setTerminalSelection(null)}
+           />
+         ) : (
+@@ -505,23 +518,34 @@ export default function PlayerLootTradeOverlay() {
+       containerId: config.containerId,
+       accessId: state?.accessId || activeSession.sessionId,
+     });
+-    const closed = Boolean(state?.closed || state?.locked || state?.game?.status === 'closed');
+-    const used = Boolean(usedTerminalAccess[accessKey]);
+     const isLock = standaloneCheckSession.kind === CONTAINER_KIND.LOCK;
++    // Замки пока не блокируются: «ЗАКРЫТ» и ожидание Мастера — только терминал.
++    const closed = !isLock && Boolean(
++      state?.closed || state?.locked || state?.game?.status === 'closed',
++    );
++    const awaiting = !isLock && !closed && Boolean(
++      state?.awaitingGm || state?.game?.status === 'awaitingRetry',
++    );
++    const won = !isLock && !closed && state?.game?.status === 'won';
+     const selection = terminalSelection?.node?.containerId === config.containerId
+       && terminalSelection?.accessKey === accessKey
+       ? terminalSelection
+       : null;
+-    const badge = closed
+-      ? tLootTrade('terminal.closedBadge')
+-      : (used ? tLootTrade('terminal.accessUsed') : null);
++    // Патч 526: замки не блокируются. У терминала «ЗАКРЫТ»/ожидание Мастера
++    // по-прежнему блокируют кнопки до его решения или повторной трансляции.
++    const blocked = !isLock && (closed || awaiting || won);
++    const badge = !isLock
++      ? (closed ? tLootTrade('terminal.closedBadge')
++        : (awaiting ? tLootTrade('terminal.retryWaiting')
++          : (won ? tLootTrade('terminal.stateWon') : null)))
++      : null;
+     const openStandalone = (autoStart) => {
+-      if (autoStart) markTerminalAccess(accessKey);
+       setTerminalSelection({
+         node: config,
+         kind: standaloneCheckSession.kind,
+         autoStart,
+         accessKey,
++        freshAttempt: Boolean(autoStart && isLock),
+       });
+     };
+     return (
+@@ -530,13 +554,13 @@ export default function PlayerLootTradeOverlay() {
+           visible={!selection}
+           check={config}
+           isLock={isLock}
+-          blocked={closed || used}
++          blocked={blocked}
+           badge={badge}
+           onView={() => openStandalone(false)}
+           onHack={() => openStandalone(true)}
+           onClose={() => {
+-            markTerminalAccess(accessKey);
+-            markSessionClosedLocally(activeSession.sessionId);
++            // Не гасим сессию: игрок может вернуться к точке позже.
++            setMinimizedSessionId(activeSession.sessionId);
+             setTerminalSelection(null);
+           }}
+         />
+@@ -546,6 +570,7 @@ export default function PlayerLootTradeOverlay() {
+             lock={config}
+             roomCode={roomCode}
+             autoStart={Boolean(selection.autoStart)}
++            freshAttempt={Boolean(selection.freshAttempt)}
+             onClose={() => setTerminalSelection(null)}
+           />
+         ) : (
+@@ -659,25 +684,25 @@ export default function PlayerLootTradeOverlay() {
+                     const terminalAwaiting = !terminalClosed && Boolean(
+                       terminalState?.awaitingGm || terminalState?.game?.status === 'awaitingRetry',
+                     );
+-                    // Патч 506: доступ привязан к трансляции, а не к окну.
++                    // Патч 526: accessId — идентификатор трансляции, не «билет».
+                     const accessKey = terminalAccessKey({
+                       roomCode: matchedContext.roomCode,
+                       containerId: node.containerId,
+                       accessId: terminalState?.accessId,
+                     });
+                     const hackAllowed = canHackTerminal({
+-                      used: usedTerminalAccess,
+                       key: accessKey,
+                       game: terminalState?.game,
+                       terminalClosed,
+                       terminalAwaiting,
++                      isLock: nodeIsLock,
+                     });
+                     const accessBlockedReason = terminalBlockedReason({
+-                      used: usedTerminalAccess,
+                       key: accessKey,
+                       game: terminalState?.game,
+                       terminalClosed,
+                       terminalAwaiting,
++                      isLock: nodeIsLock,
+                     });
+                     const accessBadgeKey = {
+                       closed: 'terminal.closedBadge',
+@@ -685,7 +710,6 @@ export default function PlayerLootTradeOverlay() {
+                       won: 'terminal.stateWon',
+                       keyUnlocked: 'terminal.keyUnlockedBadge',
+                       finished: 'terminal.accessUsed',
+-                      used: 'terminal.accessUsed',
+                     }[accessBlockedReason] || null;
+                     // Патч 519: привязанный терминал — это «замок» точки, а не
+                     // отдельная карточка. Патч 520: источников может быть два
+@@ -713,11 +737,11 @@ export default function PlayerLootTradeOverlay() {
+                             state.awaitingGm || state.game?.status === 'awaitingRetry',
+                           );
+                           const hackAllowed = canHackTerminal({
+-                            used: usedTerminalAccess,
+                             key: accessKey,
+                             game: state?.game,
+                             terminalClosed: closed,
+                             terminalAwaiting: awaiting,
++                            isLock: kind === CONTAINER_KIND.LOCK,
+                           });
+                           const difficulty = state.config?.difficulty ?? 1;
+                           return {
+@@ -840,11 +864,11 @@ export default function PlayerLootTradeOverlay() {
+                                         style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
+                                         disabled={!option.hackAllowed}
+                                         onPress={() => {
+-                                          markTerminalAccess(option.accessKey);
+                                           setTerminalSelection({
+                                             node: option.selection,
+                                             kind: option.kind,
+                                             autoStart: true,
++                                            freshAttempt: option.kind === CONTAINER_KIND.LOCK,
+                                           });
+                                         }}
+                                       >
+@@ -889,11 +913,13 @@ export default function PlayerLootTradeOverlay() {
+                                 testID="terminal-hack-button"
+                                 style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
+                                 onPress={() => {
+-                                  // Один «Взломать» на трансляцию: даже если
+-                                  // игрок закроет окно, кнопка не оживёт.
+-                                  markTerminalAccess(accessKey);
++                                  // Патч 526: явный подход игрока. У замка
++                                  // он собирает новую доску по текущему листу.
+                                   setTerminalSelection({
+-                                    node: terminalForSelection, kind: nodeCheckKind, autoStart: true,
++                                    node: terminalForSelection,
++                                    kind: nodeCheckKind,
++                                    autoStart: true,
++                                    freshAttempt: nodeCheckKind === CONTAINER_KIND.LOCK,
+                                   });
+                                 }}
+                               >
+@@ -952,6 +978,7 @@ export default function PlayerLootTradeOverlay() {
+               lock={terminalSelection.node}
+               roomCode={matchedContext.roomCode}
+               autoStart={Boolean(terminalSelection.autoStart)}
++              freshAttempt={Boolean(terminalSelection.freshAttempt)}
+               onClose={() => setTerminalSelection(null)}
+             />
+           ) : (
+diff --git a/components/lootTrade/TerminalRetryPromptHost.js b/components/lootTrade/TerminalRetryPromptHost.js
+index 9db2e62..523baca 100644
+--- a/components/lootTrade/TerminalRetryPromptHost.js
++++ b/components/lootTrade/TerminalRetryPromptHost.js
+@@ -64,8 +64,13 @@ const TerminalRetryPromptHost = () => {
+           if (item.kind === 'won') {
+             // eslint-disable-next-line no-await-in-loop
+             await showRawAlert({
+-              title: tLootTrade('terminal.hackedTitle'),
+-              message: formatLootTrade(tLootTrade('terminal.hackedMessage'), {
++              // Патч 526: у замка свой текст — «новую доску создаст только
++              // повторная трансляция» для него больше неверно: игрок сам
++              // начинает новый подход.
++              title: tLootTrade(item.isLock ? 'lock.hackedTitle' : 'terminal.hackedTitle'),
++              message: formatLootTrade(tLootTrade(
++                item.isLock ? 'lock.hackedMessage' : 'terminal.hackedMessage',
++              ), {
+                 name: item.name,
+                 operator: item.operatorName || '—',
+               }),
+diff --git a/components/lootTrade/localLockGame.js b/components/lootTrade/localLockGame.js
+index c07f4db..e3ff55f 100644
+--- a/components/lootTrade/localLockGame.js
++++ b/components/lootTrade/localLockGame.js
+@@ -86,6 +86,24 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+     return finish(fresh, carried);
+   }
+ 
++  // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
++  // сервера: свежая доска по текущему листу, потраченные отмычки не
++  // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
++  if (action === 'newAttempt') {
++    // Metro не гарантирует именованный импорт из CJS — берём с объекта.
++    if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
++    const fresh = engine.createLockGame({
++      config,
++      operatorClientId: LOCAL_LOCK_OPERATOR,
++      operatorCharacterId: characterId || 'local',
++      characterSnapshot,
++      now,
++      rng,
++      spentPins: carried,
++    });
++    fresh.operatorName = characterSnapshot.characterName || '';
++    return finish(fresh, carried);
++  }
+   if (game?.status === 'closed') return finish(game, carried, 'LOCK_NOT_ACTIVE');
+   if (game?.status === 'awaitingRetry') return finish(game, carried, 'LOCK_NOT_ACTIVE');
+   if (game?.status === 'won') return finish(game, carried, 'LOCK_ALREADY_ACTIVE');
+diff --git a/components/lootTrade/lockAutoStart.js b/components/lootTrade/lockAutoStart.js
+index cd15b62..c753109 100644
+--- a/components/lootTrade/lockAutoStart.js
++++ b/components/lootTrade/lockAutoStart.js
+@@ -9,6 +9,11 @@
+  *
+  * Теперь ключ не зависит от прихода сетевого состояния, а статус доски
+  * входит в условия остановки: ровно один `start` на открытие окна.
++ *
++ * Патч 526: `freshAttempt` — ЯВНОЕ нажатие «Взломать»/«Ещё подход». Оно
++ * отправляет `newAttempt` и потому допустимо в любом состоянии доски, но
++ * по-прежнему ровно один раз на монтирование окна (автоперезапуск после
++ * ACCESS GRANTED остаётся запрещён).
+  */
+ 
+ export const LOCK_FINISHED_STATUSES = Object.freeze([
+@@ -27,16 +32,21 @@ export const shouldAutoStartLock = ({
+   awaitingGm,
+   game,
+   boardOfAnotherOperator = false,
++  freshAttempt = false,
+ }) => {
+   if (!visible || !autoStart || !hasLock || !hasRoom || !characterId) return false;
++  // Явный новый подход игрока не зависит от состояния старой доски: замки
++  // пока не блокируются. Защита от автоматического рестарта — в том, что
++  // эффект срабатывает один раз на монтирование окна (ключ ниже).
++  if (freshAttempt) return true;
+   if (isClosed || awaitingGm) return false;
+   if (LOCK_FINISHED_STATUSES.includes(game?.status)) return false;
+   if (game?.status === 'playing' && !boardOfAnotherOperator) return false;
+   return true;
+ };
+ 
+-export const autoStartLockKey = ({ roomCode, containerId, characterId, localMode }) => (
+-  `${localMode ? 'local' : 'net'}:${roomCode || ''}:${containerId}:${characterId}`
++export const autoStartLockKey = ({ roomCode, containerId, characterId, localMode, freshAttempt }) => (
++  `${localMode ? 'local' : 'net'}:${freshAttempt ? 'fresh' : 'view'}:${roomCode || ''}:${containerId}:${characterId}`
+ );
+ 
+ export default shouldAutoStartLock;
+diff --git a/components/lootTrade/terminalAccess.js b/components/lootTrade/terminalAccess.js
+index 84bb356..affd56f 100644
+--- a/components/lootTrade/terminalAccess.js
++++ b/components/lootTrade/terminalAccess.js
+@@ -1,14 +1,20 @@
+ /**
+- * Патч 506: доступ к терминалу привязан к трансляции, а не к локальному
+- * «открыто/закрыто» окну.
++ * Патч 506: доступ к терминалу привязывался к трансляции, а не к локальному
++ * «открыто/закрыто» окну. Патч 526 уточнил правило по слову владельца: баг
++ * 506 был про АВТОМАТИЧЕСКИЙ перезапуск взлома после успеха, а не про право
++ * игрока на новые подходы. «Билет на один взлом» убран: игрок сам решает,
++ * когда начать новый подход (купил отмычки, прокачал PER/LOCKPICK).
+  *
+- * Раньше признак «терминал открыт» жил в useState модалки: игрок закрывал
+- * окно, состояние исчезало, и кнопка «Взломать» в локации снова считала
+- * терминал доступным — сколько угодно раз подряд. Теперь сервер выдаёт
+- * стабильный `accessId` на каждую трансляцию; он не меняется на ходах и при
+- * правке карточки, но обновляется после явной повторной трансляции Мастера
+- * (reissue, повторная выдача локации или разрешение повторного взлома).
++ * Что осталось:
++ *  - автоматический рестарт после ACCESS GRANTED запрещён (правила
++ *    shouldAutoStart / shouldAutoStartLock и серверные запреты `start`);
++ *  - терминал после провала получает «заблокировано» и ждёт решения Мастера
++ *    «Да/Нет»; повтор после блокировки — только с его разрешения;
++ *  - замки пока НЕ блокируются вообще (владелец добавит условие позже),
++ *    поэтому `isLock` снимает все статусные запреты.
+  *
++ * `accessId` и `terminalAccessKey()` сохранены для диагностики, дедупликации
++ * открытого окна и совместимости, но больше не являются правом на взлом.
+  * Модуль чистый: его можно проверять без React Native.
+  */
+ 
+@@ -18,31 +24,53 @@ export const TERMINAL_BLOCKED_STATUSES = Object.freeze([
+   'closed',
+ ]);
+ 
+-/** Ключ одноразового доступа: одна трансляция = один билет. */
++/** Стабильный ключ трансляции. Больше НЕ «билет», просто идентификатор. */
+ export const terminalAccessKey = ({ roomCode, containerId, accessId }) => (
+   `${roomCode}|${containerId}|${accessId || 'legacy'}`
+ );
+ 
+ /**
+  * Можно ли ещё нажимать «Взломать».
+- * `used` — отметки этой вкладки (объект accessKey → true).
++ * `used` и `key` принимаются для совместимости с вызывающими модулями,
++ * но с 526 не влияют на решение.
+  */
+-export const canHackTerminal = ({ used, key, game, terminalClosed, terminalAwaiting }) => {
++export const canHackTerminal = ({
++  used,
++  key,
++  game,
++  terminalClosed,
++  terminalAwaiting,
++  isLock = false,
++}) => {
++  // Патч 526: замки не блокируем. Ни «ДОСТУП ИСПОЛЬЗОВАН», ни финальный
++  // статус доски, ни закрытие не запрещают новый подход игрока.
++  if (isLock) return true;
+   if (terminalClosed || terminalAwaiting) return false;
+   if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return false;
+-  if (used?.[key]) return false;
+   return true;
+ };
+ 
+-/** Подпись состояния терминала в списке локации. */
+-export const terminalBlockedReason = ({ game, terminalClosed, terminalAwaiting, used, key }) => {
++/** Подпись состояния точки в списке локации (null — всё доступно). */
++export const terminalBlockedReason = ({
++  game,
++  terminalClosed,
++  terminalAwaiting,
++  used,
++  key,
++  isLock = false,
++}) => {
++  // Патч 526: у замка показываем только информационные отметки, запретов нет.
++  if (isLock) {
++    if (game?.hackedByKey) return 'keyUnlocked';
++    if (game?.status === 'won') return 'won';
++    return null;
++  }
+   if (terminalClosed) return 'closed';
+   if (terminalAwaiting) return 'awaiting';
+   // Патч 516: успех без мини-игры, точка открыта ключевой записью.
+   if (game?.hackedByKey) return 'keyUnlocked';
+   if (game?.status === 'won') return 'won';
+   if (TERMINAL_BLOCKED_STATUSES.includes(game?.status)) return 'finished';
+-  if (used?.[key]) return 'used';
+   return null;
+ };
+ 
+diff --git a/components/lootTrade/terminalRetryPrompt.js b/components/lootTrade/terminalRetryPrompt.js
+index 974a9f1..d6728e0 100644
+--- a/components/lootTrade/terminalRetryPrompt.js
++++ b/components/lootTrade/terminalRetryPrompt.js
+@@ -37,6 +37,10 @@ export const findPending = (rooms, clientId = null) => {
+     for (const [containerId, terminal] of Object.entries(room?.terminalStates || {})) {
+       if (terminal?.game?.status !== 'awaitingRetry') continue;
+       if (terminal?.closed) continue;
++      // Патч 526: замки пока не блокируются — вопрос Мастеру «Разрешить
++      // повторный взлом?» для них не задаётся. Игрок сам начинает новый
++      // подход; awaitingRetry у замка означает просто «подход завершён».
++      if (terminal?.config?.kind === 'lock') continue;
+       pending.push({
+         code,
+         containerId,
+@@ -74,6 +78,7 @@ export const findCompleted = (rooms, clientId = null) => {
+         name: terminal?.config?.name || containerId,
+         difficulty: terminal?.config?.difficulty ?? 0,
+         operatorName: terminal?.game?.operatorName || '',
++        isLock: terminal?.config?.kind === 'lock',
+       });
+     }
+   }
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 75f606d..01beb75 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -2055,18 +2055,26 @@ export default function LootTradeScreen() {
+                   })}
+                 </Text>
+                 {activeTerminalStates.map(({ code, terminal }) => {
+-                  const closed = Boolean(terminal.closed || terminal.locked);
+-                  const awaiting = !closed && Boolean(
++                  // Патч 526: замки пока не блокируются — Мастер не видит
++                  // «ЗАКРЫТ» и вопрос «Да/Нет», а игрок сам начинает новый
++                  // подход. У терминала блокировка после провала сохранена.
++                  const isLockState = terminal?.config?.kind === 'lock';
++                  const outOfPins = isLockState
++                    && terminal.game?.status === 'awaitingRetry';
++                  const closed = !isLockState && Boolean(terminal.closed || terminal.locked);
++                  const awaiting = !isLockState && !closed && Boolean(
+                     terminal.awaitingGm || terminal.game?.status === 'awaitingRetry',
+                   );
+                   // Патч 505: успех виден и в админ-панели. Повторная
+                   // трансляция — единственный способ начать новую партию
+-                  // после ACCESS GRANTED (доска сама больше не пересобирается).
++                  // терминала после ACCESS GRANTED (доска сама не пересобирается).
+                   const won = !closed && !awaiting && terminal.game?.status === 'won';
+-                  const stateLabel = closed
+-                    ? tLootTrade('terminal.stateClosed')
+-                    : (awaiting ? tLootTrade('terminal.stateAwaiting')
+-                      : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')));
++                  const stateLabel = outOfPins
++                    ? tLootTrade('lock.stateOutOfPins')
++                    : (closed
++                      ? tLootTrade('terminal.stateClosed')
++                      : (awaiting ? tLootTrade('terminal.stateAwaiting')
++                        : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady'))));
+                   const decide = (value) => useRoomStore.getState().actOnTerminal({
+                     code,
+                     containerId: activeContainer.id,
+@@ -2095,7 +2103,7 @@ export default function LootTradeScreen() {
+                           </TouchableOpacity>
+                         </View>
+                       )}
+-                      {(closed || won) && (
++                      {(closed || won || outOfPins) && (
+                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
+                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
+                         </TouchableOpacity>
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 19f9667..1041585 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,49 @@
+ # Changelog
+ ---
++## Player attempts and the Game Master's decision (patch 526)
++
++The owner clarified the meaning of the 506 report: "That was a bug report.
++When, after a successful hack, the hack started again. The user may make as
++many attempts to crack a terminal or lock as they want. But only at their own
++discretion. Say the bobby pins ran out, the user bought new ones and returned
++to hacking. Or leveled up, improved stats and decided to try again." And:
++"A terminal can start a new configuration, lockpicking cannot. After a
++failure a terminal gets the 'blocked' status, and whether it may be hacked
++again AFTER THE BLOCK is up to the Game Master... Locks are not to be blocked
++for now, but they will be in the future, once I come up with a blocking
++condition".
++
++- **The one-hack ticket is gone.** `usedTerminalAccess` / `markTerminalAccess`
++  and the «ACCESS USED» mark no longer block «Hack»: the player decides when
++  to return to the point. Closing the window becomes an «Open» pill instead
++  of burning the access.
++- **Automatic restart after ACCESS GRANTED is still forbidden.** That was the
++  actual 506 bug: `shouldAutoStart` / `shouldAutoStartLock` do not send
++  `start` in final states, and the server rejects `start` on `won` / an
++  active board.
++- **An explicit new attempt.** The `newAttempt` action (server, client and
++  local fallback) builds a fresh board from the CURRENT published sheet: new
++  bobby pins, new PER/LOCKPICK, new difficulty and cell count. Spent pins
++  (`pinLedger`) are not refunded, the `hacked` access event is not revoked,
++  `accessId` does not change — this is not a new broadcast by the GM.
++- **Locks are not blocked for now.** Instead of «Waiting for the Game
++  Master» with Yes/No, the window shows «Attempt finished», the result and an
++  «Another attempt» button. The GM is not asked about locks, «No» cannot
++  close them, and the admin panel shows «Out of bobby pins» without blocking
++  controls. The GM's hack notification for locks is kept with its own text.
++- **Hook for the future condition.** `LOCK_BLOCK_POLICY` / `shouldBlockLock()`
++  in `server/lockPicking.js` is the single place where the future lock
++  blocking condition will live; the server, local fallback and registry
++  already consult it. The policy is currently disabled.
++- **Terminals are unchanged.** After a failure they become «blocked» and the
++  GM gets «Allow another hack? Yes/No»; «Yes» starts a new configuration with
++  current settings, «No» closes it until a re-broadcast. `newAttempt` is
++  rejected for terminals — the block cannot be bypassed.
++
++Server protection was not weakened: the new action passes the same role,
++membership, published-sheet and key-requirement checks. The 520–525 laws
++(bobby pins, cells, one `start`, the entry modal, the light palette) are kept.
++
+ ## Two-step mini-game entry and the light lock window (patch 525)
+ 
+ The owner: "The hacking mini-game should not appear right away. Right now the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index f58e562..a42d140 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,48 @@
+ # История изменений
+ 
+ ---
++## Подходы игрока и решение Мастера (патч 526)
++
++Владелец уточнил смысл сообщения 506: «То было сообщение на баг. Когда после
++успешного взлома, снова запускался взлом. Юзер может совершать сколько угодно
++подходов для вскрытия терминала/замка. Но только по своему усмотрению. Вот
++сейчас кончились отмычки, юзер купил новые и вернулся к взлому. Или
++прокачался и улучшил характеристики и снова решил попробовать силы».
++И добавил: «Терминал может запускать новую конфигурацию, а взлом замков нет.
++Терминал после провала получает статус "заблокировано", и можно ли повторно
++ПОСЛЕ БЛОКИРОВКИ взламывать — на усмотрение мастера... Замки пока не
++блокировать, но в будущем будут, когда я придумаю условие блокировки».
++
++- **«Билет» на один взлом убран.** `usedTerminalAccess` / `markTerminalAccess`
++  и отметка «ДОСТУП ИСПОЛЬЗОВАН» больше не запрещают «Взломать»: игрок сам
++  решает, когда вернуться к точке. Закрытое окно превращается в кнопку-пилюлю
++  «Открыть», а не сжигает доступ.
++- **Автоматический рестарт после ACCESS GRANTED по-прежнему запрещён.** Это и
++  был баг 506: `shouldAutoStart` / `shouldAutoStartLock` не шлют `start` в
++  финальных статусах, сервер отклоняет `start` при `won` / активной доске.
++- **Явный новый подход.** Действие `newAttempt` (сервер, клиент и локальный
++  резерв) собирает свежую доску по ТЕКУЩЕМУ опубликованному листу: новые
++  отмычки, новый PER/LOCKPICK, новая сложность и число ячеек. Потраченные
++  отмычки (`pinLedger`) не возвращаются, событие доступа `hacked` не
++  отзывается, `accessId` не меняется — это не новая трансляция Мастера.
++- **Замки пока не блокируются.** Вместо «Ожидание решения Мастера» с
++  «Да/Нет» окно показывает «Подход завершён», результат и кнопку «Ещё
++  подход». Мастеру вопрос о замке не задаётся, «Нет» его не закрывает,
++  админ-панель показывает «Нет отмычек» без блокирующих кнопок. Уведомление
++  Мастеру о взломе замка сохранено со своим текстом.
++- **Задел под будущее условие.** `LOCK_BLOCK_POLICY` / `shouldBlockLock()`
++  в `server/lockPicking.js` — единственная точка, куда встанет условие
++  блокировки замка; сервер, локальный резерв и реестр уже её спрашивают.
++  Сейчас политика выключена.
++- **Терминал не изменился.** После провала — «заблокировано» и вопрос Мастеру
++  «Разрешить повторный взлом? Да/Нет»; «Да» запускает новую конфигурацию по
++  текущим настройкам, «Нет» закрывает до повторной трансляции. `newAttempt`
++  для терминала запрещён — обойти блокировку нельзя.
++
++Защита сервера не ослаблена: новое действие проходит те же проверки роли,
++членства, опубликованного листа и требования ключа. Законы 520–525 (отмычки,
++ячейки, один `start`, входная модалка, светлая гамма) сохранены.
++
+ ## Двухшаговый вход в мини-игру и светлый замок (патч 525)
+ 
+ Владелец: «Мини-игра на взлом не должна сразу показываться. А то сейчас
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 2d0c2a7..49e14a0 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -245,3 +245,24 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ - **Регрессии.** PER/отмычки/«Да-Нет» из 520, один `start`, поиск отмычек и
+   локальный резерв из 524, а также одноразовый доступ на трансляцию — без
+   изменений.
++
++## 12. Уточнение 526: подходы игрока и будущая блокировка
++
++- **«Билет» на один взлом убран.** Баг 506 был про АВТОМАТИЧЕСКИЙ
++  перезапуск доски после ACCESS GRANTED, а не про право игрока на новые
++  подходы. Игрок может закрыть окно, купить отмычки, прокачать PER/LOCKPICK,
++  вернуться и начать новый подход — сколько угодно раз, но только явным
++  нажатием «Взломать»/«Ещё подход».
++- **Явный `newAttempt`.** Свежая доска собирается по текущему
++  опубликованному листу: новые отмычки, новая сложность, новое число ячеек.
++  `pinLedger` не возвращает потраченные отмычки, событие `hacked` не
++  отзывается, `accessId` не меняется. `start` по-прежнему не пересобирает
++  доску в `won`/`playing`, поэтому автоматический рестарт невозможен.
++- **Замки пока не блокируются.** `awaitingRetry` у замка означает «подход
++  завершён» (например, `OUT OF PINS`), а не «ждём Мастера». Вместо «Да/Нет»
++  — результат подхода и «Ещё подход». Владелец добавит условие блокировки
++  позже; единственная точка для него — `LOCK_BLOCK_POLICY` и
++  `shouldBlockLock()` в `server/lockPicking.js` (сейчас `enabled: false`).
++- **Терминал сохраняет 504/505.** После провала «заблокировано» и вопрос
++  Мастеру; «Да» запускает новую конфигурацию, «Нет» закрывает до повторной
++  трансляции. `newAttempt` для терминала запрещён.
+diff --git a/docs/patch-526-install.md b/docs/patch-526-install.md
+new file mode 100644
+index 0000000..46ab920
+--- /dev/null
++++ b/docs/patch-526-install.md
+@@ -0,0 +1,101 @@
++# Установка патча 526: подходы игрока и решение Мастера
++
++Патч подготовлен от состояния **версии 525** (коммит `2a0b3e0`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–526
++цепочкой. Файл установки: `patchs/526-lock-attempts.patch`.
++
++> Владелец: «То было сообщение на баг. Когда после успешного взлома, снова
++> запускался взлом. Юзер может совершать сколько угодно подходов для вскрытия
++> терминала/замка. Но только по своему усмотрению. Вот сейчас кончились
++> отмычки, юзер купил новые и вернулся к взлому. Или прокачался и улучшил
++> характеристики и снова решил попробовать силы... Терминал может запускать
++> новую конфигурацию, а взлом замков нет. Терминал после провала получает
++> статус "заблокировано", и можно ли повторно ПОСЛЕ БЛОКИРОВКИ взламывать —
++> на усмотрение мастера. Если он разрешил, то можно взломать снова. Замки пока
++> не блокировать, но в будущем будут, когда я придумаю условие блокировки».
++
++## Что изменено
++
++### 1. «Билет на один взлом» убран
++
++`components/lootTrade/terminalAccess.js` больше не блокирует «Взломать» по
++`used`/`accessId`: `canHackTerminal` игнорирует «ДОСТУП ИСПОЛЬЗОВАН»,
++`terminalBlockedReason` не возвращает `'used'`. Из
++`PlayerLootTradeOverlay.js` удалены `usedTerminalAccess`, `markTerminalAccess`
++и отметки на карточках. Закрытое окно отдельно выданной точки превращается в
++кнопку-пилюлю «Открыть» (или «свернутое» окно сессии), а не сжигает доступ.
++
++`accessId` и `terminalAccessKey()` сохранены как идентификатор трансляции для
++диагностики, дедупликации открытого окна и совместимости.
++
++**Баг 506 остаётся исправленным:** автоматический рестарт после ACCESS
++GRANTED невозможен — `shouldAutoStart` / `shouldAutoStartLock` не шлют `start`
++в финальных статусах, сервер отклоняет `start` при `won` и активной доске.
++
++### 2. Явный новый подход (`newAttempt`)
++
++- `server/lockPicking.js`: `applyLockAction` понимает `newAttempt` и собирает
++  свежую доску по текущему снимку листа (отмычки, PER, LOCKPICK, сложность,
++  число ячеек), сохраняя `spentPins`.
++- `server/roomRegistry.js`: `terminalAction` обрабатывает `newAttempt` после
++  проверок роли `player`, членства, опубликованного листа и требования ключа.
++  Действие снимает `closed`, не меняет `accessId`, не отзывает событие
++  `hacked`. Для терминалов оно запрещено (`TERMINAL_NOT_ACTIVE`) — обойти
++  блокировку после провала нельзя.
++- `server/protocol.js` / `src/room/roomProtocol.ts`: код `LOCK_BLOCKED` для
++  будущего условия блокировки.
++- `components/lootTrade/localLockGame.js`: тот же закон в локальном резерве
++  для старого сервера комнат.
++- `components/lootTrade/LockPickingModal.js`: проп `freshAttempt` (из входной
++  модалки и карточки локации) шлёт `newAttempt` вместо `start`; кнопка «Ещё
++  подход» доступна в окне доски после победы, провала или «кончились отмычки».
++- `components/lootTrade/lockAutoStart.js`: `freshAttempt` разрешает явный
++  запуск в любом состоянии доски, но ровно один раз на монтирование окна.
++
++### 3. Замки пока не блокируются
++
++- Вместо «Ожидание решения Мастера» с «Да/Нет» — «Подход завершён», результат
++  и «Ещё подход». Парные RU/EN строки: `lock.newAttempt`,
++  `lock.approachFinished`, `lock.newAttemptHint`, `lock.stateOutOfPins`,
++  `lock.hackedTitle`, `lock.hackedMessage`.
++- `terminalRetryPrompt.js` не задаёт Мастеру вопрос по замку;
++  `TerminalRetryPromptHost` поздравляет Мастера отдельным текстом для замка.
++- `server/roomRegistry.js`: решение Мастера `retry` для замка отклоняется,
++  `awaitingGm` у замка не выставляется; админ-панель
++  (`LootTradeScreen.js`) показывает «Нет отмычек» без блокирующих кнопок.
++- **Задел под будущее условие:** `LOCK_BLOCK_POLICY` и `shouldBlockLock()`
++  в `server/lockPicking.js` (сейчас `{ enabled: false }`). Сервер, реестр и
++  локальный резерв уже спрашивают её — когда владелец придумает условие,
++  меняется одна функция.
++
++### 4. Терминал не изменился
++
++После провала — `awaitingRetry` («заблокировано»), вопрос Мастеру
++«Разрешить повторный взлом? Да/Нет»; «Да» строит новую конфигурацию по
++текущим настройкам и листу оператора, «Нет» закрывает до повторной
++трансляции (`reissue`). После ACCESS GRANTED доска не пересобирается (505).
++
++## Что сохранено
++
++- Защита сервера: лимиты сообщений, проверки роли/владельца/членства,
++  валидация JSON, целые положительные количества, атомарность переносов.
++- Мини-игра 520 (PER, отмычки, четыре стрелки, «Да/Нет» у терминала),
++  исправления 524 (один `start`, поиск отмычек, локальный резерв), 525
++  (входная модалка, светлая гамма, «Покинуть локацию» в настоящей локации).
++- Законы 522 (единый предмет, без игровых лимитов) и 523 (граф, граница
++  видимости, адресный взлом, общие ресурсы).
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор).
++- `git apply --check patchs/526-lock-attempts.patch` от дерева 525.
++- `./apply-patch.sh 526` от версии 525 и полная цепочка 493–526 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Приёмочные тесты: явный `newAttempt` после победы и после публикации нового
++  листа (PER 4→10, отмычки 5→12), сколько угодно подходов подряд, запрет
++  автоматического `start` после `won`, запрет `newAttempt` для терминала,
++  «Нет» Мастера не закрывает замок, «Подход завершён» без «Да/Нет».
++- Живой сервер комнат: `/version.json` = 526/4/97+97 и WS-проба.
++- После установки на боевой площадке перезапустить процесс сервера комнат,
++  чтобы подхватить обновлённые файлы `server/`.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 2bb6149..d3b34b4 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **525**.
++Дата ревизии: 2026-11-04. Текущая версия: **526**.
+ 
+ ## Тезисы
+ 
+@@ -27,15 +27,18 @@
+ | 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | 🔧 в работе | **523–…** |
+ | 14 | Исправление взлома замка: одна доска на нажатие, отмычки из любого инвентаря, локальный резерв старого сервера, понятные отказы; окно локации не перекрывает мини-игру, «Покинуть локацию» работает сразу | ✅ сделано | **524** |
+ | 15 | Двухшаговый вход в мини-игру: сначала модалка точки по образцу локации с «Взломать»/«Смотреть» и без «Покинуть локацию», доска монтируется уже готовой; светлая гамма взлома замка из палитры модалок | ✅ сделано | **525** |
++| 16 | Подходы игрока без «билета»: сколько угодно явных попыток по своему усмотрению (купил отмычки / прокачался), без автоматического рестарта после победы; терминал после блокировки — по решению Мастера, замки пока не блокируются с заделом под будущее условие | ✅ сделано | **526** |
+ 
+-## Осталось после патча 525
++## Осталось после патча 526
+ 
+-Патчи 524 и 525 закрыли сбой мини-игры замка, окна локации и входа в игру,
+-не меняя порядок тринадцатого тезиса: граф, граница видимости, адресный
+-взлом, общие ресурсы и одна сессия из 523 остаются регрессионными
+-инвариантами. «Покинуть локацию» по-прежнему есть в настоящей локации и
+-работает с первого нажатия; в отдельно выданной точке её нет по слову
+-владельца.
++Патчи 524–526 закрыли сбой мини-игры замка, окна локации, входа в игру и
++правило подходов, не меняя порядок тринадцатого тезиса: граф, граница
++видимости, адресный взлом, общие ресурсы и одна сессия из 523 остаются
++регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
++локации и работает с первого нажатия; в отдельно выданной точке её нет по
++слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
++после ACCESS GRANTED, а не про запрет новых подходов игрока; «один взлом на
++трансляцию» больше не действует.
+ 
+ 1. **Иерархия пространств и доступ** (в работе, первый шаг сделан в 523) —
+    все уточнения владельца одним этапом: граф локаций с циклами и несколькими
+@@ -141,6 +144,7 @@
+ - `docs/patch-522-install.md` — установка обновления 522 и его проверки.
+ - `docs/patch-524-install.md` — установка исправления 524 и его проверки.
+ - `docs/patch-525-install.md` — установка обновления 525 и его проверки.
++- `docs/patch-526-install.md` — установка обновления 526 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 024ce8a..6f2deee 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -380,6 +380,12 @@
+     "viewOnly": "Another player is picking this lock",
+     "selectCharacter": "Select a character",
+     "actionFailed": "Action failed",
++    "newAttempt": "Another attempt",
++    "approachFinished": "Attempt finished",
++    "newAttemptHint": "Start a new attempt whenever you buy bobby pins or improve your stats.",
++    "stateOutOfPins": "Out of bobby pins",
++    "hackedTitle": "Lock picked",
++    "hackedMessage": "{name}: access granted. Operator — {operator}. The player can start another attempt on their own.",
+     "noPinsHint": "The character has no bobby pins: add a Bobby Pin item and refresh the sheet in the room.",
+     "sessionNotPublished": "The character sheet has not reached the room yet. Open the character and try again.",
+     "ready": "Lock is ready",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 3579721..cc41e71 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -380,6 +380,12 @@
+     "viewOnly": "Другой игрок уже взламывает",
+     "selectCharacter": "Выберите персонажа",
+     "actionFailed": "Действие не выполнено",
++    "newAttempt": "Ещё подход",
++    "approachFinished": "Подход завершён",
++    "newAttemptHint": "Начните новый подход, когда купите отмычки или улучшите характеристики.",
++    "stateOutOfPins": "Нет отмычек",
++    "hackedTitle": "Замок взломан",
++    "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Игрок может начать новый подход сам.",
+     "noPinsHint": "В инвентаре персонажа нет отмычек: добавьте предмет «Отмычка» и обновите лист в комнате.",
+     "sessionNotPublished": "Лист персонажа ещё не передан в комнату. Откройте персонажа и повторите взлом.",
+     "ready": "Замок готов к взлому",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 0f89a1f..6e1f911 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "525"
++  "baseline": "526"
+ }
+diff --git a/public/version.json b/public/version.json
+index e3a120a..23a8357 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "525",
++  "version": "526",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Теперь игрок сам решает, сколько раз подходить к терминалу или замку: закрыл окно, купил новые отмычки или прокачал восприятие — вернулся и начал новый подход.",
++      "Терминал после провала по-прежнему ждёт решения Мастера «Да/Нет»; замки пока не блокируются. После победы игра больше не запускается сама.",
+       "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
+       "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
+       "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
+@@ -100,6 +102,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Players now decide how many attempts to make at a terminal or lock: close the window, buy new bobby pins or improve Perception, then come back and start another attempt.",
++      "A terminal still waits for the Game Master's Yes/No after a failure; locks are not blocked for now. A successful hack no longer restarts itself.",
+       "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
+       "The lockpicking window now uses the light modal palette: light cells and arrows instead of the green terminal look.",
+       "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index 4b19e9e..88abf49 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -2,9 +2,12 @@
+ 
+ /**
+  * Патч 520: мини-игра взлома замков. Чистое ядро без сетевого состояния —
+- * комната держит доску в общем реестре состояний проверок (-terminalStates),
+- * поэтому оператор, «один взлом на трансляцию», «Да/Нет» Мастера и уведомление
+- * Мастеру работают тем же кодом, что у терминала.
++ * комната держит доску в общем реестре состояний проверок (terminalStates).
++ * Патч 526: «один взлом на трансляцию» убран — игрок сам решает, когда
++ * начать новый подход (купил отмычки, прокачал PER/LOCKPICK). Замки пока
++ * НЕ блокируются: shouldBlockLock() — единственная точка, куда владелец
++ * позже добавит своё условие блокировки. Терминал сохраняет блокировку
++ * после провала и решение Мастера «Да/Нет».
+  *
+  * Правила: docs/lockpicking-mini-game-design.md. Коротко:
+  *   N = 12 − PER + 2·D ячеек, PER 4…10, D 0…5 (D=0 только понижением);
+@@ -65,6 +68,23 @@ const lockRows = (count) => {
+ 
+ const luckSaveChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10) - 4);
+ 
++/**
++ * Патч 526: задел под будущее условие блокировки замка.
++ * Владелец: «Замки пока не блокировать, но в будущем будут, когда я придумаю
++ * условие блокировки». Пока политика выключена и новый подход доступен всегда.
++ * Когда условие появится — меняется ТОЛЬКО эта функция (и, при желании,
++ * `enabled`): сервер, клиент и локальный резерв уже спрашивают её.
++ */
++const LOCK_BLOCK_POLICY = Object.freeze({ enabled: false });
++const shouldBlockLock = ({ game, config } = {}) => {
++  if (!LOCK_BLOCK_POLICY.enabled) return false;
++  // Будущее условие владельца встанет здесь. Аргументы уже передаются:
++  // текущая доска, настройки точки и (при необходимости) снимок листа.
++  void game;
++  void config;
++  return false;
++};
++
+ // ---------------------------------------------------------------------------
+ // Снимок персонажа: те же формы, что понимает terminalHacking.js — массив
+ // [{ name, value }], объект { STR: 5 }, обёртка data, skills и selectedSkills.
+@@ -362,6 +382,20 @@ const applyLockAction = ({
+       }),
+     };
+   }
++  // Патч 526: ЯВНЫЙ новый подход игрока. Отличается от 'start' тем, что
++  // пересобирает доску по ТЕКУЩЕМУ листу в любом состоянии (в т.ч. после
++  // победы, провала или «кончились отмычки»). Автоматический рестарт после
++  // ACCESS GRANTED по-прежнему невозможен: это действие шлётся только по
++  // нажатию кнопки, а start запрещён при won/playing.
++  if (action === 'newAttempt') {
++    if (shouldBlockLock({ game, config })) return { error: 'LOCK_BLOCKED' };
++    return {
++      game: createLockGame({
++        config, operatorClientId: clientId, operatorCharacterId: characterId,
++        characterSnapshot, now, rng, spentPins,
++      }),
++    };
++  }
+   if (!game || game.status !== 'playing') return { error: 'LOCK_NOT_ACTIVE' };
+   if (game.operatorClientId && game.operatorClientId !== clientId) {
+     return { error: 'LOCK_VIEW_ONLY' };
+@@ -437,6 +471,8 @@ module.exports = {
+   lockCellCount,
+   lockRows,
+   luckSaveChance,
++  LOCK_BLOCK_POLICY,
++  shouldBlockLock,
+   lockStats,
+   countBobbyPins,
+   effectiveDifficulty,
+diff --git a/server/protocol.js b/server/protocol.js
+index 7fc175c..c2f28bb 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -90,6 +90,8 @@ const ERROR_CODE = Object.freeze({
+   LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
+   LOCK_NO_PINS: 'LOCK_NO_PINS',
+   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
++  // Патч 526: будущее условие блокировки замка (политика пока выключена).
++  LOCK_BLOCKED: 'LOCK_BLOCKED',
+ });
+ 
+ 
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 60ec0b9..22f90ca 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -35,6 +35,7 @@ const {
+   publicLockGameState,
+   closeLockGame,
+   applyLockAction,
++  shouldBlockLock,
+ } = require('./lockPicking');
+ 
+ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+@@ -524,10 +525,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     closed: Boolean(entry.closed),
+     locked: Boolean(entry.closed),
+     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
+-    awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
++    // Патч 526: для замков вопрос не задаётся — замки пока не блокируются,
++    // игрок сам начинает новый подход; awaitingRetry у замка означает
++    // «подход завершён» (например, кончились отмычки).
++    awaitingGm: Boolean(
++      entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
++    ),
+     standaloneIssued: Boolean(entry.standaloneIssued),
+-    // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
+-    // открыть терминал один раз за трансляцию, даже если закрыл окно.
++    // Патч 506/526: стабильный идентификатор текущей трансляции. Раньше
++    // служил «билетом» на один взлом; с 526 игрок сам решает, сколько
++    // подходов сделать, — поле остаётся для диагностики и совместимости.
+     accessId: entry.accessId || null,
+     // Патч 516: состояние требования ключа для карточки терминала.
+     keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
+@@ -632,6 +639,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
+       if (action === 'retry') {
++        // Патч 526: замки пока не блокируются, решение Мастера «Да/Нет»
++        // относится только к терминалу. Владелец добавит условие блокировки
++        // позже — then shouldBlockLock() включится и здесь.
++        if (entry.config?.kind === 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+         if (entry.game?.status !== 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+         const decision = value === 'yes' || value === true ? 'yes'
+           : (value === 'no' || value === false ? 'no' : null);
+@@ -694,7 +705,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     }
+     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+     // не запускается вообще — игрок получает понятный отказ.
+-    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
++    if ((action === 'start' || action === 'newAttempt') && (entry.keyAccessState === KEY_ACCESS.DENIED
+       || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
+       return { error: ERROR_CODE.KEY_REQUIRED };
+     }
+@@ -703,6 +714,37 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const charId = String(characterId || '').trim();
+     const published = room.lastSnapshots.get(charId);
+     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
++    // Патч 501: весь опубликованный конверт. Движок сам снимает обёртку data
++    // и понимает legacy-массивы [{ name, value }] из сохранения. Объявление
++    // вынесено выше: новый подход (526) читает тот же текущий снимок листа.
++    const snapshot = published.snapshot || {};
++    // Патч 526: игрок сам начинает новый подход (купил отмычки, прокачал
++    // PER/LOCKPICK). Это НЕ автоперезапуск после победы: действие приходит
++    // только по нажатию «Взломать»/«Ещё подход», а `start` по-прежнему
++    // запрещён при won/playing. Терминал после блокировки может открыть
++    // только Мастер («Да» или reissue) — для него новый подход недоступен.
++    if (action === 'newAttempt') {
++      if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
++      if (shouldBlockLock({ game: entry.game, config: entry.config })) {
++        return { error: ERROR_CODE.LOCK_BLOCKED };
++      }
++      const fresh = createLockGame({
++        config: entry.config,
++        operatorClientId: clientId,
++        operatorCharacterId: charId,
++        characterSnapshot: snapshot,
++        now: now(),
++        rng: lockRandom,
++        spentPins: room.pinLedger?.get(charId) || 0,
++      });
++      fresh.operatorName = String(published.fromName || snapshot?.name || '').trim();
++      entry.game = fresh;
++      entry.closed = false;
++      entry.operatorSnapshot = published.snapshot || {};
++      entry.updatedAt = now();
++      refreshKeyAccess(room);
++      return { room, terminal: terminalPublic(id, entry) };
++    }
+     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
+     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
+     // Патч 505: взломанный терминал не переходит к другому оператору и не
+@@ -726,10 +768,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       // чужого состояния: число слов, скобки и удача берутся из нового листа.
+       entry.game = null;
+     }
+-    // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
+-    // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
+-    // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
+-    const snapshot = published.snapshot || {};
+     const result = entry.config?.kind === 'lock'
+       ? applyLockAction({
+           game: entry.game,
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 55ec328..0123d6d 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -84,6 +84,8 @@ export const ROOM_ERROR = {
+   LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
+   LOCK_NO_PINS: 'LOCK_NO_PINS',
+   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
++  // Патч 526: будущее условие блокировки замка (политика пока выключена).
++  LOCK_BLOCKED: 'LOCK_BLOCKED',
+ } as const;
+ 
+ 

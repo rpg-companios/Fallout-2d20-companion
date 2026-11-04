@@ -1,8 +1,10 @@
 {
-  "version": "525",
+  "version": "526",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Теперь игрок сам решает, сколько раз подходить к терминалу или замку: закрыл окно, купил новые отмычки или прокачал восприятие — вернулся и начал новый подход.",
+      "Терминал после провала по-прежнему ждёт решения Мастера «Да/Нет»; замки пока не блокируются. После победы игра больше не запускается сама.",
       "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
       "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
       "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
@@ -100,6 +102,8 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Players now decide how many attempts to make at a terminal or lock: close the window, buy new bobby pins or improve Perception, then come back and start another attempt.",
+      "A terminal still waits for the Game Master's Yes/No after a failure; locks are not blocked for now. A successful hack no longer restarts itself.",
       "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
       "The lockpicking window now uses the light modal palette: light cells and arrows instead of the green terminal look.",
       "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",

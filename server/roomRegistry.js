@@ -35,6 +35,7 @@ const {
   publicLockGameState,
   closeLockGame,
   applyLockAction,
+  shouldBlockLock,
 } = require('./lockPicking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
@@ -524,10 +525,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     closed: Boolean(entry.closed),
     locked: Boolean(entry.closed),
     // Мастеру нужно показать диалог «Разрешить повторный взлом? Да/Нет».
-    awaitingGm: Boolean(entry.game?.status === 'awaitingRetry'),
+    // Патч 526: для замков вопрос не задаётся — замки пока не блокируются,
+    // игрок сам начинает новый подход; awaitingRetry у замка означает
+    // «подход завершён» (например, кончились отмычки).
+    awaitingGm: Boolean(
+      entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
+    ),
     standaloneIssued: Boolean(entry.standaloneIssued),
-    // Патч 506: стабильный идентификатор текущей трансляции. Игрок может
-    // открыть терминал один раз за трансляцию, даже если закрыл окно.
+    // Патч 506/526: стабильный идентификатор текущей трансляции. Раньше
+    // служил «билетом» на один взлом; с 526 игрок сам решает, сколько
+    // подходов сделать, — поле остаётся для диагностики и совместимости.
     accessId: entry.accessId || null,
     // Патч 516: состояние требования ключа для карточки терминала.
     keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
@@ -632,6 +639,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
       if (action === 'retry') {
+        // Патч 526: замки пока не блокируются, решение Мастера «Да/Нет»
+        // относится только к терминалу. Владелец добавит условие блокировки
+        // позже — then shouldBlockLock() включится и здесь.
+        if (entry.config?.kind === 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
         if (entry.game?.status !== 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
         const decision = value === 'yes' || value === true ? 'yes'
           : (value === 'no' || value === false ? 'no' : null);
@@ -694,7 +705,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     }
     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
     // не запускается вообще — игрок получает понятный отказ.
-    if (action === 'start' && (entry.keyAccessState === KEY_ACCESS.DENIED
+    if ((action === 'start' || action === 'newAttempt') && (entry.keyAccessState === KEY_ACCESS.DENIED
       || entry.keyAccessState === KEY_ACCESS.NEEDS_CHECK)) {
       return { error: ERROR_CODE.KEY_REQUIRED };
     }
@@ -703,6 +714,37 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const charId = String(characterId || '').trim();
     const published = room.lastSnapshots.get(charId);
     if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+    // Патч 501: весь опубликованный конверт. Движок сам снимает обёртку data
+    // и понимает legacy-массивы [{ name, value }] из сохранения. Объявление
+    // вынесено выше: новый подход (526) читает тот же текущий снимок листа.
+    const snapshot = published.snapshot || {};
+    // Патч 526: игрок сам начинает новый подход (купил отмычки, прокачал
+    // PER/LOCKPICK). Это НЕ автоперезапуск после победы: действие приходит
+    // только по нажатию «Взломать»/«Ещё подход», а `start` по-прежнему
+    // запрещён при won/playing. Терминал после блокировки может открыть
+    // только Мастер («Да» или reissue) — для него новый подход недоступен.
+    if (action === 'newAttempt') {
+      if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+      if (shouldBlockLock({ game: entry.game, config: entry.config })) {
+        return { error: ERROR_CODE.LOCK_BLOCKED };
+      }
+      const fresh = createLockGame({
+        config: entry.config,
+        operatorClientId: clientId,
+        operatorCharacterId: charId,
+        characterSnapshot: snapshot,
+        now: now(),
+        rng: lockRandom,
+        spentPins: room.pinLedger?.get(charId) || 0,
+      });
+      fresh.operatorName = String(published.fromName || snapshot?.name || '').trim();
+      entry.game = fresh;
+      entry.closed = false;
+      entry.operatorSnapshot = published.snapshot || {};
+      entry.updatedAt = now();
+      refreshKeyAccess(room);
+      return { room, terminal: terminalPublic(id, entry) };
+    }
     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
     // Патч 505: взломанный терминал не переходит к другому оператору и не
@@ -726,10 +768,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       // чужого состояния: число слов, скобки и удача берутся из нового листа.
       entry.game = null;
     }
-    // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
-    // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
-    // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
-    const snapshot = published.snapshot || {};
     const result = entry.config?.kind === 'lock'
       ? applyLockAction({
           game: entry.game,

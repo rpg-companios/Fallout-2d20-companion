@@ -2,9 +2,12 @@
 
 /**
  * Патч 520: мини-игра взлома замков. Чистое ядро без сетевого состояния —
- * комната держит доску в общем реестре состояний проверок (-terminalStates),
- * поэтому оператор, «один взлом на трансляцию», «Да/Нет» Мастера и уведомление
- * Мастеру работают тем же кодом, что у терминала.
+ * комната держит доску в общем реестре состояний проверок (terminalStates).
+ * Патч 526: «один взлом на трансляцию» убран — игрок сам решает, когда
+ * начать новый подход (купил отмычки, прокачал PER/LOCKPICK). Замки пока
+ * НЕ блокируются: shouldBlockLock() — единственная точка, куда владелец
+ * позже добавит своё условие блокировки. Терминал сохраняет блокировку
+ * после провала и решение Мастера «Да/Нет».
  *
  * Правила: docs/lockpicking-mini-game-design.md. Коротко:
  *   N = 12 − PER + 2·D ячеек, PER 4…10, D 0…5 (D=0 только понижением);
@@ -64,6 +67,23 @@ const lockRows = (count) => {
 };
 
 const luckSaveChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10) - 4);
+
+/**
+ * Патч 526: задел под будущее условие блокировки замка.
+ * Владелец: «Замки пока не блокировать, но в будущем будут, когда я придумаю
+ * условие блокировки». Пока политика выключена и новый подход доступен всегда.
+ * Когда условие появится — меняется ТОЛЬКО эта функция (и, при желании,
+ * `enabled`): сервер, клиент и локальный резерв уже спрашивают её.
+ */
+const LOCK_BLOCK_POLICY = Object.freeze({ enabled: false });
+const shouldBlockLock = ({ game, config } = {}) => {
+  if (!LOCK_BLOCK_POLICY.enabled) return false;
+  // Будущее условие владельца встанет здесь. Аргументы уже передаются:
+  // текущая доска, настройки точки и (при необходимости) снимок листа.
+  void game;
+  void config;
+  return false;
+};
 
 // ---------------------------------------------------------------------------
 // Снимок персонажа: те же формы, что понимает terminalHacking.js — массив
@@ -362,6 +382,20 @@ const applyLockAction = ({
       }),
     };
   }
+  // Патч 526: ЯВНЫЙ новый подход игрока. Отличается от 'start' тем, что
+  // пересобирает доску по ТЕКУЩЕМУ листу в любом состоянии (в т.ч. после
+  // победы, провала или «кончились отмычки»). Автоматический рестарт после
+  // ACCESS GRANTED по-прежнему невозможен: это действие шлётся только по
+  // нажатию кнопки, а start запрещён при won/playing.
+  if (action === 'newAttempt') {
+    if (shouldBlockLock({ game, config })) return { error: 'LOCK_BLOCKED' };
+    return {
+      game: createLockGame({
+        config, operatorClientId: clientId, operatorCharacterId: characterId,
+        characterSnapshot, now, rng, spentPins,
+      }),
+    };
+  }
   if (!game || game.status !== 'playing') return { error: 'LOCK_NOT_ACTIVE' };
   if (game.operatorClientId && game.operatorClientId !== clientId) {
     return { error: 'LOCK_VIEW_ONLY' };
@@ -437,6 +471,8 @@ module.exports = {
   lockCellCount,
   lockRows,
   luckSaveChance,
+  LOCK_BLOCK_POLICY,
+  shouldBlockLock,
   lockStats,
   countBobbyPins,
   effectiveDifficulty,

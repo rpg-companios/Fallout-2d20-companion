@@ -61,7 +61,10 @@ const SILENT_ERRORS = new Set([
   'TERMINAL_INVALID_GUESS',
 ]);
 
-const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerToken, onClose }) => {
+// Патч 526: новый подход — штатное действие игрока, а не ошибка.
+const isNewAttempt = (action) => action === 'newAttempt';
+
+const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
   useLocale();
   const characterId = useCharacterStore((state) => state.currentCharacterId);
   const myClientId = useRoomStore((state) => state.clientId);
@@ -103,7 +106,8 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
       characterSnapshot: snapshot,
     });
     setLocalState(next);
-    if (action === 'start' && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
+    if ((action === 'start' || isNewAttempt(action))
+      && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
       showRawAlert({
         title: tLootTrade('lock.noPins'),
         message: tLootTrade('lock.noPinsHint'),
@@ -161,7 +165,9 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
           return;
         }
       }
-      if (code === 'LOCK_VIEW_ONLY' || code === 'TERMINAL_VIEW_ONLY') {
+      if (code === 'LOCK_BLOCKED') {
+        showRawAlert({ title: tLootTrade('lock.approachFinished') });
+      } else if (code === 'LOCK_VIEW_ONLY' || code === 'TERMINAL_VIEW_ONLY') {
         showRawAlert({ title: tLootTrade('lock.viewOnly') });
       } else if (code === 'KEY_REQUIRED') {
         showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
@@ -191,15 +197,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
       awaitingGm,
       game,
       boardOfAnotherOperator,
+      freshAttempt,
     });
     if (!allowed) return;
-    const key = autoStartLockKey({ roomCode, containerId, characterId, localMode });
+    const key = autoStartLockKey({ roomCode, containerId, characterId, localMode, freshAttempt });
     if (autoStartRef.current === key) return;
     autoStartRef.current = key;
-    void doAction('start');
+    // Патч 526: явное «Взломать» из входной модалки собирает НОВУЮ доску по
+    // текущему листу, а не пытается перезапустить старую. Автоматического
+    // рестарта после ACCESS GRANTED нет: эффект один раз на монтирование.
+    void doAction(freshAttempt ? 'newAttempt' : 'start');
   // Статус доски намеренно входит в зависимости: после start повтор не нужен.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, autoStart, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
+  }, [visible, autoStart, freshAttempt, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
 
   const rows = useMemo(() => {
     const cells = game?.cells || [];
@@ -267,6 +277,16 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
   );
 
   const hasBoard = Boolean(game && rows.length > 0);
+  const newAttemptButton = (
+    <TouchableOpacity
+      testID="lock-new-attempt-button"
+      accessibilityRole="button"
+      style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
+      onPress={() => void doAction('newAttempt')}
+    >
+      <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.newAttempt')}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
@@ -325,40 +345,31 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
               <Text accessibilityRole="alert" style={styles.wonText}>
                 {tLootTrade('lock.won')}
               </Text>
-              <Text style={styles.statusHint}>{tLootTrade('terminal.stateWon')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
+              {newAttemptButton}
             </View>
           ) : isClosed ? (
             <View style={styles.accessPanel}>
-              <Text style={styles.closedText}>{tLootTrade('lock.closed')}</Text>
-              <Text style={styles.statusHint}>{tLootTrade('terminal.closedHint')}</Text>
+              <Text style={styles.closedText}>{tLootTrade('lock.approachFinished')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
+              {newAttemptButton}
             </View>
           ) : awaitingGm ? (
-            <View style={styles.accessPanel}>
-              <Text style={styles.awaitingText}>{tLootTrade('lock.awaiting')}</Text>
-              <Text style={styles.statusHint} testID="lock-retry-prompt">
-                {tLootTrade('lock.retryPrompt')}
-              </Text>
+            // Патч 526: замки не блокируются. Вместо «Ожидание решения
+            // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
+            // начать ли новый (купил отмычки, прокачал PER/LOCKPICK).
+            <View style={styles.accessPanel} testID="lock-approach-finished">
+              <Text style={styles.awaitingText}>{tLootTrade('lock.approachFinished')}</Text>
+              {resultLabel ? (
+                <Text style={styles.statusHint}>{tLootTrade(resultLabel)}</Text>
+              ) : null}
               {game?.result === 'OUT OF PINS' ? (
                 <Text style={styles.hintText} testID="lock-no-pins-hint">
                   {tLootTrade('lock.noPinsHint')}
                 </Text>
               ) : null}
-              <View style={styles.retryActions}>
-                <TouchableOpacity
-                  testID="lock-retry-yes"
-                  style={[modalStyles.btn, modalStyles.saveBtn]}
-                  onPress={() => void doAction('retry', 'yes')}
-                >
-                  <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.retryYes')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID="lock-retry-no"
-                  style={[modalStyles.btn, modalStyles.cancelBtn]}
-                  onPress={() => void doAction('retry', 'no')}
-                >
-                  <Text style={modalStyles.cancelBtnText}>{tLootTrade('lock.retryNo')}</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
+              {newAttemptButton}
             </View>
           ) : !hasBoard ? (
             // Патч 525: окно мини-игры больше не притворяется запущенной игрой.

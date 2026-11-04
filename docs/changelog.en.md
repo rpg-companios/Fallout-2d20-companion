@@ -1,5 +1,49 @@
 # Changelog
 ---
+## Player attempts and the Game Master's decision (patch 526)
+
+The owner clarified the meaning of the 506 report: "That was a bug report.
+When, after a successful hack, the hack started again. The user may make as
+many attempts to crack a terminal or lock as they want. But only at their own
+discretion. Say the bobby pins ran out, the user bought new ones and returned
+to hacking. Or leveled up, improved stats and decided to try again." And:
+"A terminal can start a new configuration, lockpicking cannot. After a
+failure a terminal gets the 'blocked' status, and whether it may be hacked
+again AFTER THE BLOCK is up to the Game Master... Locks are not to be blocked
+for now, but they will be in the future, once I come up with a blocking
+condition".
+
+- **The one-hack ticket is gone.** `usedTerminalAccess` / `markTerminalAccess`
+  and the «ACCESS USED» mark no longer block «Hack»: the player decides when
+  to return to the point. Closing the window becomes an «Open» pill instead
+  of burning the access.
+- **Automatic restart after ACCESS GRANTED is still forbidden.** That was the
+  actual 506 bug: `shouldAutoStart` / `shouldAutoStartLock` do not send
+  `start` in final states, and the server rejects `start` on `won` / an
+  active board.
+- **An explicit new attempt.** The `newAttempt` action (server, client and
+  local fallback) builds a fresh board from the CURRENT published sheet: new
+  bobby pins, new PER/LOCKPICK, new difficulty and cell count. Spent pins
+  (`pinLedger`) are not refunded, the `hacked` access event is not revoked,
+  `accessId` does not change — this is not a new broadcast by the GM.
+- **Locks are not blocked for now.** Instead of «Waiting for the Game
+  Master» with Yes/No, the window shows «Attempt finished», the result and an
+  «Another attempt» button. The GM is not asked about locks, «No» cannot
+  close them, and the admin panel shows «Out of bobby pins» without blocking
+  controls. The GM's hack notification for locks is kept with its own text.
+- **Hook for the future condition.** `LOCK_BLOCK_POLICY` / `shouldBlockLock()`
+  in `server/lockPicking.js` is the single place where the future lock
+  blocking condition will live; the server, local fallback and registry
+  already consult it. The policy is currently disabled.
+- **Terminals are unchanged.** After a failure they become «blocked» and the
+  GM gets «Allow another hack? Yes/No»; «Yes» starts a new configuration with
+  current settings, «No» closes it until a re-broadcast. `newAttempt` is
+  rejected for terminals — the block cannot be bypassed.
+
+Server protection was not weakened: the new action passes the same role,
+membership, published-sheet and key-requirement checks. The 520–525 laws
+(bobby pins, cells, one `start`, the entry modal, the light palette) are kept.
+
 ## Two-step mini-game entry and the light lock window (patch 525)
 
 The owner: "The hacking mini-game should not appear right away. Right now the

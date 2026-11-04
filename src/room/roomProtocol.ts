@@ -84,6 +84,8 @@ export const ROOM_ERROR = {
   LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
   LOCK_NO_PINS: 'LOCK_NO_PINS',
   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
+  // Патч 526: будущее условие блокировки замка (политика пока выключена).
+  LOCK_BLOCKED: 'LOCK_BLOCKED',
 } as const;
 
 

@@ -86,6 +86,24 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
     return finish(fresh, carried);
   }
 
+  // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
+  // сервера: свежая доска по текущему листу, потраченные отмычки не
+  // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
+  if (action === 'newAttempt') {
+    // Metro не гарантирует именованный импорт из CJS — берём с объекта.
+    if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
+    const fresh = engine.createLockGame({
+      config,
+      operatorClientId: LOCAL_LOCK_OPERATOR,
+      operatorCharacterId: characterId || 'local',
+      characterSnapshot,
+      now,
+      rng,
+      spentPins: carried,
+    });
+    fresh.operatorName = characterSnapshot.characterName || '';
+    return finish(fresh, carried);
+  }
   if (game?.status === 'closed') return finish(game, carried, 'LOCK_NOT_ACTIVE');
   if (game?.status === 'awaitingRetry') return finish(game, carried, 'LOCK_NOT_ACTIVE');
   if (game?.status === 'won') return finish(game, carried, 'LOCK_ALREADY_ACTIVE');
