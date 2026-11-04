@@ -309,7 +309,7 @@ export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) =>
   return () => { storageListeners.delete(listener); };
 };
 
-/** Патч 528: подписка на char.spend / char.refresh для штатного списания заколки. */
+/** Патч 528/529: подписка на команды изменения листа и char.refresh. */
 export const onRoomCharSpend = (listener: (message: RoomEnvelope) => void) => {
   charSpendListeners.add(listener);
   return () => { charSpendListeners.delete(listener); };
@@ -470,11 +470,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     ) {
       applyDirectiveEnvelopeToStore(message);
     }
-    // Патч 528: сервер НЕ правит снимок — он командует клиенту списать
-    // заколку, а затем обновить лист. Обработчик намеренно вызывается до
-    // разбора requestId: у этих кадров его нет и они ни с чем не сопоставляются.
+    // Патч 529 (ЗАКОН СНИМКА): сервер НЕ правит снимок — он посылает команду
+    // изменения листа, затем команду его обновления. Обработчик намеренно
+    // вызывается до разбора requestId: у этих кадров его нет.
     if (
-      message.type === ROOM_MESSAGE.CHAR_SPEND
+      message.type === ROOM_MESSAGE.CHAR_COMMAND
+      || message.type === ROOM_MESSAGE.CHAR_SPEND
       || message.type === ROOM_MESSAGE.CHAR_REFRESH
     ) {
       charSpendListeners.forEach((listener) => {

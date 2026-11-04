@@ -40,11 +40,14 @@ describe('528: протокол команд списания', () => {
     const entry = registry.registerPinSpend({
       code, characterId: 'ch1', clientId: 'p1', count: 1, spendId: 'pin-a1',
     });
+    // Патч 529: команда стала универсальной (kind + payload), spendId — алиас.
     expect(entry).toMatchObject({
-      spendId: 'pin-a1', characterId: 'ch1', clientId: 'p1', count: 1, itemId: 'item_bobby_pin',
+      commandId: 'pin-a1', spendId: 'pin-a1', characterId: 'ch1', clientId: 'p1',
+      kind: 'item.spend', payload: { itemId: 'item_bobby_pin', count: 1 },
     });
-    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(1);
+    expect(registry.pendingCommandsForClient(code, 'p1')).toHaveLength(1);
     expect(registry.pendingSpendsForClient(code, 'another-tab')).toHaveLength(0);
+    expect(registry.getState(code).pendingCommands).toHaveLength(1);
     expect(registry.getState(code).pendingSpends).toHaveLength(1);
     // Обычная публикация листа (вторая команда) снимает неподтверждённые.
     registry.putSnapshot({
@@ -52,8 +55,8 @@ describe('528: протокол команд списания', () => {
       snapshot: { items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } } },
       fromClientId: 'p1', fromName: 'Игрок',
     });
-    expect(registry.getState(code).pendingSpends).toHaveLength(0);
-    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(0);
+    expect(registry.getState(code).pendingCommands).toHaveLength(0);
+    expect(registry.pendingCommandsForClient(code, 'p1')).toHaveLength(0);
   });
 
   it('сервер больше не правит чужой снимок', () => {
@@ -61,13 +64,14 @@ describe('528: протокол команд списания', () => {
     const serverSource = read('server/roomServer.js');
     expect(registrySource).not.toContain('consumeBobbyPins(');
     expect(registrySource).toContain('pinsToSpend');
-    expect(serverSource).toContain('sendPinSpendCommands');
-    expect(serverSource).toContain('MESSAGE.CHAR_SPEND');
+    expect(serverSource).toContain('sendCharacterCommand');
+    expect(serverSource).toContain('MESSAGE.CHAR_COMMAND');
     expect(serverSource).toContain('MESSAGE.CHAR_REFRESH');
+    expect(serverSource).not.toContain('MESSAGE.CHAR_SPEND');
   });
 });
 
-describe('528: клиент применяет команды в строгом порядке', () => {
+describe('529: клиент применяет команды в строгом порядке', () => {
   const deps = (overrides = {}) => {
     const spend = vi.fn(async () => 1);
     const publish = vi.fn(async () => true);
@@ -75,7 +79,7 @@ describe('528: клиент применяет команды в строгом 
       spend,
       publish,
       d: {
-        spendBobbyPins: spend,
+        executionDeps: { spendBobbyPins: spend },
         publish,
         getCharacterId: () => 'ch1',
         isApplied: async () => false,
@@ -85,23 +89,27 @@ describe('528: клиент применяет команды в строгом 
       },
     };
   };
+  const command = (commandId, payload = {}) => ({
+    type: CLIENT_MESSAGE.CHAR_COMMAND,
+    payload: {
+      commandId, characterId: 'ch1', kind: 'item.spend',
+      payload: { itemId: 'item_bobby_pin', count: 1, ...payload },
+    },
+  });
 
-  it('char.spend списывает штатным вызовом и НЕ публикует лист сам', async () => {
+  it('char.command(item.spend) списывает штатным вызовом и НЕ публикует лист сам', async () => {
     const { spend, d } = deps();
-    const result = await applyCharSpendCommand({
-      type: CLIENT_MESSAGE.CHAR_SPEND,
-      payload: { spendId: 's1', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
-    }, new Map(), d);
-    expect(result).toMatchObject({ ok: true, started: true });
+    const result = await applyCharSpendCommand(command('s1'), new Map(), d);
+    expect(result).toMatchObject({ ok: true, started: true, kind: 'item.spend' });
     expect(spend).toHaveBeenCalledWith(1, { characterId: 'ch1', publish: false });
   });
 
-  it('char.refresh ждёт окончания списания и только потом обновляет снимок', async () => {
+  it('char.refresh ждёт окончания исполнения и только потом обновляет снимок', async () => {
     let resolveSpend;
     const spend = vi.fn(() => new Promise((resolve) => { resolveSpend = resolve; }));
     const publish = vi.fn(async () => true);
     const d = {
-      spendBobbyPins: spend,
+      executionDeps: { spendBobbyPins: spend },
       publish,
       getCharacterId: () => 'ch1',
       isApplied: async () => false,
@@ -109,11 +117,8 @@ describe('528: клиент применяет команды в строгом 
       log: vi.fn(),
     };
     const jobs = new Map();
-    const base = { spendId: 's2', characterId: 'ch1' };
-    await applyCharSpendCommand({
-      type: CLIENT_MESSAGE.CHAR_SPEND,
-      payload: { ...base, itemId: 'item_bobby_pin', count: 1 },
-    }, jobs, d);
+    const base = { commandId: 's2', characterId: 'ch1' };
+    await applyCharSpendCommand(command('s2'), jobs, d);
     const refreshing = applyCharSpendCommand({
       type: CLIENT_MESSAGE.CHAR_REFRESH, payload: base,
     }, jobs, d);
@@ -124,27 +129,21 @@ describe('528: клиент применяет команды в строгом 
     expect(jobs.has('s2')).toBe(false);
   });
 
-  it('повтор команды после реконнекта не списывает заколку дважды', async () => {
+  it('повтор команды после реконнекта не применяет изменение дважды', async () => {
     const { spend, d } = deps({ isApplied: async () => true });
-    const result = await applyCharSpendCommand({
-      type: CLIENT_MESSAGE.CHAR_SPEND,
-      payload: { spendId: 's3', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
-    }, new Map(), d);
+    const result = await applyCharSpendCommand(command('s3'), new Map(), d);
     expect(result.duplicate).toBe(true);
     expect(spend).not.toHaveBeenCalled();
   });
 
-  it('команда для другого персонажа или другого предмета игнорируется', async () => {
+  it('команда для другого персонажа игнорируется, а чужой предмет не исполняется', async () => {
     const { spend, d } = deps({ getCharacterId: () => 'ch2' });
-    expect((await applyCharSpendCommand({
-      type: CLIENT_MESSAGE.CHAR_SPEND,
-      payload: { spendId: 's4', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
-    }, new Map(), d)).reason).toBe('other-character');
-    const wrongItem = await applyCharSpendCommand({
-      type: CLIENT_MESSAGE.CHAR_SPEND,
-      payload: { spendId: 's5', characterId: 'ch1', itemId: 'caps', count: 1 },
-    }, new Map(), deps().d);
-    expect(wrongItem.reason).toBe('wrong-item');
+    expect((await applyCharSpendCommand(command('s4'), new Map(), d)).reason).toBe('other-character');
+    const { spend: spend2, d: d2 } = deps();
+    const foreign = command('s5', { itemId: 'caps' });
+    const result = await applyCharSpendCommand(foreign, new Map(), d2);
+    expect(result.started).toBe(true); // команда принята, но исполнитель её отверг
+    expect(spend2).not.toHaveBeenCalled(); // белый список предметов
     expect(spend).not.toHaveBeenCalled();
   });
 

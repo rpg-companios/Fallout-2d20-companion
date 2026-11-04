@@ -278,21 +278,24 @@ const attachRoomWebSocketServer = (httpServer, {
   };
 
   /**
-   * Патч 528: две команды оператору. Порядок кадров WebSocket гарантирует,
-   * что клиент сначала спишет заколку штатным spendItemStacks + saveCharacter,
-   * и ТОЛЬКО ПОСЛЕ этого опубликует свежий снимок (char.publish).
-   * Сервер сам никогда не правит чужой инвентарь.
+   * Патч 529 (ЗАКОН СНИМКА): две команды оператору. Порядок кадров WebSocket
+   * гарантирует, что клиент сначала ИСПОЛНИТ изменение штатными средствами
+   * (characterStore + saveCharacter) и ТОЛЬКО ПОСЛЕ этого опубликует свежий
+   * снимок (char.publish). Сервер сам никогда не правит чужой лист: ни
+   * инвентарь, ни журнал журналов, ни эффекты, ни ревизию.
    */
-  const sendPinSpendCommands = (ws, code, clientId, entry) => {
+  const sendCharacterCommand = (ws, code, clientId, entry) => {
     if (!entry) return;
-    sendEnvelope(ws, MESSAGE.CHAR_SPEND, {
-      spendId: entry.spendId,
+    sendEnvelope(ws, MESSAGE.CHAR_COMMAND, {
+      commandId: entry.commandId,
       characterId: entry.characterId,
-      itemId: entry.itemId,
-      count: entry.count,
+      kind: entry.kind,
+      payload: entry.payload,
     }, code, clientId);
     sendEnvelope(ws, MESSAGE.CHAR_REFRESH, {
-      spendId: entry.spendId,
+      commandId: entry.commandId,
+      // Алиас 528: клиенты предыдущей версии ищут spendId.
+      spendId: entry.spendId || entry.commandId,
       characterId: entry.characterId,
     }, code, clientId);
   };
@@ -531,8 +534,8 @@ const attachRoomWebSocketServer = (httpServer, {
           broadcastMembers(result.room, clientId);
           // Патч 528: вкладка оператора могла уйти до публикации листа.
           // Повторяем обе команды — клиент дедуплицирует по spendId.
-          for (const pending of registry.pendingSpendsForClient(canonical, clientId)) {
-            sendPinSpendCommands(ws, canonical, clientId, pending);
+          for (const pending of registry.pendingCommandsForClient(canonical, clientId)) {
+            sendCharacterCommand(ws, canonical, clientId, pending);
           }
           break;
         }
@@ -771,14 +774,29 @@ const attachRoomWebSocketServer = (httpServer, {
           // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
           // Никакой правки room.lastSnapshots здесь больше нет.
           if (result.pinsToSpend > 0) {
-            const entry = registry.registerPinSpend({
+            const entry = registry.registerCharacterCommand({
               code: canonical,
               characterId: result.characterId || payload.characterId,
               clientId,
-              count: result.pinsToSpend,
-              spendId: `pin-${crypto.randomBytes(8).toString('hex')}`,
+              commandId: `pin-${crypto.randomBytes(8).toString('hex')}`,
+              kind: 'item.spend',
+              payload: { itemId: 'item_bobby_pin', count: result.pinsToSpend },
             });
-            sendPinSpendCommands(ws, canonical, clientId, entry);
+            sendCharacterCommand(ws, canonical, clientId, entry);
+          }
+          // Патч 529: журнал «Программиста» тоже меняет лист — значит, тоже
+          // команда клиенту, а не правка room.lastSnapshots.
+          if (result.digestCommand) {
+            const digest = result.digestCommand;
+            const entry = registry.registerCharacterCommand({
+              code: canonical,
+              characterId: digest.characterId,
+              clientId,
+              commandId: `mag-${crypto.randomBytes(8).toString('hex')}`,
+              kind: digest.kind,
+              payload: digest.payload,
+            });
+            sendCharacterCommand(ws, canonical, clientId, entry);
           }
           break;
         }

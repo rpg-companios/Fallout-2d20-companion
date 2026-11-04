@@ -1,8 +1,12 @@
 {
-  "version": "528",
+  "version": "529",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Заведён закон снимка: сервер не трогает лист игрока. Любое изменение оформляется командой char.command, которую исполняет клиент штатными средствами, а затем сам публикует обновлённый снимок.",
+      "Закон действует на всё пространство Мастера: списание заколок, эффект журнала «Программиста», директивы, добыча, переносы и торговля не правят снимок на сервере.",
+      "Снимок остаётся каналом наблюдения за состоянием игрока без вмешательства: он виден Мастеру, когда ни одна сессия не открыта, и не очищается при открытии/закрытии локации.",
+      "Команды стали универсальными (kind + payload), дедуплицируются по commandId и повторяются при переподключении; char.spend 528 остаётся совместимым алиасом.",
       "Сломанная заколка теперь списывается штатными средствами самого игрока: сервер больше не правит снимок чужого листа, а посылает команды «спиши предмет» и «обнови снимок».",
       "Сначала клиент списывает заколку из инвентаря и сохраняет лист, и только после этого публикует обновлённый снимок в комнату Мастера.",
       "Если на нажатии заколка сломалась, красный «?» остаётся видимым ещё мгновение и лишь потом гаснет; если заколка не сломалась, красный остаётся до следующего нажатия.",
@@ -110,6 +114,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Introduced the snapshot law: the server never edits a player's sheet. Every change is a char.command that the client executes with its standard tools, after which the client publishes the updated snapshot itself.",
+      "The law covers the whole Game Master space: pin spending, the Programmer's Digest magazine effect, directives, loot, storage transfers and trading no longer mutate the snapshot on the server.",
+      "The snapshot stays an observation channel for the player's state without interference: the GM sees it when no session is open, and it is not cleared when a location opens or closes.",
+      "Commands are now generic (kind + payload), deduplicated by commandId and replayed on reconnect; the 528 char.spend remains a compatible alias.",
       "A broken bobby pin is now spent by the player's own standard inventory tools: the server no longer edits the published sheet, it sends a «spend item» command and then a «refresh snapshot» command.",
       "The client first removes the pin from the inventory and saves the sheet, and only then publishes the updated snapshot to the Game Master's room.",
       "When a pin breaks on a press, the red «?» stays visible for a short pause before the colours update; if the pin did not break, the red mark stays until the next press.",

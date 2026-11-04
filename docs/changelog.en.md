@@ -1,5 +1,62 @@
 # Changelog
 ---
+## Snapshot law: commands instead of editing the sheet (patch 529)
+
+> **Owner's words:** "don't touch the user's snapshot; if something must change
+> for the user, send a command that the client executes. The whole Game Master
+> space must obey it. The snapshot is for observing the user's state without
+> interference, even between sessions."
+
+The canon is `docs/gm-snapshot-law.md`. This is a law for the whole GM space,
+not a one-off fix.
+
+### 1. The snapshot is observation only
+
+`room.lastSnapshots` lives on the room, not on a session: the GM sees the
+player's sheet when no loot/trade session is open, and it is not cleared when a
+location opens/closes or on «Leave location». The only writer is the client's
+own `char.publish`; only the client can remove its entry. The server no longer
+writes, clears or bumps a revision on someone else's sheet.
+
+### 2. A single command frame
+
+`char.command` `{ commandId, characterId, kind, payload }` → the client executes
+the change with **standard tools** (`useCharacterStore` + `saveCharacter`) →
+`char.refresh` awaits it → ordinary `char.publish`. The whitelist of executors
+lives in `components/gm/charCommands.js`:
+
+- `item.spend` — a broken bobby pin (former 528 `char.spend`, `spendItemStacks`);
+- `magazine.use` — the Programmer's Digest magazine (`markMagazineEffectUsed`).
+
+**The last loophole is closed:** the server used to write
+`usedMagazineEffects` and `terminalHacking` into the published sheet when
+«Use magazine» was pressed. It now returns `digestCommand`, the network layer
+sends `char.command(magazine.use)`, and the client edits and publishes its own
+sheet. The branch in `TerminalHackingModal` remains as an idempotent fallback
+for a 528 server.
+
+`commandId` is deduplicated (memory + AsyncStorage); `pendingCharCommands`
+replays commands on `room.join` and clears them in `putSnapshot`. Unknown
+`kind`, another character and items outside the whitelist are not executed.
+
+### 3. What is preserved
+
+State owned by the Game Master (sessions, `terminalStates`, `accessEvents`,
+`partyStorage`, directives, keys) is still server canon — the law is about the
+player's sheet. Message caps, roles, validation and atomicity are intact.
+Laws 520–528 (terminal balance, four attempts, explicit player attempts, light
+palette, the «Заколка» canon, the red pause, spend commands) are unchanged.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (258 files, 2334 tests),
+`git apply --check`, installer from the exact `a62ec71` base and from version
+528 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/gm-snapshot-law-529.test.js` (static guard "one
+lastSnapshots.set and only in putSnapshot", snapshots between sessions, kind
+whitelist, deduplication); the 528 tests were updated for the unified
+`char.command` frame.
+
 ## Spend commands and a pause before the colours update (patch 528)
 
 The owner clarified the patch 527 architecture: "Bobby pins are removed not

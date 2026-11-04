@@ -172,6 +172,11 @@ ${tLootTrade('terminal.retryMessage')}`,
         value,
         ownerToken,
       });
+      // Патч 529 (ЗАКОН СНИМКА): сервер 529 присылает char.command с
+      // kind=magazine.use, его исполняет CharSpendCommandHost. Эта ветка —
+      // локальный резерв для сервера 528 без общего кадра команд; действие
+      // стора идемпотентно, поэтому двойного эффекта нет. Снимок на сервере
+      // не правит никто: лист публикует сам клиент.
       if (action === 'useDigest' && updated?.game?.digestUsed) {
         markMagazineEffectUsed?.('mag_programmers_digest');
         if (characterId) {

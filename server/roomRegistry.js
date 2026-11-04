@@ -194,17 +194,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
     accessEvents: new Map(),
-    // Патч 520/527/528: диагностический счётчик сломанных заколок. С 528
-    // сервер НЕ правит опубликованный снимок листа: он шлёт клиенту команду
-    // char.spend (списать предмет штатными средствами) и char.refresh
-    // (обновить снимок), а снимок меняется только обычным char.publish.
+    // Патч 520/527/528/529: диагностический счётчик сломанных заколок.
+    // ЗАКОН СНИМКА (529): lastSnapshots — ТОЛЬКО наблюдение. Единственный
+    // писатель — сам клиент через char.publish (putSnapshot). Любое изменение
+    // листа оформляется командой char.command + char.refresh, которую клиент
+    // исполняет штатными средствами (characterStore + saveCharacter).
     pinLedger: new Map(),
-    // Неподтверждённые команды списания: до публикации свежего листа. Нужны,
-    // чтобы повторить команду при переподключении вкладки оператора.
-    pendingPinSpends: new Map(),
+    // Неподтверждённые команды изменения листа: до публикации свежего листа.
+    // Нужны, чтобы повторить команду при переподключении вкладки оператора.
+    pendingCharCommands: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
+    // Алиас 528: тот же Map, чтобы старые обращения не теряли команды.
+    get pendingPinSpends() { return this.pendingCharCommands; },
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
     directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
     createdAt: now(),
@@ -243,8 +246,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
-    // Патч 528: команды, которые клиент обязан применить после реконнекта.
-    pendingSpends: [...(room.pendingPinSpends?.values() || [])].map((entry) => ({ ...entry })),
+    // Патч 529: команды, которые клиент обязан применить после реконнекта.
+    // Снимки листов летят ВСЕГДА, даже когда ни одна сессия не открыта:
+    // Мастер наблюдает состояние игрока между сессиями, не вмешиваясь в него.
+    pendingCommands: [...(room.pendingCharCommands?.values() || [])].map((entry) => ({ ...entry })),
+    pendingSpends: [...(room.pendingCharCommands?.values() || [])]
+      .filter((entry) => entry.kind === 'item.spend')
+      .map((entry) => ({ ...entry })),
     terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
       id,
       terminalPublic(id, entry),
@@ -426,8 +434,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     });
     // Патч 528: свежий лист уже учёл списание — повторять команду не надо.
     // Это же снимает гонку, если char.refresh/char.spendAck потерялся.
-    for (const [spendId, pending] of room.pendingPinSpends || []) {
-      if (pending.characterId === characterId) room.pendingPinSpends.delete(spendId);
+    for (const [commandId, pending] of room.pendingCharCommands || []) {
+      if (pending.characterId === characterId) room.pendingCharCommands.delete(commandId);
     }
     return { room, stored: true, currentRevision: Number(revision) || 0 };
   };
@@ -822,21 +830,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       const fresh = entry.game.wordRanges.map((range) => range.word);
       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
     }
+    // Патч 529 (ЗАКОН СНИМКА): раньше здесь сервер сам писал
+    // usedMagazineEffects / terminalHacking в опубликованный лист. Теперь он
+    // только сообщает сетевому слою «нужна команда magazine.use»: клиент
+    // исполнит её штатным markMagazineEffectUsed + saveCharacter, и сам же
+    // опубликует свежий лист. Снимок остаётся каналом НАБЛЮДЕНИЯ.
+    let digestCommand = null;
     if (entry.config?.kind !== 'lock' && result.usedDigest) {
-      const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
-      const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
-        ? nextSnapshot.data
-        : nextSnapshot;
-      const used = new Set(Array.isArray(snapshotData.usedMagazineEffects) ? snapshotData.usedMagazineEffects : []);
-      used.add('mag_programmers_digest');
-      snapshotData.usedMagazineEffects = [...used];
-      snapshotData.terminalHacking = { ...(snapshotData.terminalHacking || {}), hasProgrammersDigest: true, digestUsed: true };
-      room.lastSnapshots.set(charId, {
-        ...published,
-        snapshot: nextSnapshot,
-        revision: published.revision + 1,
-        updatedAt: now(),
-      });
+      digestCommand = {
+        kind: 'magazine.use',
+        payload: { magazineId: 'mag_programmers_digest' },
+        characterId: charId,
+        clientId,
+      };
     }
     entry.updatedAt = now();
     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
@@ -847,6 +853,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       terminal: terminalPublic(id, entry),
       usedDigest: Boolean(result.usedDigest),
       pinsToSpend,
+      digestCommand,
       characterId: charId,
       clientId,
     };
@@ -1416,35 +1423,58 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
    * Патч 528: зарегистрировать команду списания заколки для оператора.
    * Возвращает её идентификатор; команда живёт до публикации свежего листа.
    */
-  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => {
+  const registerCharacterCommand = ({
+    code, characterId, clientId, commandId, kind, payload = {},
+  }) => {
     const room = rooms.get(code);
-    if (!room || !spendId || !characterId) return null;
+    if (!room || !commandId || !characterId || !kind) return null;
     const entry = {
-      spendId: String(spendId),
+      commandId: String(commandId),
+      // Алиас 528: старые клиенты ищут spendId.
+      spendId: String(commandId),
       characterId: String(characterId),
       clientId: String(clientId || ''),
-      count: Math.max(1, Math.floor(Number(count) || 1)),
-      itemId: 'item_bobby_pin',
+      kind: String(kind),
+      payload: { ...payload },
       at: now(),
     };
-    room.pendingPinSpends.set(entry.spendId, entry);
+    room.pendingCharCommands.set(entry.commandId, entry);
     return entry;
   };
 
+  /** Алиас 528: команда списания заколки — частный случай char.command. */
+  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => (
+    registerCharacterCommand({
+      code, characterId, clientId,
+      commandId: spendId,
+      kind: 'item.spend',
+      payload: {
+        itemId: 'item_bobby_pin',
+        count: Math.max(1, Math.floor(Number(count) || 1)),
+      },
+    })
+  );
+
   /** Команды, которые надо повторить конкретному клиенту после реконнекта. */
-  const pendingSpendsForClient = (code, clientId, characterId = null) => {
+  const pendingCommandsForClient = (code, clientId, characterId = null) => {
     const room = rooms.get(code);
     if (!room) return [];
-    return [...(room.pendingPinSpends?.values() || [])]
+    return [...(room.pendingCharCommands?.values() || [])]
       .filter((entry) => entry.clientId === clientId
         || (characterId && entry.characterId === characterId))
       .map((entry) => ({ ...entry }));
   };
+  const pendingSpendsForClient = (code, clientId, characterId = null) => (
+    pendingCommandsForClient(code, clientId, characterId)
+      .filter((entry) => entry.kind === 'item.spend')
+  );
 
   return {
     createRoom,
     joinRoom,
     registerPinSpend,
+    registerCharacterCommand,
+    pendingCommandsForClient,
     pendingSpendsForClient,
     leaveRoom,
     putSnapshot,

@@ -1,19 +1,22 @@
 /**
- * Патч 528: штатное списание заколки по команде сервера.
+ * Патч 528/529: ЗАКОН СНИМКА — исполнитель команд изменения листа.
  *
- * Сервер больше НЕ уменьшает quantity в опубликованном снимке листа. При
- * поломке он шлёт оператору две команды подряд (порядок кадров WebSocket
- * гарантирован):
+ * «Снапшот юзера не трогаем, если надо что-то изменить у пользователя —
+ * посылаем команду, которую исполнит клиент. По нему должно работать всё
+ * пространство мастера. Снапшот нужен для наблюдения за изменением состояния
+ * пользователя без вмешательства даже между сессиями».
  *
- *   1. `char.spend`   — «спиши заколку из инвентаря штатными средствами»;
- *   2. `char.refresh` — «после списания обнови снимок» (обычный char.publish).
+ * Сервер шлёт оператору два кадра подряд (порядок WebSocket гарантирован):
  *
- * Здесь команды применяются последовательно: вторая всегда дожидается первой.
- * Списание идёт через общий `spendItemStacks` + `saveCharacter`, публикация —
- * через штатный `pushSavedCharacterToBoundRoomIfAny`. `spendId` дедуплицирует
- * повтор команды после реконнекта, чтобы не списать заколку дважды.
+ *   1. `char.command` (528-алиас `char.spend`) — { commandId, characterId,
+ *      kind, payload }. Исполнители — `components/gm/charCommands.js`: только
+ *      штатные действия characterStore + saveCharacter, белый список kind.
+ *   2. `char.refresh` — «после исполнения обнови снимок»: обычный char.publish
+ *      через `pushSavedCharacterToBoundRoomIfAny`.
  *
- * Монтируется один раз в App.js: игрок мог уже закрыть окно мини-игры, а лист
+ * `commandId` дедуплицируется (память + AsyncStorage), поэтому повтор команды
+ * после реконнекта не применит изменение дважды. Монтируется один раз в App.js
+ * поверх ВСЕХ экранов: окно мини-игры/终端а могло быть уже закрыто, а лист
  * всё равно должен обновиться. Компонент ничего не рисует.
  */
 
@@ -24,9 +27,12 @@ import { onRoomCharSpend } from '../../src/room/roomStore';
 import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
 import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
 import { debugLog } from '../../src/debug/falloutDebug';
-import { spendBobbyPins } from './spendBobbyPins';
+import {
+  normalizeCharacterCommand,
+  applyCharacterCommand,
+} from '../gm/charCommands';
 
-const APPLIED_KEY = 'positronium_applied_pin_spends_v1';
+const APPLIED_KEY = 'positronium_applied_char_commands_v1';
 const MAX_APPLIED = 200;
 const applied = new Set();
 let hydrated = false;
@@ -41,11 +47,11 @@ const hydrateOnce = async () => {
   } catch { /* нет хранилища — дедуплицируем в памяти сессии */ }
 };
 
-const markApplied = async (spendId) => {
-  applied.add(spendId);
+const markApplied = async (commandId) => {
+  applied.add(commandId);
   try {
     await AsyncStorage.setItem(APPLIED_KEY, JSON.stringify([...applied].slice(-MAX_APPLIED)));
-  } catch { /* не блокируем списание */ }
+  } catch { /* не блокируем исполнение */ }
 };
 
 /** Точка сброса для тестов. */
@@ -57,57 +63,55 @@ export const resetAppliedPinSpendsForTests = () => {
 /** Чистый обработчик кадра — экспортирован для приёмочных тестов. */
 export const applyCharSpendCommand = async (message, jobs, deps = {}) => {
   const {
-    spendBobbyPins: spend = spendBobbyPins,
+    execute = applyCharacterCommand,
     publish = pushSavedCharacterToBoundRoomIfAny,
     getCharacterId = () => useCharacterStore.getState().currentCharacterId,
     isApplied = async (id) => { await hydrateOnce(); return applied.has(id); },
     setApplied = markApplied,
     log = debugLog,
+    executionDeps = {},
   } = deps;
   const type = message?.type;
   const payload = message?.payload || {};
-  const spendId = String(payload.spendId || '').trim();
-  if (!spendId) return { ok: false, reason: 'no-spend-id' };
 
-  if (type === ROOM_MESSAGE.CHAR_SPEND) {
-    if (await isApplied(spendId)) return { ok: true, duplicate: true };
-    const characterId = String(payload.characterId || '').trim();
-    if (!characterId) return { ok: false, reason: 'no-character' };
+  if (type === ROOM_MESSAGE.CHAR_COMMAND || type === ROOM_MESSAGE.CHAR_SPEND) {
+    const command = normalizeCharacterCommand(message, ROOM_MESSAGE);
+    const commandId = command.commandId;
+    if (!commandId) return { ok: false, reason: 'no-command-id' };
+    if (await isApplied(commandId)) return { ok: true, duplicate: true };
+    if (!command.characterId) return { ok: false, reason: 'no-character' };
     const current = getCharacterId();
-    if (current && current !== characterId) {
+    if (current && current !== command.characterId) {
       // Другая вкладка/персонаж: команда адресована не этому листу.
       return { ok: false, reason: 'other-character' };
     }
-    if (String(payload.itemId || 'item_bobby_pin') !== 'item_bobby_pin') {
-      return { ok: false, reason: 'wrong-item' };
-    }
     const job = (async () => {
-      const spent = await spend(Math.max(1, Math.floor(Number(payload.count) || 1)), {
-        characterId,
-        publish: false, // публикация — вторая команда char.refresh
-      });
-      await setApplied(spendId);
-      return spent;
+      const result = await execute(command, executionDeps);
+      if (!result?.ok) return 0;
+      await setApplied(commandId);
+      return 1;
     })().catch((error) => {
-      log('lock.charSpend:failed', { spendId, message: error?.message });
+      log('gm.charCommand:jobFailed', { commandId, message: error?.message });
       return 0;
     });
-    jobs.set(spendId, job);
-    return { ok: true, started: true };
+    jobs.set(commandId, job);
+    return { ok: true, started: true, kind: command.kind };
   }
 
   if (type === ROOM_MESSAGE.CHAR_REFRESH) {
-    // Вторая команда приходит сразу за первой, но списание асинхронно:
+    const commandId = String(payload.commandId || payload.spendId || '').trim();
+    if (!commandId) return { ok: false, reason: 'no-command-id' };
+    // Вторая команда приходит сразу за первой, но исполнение асинхронно:
     // явно ждём его, чтобы в комнату ушёл УЖЕ обновлённый лист.
-    const job = jobs.get(spendId) || Promise.resolve(0);
+    const job = jobs.get(commandId) || Promise.resolve(0);
     await job;
     const characterId = String(payload.characterId || '').trim();
     if (characterId) {
       try { await publish(characterId); } catch (error) {
-        log('lock.charRefresh:failed', { spendId, message: error?.message });
+        log('gm.charRefresh:failed', { commandId, message: error?.message });
       }
     }
-    jobs.delete(spendId);
+    jobs.delete(commandId);
     return { ok: true, refreshed: true };
   }
   return { ok: false, reason: 'unknown-type' };

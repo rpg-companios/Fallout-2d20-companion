@@ -25,6 +25,9 @@ const MESSAGE = Object.freeze({
   // затем «обнови снимок» (клиент публикует лист обычным char.publish).
   CHAR_SPEND: 'char.spend',
   CHAR_REFRESH: 'char.refresh',
+  // Патч 529: единая команда изменения листа. kind задаёт исполнителя на
+  // клиенте (item.spend / magazine.use); за ней всегда идёт char.refresh.
+  CHAR_COMMAND: 'char.command',
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',
