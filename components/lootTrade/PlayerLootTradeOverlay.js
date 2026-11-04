@@ -34,6 +34,7 @@ import {
   normalizeLinkedCheckIds,
 } from '../../domain/lootTrade';
 import { describeItemBasics } from '../../domain/itemBasics';
+import itemStacking from '../../domain/itemStacking.js';
 import {
   applyCommittedMerchantTradeToCharacter,
   getSellablePlayerInventoryItems,
@@ -1025,16 +1026,31 @@ export default function PlayerLootTradeOverlay() {
         entryId: line.entryId,
         quantity: line.quantity,
       }));
-      const sellItems = barterSummary.sellLines.map((line) => ({
-        clientItemId: line.playerItemId,
-        itemId: line.item.catalogId,
-        itemType: line.item.itemType,
-        name: line.item.name,
-        cost: line.item.cost,
-        weight: line.item.weight,
-        quantity: line.quantity,
-        itemSnapshot: line.item.itemSnapshot,
-      }));
+      // Патч 522: торговцу уходит ПОЛНЫЙ предмет с модами, состоянием и
+      // эффективными ценой/весом. Сервер не пересчитывает их из базового каталога.
+      const sellItems = barterSummary.sellLines.map((line) => {
+        const effectiveCost = itemStacking.effectiveItemCost(line.item);
+        const effectiveWeight = itemStacking.effectiveItemWeight(line.item);
+        const snapshot = line.item.itemSnapshot || {};
+        return {
+          clientItemId: line.playerItemId,
+          itemId: line.item.catalogId,
+          itemType: line.item.itemType,
+          name: line.item.name,
+          cost: effectiveCost,
+          weight: effectiveWeight,
+          effectiveCost,
+          effectiveWeight,
+          quantity: line.quantity,
+          itemSnapshot: {
+            ...snapshot,
+            cost: effectiveCost,
+            weight: effectiveWeight,
+            effectiveCost,
+            effectiveWeight,
+          },
+        };
+      });
 
       const { committed } = await useRoomStore.getState().commitMerchantTrade({
         code: matchedContext.roomCode,

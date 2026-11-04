@@ -1,8 +1,10 @@
 {
-  "version": "521",
+  "version": "522",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
+      "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
       "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
       "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
@@ -92,6 +94,8 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
+      "An item is now identical in your inventory, in storage and at a trader: a modified weapon keeps its mods, durability and charges, and its price and weight are calculated from the installed mods.",
       "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
       "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
       "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",

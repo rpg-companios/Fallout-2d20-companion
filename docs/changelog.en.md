@@ -1,5 +1,40 @@
 # Changelog
 ---
+## One item everywhere (patch 522)
+
+The owner clarified: "There are no weight or quantity limits, an item in the
+inventory is the same item in storage... Items must not lose properties when
+they change where they are kept. The same goes for traders... price and weight
+are calculated from the mods." The limits from the previous update are gone —
+that gameplay rule was wrong. Server protection was not weakened anywhere.
+
+- **No gameplay limits.** Storage has no weight cap, no row cap, no stack cap
+  and no per-operation quantity cap. The "storage full" message and the
+  `STORAGE_FULL` code are removed. Only technical safeguards remain: the
+  WebSocket message size, integer positive quantity checks, the number of
+  operations in one message, sanitizing incoming item snapshots and atomic
+  transfers. An imported snapshot of any size is accepted, while malformed data
+  is rejected before any room state changes.
+- **One domain module.** The stacking law now lives in `server/itemStacking.js`
+  with `domain/itemStacking.js` as the client entry point. Inventory, shared
+  storage and traders all use it instead of duplicating rules. Different mods,
+  charges, durability, current HP, unique qualities and base names produce
+  separate stacks everywhere; placement-only service fields do not affect the
+  comparison.
+- **No field stripping.** Depositing to storage, granting to a player and
+  selling to a trader now carry the whole item: `appliedMods`, `charges`,
+  `durability`, `hpCurrent`, `uniqQualities`, `uniqueId`, `stackKey` and
+  `baseName` survive. Only placement state and the operation's quantity change.
+- **Price and weight from mods.** Player sales and the item card take their
+  numbers from the enriched item (`resolveItem` already adds `mod.cost` and
+  `mod.weight`) instead of the bare catalog row. Effective `cost`/`weight`
+  travel with the snapshot and survive on the server, so a modified weapon no
+  longer loses its value when it changes hands.
+- **The window is unchanged.** Two panes, a buffer and the «Transfer» button;
+  no prices, applying, equipping or settings. Keys remain read-only, the Game
+  Master still broadcasts them and sees «Add to storage», and file export/import
+  still works for both the Game Master and players.
+
 ## Shared storage polish (patch 521)
 
 The last item of the live plan is done. Two of the three small bits already

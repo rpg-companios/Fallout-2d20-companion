@@ -7,6 +7,7 @@
 // - расчёт двухпанельного буфера обмена с контролем лимита крышек торговца;
 // - дублирование контейнеров и слияние одинаковых позиций.
 
+import itemStacking from './itemStacking.js';
 import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
 import {
   AMMO_FOUND_BY_ID,
@@ -426,8 +427,8 @@ export const normalizeContainerItem = (raw, now = Date.now()) => {
     itemId: itemId || name,
     itemType,
     name: name || 'Крышки',
-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
+    cost: itemStacking.effectiveItemCost(raw),
+    weight: itemStacking.effectiveItemWeight(raw),
     quantity,
     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
@@ -725,16 +726,8 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   };
 };
 
-const snapshotMergeSignature = (snapshot) => {
-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
-    : '';
-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
-  return `${mods}|${dur}|${charges}|${hp}`;
-};
+// Патч 522: один закон стака для инвентаря, склада и торговцев.
+const snapshotMergeSignature = (snapshot) => itemStacking.itemStackKey(snapshot);
 
 /**
  * Добавляет или объединяет одинаковую позицию в списке контейнера/торговца.
@@ -817,7 +810,7 @@ export const computeMerchantSellPriceToPlayer = (
   entry,
   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
+  const baseCost = itemStacking.effectiveItemCost(entry);
   if (baseCost <= 0) return 0;
 
   const itemMarkup = Number(entry?.markupPercent) || 0;
@@ -843,7 +836,7 @@ export const computeMerchantBuybackPriceFromPlayer = (
 ) => {
   const resolvedBase = catalogCost != null
     ? Number(catalogCost)
-    : Number(item?.cost ?? item?.price ?? 0);
+    : itemStacking.effectiveItemCost(item);
   const baseCost = Math.max(0, Number.isFinite(resolvedBase) ? resolvedBase : 0);
   if (baseCost <= 0) return 0;
 

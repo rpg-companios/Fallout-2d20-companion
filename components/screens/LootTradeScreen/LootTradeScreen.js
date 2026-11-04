@@ -1320,6 +1320,12 @@ export default function LootTradeScreen() {
         id: pickedItem.id || pickedItem.weaponId,
         weaponId: pickedItem.weaponId || pickedItem.id,
         itemType: pickedItem.itemType || 'misc',
+        // Патч 522: снимок хранит цену и вес с учётом модов — при выдаче игроку
+        // и при обратной продаже числа не откатываются к базовому каталогу.
+        cost: baseCost,
+        weight,
+        effectiveCost: baseCost,
+        effectiveWeight: weight,
       },
     });
 

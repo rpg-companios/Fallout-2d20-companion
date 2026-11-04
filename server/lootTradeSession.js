@@ -6,6 +6,11 @@
 // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
 
 const { ERROR_CODE } = require('./protocol');
+const {
+  itemStackKey,
+  effectiveItemCost,
+  effectiveItemWeight,
+} = require('./itemStacking.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
 
@@ -50,16 +55,8 @@ const normalizeCapsAmount = (value, fallback = 0) =>
 const makeEntryId = (now = Date.now(), idx = 0) =>
   `ent_${now}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
 
-const snapshotMergeSignature = (snapshot) => {
-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
-    : '';
-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
-  return `${mods}|${dur}|${charges}|${hp}`;
-};
+// Патч 522: один закон стака для инвентаря, склада и торговцев.
+const snapshotMergeSignature = (snapshot) => itemStackKey(snapshot);
 
 const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
@@ -75,8 +72,8 @@ const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
     itemId: itemId || name,
     itemType,
     name: name || 'Крышки',
-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
+    cost: effectiveItemCost(raw),
+    weight: effectiveItemWeight(raw),
     quantity,
     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
@@ -367,7 +364,7 @@ const computeMerchantSellPriceToPlayer = (
   entry,
   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
+  const baseCost = effectiveItemCost(entry);
   if (baseCost <= 0) return 0;
 
   const itemMarkup = Number(entry?.markupPercent) || 0;
@@ -385,7 +382,7 @@ const computeMerchantBuybackPriceFromPlayer = (
   item,
   { buyDepreciationPercent = 50, capCollectorPercent = 0 } = {},
 ) => {
-  const baseCost = Math.max(0, Number(item?.cost ?? item?.price ?? 0) || 0);
+  const baseCost = effectiveItemCost(item);
   if (baseCost <= 0) return 0;
 
   const depreciation = normalizeBuyDepreciationPercent(buyDepreciationPercent, 50);

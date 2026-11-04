@@ -1,0 +1,1818 @@
+diff --git a/__tests__/room/item-stacking-522.test.js b/__tests__/room/item-stacking-522.test.js
+new file mode 100644
+index 0000000..0dc56c2
+--- /dev/null
++++ b/__tests__/room/item-stacking-522.test.js
+@@ -0,0 +1,293 @@
++// Приёмочный тест 522: один закон предмета для инвентаря, общего хранилища и
++// торговцев. Игровых ограничений веса/количества нет; защита сервера на месте.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import stacking from '../../domain/itemStacking.js';
++import rules from '../../server/partyStorageRules.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { ERROR_CODE, LIMITS } from '../../server/protocol.js';
++import {
++  normalizeContainerItem,
++  addOrMergeContainerItem,
++  computeMerchantBuybackPriceFromPlayer,
++} from '../../domain/lootTrade.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const BASE = {
++  id: 'w1', weaponId: 'w1', itemType: 'weapon', name: 'Винтовка',
++  cost: 100, weight: 5, appliedMods: { barrel: 'long' },
++  durability: 80, durabilityTracked: true, charges: 3,
++  hpCurrent: 9, uniqQualities: ['q1'], baseName: 'Стандарт',
++  uniqueId: 'u-1', stackKey: 'w1_mods_long', equipInstanceId: 'e-1',
++};
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm-1', name: 'Стол', ownerToken: 'token-1' });
++  registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Первый', role: 'player' });
++  return { registry, room };
++};
++
++describe('522: единая механика предметов', () => {
++  it('стек-ключ игнорирует служебные поля размещения, но различает живое состояние', () => {
++    const same = { ...BASE, uniqueId: 'u-2', quantity: 99, equipped: true, locked: true };
++    expect(stacking.itemStackKey(BASE)).toBe(stacking.itemStackKey(same));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, appliedMods: { barrel: 'short' } }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, charges: 2 }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, durability: 40 }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, hpCurrent: 4 }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, uniqQualities: ['q2'] }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, baseName: 'Другой' }));
++    expect(stacking.itemStackKey(BASE)).not.toBe(
++      stacking.itemStackKey({ ...BASE, id: 'w2', weaponId: 'w2' }));
++  });
++
++  it('ядерные блоки с разными зарядами — разные стопки везде', () => {
++    const core = (charges) => ({ id: stacking.FUSION_CORE_ID, itemType: 'ammo', charges });
++    expect(stacking.itemStackKey(core(10))).not.toBe(stacking.itemStackKey(core(9)));
++    expect(stacking.itemStackKey(core(10))).toBe(stacking.itemStackKey(core(10)));
++  });
++
++  it('перенос не обрезает поля: моды, состояние, id и ключ стака остаются', () => {
++    const snap = stacking.itemTransferSnapshot(BASE, { effectiveCost: 480, effectiveWeight: 9 });
++    expect(snap.appliedMods).toEqual(BASE.appliedMods);
++    expect(snap.charges).toBe(3);
++    expect(snap.durability).toBe(80);
++    expect(snap.hpCurrent).toBe(9);
++    expect(snap.uniqQualities).toEqual(['q1']);
++    expect(snap.baseName).toBe('Стандарт');
++    expect(snap.uniqueId).toBe('u-1');
++    expect(snap.stackKey).toBe('w1_mods_long');
++    expect(snap.equipInstanceId).toBe('e-1');
++    expect(snap.quantity).toBe(1);
++    expect(snap.equipped).toBe(false);
++    expect(stacking.itemStackKey(snap)).toBe(stacking.itemStackKey(BASE));
++  });
++
++  it('цена и вес читаются из эффективных полей (модов), а не голой базы', () => {
++    expect(stacking.effectiveItemCost({ cost: 100, effectiveCost: 480 })).toBe(480);
++    expect(stacking.effectiveItemWeight({ weight: 5, effectiveWeight: 9 })).toBe(9);
++    expect(stacking.effectiveItemCost({ cost: '1 234,5' })).toBe(1234.5);
++    expect(stacking.effectiveItemWeight({ weight: '2,5' })).toBe(2.5);
++  });
++
++  it('все три потребителя берут правила из domain/itemStacking.js', () => {
++    // канон лежит внутри server/, чтобы изолированный деплой не тянул domain/
++    expect(read('domain/itemStacking.js')).toContain("require('../server/itemStacking.js')");
++    expect(read('server/itemStacking.js')).toContain('const itemStackKey');
++    expect(read('components/screens/InventoryScreen/InventoryScreen.js')).toContain('domain/itemStacking.js');
++    expect(read('server/partyStorageRules.js')).toContain("'./itemStacking.js'");
++    expect(read('server/lootTradeSession.js')).toContain("'./itemStacking.js'");
++    expect(read('domain/lootTrade.js')).toContain("'./itemStacking.js'");
++    expect(read('components/lootTrade/PartyStorageModal.js')).toContain('domain/itemStacking.js');
++    // локальный дубль закона стака из инвентаря удалён
++    expect(read('components/screens/InventoryScreen/InventoryScreen.js')).not.toContain('__legacyStackKey');
++    // больше не выкидываем appliedMods / uniqueId / stackKey
++    expect(read('components/lootTrade/PartyStorageModal.js')).not.toContain('appliedMods, ...rest');
++    expect(read('src/lootTrade/grantCharacterItems.js')).not.toContain('delete cleanSnapshot.uniqueId');
++    expect(read('src/lootTrade/grantCharacterItems.js')).toContain('getItemPrice(resolved) || catalogCost');
++  });
++});
++
++describe('522: склад без игровых лимитов', () => {
++  const makeEntry = ({ item, name, quantity }) => ({
++    entryId: `new-${Math.random()}`, item, name, quantity,
++  });
++
++  it('разные моды и заряды дают разные строки, одинаковые склеиваются', () => {
++    const first = rules.applyStorageDeposits({
++      entries: [],
++      deposits: [
++        { item: BASE, quantity: 2, name: 'Винтовка' },
++        { item: { ...BASE, appliedMods: { barrel: 'short' } }, quantity: 1, name: 'Винтовка' },
++        { item: { ...BASE, charges: 2 }, quantity: 1, name: 'Винтовка' },
++      ],
++      makeEntry,
++    });
++    expect(first.error).toBeNull();
++    expect(first.entries).toHaveLength(3);
++
++    const merged = rules.applyStorageDeposits({
++      entries: first.entries,
++      deposits: [{ item: BASE, quantity: 4, name: 'Винтовка' }],
++      makeEntry,
++    });
++    expect(merged.entries).toHaveLength(3);
++    expect(merged.entries[0].quantity).toBe(6);
++  });
++
++  it('нет потолка стопки, числа строк и количества за операцию', () => {
++    const huge = rules.applyStorageDeposits({
++      entries: [], deposits: [{ item: BASE, quantity: 100000, name: 'Винтовка' }], makeEntry,
++    });
++    expect(huge.error).toBeNull();
++    expect(huge.entries[0].quantity).toBe(100000);
++
++    const many = rules.applyStorageDeposits({
++      entries: [],
++      deposits: Array.from({ length: 300 }, (_, i) => ({
++        item: { ...BASE, id: `x${i}`, weaponId: `x${i}` }, quantity: 1, name: `Предмет ${i}`,
++      })),
++      makeEntry,
++    });
++    expect(many.error).toBeNull();
++    expect(many.entries).toHaveLength(300);
++  });
++
++  it('сервер принимает большой перенос и не знает кода STORAGE_FULL', () => {
++    const { registry, room } = setup();
++    const dep = registry.depositToPartyStorage({
++      code: room.code, clientId: 'p1', item: BASE, quantity: 100000,
++    });
++    expect(dep.error).toBeUndefined();
++    expect(dep.storage.entries[0].quantity).toBe(100000);
++    expect(dep.storage.entries[0].item.appliedMods).toEqual(BASE.appliedMods);
++    expect(ERROR_CODE.STORAGE_FULL).toBeUndefined();
++    expect(read('components/lootTrade/PartyStorageModal.js')).not.toContain('STORAGE_FULL');
++  });
++
++  it('атомарный перенос «Перенести» сохраняет моды и состояние предмета', () => {
++    const { registry, room } = setup();
++    registry.depositToPartyStorage({ code: room.code, clientId: 'p1', item: BASE, quantity: 2 });
++    const changed = { ...BASE, appliedMods: { barrel: 'short' }, charges: 1 };
++    const result = registry.transferPartyStorage({
++      code: room.code, clientId: 'p1',
++      deposits: [{ item: changed, quantity: 1, name: 'Винтовка' }],
++      withdrawals: [{ entryId: registry.getState(room.code).partyStorage.entries[0].entryId, quantity: 1 }],
++    });
++    expect(result.error).toBeUndefined();
++    const entries = result.storage.entries;
++    expect(entries.some((e) => e.item?.charges === 1 && e.item?.appliedMods?.barrel === 'short')).toBe(true);
++    expect(entries.some((e) => e.item?.charges === 3 && e.item?.appliedMods?.barrel === 'long')).toBe(true);
++  });
++});
++
++describe('522: защита сервера осталась священной', () => {
++  const makeEntry = ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity });
++
++  it('некорректное количество отклоняется до всякого изменения состояния', () => {
++    const entries = [{ entryId: 'e1', item: BASE, name: 'Винтовка', quantity: 2 }];
++    for (const bad of [0, -1, 1.5, NaN, Infinity, 'abc', Number.MAX_SAFE_INTEGER + 1]) {
++      const result = rules.applyStorageDeposits({
++        entries, deposits: [{ item: BASE, quantity: bad, name: 'Винтовка' }], makeEntry,
++      });
++      expect(result.error).toBe('STORAGE_BAD_MESSAGE');
++      expect(result.entries).toEqual(entries);
++      expect(result.added).toHaveLength(0);
++    }
++  });
++
++  it('сетевой снимок санитайзится: прототипные ключи, циклы и переполнение', () => {
++    const dirty = JSON.parse('{"id":"x","__proto__":{"polluted":true},"constructor":{"x":1},"appliedMods":{"a":"b"}}');
++    const clean = stacking.sanitizeItemSnapshot(dirty);
++    expect(Object.prototype.hasOwnProperty.call(clean, '__proto__')).toBe(false);
++    expect(Object.prototype.hasOwnProperty.call(clean, 'constructor')).toBe(false);
++    expect(clean.appliedMods).toEqual({ a: 'b' });
++    expect({}.polluted).toBeUndefined();
++
++    const cyclic = { id: 'x' };
++    cyclic.self = cyclic;
++    expect(stacking.sanitizeItemSnapshot(cyclic)).toBeNull();
++    expect(stacking.sanitizeItemSnapshot({ blob: 'x'.repeat(stacking.MAX_SNAPSHOT_BYTES + 10) })).toBeNull();
++    expect(stacking.sanitizeItemSnapshot(null)).toBeNull();
++  });
++
++  it('предел размера сообщения и число операций в сообщении не ослаблены', () => {
++    expect(LIMITS.MAX_MESSAGE_BYTES).toBe(2 * 1024 * 1024);
++    expect(rules.PROTOCOL_MAX_TRANSFER_OPERATIONS).toBe(50);
++    const { registry, room } = setup();
++    const deposits = Array.from({ length: 51 }, (_, i) => ({
++      item: { ...BASE, id: `p${i}`, weaponId: `p${i}` }, quantity: 1, name: `P${i}`,
++    }));
++    expect(registry.transferPartyStorage({
++      code: room.code, clientId: 'p1', deposits, withdrawals: [],
++    }).error).toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
++  });
++
++  it('недопустимое количество от сервера тоже отбивается', () => {
++    const { registry, room } = setup();
++    expect(registry.depositToPartyStorage({
++      code: room.code, clientId: 'p1', item: BASE, quantity: -5,
++    }).error).toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
++  });
++});
++
++describe('522: торговцы считают цену с модами', () => {
++  const raw = (extra = {}) => ({
++    itemId: 'w1', itemType: 'weapon', name: 'Винтовка', quantity: 1,
++    cost: 100, weight: 5, effectiveCost: 480, effectiveWeight: 9,
++    itemSnapshot: { ...BASE, effectiveCost: 480, effectiveWeight: 9 },
++    ...extra,
++  });
++
++  it('нормализация записи сохраняет снимок и берёт эффективную цену/вес', () => {
++    const entry = normalizeContainerItem(raw());
++    expect(entry.cost).toBe(480);
++    expect(entry.weight).toBe(9);
++    expect(entry.itemSnapshot.appliedMods).toEqual(BASE.appliedMods);
++    expect(entry.itemSnapshot.charges).toBe(3);
++    expect(entry.itemSnapshot.stackKey).toBe(BASE.stackKey);
++  });
++
++  it('разные моды не склеиваются в одну позицию торговца', () => {
++    const list = addOrMergeContainerItem([], raw());
++    const next = addOrMergeContainerItem(list, raw({
++      itemSnapshot: { ...BASE, appliedMods: { barrel: 'short' }, effectiveCost: 300 },
++      effectiveCost: 300,
++    }));
++    expect(next).toHaveLength(2);
++    const same = addOrMergeContainerItem(next, raw());
++    expect(same).toHaveLength(2);
++    expect(same.find((e) => e.cost === 480).quantity).toBe(2);
++  });
++
++  it('скупка модифицированного оружия дороже базового', () => {
++    const opts = { buyDepreciationPercent: 50, capCollectorPercent: 0 };
++    const base = computeMerchantBuybackPriceFromPlayer({ cost: 100 }, opts);
++    const modded = computeMerchantBuybackPriceFromPlayer({ cost: 100, effectiveCost: 480 }, opts);
++    expect(base).toBeGreaterThan(0);
++    expect(modded).toBeGreaterThan(base);
++  });
++
++  it('UI продажи и карточка товара используют эффективные числа', () => {
++    expect(read('components/lootTrade/PlayerLootTradeOverlay.js')).toContain('effectiveCost');
++    expect(read('components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js')).toContain('effectiveItemCost(item)');
++    expect(read('components/screens/LootTradeScreen/LootTradeScreen.js')).toContain('effectiveCost: baseCost');
++  });
++});
++
++describe('522: двухпанельное окно склада не изменилось', () => {
++  it('буфер + «Перенести», локальные колбэки, без цен/экипировки/настроек', () => {
++    const src = read('components/lootTrade/PartyStorageModal.js');
++    expect(src).toContain('onDepositLocal');
++    expect(src).toContain('onWithdrawLocal');
++    expect(src).toContain('«Перенести»');
++    expect(src).toContain('setGiveBuffer');
++    expect(src).toContain('setTakeBuffer');
++    expect(src).not.toContain('markupPercent');
++    expect(src).not.toContain('equipItem');
++  });
++});
++
++describe('522: документы и версия', () => {
++  it('версия, план и заметки ведут на 522', () => {
++    expect(JSON.parse(read('public/version.json')).version).toBe('522');
++    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
++    expect(read('docs/roadmap.md')).toContain('522');
++    expect(read('docs/changelog.ru.md')).toContain('522');
++    expect(read('docs/changelog.en.md')).toContain('522');
++    expect(read('docs/patch-522-install.md')).toContain('522');
++    expect(read('patchs/522-storage-identity.patch')).toContain('domain/itemStacking.js');
++  });
++});
+diff --git a/__tests__/room/storage-polish-521.test.js b/__tests__/room/storage-polish-521.test.js
+index 4e7093a..4823b82 100644
+--- a/__tests__/room/storage-polish-521.test.js
++++ b/__tests__/room/storage-polish-521.test.js
+@@ -1,18 +1,15 @@
+-// Приёмочный тест 521: «мелочи склада» — лимиты, стаканье и два уже
+-// решённых вопроса (удаление шаблона, тихое срабатывание ключа).
++// Исторический приёмочный тест 521, приведённый к закону 522: игровые лимиты
++// веса/количества отменены, стаканье идёт по общему доменному модулю, а защита
++// сервера (валидация, санитайзинг, атомарность) сохранена.
+ import { describe, expect, it } from 'vitest';
+ import { readFileSync } from 'node:fs';
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { createRoomRegistry } from '../../server/roomRegistry.js';
+ import { ERROR_CODE } from '../../server/protocol.js';
+-import { ROOM_ERROR } from '../../src/room/roomProtocol.ts';
+-import {
+-  STORAGE_LIMITS,
+-  storageStackKey,
+-  applyStorageDeposits,
+-} from '../../server/partyStorageRules.js';
++import rules from '../../server/partyStorageRules.js';
+ 
++const { storageStackKey, applyStorageDeposits } = rules;
+ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+ const ITEM = { id: 'w1', name: 'Пулемёт', itemType: 'weapon', weight: 12, cost: 300 };
+@@ -26,7 +23,7 @@ const setup = () => {
+   return { registry, room };
+ };
+ 
+-const fill = (registry, room, count = STORAGE_LIMITS.MAX_ENTRIES) => {
++const fill = (registry, room, count = 200) => {
+   const entries = Array.from({ length: count }, (_, index) => ({
+     entryId: `fill_${index}`,
+     item: { id: `fill_${index}`, name: `Предмет ${index}`, itemType: 'misc' },
+@@ -41,12 +38,13 @@ const fill = (registry, room, count = STORAGE_LIMITS.MAX_ENTRIES) => {
+   return entries;
+ };
+ 
+-describe('521: стаканье и лимиты «Общего хранилища»', () => {
++describe('521 → 522: стаканье «Общего хранилища» без игровых лимитов', () => {
+   it('ключ стаканья не зависит от служебных полей экземпляра и порядка полей', () => {
+     const a = { uniqueId: 'a', equipped: true, locked: false, quantity: 7, name: 'Пулемёт', id: 'w1' };
+     const b = { id: 'w1', name: 'Пулемёт', quantity: 1, uniqueId: 'b', stackKey: 'x' };
+     expect(storageStackKey(a)).toBe(storageStackKey(b));
+-    expect(storageStackKey(a)).not.toBe(storageStackKey({ ...a, name: 'Дробовик' }));
++    // имя и количество не меняют идентичность, а каталожный id — меняет
++    expect(storageStackKey(a)).not.toBe(storageStackKey({ ...a, id: 'w2' }));
+   });
+ 
+   it('чистый слой склеивает поступление с существующей строкой', () => {
+@@ -64,23 +62,22 @@ describe('521: стаканье и лимиты «Общего хранилищ
+     expect(entries[0].quantity).toBe(2); // вход не мутируется
+   });
+ 
+-  it('переполненный стек порождает новую строку, а не теряет предметы', () => {
++  it('огромная стопка не «переполняется» и не теряет предметы', () => {
+     const entries = [{
+-      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon',
+-      quantity: STORAGE_LIMITS.MAX_STACK_QUANTITY,
++      entryId: 'e1', item: ITEM, name: 'Пулемёт', itemType: 'weapon', quantity: 999,
+     }];
+     const applied = applyStorageDeposits({
+       entries,
+-      deposits: [{ item: ITEM, quantity: 2, name: 'Пулемёт' }],
++      deposits: [{ item: ITEM, quantity: 100000, name: 'Пулемёт' }],
+       makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
+     });
+     expect(applied.error).toBeNull();
+-    expect(applied.entries).toHaveLength(2);
+-    expect(applied.entries[1].quantity).toBe(2);
++    expect(applied.entries).toHaveLength(1);
++    expect(applied.entries[0].quantity).toBe(100999);
+   });
+ 
+-  it('лимит строк возвращает ошибку и не меняет исходный массив', () => {
+-    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES }, (_, i) => ({
++  it('число строк не ограничено игрой', () => {
++    const entries = Array.from({ length: 200 }, (_, i) => ({
+       entryId: `e${i}`, item: { id: `x${i}` }, name: `X${i}`, quantity: 1,
+     }));
+     const applied = applyStorageDeposits({
+@@ -88,9 +85,8 @@ describe('521: стаканье и лимиты «Общего хранилищ
+       deposits: [{ item: { id: 'fresh' }, quantity: 1, name: 'Новый' }],
+       makeEntry: ({ item, name, quantity }) => ({ entryId: 'new', item, name, quantity }),
+     });
+-    expect(applied.error).toBe('STORAGE_FULL');
+-    expect(applied.entries).toEqual(entries);
+-    expect(applied.added).toHaveLength(0);
++    expect(applied.error).toBeNull();
++    expect(applied.entries).toHaveLength(201);
+   });
+ 
+   it('сервер: два одинаковых предмета — одна строка, разные — две', () => {
+@@ -105,42 +101,33 @@ describe('521: стаканье и лимиты «Общего хранилищ
+     expect(registry.getState(room.code).partyStorage.entries).toHaveLength(2);
+   });
+ 
+-  it('сервер: переполнение склада — понятный код ошибки, состояние не меняется', () => {
++  it('сервер: заполненный склад всё равно принимает новые предметы', () => {
+     const { registry, room } = setup();
+-    fill(registry, room);
++    fill(registry, room, 200);
+     const before = registry.getState(room.code).partyStorage;
+     const dep = registry.depositToPartyStorage({
+       code: room.code, clientId: 'p1', item: OTHER, quantity: 1,
+     });
+-    expect(dep.error).toBe(ERROR_CODE.STORAGE_FULL);
+-    expect(ROOM_ERROR.STORAGE_FULL).toBe(ERROR_CODE.STORAGE_FULL);
++    expect(dep.error).toBeUndefined();
+     const after = registry.getState(room.code).partyStorage;
+-    expect(after.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+-    expect(after.revision).toBe(before.revision);
++    expect(after.entries).toHaveLength(201);
++    expect(after.revision).toBeGreaterThan(before.revision);
+   });
+ 
+-  it('атомарный перенос: списание освобождает место, без списания — отказ', () => {
++  it('атомарный перенос: списание не нужно для приёма, состояние меняется один раз', () => {
+     const { registry, room } = setup();
+-    const entries = fill(registry, room);
+-    const rejected = registry.transferPartyStorage({
+-      code: room.code, clientId: 'p1',
+-      deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
+-      withdrawals: [],
+-    });
+-    expect(rejected.error).toBe(ERROR_CODE.STORAGE_FULL);
+-    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+-
++    const entries = fill(registry, room, 20);
+     const accepted = registry.transferPartyStorage({
+       code: room.code, clientId: 'p1',
+       deposits: [{ item: OTHER, quantity: 1, name: 'Дробовик' }],
+       withdrawals: [{ entryId: entries[0].entryId, quantity: 1 }],
+     });
+     expect(accepted.error).toBeUndefined();
+-    expect(accepted.storage.entries).toHaveLength(STORAGE_LIMITS.MAX_ENTRIES);
+     expect(accepted.storage.entries.some((e) => e.name === 'Дробовик')).toBe(true);
++    expect(accepted.storage.entries).toHaveLength(20);
+   });
+ 
+-  it('ключевые записи не стакаются, не дублируются и занимают место', () => {
++  it('ключевые записи не стакаются, не дублируются и не имеют лимита', () => {
+     const { registry, room } = setup();
+     const first = registry.addKeyItemToStorage({
+       code: room.code, clientId: 'gm-1', keyItemId: 'k1', name: 'Ключ', description: '',
+@@ -152,40 +139,44 @@ describe('521: стаканье и лимиты «Общего хранилищ
+     expect(duplicate.added).toBe(false);
+     expect(registry.getState(room.code).partyStorage.entries).toHaveLength(1);
+ 
+-    fill(registry, room, STORAGE_LIMITS.MAX_ENTRIES - 1);
++    fill(registry, room, 250);
+     expect(registry.addKeyItemToStorage({
+       code: room.code, clientId: 'gm-1', keyItemId: 'k2', name: 'Второй', description: '',
+     }).error).toBeUndefined();
+     expect(registry.addKeyItemToStorage({
+       code: room.code, clientId: 'gm-1', keyItemId: 'k3', name: 'Третий', description: '',
+-    }).error).toBe(ERROR_CODE.STORAGE_FULL);
++    }).error).toBeUndefined();
+   });
+ 
+-  it('импорт снимка сверх лимита отклоняется', () => {
++  it('импорт снимка любого размера принимается, но некорректный — отклоняется', () => {
+     const { registry, room } = setup();
+-    const entries = Array.from({ length: STORAGE_LIMITS.MAX_ENTRIES + 1 }, (_, i) => ({
++    const entries = Array.from({ length: 250 }, (_, i) => ({
+       entryId: `e${i}`, name: `X${i}`, item: { id: `x${i}` }, quantity: 1,
+     }));
+     expect(registry.restorePartyStorage({
+       code: room.code, clientId: 'gm-1', storage: { revision: 20, entries },
+-    }).error).toBe(ERROR_CODE.STORAGE_FULL);
+-    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(0);
++    }).error).toBeUndefined();
++    expect(registry.getState(room.code).partyStorage.entries).toHaveLength(250);
++
++    expect(registry.restorePartyStorage({
++      code: room.code, clientId: 'gm-1', storage: { revision: 21, entries: 'не массив' },
++    }).error).toBe(ERROR_CODE.STORAGE_BAD_MESSAGE);
+   });
+ 
+-  it('две прежние «мелочи» уже закрыты: тихий ключ и удаление шаблона', () => {
++  it('две прежние «мелочи» закрыты: тихий ключ и удаление шаблона', () => {
+     expect(read('server/roomRegistry.js')).toContain('уведомление Мастеру не шлём');
+     expect(read('docs/changelog.ru.md')).toContain('удаление шаблона не гасит уже добытую запись');
+-    expect(read('components/lootTrade/PartyStorageModal.js')).toContain('screen.storage.full');
++    expect(read('components/lootTrade/PartyStorageModal.js')).toContain('screen.storage.failed');
+     const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json'));
+     const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json'));
+-    expect(ru.storage.full).toBeTruthy();
+-    expect(en.storage.full).toBeTruthy();
++    expect(ru.storage.failed).toBeTruthy();
++    expect(en.storage.failed).toBeTruthy();
+   });
+ 
+-  it('план и версия ведут на 521', () => {
+-    expect(read('docs/roadmap.md')).toContain('521');
+-    expect(JSON.parse(read('public/version.json')).version).toBe('521');
+-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('521');
++  it('план и версия ведут на 522, а иерархия всё ещё в плане', () => {
++    expect(read('docs/roadmap.md')).toContain('522');
++    expect(JSON.parse(read('public/version.json')).version).toBe('522');
++    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
+     expect(read('docs/roadmap.md')).toContain('Иерархия');
+   });
+ });
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 9ffa2cd..3da9ee0 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -37,21 +37,28 @@ import { renderTextWithIcons } from '../../modules/fallout/screens/WeaponsAndArm
+ import { showRawAlert } from '../alerts/alertService';
+ import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import { useLocale } from '../../i18n/locale';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { resolveItem, getItemPrice, getItemWeight } from '../../domain/resolveItem';
++import itemStacking from '../../domain/itemStacking.js';
+ import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
+ 
+-// В сейве/сторе предмета есть служебные поля, которые не должны уезжать на
+-// сервер: уникальные id экземпляра, экипировка, ключи стаканья и т.п.
++// Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
++// не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
++// ключ стака едут вместе с ним. Сбрасывается только состояние РАЗМЕЩЕНИЯ
++// (экипировано/заблокировано) и количество — оно передаётся отдельным полем
++// операции. Цена и вес берутся от обогащённого предмета, то есть с модами.
+ const pickItemSnapshot = (item) => {
+   const src = item || {};
+-  const { uniqueId, equipInstanceId, stackKey, equipped, locked, appliedMods, ...rest } = src;
+-  return {
+-    ...rest,
++  const resolved = resolveItem({ ...src }, getEquipmentCatalog()) || src;
++  const effectiveCost = itemStacking.effectiveItemCost({ effectiveCost: getItemPrice(resolved) });
++  const effectiveWeight = itemStacking.effectiveItemWeight({ effectiveWeight: getItemWeight(resolved) });
++  return itemStacking.itemTransferSnapshot({
++    ...src,
+     name: String(src.name || 'Предмет'),
+     itemType: String(src.itemType || 'misc'),
+-    quantity: 1,
+-    equipped: false,
+-    locked: false,
+-  };
++    cost: src.cost ?? effectiveCost,
++    weight: src.weight ?? effectiveWeight,
++  }, { effectiveCost, effectiveWeight });
+ };
+ 
+ const PartyStorageModal = ({
+@@ -149,11 +156,11 @@ const PartyStorageModal = ({
+       setGiveBuffer({});
+       setTakeBuffer({});
+     } catch (error) {
+-      // Патч 521: переполнение склада — отдельная, понятная причина отказа.
+-      const full = String(error?.message || '').includes('STORAGE_FULL');
++      // Патч 522: игрового «склад заполнен» больше нет. Ошибка связи/защиты
++      // сервера показывается как есть, без выдуманной причины.
+       showRawAlert({
+-        title: tInventory(full ? 'screen.storage.full' : 'screen.storage.failed'),
+-        message: full ? undefined : error?.message,
++        title: tInventory('screen.storage.failed'),
++        message: error?.message,
+       });
+     } finally {
+       setBusy(false);
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 4adaf76..6e8caad 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -34,6 +34,7 @@ import {
+   normalizeLinkedCheckIds,
+ } from '../../domain/lootTrade';
+ import { describeItemBasics } from '../../domain/itemBasics';
++import itemStacking from '../../domain/itemStacking.js';
+ import {
+   applyCommittedMerchantTradeToCharacter,
+   getSellablePlayerInventoryItems,
+@@ -1025,16 +1026,31 @@ export default function PlayerLootTradeOverlay() {
+         entryId: line.entryId,
+         quantity: line.quantity,
+       }));
+-      const sellItems = barterSummary.sellLines.map((line) => ({
+-        clientItemId: line.playerItemId,
+-        itemId: line.item.catalogId,
+-        itemType: line.item.itemType,
+-        name: line.item.name,
+-        cost: line.item.cost,
+-        weight: line.item.weight,
+-        quantity: line.quantity,
+-        itemSnapshot: line.item.itemSnapshot,
+-      }));
++      // Патч 522: торговцу уходит ПОЛНЫЙ предмет с модами, состоянием и
++      // эффективными ценой/весом. Сервер не пересчитывает их из базового каталога.
++      const sellItems = barterSummary.sellLines.map((line) => {
++        const effectiveCost = itemStacking.effectiveItemCost(line.item);
++        const effectiveWeight = itemStacking.effectiveItemWeight(line.item);
++        const snapshot = line.item.itemSnapshot || {};
++        return {
++          clientItemId: line.playerItemId,
++          itemId: line.item.catalogId,
++          itemType: line.item.itemType,
++          name: line.item.name,
++          cost: effectiveCost,
++          weight: effectiveWeight,
++          effectiveCost,
++          effectiveWeight,
++          quantity: line.quantity,
++          itemSnapshot: {
++            ...snapshot,
++            cost: effectiveCost,
++            weight: effectiveWeight,
++            effectiveCost,
++            effectiveWeight,
++          },
++        };
++      });
+ 
+       const { committed } = await useRoomStore.getState().commitMerchantTrade({
+         code: matchedContext.roomCode,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index c6bb848..0937a20 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -45,6 +45,7 @@ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
++import itemStacking from '../../../domain/itemStacking.js';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+@@ -291,40 +292,9 @@ const InventoryScreen = () => {
+     return 'misc';
+   };
+   const isWeaponItem = (item) => getItemType(item) === 'weapon';
+-  const getModsSignature = (item) => {
+-    const applied = item?.appliedMods || {};
+-    const modIds = Object.values(applied).filter(Boolean).sort();
+-    return modIds.length ? modIds.join('|') : 'none';
+-  };
+-  const getStackKey = (item) => {
+-    // Ядерный Блок: блоки с разным зарядом лежат отдельными стопками (§2 плана).
+-    // Ветка ПЕРВАЯ: блок — разновидность ammo, но его подпись строится по зарядам.
+-    if (isFusionCoreItem(item)) return fusionCoreStackKey(item.charges);
+-    if (item?.itemType === 'powerArmor') {
+-      // Каталожный id у стор-предмета живёт в weaponId, у свежего из каталога — в id.
+-      const catalogId = item.weaponId || item.id;
+-      if (isPowerArmorFrame(item)) {
+-        // Пакет: подпись считает домен по составу установленных частей и заряду блока.
+-        return powerArmorFrameStackKey({ ...item, id: catalogId });
+-      }
+-      return powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent });
+-    }
+-    const itemType = getItemType(item);
+-    if (itemType === 'weapon') {
+-      // Середина ключа — СТОРОВЫЙ стек-ключ (id + прочие параметры + имя),
+-      // чтобы точное совпадение в findUnequippedStoreItemByStackKey не путало
+-      // бритву с ножом (у них одинаковый истинный id).
+-      const storeKey = item?.stackKey || generateStackKey(
+-        item?.weaponId || item?.id || getItemName(item),
+-        item?.appliedMods,
+-        item?.baseName,
+-        item?.durabilityTracked ? item?.durability : undefined,
+-        item?.uniqQualities,
+-      );
+-      return `weapon:${storeKey}:mods:${getModsSignature(item)}`;
+-    }
+-    return `${itemType}:${getItemCatalogId(item)}`;
+-  };
++  // Патч 522: закон стака вынесен в domain/itemStacking.js — им же пользуются
++  // общее хранилище и торговцы. Локальный дубль удалён.
++  const getStackKey = itemStacking.itemStackKey;
+   const createWeaponInstanceId = () => `weapon-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   const createArmorInstanceId = () => `armor-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   const getArmorInstanceKey = (item, slot, type) =>
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 97d6d45..629596b 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -1320,6 +1320,12 @@ export default function LootTradeScreen() {
+         id: pickedItem.id || pickedItem.weaponId,
+         weaponId: pickedItem.weaponId || pickedItem.id,
+         itemType: pickedItem.itemType || 'misc',
++        // Патч 522: снимок хранит цену и вес с учётом модов — при выдаче игроку
++        // и при обратной продаже числа не откатываются к базовому каталогу.
++        cost: baseCost,
++        weight,
++        effectiveCost: baseCost,
++        effectiveWeight: weight,
+       },
+     });
+ 
+diff --git a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+index 0f675fe..e26c4e5 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+@@ -12,6 +12,7 @@ import {
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../../../i18n/locale';
++import itemStacking from '../../../../domain/itemStacking.js';
+ import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import IconText, { CdIcon, withCdToken } from '../../../lootTrade/LootTradeIconText';
+ import {
+@@ -78,7 +79,7 @@ const ContainerItemConfigModal = ({
+   };
+ 
+   const numericCount = Math.max(1, parseInt(count, 10) || 1);
+-  const baseCost = Math.max(0, Number(item.cost ?? item.price ?? 0) || 0);
++  const baseCost = itemStacking.effectiveItemCost(item);
+   const parsedMarkup = normalizeSaleMarkupPercent(markupPercent, 0);
+   const previewPrice = computeMerchantSellPriceToPlayer(
+     { cost: baseCost, markupPercent: parsedMarkup },
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 34b865f..fb7b00d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,40 @@
+ # Changelog
+ ---
++## One item everywhere (patch 522)
++
++The owner clarified: "There are no weight or quantity limits, an item in the
++inventory is the same item in storage... Items must not lose properties when
++they change where they are kept. The same goes for traders... price and weight
++are calculated from the mods." The limits from the previous update are gone —
++that gameplay rule was wrong. Server protection was not weakened anywhere.
++
++- **No gameplay limits.** Storage has no weight cap, no row cap, no stack cap
++  and no per-operation quantity cap. The "storage full" message and the
++  `STORAGE_FULL` code are removed. Only technical safeguards remain: the
++  WebSocket message size, integer positive quantity checks, the number of
++  operations in one message, sanitizing incoming item snapshots and atomic
++  transfers. An imported snapshot of any size is accepted, while malformed data
++  is rejected before any room state changes.
++- **One domain module.** The stacking law now lives in `server/itemStacking.js`
++  with `domain/itemStacking.js` as the client entry point. Inventory, shared
++  storage and traders all use it instead of duplicating rules. Different mods,
++  charges, durability, current HP, unique qualities and base names produce
++  separate stacks everywhere; placement-only service fields do not affect the
++  comparison.
++- **No field stripping.** Depositing to storage, granting to a player and
++  selling to a trader now carry the whole item: `appliedMods`, `charges`,
++  `durability`, `hpCurrent`, `uniqQualities`, `uniqueId`, `stackKey` and
++  `baseName` survive. Only placement state and the operation's quantity change.
++- **Price and weight from mods.** Player sales and the item card take their
++  numbers from the enriched item (`resolveItem` already adds `mod.cost` and
++  `mod.weight`) instead of the bare catalog row. Effective `cost`/`weight`
++  travel with the snapshot and survive on the server, so a modified weapon no
++  longer loses its value when it changes hands.
++- **The window is unchanged.** Two panes, a buffer and the «Transfer» button;
++  no prices, applying, equipping or settings. Keys remain read-only, the Game
++  Master still broadcasts them and sees «Add to storage», and file export/import
++  still works for both the Game Master and players.
++
+ ## Shared storage polish (patch 521)
+ 
+ The last item of the live plan is done. Two of the three small bits already
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6065696..06fe396 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,40 @@
+ # История изменений
+ 
+ ---
++## Один предмет на всех экранах (патч 522)
++
++Владелец уточнил: «Ограничений на вес и количество нет, предмет из
++инвентаря = предмету на складе... Предметы не должны терять свойства при смене
++места хранения. То же самое с торговцами... цена и вес считаются от модов».
++Лимиты из предыдущего обновления отменены — это была неправильная игровая
++механика. Защита сервера при этом не ослаблена ни в одном месте.
++
++- **Без игровых лимитов.** На складе нет потолка веса, числа строк, размера
++  стопки и количества за операцию. Сообщение «хранилище заполнено» и код
++  `STORAGE_FULL` убраны. Остались только технические предохранители: размер
++  WebSocket-сообщения, проверка целого положительного количества, число
++  операций в одном сообщении, санитайзинг сетевого снимка и атомарность
++  переноса. Импорт снимка любого размера принимается, но некорректные данные
++  отклоняются до изменения состояния комнаты.
++- **Один доменный модуль.** Закон стаканья вынесен в `server/itemStacking.js`
++  с точкой входа `domain/itemStacking.js`. Инвентарь, общее хранилище и
++  торговцы пользуются им одним, больше не дублируя правила. Разные моды,
++  заряды, прочность, текущие очки, уникальные качества и базовое имя дают
++  разные стопки везде; служебные поля размещения не влияют на сравнение.
++- **Поля не обрезаются.** При вносе на склад, выдаче игроку и продаже
++  торговцу предмет едет целиком: `appliedMods`, `charges`, `durability`,
++  `hpCurrent`, `uniqQualities`, `uniqueId`, `stackKey`, `baseName` остаются.
++  Меняется только состояние размещения и количество операции.
++- **Цена и вес с модами.** Продажа игрока и карточка товара берут числа из
++  обогащённого предмета (`resolveItem` уже складывает `mod.cost` и
++  `mod.weight`), а не из голой каталожной записи. Эффективные `cost`/`weight`
++  едут вместе со снимком и сохраняются на сервере, поэтому модифицированное
++  оружие не обесценивается при смене владельца.
++- **Окно не менялось.** Две панели, буфер и кнопка «Перенести»; никаких цен,
++  применений, экипировки и настроек. Ключи по-прежнему только читаются,
++  Мастер транслирует их и видит «Выдать на склад», экспорт/импорт файла работает
++  у Мастера и игрока.
++
+ ## Мелочи «Общего хранилища» (патч 521)
+ 
+ Последний тезис живого плана закрыт. Две из трёх «мелочей» уже работали:
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 207a634..831c0e5 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -589,9 +589,11 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+   позволяют поднять его заново.
+ - **Не делаем (решение владельца):** счётчик на плашке и лог операций —
+   «предметы есть на складе или нет, игроки сами смотрят».
+-- **Реализовано в 521:** лимиты и стаканье (`server/partyStorageRules.js`);
+-  удаление записи-шаблона не гасит уже добытую запись (514); тихое
+-  срабатывание ключа без уведомления Мастеру (516).
++- **Реализовано в 521–522:** единый закон стаканья для инвентаря, склада и
++  торговцев (`server/itemStacking.js` → `domain/itemStacking.js`); игровые
++  лимиты веса/количества отменены в 522, защита сервера сохранена; удаление
++  записи-шаблона не гасит уже добытую запись (514); тихое срабатывание ключа
++  без уведомления Мастеру (516).
+ - Шаг 2 ✅ реализован в 510–512. Патч 513 зафиксировал контракт без кода,
+   патч 514 реализовал поля/формы/вложенность шага 3. Остались: серверная
+   проверка ключа, ворота между контейнерами, мини-игра взлома замков,
+diff --git a/docs/patch-522-install.md b/docs/patch-522-install.md
+new file mode 100644
+index 0000000..f3190ce
+--- /dev/null
++++ b/docs/patch-522-install.md
+@@ -0,0 +1,111 @@
++# Установка патча 522: один предмет на всех экранах
++
++Патч подготовлен от состояния **версии 521** (коммит `76fd1e7`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–522
++цепочкой.
++
++> Владелец: «Ограничений на вес и количество нет, предмет из инвентаря =
++> предмету на складе. Если оружие с модами, то оно с теми же модами, состоянием,
++> на складе. Если в инвентаре 2 предмета с разными зарядами, то они и на складе
++> с разными. Предметы не должны терять свойства при смене места хранения. То же
++> самое с торговцами. Если я торговцу дал модифицированное оружие, то оно таким
++> и числится и цена и вес считаются от модов. Механики инвентаря в доменный
++> модуль. Чтобы использовали все. перестать обрезать поля. У торговцев считать
++> цену с модами. Сделай.»
++>
++> И отдельно: «Защита сервера это святое. Безопасность важна.»
++
++## Что изменено
++
++### 1. Игровые лимиты склада отменены
++
++Удалены 200 строк на складе, 999 предметов в стопке, 999 предметов за операцию,
++код `STORAGE_FULL` и парная строка «хранилище заполнено». Теперь можно положить
++сколько угодно вещей и каким угодно количеством за один перенос.
++
++**Защита сервера не ослаблена** — она усилена:
++
++| Предохранитель | Состояние |
++| --- | --- |
++| `LIMITS.MAX_MESSAGE_BYTES` (2 МБ на WebSocket-сообщение) | без изменений |
++| Число операций в одном сообщении (50) | без изменений, это защита протокола, не лимит игры |
++| Целое положительное количество, `Number.isSafeInteger` | без изменений |
++| Санитайзинг снимка: `__proto__` / `constructor` / `prototype`, циклы, глубина, 64 КБ | **добавлено** |
++| Валидация импорта снимка (`entries` должен быть массивом) | **добавлено** |
++| Роли, членство, владелец, атомарность переноса | без изменений |
++
++### 2. Один доменный модуль на троих
++
++Канон — `server/itemStacking.js`, клиентская точка входа —
++`domain/itemStacking.js` (`module.exports = require(...)`). Такое расположение
++необходимо: лёгкий деплой NetAngels копирует в `app/` только `server/` + `ws`,
++поэтому сервер не может зависеть от каталога `domain/`. Дубля правил нет.
++
++Потребители одного модуля:
++
++- `components/screens/InventoryScreen/InventoryScreen.js` — локальный дубль
++  `getStackKey` удалён, инвентарь берёт `itemStacking.itemStackKey`;
++- `server/partyStorageRules.js` — `storageStackKey` и `applyStorageDeposits`
++  по общему ключу;
++- `server/lootTradeSession.js` и `domain/lootTrade.js` — прежние два
++  `snapshotMergeSignature` стали тонкими обёртками над `itemStackKey`;
++- `components/lootTrade/PartyStorageModal.js`,
++  `src/lootTrade/grantCharacterItems.js`,
++  `components/lootTrade/PlayerLootTradeOverlay.js` и
++  `ContainerItemConfigModal.js` — снимок и эффективные числа через общий модуль.
++
++Разные `appliedMods`, `charges`, `durability`, `hpCurrent`, `uniqQualities` и
++`baseName` дают разные стопки везде; `uniqueId`, `equipInstanceId`, `stackKey`,
++`equipped`, `locked`, `quantity` на идентичность не влияют. Ключевые записи
++по-прежнему не стакаются.
++
++### 3. Поля больше не обрезаются
++
++`itemTransferSnapshot` сохраняет предмет целиком и меняет только `quantity`
++(количество едет отдельным полем операции), `equipped` и `locked`. Удалены
++деструктуризация с выбросом `appliedMods` в окне склада и
++`delete cleanSnapshot.uniqueId` при продаже торговцу.
++
++### 4. Цена и вес считаются с модов
++
++`resolveItem` уже обогащает Weapons через `domain/enrichItem.js`, складывая
++`mod.cost` и `mod.weight`. Теперь продажа игрока и карточка товара берут
++`getItemPrice(resolved)` / `getItemWeight(resolved)`, а не голую каталожную
++`catalogEntry.cost`. Эффективные `cost`/`weight` кладутся в `itemSnapshot`,
++переживают серверную нормализацию (`normalizeSessionItem`,
++`normalizeContainerItem`) и читаются формулами скупки через
++`itemStacking.effectiveItemCost`. Модифицированное оружие больше не
++обесценивается при смене владельца.
++
++### 5. Окно склада не менялось
++
++Две панели, буфер, «Перенести», локальные колбэки вноса/выдачи. Без цен,
++наценок, крышек, настроек, применения и экипировки. Ключи — только чтение;
++Мастер транслирует записи, видит «Выдать на склад» и не может брать вещи;
++экспорт/импорт файла работает у Мастера и игрока.
++
++## Проверка
++
++```bash
++./apply-patch.sh            # или ./apply-patch.sh --status
++cat public/version.json     # "version": "522"
++npm run typecheck
++npm test
++npm run build
++npm run serve:app           # перезапустить комнатный сервер (менялся server/)
++```
++
++Приёмочные тесты: `__tests__/room/item-stacking-522.test.js` и обновлённый
++`__tests__/room/storage-polish-521.test.js`. Проверяются: единый ключ стаканья,
++сохранность полей, отсутствие лимитов, эффективная цена с модами, неизменность
++двухпанельного окна и вся серверная защита.
++
++`patchs/baseline.json` = `522`, заметки релиза парные (89 / 89), `dist/`
++пересобран. Живой план — `docs/roadmap.md`: тезис 12 закрыт полностью,
++следующий этап — иерархия пространств и доступ (тезис 13).
++
++## Важно
++
++Мини-игры, ворота, ключи и вложенность локаций **не менялись**. Все уточнения
++владельца по иерархии перенесены в следующий этап и в код не попали.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 4418450..fb82715 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **521**.
++Дата ревизии: 2026-11-04. Текущая версия: **522**.
+ 
+ ## Тезисы
+ 
+@@ -23,10 +23,10 @@
+ | 9а | **Терминал как замок точки:** привязанный терминал скрыт из локации у игроков, нажатие на запертый сундук открывает его мини-игру, добыча доступна только после взлома/ключа | ✅ сделано | **519** |
+ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
+ | 11 | **Мини-игра взлома замков:** пятая карточка, отдельно / в локации / как преграда, отмычки и ячейки по PER, терминал **ИЛИ** замок в требованиях, нейтральное событие `hacked` | ✅ сделано | **520** |
+-| 12 | Мелочи склада: лимиты и стаканье, поведение при удалении записи-шаблона, тихое срабатывание ключа без уведомления Мастеру | ✅ сделано | **521** |
++| 12 | Мелочи склада и единый предмет: без игровых лимитов веса/количества, один закон стаканья для инвентаря/склада/торговцев, поля не обрезаются, цена и вес считаются с модов; поведение при удалении записи-шаблона и тихое срабатывание ключа | ✅ сделано | **521–522** |
+ | 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | ⏳ осталось | — |
+ 
+-## Осталось после патча 521
++## Осталось после патча 522
+ 
+ 1. **Иерархия пространств и доступ** — все уточнения владельца, зафиксированные
+    в обсуждении, одним следующим этапом: граф локаций с циклами и несколькими
+@@ -42,17 +42,34 @@
+ по-прежнему может открыть доступ вручную, сняв блокировку узла локации.
+ Спецификация мини-игры — `docs/lockpicking-mini-game-design.md`.
+ 
+-## Мелочи склада (реализовано в 521)
+-
+-- **Стаканье.** Одинаковые предметы ложатся в одну строку; служебные поля
+-  экземпляра (`uniqueId`, `equipInstanceId`, `stackKey`, `equipped`, `locked`,
+-  `appliedMods`, `quantity`) и порядок полей не влияют на сравнение. Ключевые
+-  записи не стакаются. Излишек сверх 999 предметов уходит в новую строку, а не
+-  теряется.
+-- **Лимиты.** 200 строк на складе (включая ключи), 999 предметов в стеке,
+-  50 операций в одном переносе и 999 предметов за операцию. Превышение
+-  возвращает `STORAGE_FULL` **до** единого изменения состояния комнаты, поэтому
+-  перенос остаётся атомарным; импорт снимка сверх лимита отклоняется.
++## Единый предмет и склад (реализовано в 522)
++
++Владелец отменил лимиты из 521: «Ограничений на вес и количество нет, предмет
++из инвентаря = предмету на складе... Предметы не должны терять свойства при
++смене места хранения. То же самое с торговцами... цена и вес считаются от
++модов». **Защита сервера это святое: безопасность важна** — все проверки
++сообщений, ролей, целых положительных количеств и атомарность переноса
++сохранены и даже усилены санитайзингом входящего снимка.
++
++- **Игровых лимитов нет.** Нет потолка веса, числа строк, размера стопки и
++  количества за операцию. `STORAGE_FULL` и строка «хранилище заполнено»
++  удалены. Технические предохранители остались: `LIMITS.MAX_MESSAGE_BYTES`,
++  число операций в одном сообщении (50), валидация количества, чистка
++  прототипных ключей/циклов/переполненных снимков.
++- **Один закон стаканья.** Канон — `server/itemStacking.js`, точка входа для
++  клиента — `domain/itemStacking.js`. Инвентарь, склад (`partyStorageRules`),
++  сервер сессий и `domain/lootTrade` больше не дублируют правило. Разные моды,
++  заряды, прочность, `hpCurrent`, уникальные качества и `baseName` дают разные
++  стопки; служебные поля размещения (`uniqueId`, `equipped`, `locked`,
++  `quantity`) не влияют на сравнение. Ключевые записи не стакаются.
++- **Поля не обрезаются.** Снимок для переноса (`itemTransferSnapshot`)
++  сохраняет всё, меняя только состояние размещения и количество операции.
++- **Цена и вес с модами.** Эффективные `cost`/`weight` считаются из
++  обогащённого предмета и едут вместе со снимком в склад и к торговцу;
++  скупка и карточка товара читают их через общий модуль.
++- **Окно склада прежнее.** Две панели, буфер, «Перенести»; без цен, настроек,
++  применения и экипировки. Ключи только для чтения, у Мастера — трансляция и
++  «Выдать на склад», экспорт/импорт файла у Мастера и игрока.
+ - **Уже работало раньше.** Удаление записи-шаблона не гасит добытую запись
+   (514, привязка хранится в родителе); ключ открывает точку без мини-игры и без
+   уведомления Мастеру (516). Оба правила закрыты приёмочным тестом.
+@@ -88,6 +105,7 @@
+ 
+ - `docs/key-items-and-gates-design.md` — полный контракт ключей, требований и ворот (Обновление 7, раздел 10; задел под замки — раздел 7).
+ - `docs/lockpicking-mini-game-design.md` — спецификация мини-игры взлома замков (к пачу 520).
++- `docs/patch-522-install.md` — установка обновления 522 и его проверки.
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/domain/itemStacking.js b/domain/itemStacking.js
+new file mode 100644
+index 0000000..d33c3d0
+--- /dev/null
++++ b/domain/itemStacking.js
+@@ -0,0 +1,11 @@
++'use strict';
++
++/**
++ * Патч 522: доменная точка входа к ЕДИНОМУ модулю механики предметов.
++ *
++ * Канон живёт в `server/itemStacking.js`: лёгкий деплой NetAngels раскладывает
++ * в app/ только `server/` + `ws`, поэтому комнатный сервер не может зависеть от
++ * каталога `domain/`. Клиент (инвентарь, склад, торговцы) импортирует именно
++ * этот файл —规则 физически одни и те же, дубля нет.
++ */
++module.exports = require('../server/itemStacking.js');
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 3485342..3c4cd98 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -7,6 +7,7 @@
+ // - расчёт двухпанельного буфера обмена с контролем лимита крышек торговца;
+ // - дублирование контейнеров и слияние одинаковых позиций.
+ 
++import itemStacking from './itemStacking.js';
+ import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
+ import {
+   AMMO_FOUND_BY_ID,
+@@ -426,8 +427,8 @@ export const normalizeContainerItem = (raw, now = Date.now()) => {
+     itemId: itemId || name,
+     itemType,
+     name: name || 'Крышки',
+-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
+-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
++    cost: itemStacking.effectiveItemCost(raw),
++    weight: itemStacking.effectiveItemWeight(raw),
+     quantity,
+     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
+     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
+@@ -725,16 +726,8 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+   };
+ };
+ 
+-const snapshotMergeSignature = (snapshot) => {
+-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
+-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
+-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
+-    : '';
+-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
+-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
+-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
+-  return `${mods}|${dur}|${charges}|${hp}`;
+-};
++// Патч 522: один закон стака для инвентаря, склада и торговцев.
++const snapshotMergeSignature = (snapshot) => itemStacking.itemStackKey(snapshot);
+ 
+ /**
+  * Добавляет или объединяет одинаковую позицию в списке контейнера/торговца.
+@@ -817,7 +810,7 @@ export const computeMerchantSellPriceToPlayer = (
+   entry,
+   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
+ ) => {
+-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
++  const baseCost = itemStacking.effectiveItemCost(entry);
+   if (baseCost <= 0) return 0;
+ 
+   const itemMarkup = Number(entry?.markupPercent) || 0;
+@@ -843,7 +836,7 @@ export const computeMerchantBuybackPriceFromPlayer = (
+ ) => {
+   const resolvedBase = catalogCost != null
+     ? Number(catalogCost)
+-    : Number(item?.cost ?? item?.price ?? 0);
++    : itemStacking.effectiveItemCost(item);
+   const baseCost = Math.max(0, Number.isFinite(resolvedBase) ? resolvedBase : 0);
+   if (baseCost <= 0) return 0;
+ 
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 00a4420..90b8eb8 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -101,8 +101,7 @@
+     "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
+     "issueKey": "Add to storage",
+     "issuedKey": "Record added to shared storage",
+-    "noKeyItems": "No keys yet",
+-    "full": "Shared storage is full: withdraw some items or free a slot before depositing more."
++    "noKeyItems": "No keys yet"
+   },
+   "labels": {
+     "leftArm": "Left bracer",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 6954724..150388d 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -101,8 +101,7 @@
+     "gmNoActions": "Мастер смотрит состав склада, но не вносит и не забирает предметы",
+     "issueKey": "Выдать на склад",
+     "issuedKey": "Запись выдана в общее хранилище",
+-    "noKeyItems": "Ключей пока нет",
+-    "full": "Общее хранилище заполнено: уберите часть предметов или освободите место, прежде чем класть новые."
++    "noKeyItems": "Ключей пока нет"
+   },
+   "labels": {
+     "leftArm": "Левый наруч",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index e3bacce..6f6432d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "521"
++  "baseline": "522"
+ }
+diff --git a/public/version.json b/public/version.json
+index f42d46a..391b228 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "521",
++  "version": "522",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
++      "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
+       "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
+       "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
+       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
+@@ -92,6 +94,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
++      "An item is now identical in your inventory, in storage and at a trader: a modified weapon keeps its mods, durability and charges, and its price and weight are calculated from the installed mods.",
+       "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
+       "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
+       "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
+diff --git a/server/itemStacking.js b/server/itemStacking.js
+new file mode 100644
+index 0000000..48d24f8
+--- /dev/null
++++ b/server/itemStacking.js
+@@ -0,0 +1,233 @@
++'use strict';
++
++/**
++ * Патч 522: единая механика предметов для инвентаря, склада и торговцев.
++ *
++ * Один модуль на всех: клиент (React Native / Metro / Vite) и комнатный сервер
++ * (CommonJS) загружают ОДНИ И ТЕ ЖЕ правила. Раньше инвентарь считал стек-ключ
++ * локальной функцией, сервер сессий дублировал `snapshotMergeSignature`, а склад
++ * изобретал свой снимок — из-за этого моды, заряды и прочность терялись или
++ * склеивались неверно при смене места хранения.
++ *
++ * Модуль сознательно написан на CommonJS и не зависит от React, сети, стора и
++ * каталога: сервер не умеет загружать ESM-файлы domain/, а Metro и Vite умеют
++ * импортировать CJS. Чистые функции, никаких побочных эффектов.
++ */
++
++const FUSION_CORE_ID = 'ammo_fusion_core';
++const PA_FRAME_SET_KEY = 'frame';
++const PA_PIECE_SLOTS = Object.freeze(['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
++
++// ─── Защита сервера -----------------------------------------------------------
++// Снимок предмета приходит по сети. Не даём клиенту отравить прототип, положить
++// циклическую структуру или завалить сервер гигантским сообщением. Это НЕ игровое
++// ограничение количества/веса — только санитайзинг входящих данных.
++const FORBIDDEN_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
++const MAX_SNAPSHOT_DEPTH = 12;
++const MAX_SNAPSHOT_BYTES = 64 * 1024;
++
++const sanitizeValue = (value, depth = 0) => {
++  if (depth > MAX_SNAPSHOT_DEPTH) return null;
++  if (value === null || typeof value !== 'object') {
++    // функции/символы/undefined не едут по сети
++    return typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean'
++      ? value
++      : null;
++  }
++  if (Array.isArray(value)) return value.map((entry) => sanitizeValue(entry, depth + 1));
++  const out = {};
++  for (const key of Object.keys(value)) {
++    if (FORBIDDEN_KEYS.includes(key)) continue;
++    out[key] = sanitizeValue(value[key], depth + 1);
++  }
++  return out;
++};
++
++/** Безопасный снимок: без прототипных ключей, циклов и超限. */
++const sanitizeItemSnapshot = (raw) => {
++  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
++  let plain;
++  try {
++    plain = JSON.parse(JSON.stringify(raw));
++  } catch {
++    return null; // циклическая структура / BigInt и прочее
++  }
++  const clean = sanitizeValue(plain);
++  try {
++    if (JSON.stringify(clean).length > MAX_SNAPSHOT_BYTES) return null;
++  } catch {
++    return null;
++  }
++  return clean;
++};
++
++/** Валидация количества: не игровой лимит, а защита от некорректного клиента. */
++const isValidQuantity = (value) => Number.isSafeInteger(value) && value > 0;
++
++// ─── Идентичность и стек (канон из domain/itemIdentity.js + domain/powerArmor.js) ──
++
++const slugifyBaseName = (baseName = '') => String(baseName)
++  .toLowerCase()
++  .replace(/[^a-zа-яё0-9]+/gi, '_')
++  .replace(/^_+|_+$/g, '')
++  .slice(0, 40);
++
++const buildKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities = []) => {
++  if (!weaponId) return 'anonymous';
++  const modIds = Object.entries(appliedMods || {})
++    .sort(([k1], [k2]) => String(k1).localeCompare(String(k2)))
++    .map(([, modId]) => modId)
++    .join('_');
++  const parts = [weaponId];
++  if (durability !== undefined && durability !== null && durability !== '') {
++    parts.push(`dur_${durability}`);
++  }
++  if (modIds) parts.push(`mods_${modIds}`);
++  const uniqIds = [...(uniqQualities || [])].filter(Boolean).sort();
++  uniqIds.forEach((id) => parts.push(`uniq_${id}`));
++  if (baseName) parts.push(slugifyBaseName(baseName));
++  return parts.join('_');
++};
++
++const generateStackKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities) =>
++  buildKey(weaponId, appliedMods, baseName, durability, uniqQualities);
++
++const modsSignature = (appliedMods) => {
++  const ids = Object.values(appliedMods || {}).filter(Boolean).map(String).sort();
++  return ids.length ? ids.join('|') : 'none';
++};
++
++const isFusionCoreItem = (item) => item?.id === FUSION_CORE_ID || item?.weaponId === FUSION_CORE_ID;
++const fusionCoreStackKey = (charges) => `ammo:${FUSION_CORE_ID}:charges:${charges}`;
++const isPowerArmorFrame = (item) => item?.itemType === 'powerArmor' && item?.set === PA_FRAME_SET_KEY;
++
++const powerArmorPieceStackKey = (piece) =>
++  `powerArmor:${piece.catalogId}:mods:${modsSignature(piece.appliedMods)}:hp:${piece.hpCurrent}`;
++
++const powerArmorFrameStackKey = (frameItem) => {
++  const piecesSig = PA_PIECE_SLOTS
++    .map((slot) => {
++      const p = frameItem.installedPieces?.[slot];
++      return p ? `${slot}:${powerArmorPieceStackKey(p)}` : `${slot}:empty`;
++    })
++    .join('|');
++  const coreSig = frameItem.installedCore ? String(frameItem.installedCore.charges) : 'none';
++  return `powerArmor:${frameItem.id}:mods:${modsSignature(frameItem.appliedMods)}:pieces:${piecesSig}:core:${coreSig}`;
++};
++
++const getItemName = (item) => item?.name || item?.id || '';
++const getItemCatalogId = (item) => item?.id || item?.weaponId || item?.itemId
++  || item?.armorId || item?.clothingId || item?.code || '';
++
++const getItemType = (item) => {
++  if (item?.itemType) return item.itemType;
++  if (item?.effectType || item?.durationInScenes || item?.duration || item?.positiveEffect) return 'chem';
++  if (item?.type === 'ammo') return 'ammo';
++  if (item?.weaponId || item?.damage !== undefined) return 'weapon';
++  if (item?.clothingType) return 'clothing';
++  if (item?.protectedAreas) return 'armor';
++  return 'misc';
++};
++
++/**
++ * Подпись ЖИВОГО состояния экземпляра. Патч 522: предмет не теряет свойства
++ * при смене места хранения, поэтому два экземпляра с разными модами, зарядами,
++ * прочностью или уникальными качествами НИГДЕ не склеиваются — ни в инвентаре,
++ * ни на складе, ни у торговца.
++ */
++const stateSignature = (item) => [
++  `mods:${modsSignature(item.appliedMods)}`,
++  `charges:${item.charges ?? 'none'}`,
++  `durability:${item.durability ?? 'none'}`,
++  `hp:${item.hpCurrent ?? 'none'}`,
++  `uniq:${[...(item.uniqQualities || [])].filter(Boolean).map(String).sort().join('|') || 'none'}`,
++  `base:${item.baseName ? slugifyBaseName(item.baseName) : 'none'}`,
++].join('|');
++
++/**
++ * КАНОНИЧЕСКИЙ ключ стака. Совпадает с законом инвентаря:
++ * разные заряды ядерного блока, разные моды, прочность, уникальные качества,
++ * состав силовой брони и вариант имени — разные стопки.
++ */
++const itemStackKey = (item) => {
++  if (!item || typeof item !== 'object') return 'plain';
++  const state = `state:${stateSignature(item)}`;
++  if (isFusionCoreItem(item)) return `${fusionCoreStackKey(item.charges)}|${state}`;
++  if (item.itemType === 'powerArmor') {
++    const catalogId = item.weaponId || item.id;
++    if (isPowerArmorFrame(item)) return `${powerArmorFrameStackKey({ ...item, id: catalogId })}|${state}`;
++    return `${powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent })}|${state}`;
++  }
++  const itemType = getItemType(item);
++  if (itemType === 'weapon') {
++    const storeKey = item.stackKey || generateStackKey(
++      item.weaponId || item.id || getItemName(item),
++      item.appliedMods,
++      item.baseName,
++      item.durabilityTracked ? item.durability : undefined,
++      item.uniqQualities,
++    );
++    return `weapon:${getItemCatalogId(item)}:${storeKey}:mods:${modsSignature(item.appliedMods)}|${state}`;
++  }
++  return `${itemType}:${getItemCatalogId(item)}|${state}`;
++};
++
++// ─── Цена и вес с учётом модов ------------------------------------------------
++// Расчёт «эффективного» предмета требует каталога (`resolveEffectiveItem`), он
++// доступен только на клиенте. Клиент кладёт в запись effectiveCost/effectiveWeight,
++// а сервер, склад и торговец читают их ЧЕРЕЗ ЭТИ ЖЕ функции и больше не теряют.
++
++const toNumber = (value) => {
++  const parsed = typeof value === 'string'
++    ? parseFloat(value.replace(/\s/g, '').replace(',', '.'))
++    : Number(value);
++  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
++};
++
++const effectiveItemCost = (item) => toNumber(
++  item?.effectiveCost ?? item?.cost ?? item?.price ?? item?.value ?? 0,
++);
++const effectiveItemWeight = (item) => toNumber(
++  item?.effectiveWeight ?? item?.weight ?? 0,
++);
++
++/**
++ * Снимок предмета для переноса (инвентарь → склад → торговец → инвентарь).
++ * Патч 522: НИКАКОГО обрезания полей. Моды, заряды, прочность, уникальные
++ * качества, уникальные id, stackKey, базовое имя — всё остаётся. Меняется только
++ * состояние размещения и количество, которое едет отдельным полем операции.
++ */
++const itemTransferSnapshot = (item, effectiveNumbers = {}) => ({
++  ...(item && typeof item === 'object' ? item : {}),
++  quantity: 1,
++  equipped: false,
++  locked: false,
++  ...effectiveNumbers,
++});
++
++module.exports = {
++  FUSION_CORE_ID,
++  PA_FRAME_SET_KEY,
++  PA_PIECE_SLOTS,
++  PROTOCOL_MAX_TRANSFER_OPERATIONS: 50,
++  MAX_SNAPSHOT_BYTES,
++  sanitizeItemSnapshot,
++  isValidQuantity,
++  slugifyBaseName,
++  buildKey,
++  generateStackKey,
++  modsSignature,
++  isFusionCoreItem,
++  fusionCoreStackKey,
++  isPowerArmorFrame,
++  powerArmorPieceStackKey,
++  powerArmorFrameStackKey,
++  getItemName,
++  getItemCatalogId,
++  getItemType,
++  itemStackKey,
++  stateSignature,
++  effectiveItemCost,
++  effectiveItemWeight,
++  itemTransferSnapshot,
++};
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 9fb5435..a94c251 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -6,6 +6,11 @@
+ // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
+ 
+ const { ERROR_CODE } = require('./protocol');
++const {
++  itemStackKey,
++  effectiveItemCost,
++  effectiveItemWeight,
++} = require('./itemStacking.js');
+ const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+ 
+@@ -50,16 +55,8 @@ const normalizeCapsAmount = (value, fallback = 0) =>
+ const makeEntryId = (now = Date.now(), idx = 0) =>
+   `ent_${now}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
+ 
+-const snapshotMergeSignature = (snapshot) => {
+-  if (!snapshot || typeof snapshot !== 'object') return 'plain';
+-  const mods = snapshot.appliedMods && typeof snapshot.appliedMods === 'object'
+-    ? JSON.stringify(Object.entries(snapshot.appliedMods).sort(([a], [b]) => a.localeCompare(b)))
+-    : '';
+-  const dur = snapshot.durabilityTracked ? `dur:${snapshot.durability ?? 100}` : '';
+-  const charges = snapshot.charges != null ? `chg:${snapshot.charges}` : '';
+-  const hp = snapshot.hpCurrent != null ? `hp:${snapshot.hpCurrent}` : '';
+-  return `${mods}|${dur}|${charges}|${hp}`;
+-};
++// Патч 522: один закон стака для инвентаря, склада и торговцев.
++const snapshotMergeSignature = (snapshot) => itemStackKey(snapshot);
+ 
+ const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
+   if (!raw || typeof raw !== 'object') return null;
+@@ -75,8 +72,8 @@ const normalizeSessionItem = (raw, now = Date.now(), idx = 0) => {
+     itemId: itemId || name,
+     itemType,
+     name: name || 'Крышки',
+-    cost: Math.max(0, Number(raw.cost ?? raw.price ?? 0) || 0),
+-    weight: Math.max(0, Number(String(raw.weight ?? 0).replace(',', '.')) || 0),
++    cost: effectiveItemCost(raw),
++    weight: effectiveItemWeight(raw),
+     quantity,
+     markupPercent: normalizeSaleMarkupPercent(raw.markupPercent, 0),
+     itemSnapshot: raw.itemSnapshot && typeof raw.itemSnapshot === 'object'
+@@ -367,7 +364,7 @@ const computeMerchantSellPriceToPlayer = (
+   entry,
+   { saleMarkupPercent = 0, capCollectorPercent = 0 } = {},
+ ) => {
+-  const baseCost = Math.max(0, Number(entry?.cost ?? entry?.price ?? 0) || 0);
++  const baseCost = effectiveItemCost(entry);
+   if (baseCost <= 0) return 0;
+ 
+   const itemMarkup = Number(entry?.markupPercent) || 0;
+@@ -385,7 +382,7 @@ const computeMerchantBuybackPriceFromPlayer = (
+   item,
+   { buyDepreciationPercent = 50, capCollectorPercent = 0 } = {},
+ ) => {
+-  const baseCost = Math.max(0, Number(item?.cost ?? item?.price ?? 0) || 0);
++  const baseCost = effectiveItemCost(item);
+   if (baseCost <= 0) return 0;
+ 
+   const depreciation = normalizeBuyDepreciationPercent(buyDepreciationPercent, 50);
+diff --git a/server/partyStorageRules.js b/server/partyStorageRules.js
+index e3028ce..41e21ea 100644
+--- a/server/partyStorageRules.js
++++ b/server/partyStorageRules.js
+@@ -1,53 +1,34 @@
+ 'use strict';
+ 
+ /**
+- * Патч 521: мелочи «Общего хранилища» — стаканье одинаковых предметов и лимиты.
++ * Патч 522: складирование по закону инвентаря.
+  *
+- * Модуль чистый: без сети, без состояния комнаты и без React. Все функции
+- * работают с обычным массивом записей и не мутируют входные данные, поэтому
+- * сервер может сначала проверить перенос целиком, а уже потом применять его
+- * (правило «пока кнопка «Перенести» не нажата, предметы не перенесены»).
++ * Игровых ограничений нет: ни веса, ни числа строк, ни размера стопки, ни
++ * потолка количества за операцию. Осталась только ЗАЩИТА СЕРВЕРА — валидация
++ * количества, санитайзинг сетевого снимка и предел числа операций в одном
++ * сообщении (вместе с LIMITS.MAX_MESSAGE_BYTES на уровне WebSocket).
++ *
++ * Все правила стака приходят из `domain/itemStacking.js` — того же модуля, что
++ * используют инвентарь и торговцы. Моды, заряды, прочность и уникальные качества
++ * разделяют стопки; одинаковые предметы склеиваются.
+  */
+ 
+-const STORAGE_LIMITS = Object.freeze({
+-  /** Максимум строк на складе, включая ключевые записи. */
+-  MAX_ENTRIES: 200,
+-  /** Максимум предметов в одном стеке; излишек уходит в новую строку. */
+-  MAX_STACK_QUANTITY: 999,
+-  /** Максимум операций в одном атомарном переносе. */
+-  MAX_TRANSFER_OPERATIONS: 50,
+-  /** Максимум предметов в одной операции. */
+-  MAX_QUANTITY_PER_OPERATION: 999,
+-});
+-
+-// Служебные поля экземпляра предмета не участвуют в сравнении: два одинаковых
+-// пулемёта с разными uniqueId должны лежать в одной строке склада.
+-const SERVICE_FIELDS = Object.freeze([
+-  'uniqueId', 'equipInstanceId', 'stackKey', 'equipped', 'locked', 'appliedMods', 'quantity',
+-]);
+-
+-const stableStringify = (value) => {
+-  if (value === null || typeof value !== 'object') {
+-    return JSON.stringify(value) === undefined ? 'null' : JSON.stringify(value);
+-  }
+-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+-  const keys = Object.keys(value)
+-    .filter((key) => !SERVICE_FIELDS.includes(key) && value[key] !== undefined)
+-    .sort();
+-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+-};
+-
+-/** Ключ стаканья по снимку предмета, устойчивый к порядку полей. */
+-const storageStackKey = (item) => stableStringify(item && typeof item === 'object' ? item : {});
++const {
++  PROTOCOL_MAX_TRANSFER_OPERATIONS,
++  sanitizeItemSnapshot,
++  isValidQuantity,
++  itemStackKey,
++  effectiveItemCost,
++  effectiveItemWeight,
++} = require('./itemStacking.js');
+ 
+-/** Индекс первой строки, куда можно доложить предмет. Ключи не стакаются. */
++/** Индекс строки, в которую можно доложить предмет. Ключи не стакаются. */
+ const findStackIndex = (entries, item) => {
+-  const key = storageStackKey(item);
++  const key = itemStackKey(item);
+   for (let index = 0; index < entries.length; index += 1) {
+     const entry = entries[index];
+     if (!entry || entry.kind === 'keyItem') continue;
+-    if (Number(entry.quantity) >= STORAGE_LIMITS.MAX_STACK_QUANTITY) continue;
+-    if (storageStackKey(entry.item) !== key) continue;
++    if (itemStackKey(entry.item) !== key) continue;
+     return index;
+   }
+   return -1;
+@@ -56,43 +37,47 @@ const findStackIndex = (entries, item) => {
+ /**
+  * Применить поступления к уже подготовленному массиву записей (после списаний).
+  * Принимает `{ item | plain, quantity | qty, name }`.
+- * Возвращает `{ entries, added, error }`; при `error` исходный массив не меняется.
++ * Возвращает `{ entries, added, error }`; при `error` исходный массив не меняется,
++ * поэтому перенос остаётся атомарным.
+  */
+ const applyStorageDeposits = ({ entries = [], deposits = [], makeEntry, at = Date.now() }) => {
+   const next = (Array.isArray(entries) ? entries : []).map((entry) => ({ ...entry }));
+   const added = [];
+-  for (const put of (Array.isArray(deposits) ? deposits : [])) {
+-    const item = put.item || put.plain;
+-    const name = String(put.name || '').trim() || 'Предмет';
+-    let remaining = Math.max(1, Math.floor(Number(put.quantity ?? put.qty) || 1));
+-    while (remaining > 0) {
+-      const index = findStackIndex(next, item);
+-      if (index >= 0) {
+-        const target = next[index];
+-        const free = STORAGE_LIMITS.MAX_STACK_QUANTITY - Number(target.quantity);
+-        const portion = Math.max(1, Math.min(free, remaining));
+-        const merged = { ...target, quantity: Number(target.quantity) + portion };
+-        next[index] = merged;
+-        added.push({ ...merged });
+-        remaining -= portion;
+-        continue;
+-      }
+-      if (next.length >= STORAGE_LIMITS.MAX_ENTRIES) {
+-        return { entries, added: [], error: 'STORAGE_FULL' };
+-      }
+-      const portion = Math.min(remaining, STORAGE_LIMITS.MAX_STACK_QUANTITY);
+-      const entry = makeEntry({ item, name, quantity: portion, at });
++  const list = Array.isArray(deposits) ? deposits : [];
++
++  for (const put of list) {
++    const rawItem = put.item || put.plain;
++    const clean = sanitizeItemSnapshot(rawItem);
++    const quantity = Number(put.quantity ?? put.qty);
++    if (!clean || !isValidQuantity(quantity)) {
++      return { entries, added: [], error: 'STORAGE_BAD_MESSAGE' };
++    }
++    const name = String(put.name || clean.name || '').trim() || 'Предмет';
++    const index = findStackIndex(next, clean);
++    if (index >= 0) {
++      const target = next[index];
++      const merged = { ...target, quantity: Number(target.quantity) + quantity };
++      next[index] = merged;
++      added.push({ ...merged });
++    } else {
++      const entry = makeEntry({ item: clean, name, quantity, at });
+       next.push(entry);
+       added.push({ ...entry });
+-      remaining -= portion;
+     }
+   }
+   return { entries: next, added, error: null };
+ };
+ 
+ module.exports = {
+-  STORAGE_LIMITS,
+-  storageStackKey,
++  // Технический предохранитель протокола, НЕ игровой лимит.
++  PROTOCOL_MAX_TRANSFER_OPERATIONS,
++  sanitizeItemSnapshot,
++  isValidQuantity,
++  effectiveItemCost,
++  effectiveItemWeight,
++  // Алиас для прежних тестов и внешних потребителей.
++  storageStackKey: itemStackKey,
++  itemStackKey,
+   findStackIndex,
+   applyStorageDeposits,
+ };
+diff --git a/server/protocol.js b/server/protocol.js
+index d7cc876..7fc175c 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -84,7 +84,6 @@ const ERROR_CODE = Object.freeze({
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
+-  STORAGE_FULL: 'STORAGE_FULL',
+   // Патч 520: мини-игра взлома замков.
+   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
+   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 6a3c8e1..0cffb77 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -43,7 +43,12 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
+  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
+  */
+-const { STORAGE_LIMITS, applyStorageDeposits } = require('./partyStorageRules');
++const {
++  PROTOCOL_MAX_TRANSFER_OPERATIONS,
++  applyStorageDeposits,
++  sanitizeItemSnapshot,
++  isValidQuantity,
++} = require('./partyStorageRules');
+ 
+ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+   // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
+@@ -63,9 +68,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   // поднимает его в комнату сообщением `storage.restore` при подключении.
+   let storageEntryCounter = 0;
+   const emptyStorage = () => ({ revision: 0, entries: [] });
++  // Патч 522: импорт снимка приходит по сети — не даём строке/объекту
++  // притвориться массивом записей и уронить комнату.
+   const cloneStorage = (storage) => ({
+     revision: Number(storage?.revision) || 0,
+-    entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
++    entries: (Array.isArray(storage?.entries) ? storage.entries : [])
++      .map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
+   });
+   const isGmOnline = (room) => Boolean(room.ownerClientId && room.members.has(room.ownerClientId));
+   const storageSnapshot = (room) => ({
+@@ -1065,11 +1073,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Без Мастера в сети хранилище доступно только для просмотра.
+     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
+     const qty = Math.floor(Number(quantity));
+-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++    if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
+       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+     }
+-    let plain;
+-    try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
++    const plain = sanitizeItemSnapshot(item);
++    if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+     const member = room.members.get(clientId);
+     // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
+     // Он только смотрит список и транслирует ключи.
+@@ -1116,7 +1124,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (putList.length === 0 && takeList.length === 0) {
+       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+     }
+-    if (putList.length + takeList.length > STORAGE_LIMITS.MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++    if (putList.length + takeList.length > PROTOCOL_MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+ 
+     const storage = room.partyStorage || emptyStorage();
+     const original = storage.entries;
+@@ -1126,7 +1134,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       const entryId = String(req?.entryId || '').trim();
+       const qty = Math.floor(Number(req?.quantity));
+       const entry = original.find((e) => e.entryId === entryId);
+-      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++      if (!entry || entry.kind === 'keyItem' || !isValidQuantity(qty)) {
+         return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
+       }
+       if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+@@ -1136,12 +1144,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     for (const req of putList) {
+       const qty = Math.floor(Number(req?.quantity));
+       const item = req?.item;
+-      if (!item || typeof item !== 'object' || Array.isArray(item)
+-        || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
++      if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
+         return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+       }
+-      let plain;
+-      try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
++      const plain = sanitizeItemSnapshot(item);
++      if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+       if (plain.kind === 'keyItem') return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+       plannedPuts.push({ plain, qty, name: String(req?.name || plain.name || '').trim() || 'Предмет' });
+     }
+@@ -1186,7 +1193,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const storage = room.partyStorage || emptyStorage();
+     const cleanId = String(keyItemId).trim();
+     if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
+-    if (storage.entries.length >= STORAGE_LIMITS.MAX_ENTRIES) return null;
+     const entry = {
+       entryId: `key_${now()}_${++storageEntryCounter}`,
+       kind: 'keyItem',
+@@ -1214,9 +1220,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const member = room.members.get(clientId);
+     if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
+     if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+-    if ((room.partyStorage?.entries || []).length >= STORAGE_LIMITS.MAX_ENTRIES) {
+-      return { error: ERROR_CODE.STORAGE_FULL };
+-    }
+     const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
+     return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
+   };
+@@ -1261,12 +1264,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   const restorePartyStorage = ({ code, clientId, ownerToken = null, storage }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    if (!storage || typeof storage !== 'object' || Array.isArray(storage)
++      || !Array.isArray(storage.entries)) {
++      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
++    }
+     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+     const incoming = cloneStorage(storage);
+-    if (incoming.entries.length > STORAGE_LIMITS.MAX_ENTRIES) {
+-      return { error: ERROR_CODE.STORAGE_FULL };
+-    }
+     const current = room.partyStorage || emptyStorage();
+     if (Number(incoming.revision) < Number(current.revision)) {
+       return { room, storage: storageSnapshot(room), applied: false };
+diff --git a/src/lootTrade/grantCharacterItems.js b/src/lootTrade/grantCharacterItems.js
+index 862d9bf..b315b5a 100644
+--- a/src/lootTrade/grantCharacterItems.js
++++ b/src/lootTrade/grantCharacterItems.js
+@@ -19,6 +19,7 @@ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { getCurrentModuleLocale } from '../../i18n/locale';
+ import { resolveItem, findCatalogEntry, getItemPrice, getItemWeight } from '../../domain/resolveItem';
+ import { generateStackKey, getItemId } from '../../domain/itemIdentity';
++import itemStacking from '../../domain/itemStacking.js';
+ import {
+   isFusionCoreItem,
+   fusionCoreStackKey,
+@@ -292,8 +293,10 @@ const buildRawItemFromContainerEntry = (entry) => {
+     weaponId: snapshot.weaponId || catalogId,
+     itemType: entry.itemType || snapshot.itemType || 'misc',
+     name: entry.name || snapshot.name,
+-    cost: Number(entry.cost ?? snapshot.cost ?? 0) || 0,
+-    weight: Number(entry.weight ?? snapshot.weight ?? 0) || 0,
++    cost: itemStacking.effectiveItemCost({ ...snapshot, ...entry }),
++    weight: itemStacking.effectiveItemWeight({ ...snapshot, ...entry }),
++    effectiveCost: itemStacking.effectiveItemCost({ ...snapshot, ...entry }),
++    effectiveWeight: itemStacking.effectiveItemWeight({ ...snapshot, ...entry }),
+     equipped: false,
+     locked: false,
+   };
+@@ -394,18 +397,25 @@ export const getSellablePlayerInventoryItems = (storeItems, moduleLocale = getCu
+         catalogEntry = null;
+       }
+       const catalogCost = Number(catalogEntry?.cost ?? resolved?.cost ?? item?.cost ?? item?.price ?? 0) || 0;
+-      const weight = getItemWeight(resolved) || 0;
++      // Патч 522: resolveItem уже применяет моды (domain/enrichItem.js складывает
++      // mod.cost и mod.weight). Цену берём ОТ МОДИФИЦИРОВАННОГО предмета, а не
++      // из голой каталожной записи, иначе торговец скупает моды бесплатно.
++      const effectiveCost = getItemPrice(resolved) || catalogCost;
++      const weight = itemStacking.effectiveItemWeight({ effectiveWeight: getItemWeight(resolved) });
+       const cleanSnapshot = {
+         ...item,
+         id: catalogId || item.id,
+         weaponId: item.weaponId || catalogId || item.id,
+         itemType,
+-        cost: catalogCost,
++        cost: effectiveCost,
+         weight,
++        effectiveCost,
++        effectiveWeight: weight,
+         equipped: false,
+         locked: false,
+       };
+-      delete cleanSnapshot.uniqueId;
++      // uniqueId и прочие поля экземпляра НЕ удаляются: предмет не теряет
++      // свойства при смене владельца.
+ 
+       return {
+         id: String(item.id),
+@@ -413,8 +423,10 @@ export const getSellablePlayerInventoryItems = (storeItems, moduleLocale = getCu
+         itemType,
+         name: resolved?.name || item?.name || catalogId || '—',
+         quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+-        cost: catalogCost,
+-        price: getItemPrice(resolved) || catalogCost,
++        cost: effectiveCost,
++        price: effectiveCost,
++        effectiveCost,
++        effectiveWeight: weight,
+         weight,
+         durability: item.durabilityTracked ? item.durability : null,
+         charges: isFusionCoreItem(item) ? item.charges : null,
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 49ece5e..55ec328 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -78,7 +78,6 @@ export const ROOM_ERROR = {
+   STORAGE_FORBIDDEN: 'STORAGE_FORBIDDEN',
+   STORAGE_GM_OFFLINE: 'STORAGE_GM_OFFLINE',
+   STORAGE_KEY_READ_ONLY: 'STORAGE_KEY_READ_ONLY',
+-  STORAGE_FULL: 'STORAGE_FULL',
+   // Патч 520: мини-игра взлома замков.
+   LOCK_NOT_ACTIVE: 'LOCK_NOT_ACTIVE',
+   LOCK_ALREADY_ACTIVE: 'LOCK_ALREADY_ACTIVE',

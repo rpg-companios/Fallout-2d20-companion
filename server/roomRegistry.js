@@ -43,7 +43,12 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
-const { STORAGE_LIMITS, applyStorageDeposits } = require('./partyStorageRules');
+const {
+  PROTOCOL_MAX_TRANSFER_OPERATIONS,
+  applyStorageDeposits,
+  sanitizeItemSnapshot,
+  isValidQuantity,
+} = require('./partyStorageRules');
 
 const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
   // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
@@ -63,9 +68,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   // поднимает его в комнату сообщением `storage.restore` при подключении.
   let storageEntryCounter = 0;
   const emptyStorage = () => ({ revision: 0, entries: [] });
+  // Патч 522: импорт снимка приходит по сети — не даём строке/объекту
+  // притвориться массивом записей и уронить комнату.
   const cloneStorage = (storage) => ({
     revision: Number(storage?.revision) || 0,
-    entries: (storage?.entries || []).map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
+    entries: (Array.isArray(storage?.entries) ? storage.entries : [])
+      .map((entry) => ({ ...entry, item: { ...(entry.item || {}) } })),
   });
   const isGmOnline = (room) => Boolean(room.ownerClientId && room.members.has(room.ownerClientId));
   const storageSnapshot = (room) => ({
@@ -1065,11 +1073,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Без Мастера в сети хранилище доступно только для просмотра.
     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
     const qty = Math.floor(Number(quantity));
-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     }
-    let plain;
-    try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
+    const plain = sanitizeItemSnapshot(item);
+    if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     const member = room.members.get(clientId);
     // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
     // Он только смотрит список и транслирует ключи.
@@ -1116,7 +1124,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (putList.length === 0 && takeList.length === 0) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     }
-    if (putList.length + takeList.length > STORAGE_LIMITS.MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    if (putList.length + takeList.length > PROTOCOL_MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
 
     const storage = room.partyStorage || emptyStorage();
     const original = storage.entries;
@@ -1126,7 +1134,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       const entryId = String(req?.entryId || '').trim();
       const qty = Math.floor(Number(req?.quantity));
       const entry = original.find((e) => e.entryId === entryId);
-      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+      if (!entry || entry.kind === 'keyItem' || !isValidQuantity(qty)) {
         return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
       }
       if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
@@ -1136,12 +1144,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     for (const req of putList) {
       const qty = Math.floor(Number(req?.quantity));
       const item = req?.item;
-      if (!item || typeof item !== 'object' || Array.isArray(item)
-        || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !isValidQuantity(qty)) {
         return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
       }
-      let plain;
-      try { plain = JSON.parse(JSON.stringify(item)); } catch { return { error: ERROR_CODE.STORAGE_BAD_MESSAGE }; }
+      const plain = sanitizeItemSnapshot(item);
+      if (!plain) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
       if (plain.kind === 'keyItem') return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
       plannedPuts.push({ plain, qty, name: String(req?.name || plain.name || '').trim() || 'Предмет' });
     }
@@ -1186,7 +1193,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const storage = room.partyStorage || emptyStorage();
     const cleanId = String(keyItemId).trim();
     if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
-    if (storage.entries.length >= STORAGE_LIMITS.MAX_ENTRIES) return null;
     const entry = {
       entryId: `key_${now()}_${++storageEntryCounter}`,
       kind: 'keyItem',
@@ -1214,9 +1220,6 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const member = room.members.get(clientId);
     if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
     if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
-    if ((room.partyStorage?.entries || []).length >= STORAGE_LIMITS.MAX_ENTRIES) {
-      return { error: ERROR_CODE.STORAGE_FULL };
-    }
     const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
     return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
   };
@@ -1261,12 +1264,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const restorePartyStorage = ({ code, clientId, ownerToken = null, storage }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!storage || typeof storage !== 'object' || Array.isArray(storage)
+      || !Array.isArray(storage.entries)) {
+      return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    }
     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
     const incoming = cloneStorage(storage);
-    if (incoming.entries.length > STORAGE_LIMITS.MAX_ENTRIES) {
-      return { error: ERROR_CODE.STORAGE_FULL };
-    }
     const current = room.partyStorage || emptyStorage();
     if (Number(incoming.revision) < Number(current.revision)) {
       return { room, storage: storageSnapshot(room), applied: false };

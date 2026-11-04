@@ -37,21 +37,28 @@ import { renderTextWithIcons } from '../../modules/fallout/screens/WeaponsAndArm
 import { showRawAlert } from '../alerts/alertService';
 import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { useLocale } from '../../i18n/locale';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { resolveItem, getItemPrice, getItemWeight } from '../../domain/resolveItem';
+import itemStacking from '../../domain/itemStacking.js';
 import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
 
-// В сейве/сторе предмета есть служебные поля, которые не должны уезжать на
-// сервер: уникальные id экземпляра, экипировка, ключи стаканья и т.п.
+// Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
+// не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
+// ключ стака едут вместе с ним. Сбрасывается только состояние РАЗМЕЩЕНИЯ
+// (экипировано/заблокировано) и количество — оно передаётся отдельным полем
+// операции. Цена и вес берутся от обогащённого предмета, то есть с модами.
 const pickItemSnapshot = (item) => {
   const src = item || {};
-  const { uniqueId, equipInstanceId, stackKey, equipped, locked, appliedMods, ...rest } = src;
-  return {
-    ...rest,
+  const resolved = resolveItem({ ...src }, getEquipmentCatalog()) || src;
+  const effectiveCost = itemStacking.effectiveItemCost({ effectiveCost: getItemPrice(resolved) });
+  const effectiveWeight = itemStacking.effectiveItemWeight({ effectiveWeight: getItemWeight(resolved) });
+  return itemStacking.itemTransferSnapshot({
+    ...src,
     name: String(src.name || 'Предмет'),
     itemType: String(src.itemType || 'misc'),
-    quantity: 1,
-    equipped: false,
-    locked: false,
-  };
+    cost: src.cost ?? effectiveCost,
+    weight: src.weight ?? effectiveWeight,
+  }, { effectiveCost, effectiveWeight });
 };
 
 const PartyStorageModal = ({
@@ -149,11 +156,11 @@ const PartyStorageModal = ({
       setGiveBuffer({});
       setTakeBuffer({});
     } catch (error) {
-      // Патч 521: переполнение склада — отдельная, понятная причина отказа.
-      const full = String(error?.message || '').includes('STORAGE_FULL');
+      // Патч 522: игрового «склад заполнен» больше нет. Ошибка связи/защиты
+      // сервера показывается как есть, без выдуманной причины.
       showRawAlert({
-        title: tInventory(full ? 'screen.storage.full' : 'screen.storage.failed'),
-        message: full ? undefined : error?.message,
+        title: tInventory('screen.storage.failed'),
+        message: error?.message,
       });
     } finally {
       setBusy(false);
