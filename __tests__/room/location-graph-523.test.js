@@ -236,8 +236,10 @@ describe('523: документы и версия', () => {
     expect(read('docs/changelog.ru.md')).toContain('523');
     expect(read('docs/changelog.en.md')).toContain('523');
     expect(read('docs/patch-523-install.md')).toContain('523');
-    expect(JSON.parse(read('public/version.json')).version).toBe('523');
-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('523');
+    // Номер версии растёт дальше: исторический тест проверяет закон, а не
+    // конкретный номер (патч 524 и последующие не должны ломать цепочку).
+    expect(Number(JSON.parse(read('public/version.json')).version)).toBeGreaterThanOrEqual(523);
+    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(523);
     expect(read('patchs/523-location-graph.patch')).toContain('server/locationGraph.js');
   });
 });

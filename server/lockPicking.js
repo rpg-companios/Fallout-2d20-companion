@@ -101,13 +101,14 @@ const normalizeCharacterSnapshot = (snapshot) => {
     items: pick('items'),
     inventory: pick('inventory'),
     equipment: pick('equipment'),
+    bag: pick('bag'),
     usedMagazineEffects: pick('usedMagazineEffects'),
     lockPicking: pick('lockPicking'),
   };
 };
 
 const ATTR_ALIASES = Object.freeze({
-  PER: ['PER', 'PERCEPTION', 'ВОС', 'ВОСПРИЯТИЕ'],
+  PER: ['PER', 'PERCEPTION', 'ВОС', 'ВОСПРИЯТИЕ', 'В'],
   LCK: ['LCK', 'LUCK', 'УДЧ', 'УДАЧА'],
   LOCKPICK: ['LOCKPICK', 'LOCKPICKING', 'ОТМЫЧКИ', 'ВЗЛОМ'],
 });
@@ -120,24 +121,76 @@ const findNamed = (entries, aliases) => {
   return found ? toNumber(found) : 0;
 };
 
-const inventoryEntries = (source) => [
+// Патч 524: отмычки в живом инвентаре могут лежать и в словаре items (ключ —
+// id экземпляра), и в массиве equipment.items, и в обёртке itemSnapshot. Канон
+// каталога при этом живёт в разных полях: itemId / catalogId / weaponId / code
+// / id, а старые сейвы оставляют только ключ записи. Проверяем все формы и
+// считаем каждый экземпляр один раз — иначе доска стартовала с «0 отмычек».
+const PIN_ID_FIELDS = Object.freeze([
+  'itemId', 'catalogId', 'weaponId', 'code', 'id', 'key', 'Name',
+]);
+const PIN_BUCKETS = (source) => [
   source.items,
   source.equipment?.items,
   source.inventory,
-].flatMap((bucket) => {
-  if (!bucket) return [];
-  if (Array.isArray(bucket)) return bucket;
-  if (typeof bucket === 'object') return Object.values(bucket);
-  return [];
-});
+  source.bag,
+];
 
-const countBobbyPins = (source) => inventoryEntries(source).reduce((sum, item) => {
-  if (!item || typeof item !== 'object') return sum;
-  const id = String(item.itemId ?? item.id ?? item.key ?? '').trim();
-  if (id !== 'item_bobby_pin') return sum;
-  const qty = Number(item.quantity ?? item.count ?? item.qty ?? 1);
-  return sum + (Number.isFinite(qty) ? Math.max(0, Math.floor(qty)) : 1);
-}, 0);
+const candidatePinIds = (key, item) => {
+  const ids = [String(key || '').trim()];
+  const collect = (value) => {
+    if (!value || typeof value !== 'object') return;
+    for (const field of PIN_ID_FIELDS) {
+      const raw = value[field];
+      if (typeof raw === 'string' || typeof raw === 'number') ids.push(String(raw).trim());
+    }
+  };
+  collect(item);
+  for (const nested of [item?.item, item?.snapshot, item?.data]) collect(nested);
+  return ids;
+};
+
+const pinQuantity = (item) => {
+  const raw = item?.quantity ?? item?.count ?? item?.qty ?? item?.amount
+    ?? item?.item?.quantity ?? item?.snapshot?.quantity ?? 1;
+  const parsed = Number(String(raw).replace(/\s+/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 1;
+};
+
+const countBobbyPins = (source) => {
+  const objectKeys = new Set();
+  const counted = new Set();
+  let total = 0;
+  PIN_BUCKETS(source).forEach((bucket, bucketIdx) => {
+    if (!bucket) return;
+    const isArray = Array.isArray(bucket);
+    const entries = isArray
+      ? bucket.map((item, idx) => [`${bucketIdx}:${idx}`, item])
+      : (typeof bucket === 'object' ? Object.entries(bucket) : []);
+    for (const [key, value] of entries) {
+      if (!value || typeof value !== 'object') continue;
+      if (!candidatePinIds(key, value).includes('item_bobby_pin')) continue;
+      // Один и тот же экземпляр может быть представлен и в словаре items, и
+      // в массиве equipment.items. Сверяем id экземпляра с ключами словарей;
+      // каталожный id 'item_bobby_pin' не считается ключом экземпляра, иначе
+      // несколько разных стопок склеились бы в одну.
+      const aliases = [
+        value.instanceId, value.uniqueId, value.key, value.id,
+        value.item?.instanceId, value.item?.id,
+        value.snapshot?.instanceId, value.snapshot?.id,
+      ].filter((raw) => typeof raw === 'string' || typeof raw === 'number').map(String);
+      const shared = isArray
+        ? aliases.find((alias) => alias !== 'item_bobby_pin' && objectKeys.has(alias))
+        : null;
+      const marker = shared || (isArray ? `${bucketIdx}:${key}` : String(key));
+      if (!isArray) objectKeys.add(String(key));
+      if (counted.has(marker)) continue;
+      counted.add(marker);
+      total += pinQuantity(value);
+    }
+  });
+  return total;
+};
 
 const hasDifficultyReduction = (source) => {
   const used = Array.isArray(source.usedMagazineEffects) ? source.usedMagazineEffects : [];
@@ -385,6 +438,7 @@ module.exports = {
   lockRows,
   luckSaveChance,
   lockStats,
+  countBobbyPins,
   effectiveDifficulty,
   createLockGame,
   keyWonLockGame,

@@ -8,12 +8,19 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useCharacterStore from '../../src/store/characterStore';
-import useRoomStore from '../../src/room/roomStore';
+import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
+import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
 import { useLocale } from '../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import { showRawAlert } from '../alerts/alertService';
 import { terminalHackingStyles } from './terminalHackingStyles';
 import { CELL_STATE } from './lockPickingConstants';
+import {
+  initialLocalLockState,
+  applyLocalLockAction,
+  buildLocalLockSnapshot,
+} from './localLockGame';
+import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
 
 // Патч 520: каркас окна (backdrop/window/header/statusRow/кнопки/бейджи)
 // целиком берётся у TerminalHackingModal. Здесь только то, чего у терминала
@@ -50,6 +57,7 @@ const styles = StyleSheet.create({
   ghostButton: { borderWidth: 1, borderColor: '#507052', borderRadius: 4, paddingHorizontal: 18, paddingVertical: 9 },
   ghostButtonText: { color: '#c9ddb9', fontFamily: 'monospace', fontWeight: '700' },
   retryActions: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 12 },
+  hintText: { color: '#d7c68e', fontSize: 12, textAlign: 'center', marginTop: 8, fontFamily: 'monospace' },
 });
 
 const ARROW_ICON = {
@@ -73,49 +81,129 @@ const CELL_ICON = {
   down: 'arrow-down',
 };
 
+// Патч 524: повторный start, «уже закрыт», «ждём Мастера» и отсутствие
+// отмычек — штатные состояния доски, а не «Действие не выполнено».
+const SILENT_ERRORS = new Set([
+  'ROOM_TIMEOUT',
+  'LOCK_NOT_ACTIVE',
+  'LOCK_ALREADY_ACTIVE',
+  'LOCK_NO_PINS',
+  'LOCK_INVALID_ARROW',
+  'TERMINAL_NOT_ACTIVE',
+  'TERMINAL_ALREADY_ACTIVE',
+  'TERMINAL_AWAITING_RETRY',
+  'TERMINAL_INVALID_GUESS',
+]);
+
 const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerToken, onClose }) => {
   useLocale();
   const characterId = useCharacterStore((state) => state.currentCharacterId);
   const myClientId = useRoomStore((state) => state.clientId);
   const rooms = useRoomStore((state) => state.rooms);
   const [busy, setBusy] = useState(false);
+  const [localState, setLocalState] = useState(initialLocalLockState);
+  const [forceLocal, setForceLocal] = useState(false);
   const autoStartRef = useRef('');
+  const republishRef = useRef(false);
 
   const containerId = String(lock?.containerId || '').trim();
   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
-  const game = terminalState?.game || null;
-  const isClosed = Boolean(terminalState?.closed || terminalState?.locked || game?.status === 'closed');
-  const awaitingGm = Boolean(terminalState?.awaitingGm || game?.status === 'awaitingRetry');
+  // Патч 524: как и у терминала, при отсутствии протокола комнаты доска
+  // собирается локально. Никакого переключателя «локальный режим» в UI нет.
+  const localMode = forceLocal || !roomHasTerminalProtocol(rooms?.[roomCode]);
+  const game = localMode ? localState.view : (terminalState?.game || null);
+  const isClosed = Boolean(game?.status === 'closed'
+    || (!localMode && (terminalState?.closed || terminalState?.locked)));
+  const awaitingGm = !isClosed && Boolean(game?.status === 'awaitingRetry'
+    || (!localMode && terminalState?.awaitingGm));
   const won = game?.status === 'won';
-  const isOperator = Boolean(game && game.operatorClientId === myClientId);
-  const viewOnly = Boolean(game && game.status === 'playing' && !isOperator);
+  const isOperator = localMode || Boolean(game && game.operatorClientId === myClientId);
+  const boardOfAnotherOperator = !localMode && Boolean(
+    game && game.status === 'playing'
+    && (game.operatorClientId !== myClientId || game.operatorCharacterId !== characterId),
+  );
+  const viewOnly = !localMode && Boolean(game && game.status === 'playing' && !isOperator);
   const canPress = Boolean(
-    characterId && roomCode && containerId && game?.status === 'playing'
-    && isOperator && !busy,
+    characterId && (roomCode || localMode) && containerId
+    && game?.status === 'playing' && isOperator && !busy,
   );
   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
 
+  const localStep = (state, action, value) => {
+    const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
+    const next = applyLocalLockAction(state, action, value, {
+      lock: lock || terminalState?.config,
+      characterId,
+      characterSnapshot: snapshot,
+    });
+    setLocalState(next);
+    if (action === 'start' && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
+      showRawAlert({
+        title: tLootTrade('lock.noPins'),
+        message: tLootTrade('lock.noPinsHint'),
+      });
+    } else if (next.error && !SILENT_ERRORS.has(next.error)) {
+      showRawAlert({ title: tLootTrade('lock.actionFailed') });
+    }
+    return next;
+  };
+
   const doAction = async (action, value) => {
-    if (!containerId || !roomCode) return;
+    if (!containerId || (!roomCode && !localMode)) return;
     if (action !== 'retry' && !characterId) {
       showRawAlert({ title: tLootTrade('lock.selectCharacter') });
       return;
     }
+    if (localMode) {
+      localStep(localState, action, value);
+      return;
+    }
     setBusy(true);
+    const publish = () => useRoomStore.getState().actOnTerminal({
+      code: roomCode,
+      containerId,
+      action,
+      characterId: characterId || undefined,
+      value,
+      ownerToken,
+    });
     try {
-      await useRoomStore.getState().actOnTerminal({
-        code: roomCode,
-        containerId,
-        action,
-        characterId: characterId || undefined,
-        value,
-        ownerToken,
-      });
+      await publish();
+      republishRef.current = false;
     } catch (error) {
       const code = error?.code || error?.message;
-      if (code === 'LOCK_VIEW_ONLY') showRawAlert({ title: tLootTrade('lock.viewOnly') });
-      else if (code === 'KEY_REQUIRED') showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
-      else if (!['ROOM_TIMEOUT', 'LOCK_NOT_ACTIVE', 'LOCK_ALREADY_ACTIVE'].includes(code)) {
+      // Старый сервер комнат не знает terminal.action: уходим в локальную
+      // доску тем же безмолвным способом, что и мини-игра терминала.
+      if (code === 'UNKNOWN_TYPE' || code === 'TERMINAL_NOT_ISSUED') {
+        setForceLocal(true);
+        localStep(initialLocalLockState(), 'start');
+        return;
+      }
+      // Лист персонажа мог ещё не уехать в комнату (первый вход, реконнект).
+      // Публикуем его и один раз повторяем действие вместо глухого отказа.
+      if ((code === 'SESSION_FORBIDDEN' || code === 'CHAR_NOT_PUBLISHED') && !republishRef.current) {
+        republishRef.current = true;
+        try {
+          await pushSavedCharacterToBoundRoomIfAny(characterId);
+          await publish();
+          return;
+        } catch (retryError) {
+          const retryCode = retryError?.code || retryError?.message;
+          if (!SILENT_ERRORS.has(retryCode)) {
+            showRawAlert({ title: tLootTrade('lock.sessionNotPublished') });
+          }
+          return;
+        }
+      }
+      if (code === 'LOCK_VIEW_ONLY' || code === 'TERMINAL_VIEW_ONLY') {
+        showRawAlert({ title: tLootTrade('lock.viewOnly') });
+      } else if (code === 'KEY_REQUIRED') {
+        showRawAlert({ title: tLootTrade('terminal.keyRequiredError') });
+      } else if (code === 'TERMINAL_CLOSED') {
+        showRawAlert({ title: tLootTrade('lock.closed'), message: tLootTrade('terminal.closedHint') });
+      } else if (code === 'TERMINAL_AWAITING_RETRY') {
+        showRawAlert({ title: tLootTrade('lock.awaiting'), message: tLootTrade('terminal.retryWaitingHint') });
+      } else if (!SILENT_ERRORS.has(code)) {
         showRawAlert({ title: tLootTrade('lock.actionFailed') });
       }
     } finally {
@@ -124,15 +212,28 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
   };
 
   // «Взломать» из карточки сразу собирает доску под текущий лист персонажа.
+  // Патч 524: ключ дедупликации не зависит от accessId — приход состояния
+  // комнаты больше не порождает второй start и ложное «Действие не выполнено».
   useEffect(() => {
-    if (!visible || !autoStart || !containerId || !characterId) return;
-    const key = `${containerId}:${terminalState?.accessId || ''}:${characterId}`;
+    const allowed = shouldAutoStartLock({
+      visible,
+      autoStart,
+      hasLock: Boolean(containerId),
+      hasRoom: Boolean(roomCode || localMode),
+      characterId,
+      isClosed,
+      awaitingGm,
+      game,
+      boardOfAnotherOperator,
+    });
+    if (!allowed) return;
+    const key = autoStartLockKey({ roomCode, containerId, characterId, localMode });
     if (autoStartRef.current === key) return;
     autoStartRef.current = key;
-    if (game?.status === 'playing' || won || isClosed || awaitingGm) return;
     void doAction('start');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, autoStart, containerId, characterId, terminalState?.accessId]);
+  // Статус доски намеренно входит в зависимости: после start повтор не нужен.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, autoStart, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
 
   const rows = useMemo(() => {
     const cells = game?.cells || [];
@@ -265,6 +366,11 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, ownerTok
               <Text style={terminalHackingStyles.statusHint} testID="lock-retry-prompt">
                 {tLootTrade('lock.retryPrompt')}
               </Text>
+              {game?.result === 'OUT OF PINS' ? (
+                <Text style={styles.hintText} testID="lock-no-pins-hint">
+                  {tLootTrade('lock.noPinsHint')}
+                </Text>
+              ) : null}
               <View style={styles.retryActions}>
                 <TouchableOpacity
                   testID="lock-retry-yes"

@@ -194,11 +194,30 @@ export default function PlayerLootTradeOverlay() {
   }, [isGmMode, bindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
+
+  /**
+   * Патч 524: одиночная проверка (терминал/замок), выданная как локация на
+   * старом сервере комнат, — это НЕ локация. Такую сессию показываем сразу
+   * мини-игрой, без списка точек и без кнопки «Покинуть локацию», которая
+   * тут не к месту. Признак: узел ровно один и его id совпадает с id сессии.
+   */
+  const standaloneCheckSession = useMemo(() => {
+    if (!activeSession || activeSession.kind !== CONTAINER_KIND.HUB) return null;
+    const nodes = Array.isArray(activeSession.nodes) ? activeSession.nodes : [];
+    if (nodes.length !== 1) return null;
+    const only = nodes[0];
+    if (!only || only.containerId !== activeSession.containerId) return null;
+    const resolved = resolveCheckSessionNode(only);
+    if (!resolved.checkKind) return null;
+    return { node: resolved.node, kind: resolved.checkKind };
+  }, [activeSession]);
+
   /**
    * Патч 506: «Покинуть локацию». Игрок отключается сам, сессия Мастера
-   * остаётся активной для остальных. Сервер помечает этого участника в
-   * session.closedByClientIds, и matchedContext выше перестаёт показывать
-   * окно — источник правды не локальный useState, а состояние комнаты.
+   * остаётся активной для остальных. Патч 524: окно закрывается сразу по
+   * нажатию — локально, не дожидаясь ответа сервера. Раньше, когда сервер
+   * не поддерживал session.playerClose или окно мини-игры перекрывало
+   * кнопку, нажатие выглядело «не работающим».
    */
   const leaveLocation = async () => {
     const session = matchedContext?.session;
@@ -206,6 +225,7 @@ export default function PlayerLootTradeOverlay() {
     setTerminalSelection(null);
     setDismissedTerminalId(null);
     setParentStack([]);
+    markSessionClosedLocally(session.sessionId);
     try {
       await useRoomStore.getState().playerCloseRoomSession({
         code: matchedContext.roomCode,
@@ -213,7 +233,6 @@ export default function PlayerLootTradeOverlay() {
       });
     } catch (error) {
       debugLog('playerOverlay.leaveLocation:failed', { message: error?.message });
-      markSessionClosedLocally(session.sessionId);
     }
   };
 
@@ -443,6 +462,39 @@ export default function PlayerLootTradeOverlay() {
 
   // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
   if (isHubSession && !viewTarget) {
+    // Патч 524: одиночная проверка, выданная как локация, сразу открывает
+    // мини-игру. Ни списка точек, ни «Покинуть локацию» игрок не видит.
+    // Мини-игра остаётся СОСЕДОМ окна локации (правило пача 493), а само
+    // окно в этом случае не рендерится.
+    const standaloneCheck = (() => {
+      if (!standaloneCheckSession) return null;
+      const roomCode = matchedContext.roomCode;
+      const state = rooms?.[roomCode]?.terminalStates?.[standaloneCheckSession.node.containerId];
+      const config = {
+        ...standaloneCheckSession.node,
+        ...(state?.config || {}),
+        containerId: standaloneCheckSession.node.containerId,
+        kind: standaloneCheckSession.kind,
+      };
+      const accessKey = terminalAccessKey({
+        roomCode,
+        containerId: config.containerId,
+        accessId: state?.accessId || activeSession.sessionId,
+      });
+      return {
+        roomCode,
+        config,
+        accessKey,
+        closed: Boolean(state?.closed || state?.locked || state?.game?.status === 'closed'),
+        used: Boolean(usedTerminalAccess[accessKey]),
+      };
+    })();
+    const closeStandalone = () => {
+      if (!standaloneCheck) return;
+      markTerminalAccess(standaloneCheck.accessKey);
+      markSessionClosedLocally(activeSession.sessionId);
+    };
+
     const rootId = activeSession.containerId || '';
     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
     // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
@@ -456,7 +508,7 @@ export default function PlayerLootTradeOverlay() {
     return (
       <>
         <Modal
-          visible
+          visible={!terminalSelection && !standaloneCheck}
           transparent
           animationType="slide"
           onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
@@ -825,6 +877,34 @@ export default function PlayerLootTradeOverlay() {
             </View>
           </View>
         </Modal>
+        {standaloneCheck ? (
+          standaloneCheck.closed || standaloneCheck.used ? (
+            <View style={styles.floatingBar} pointerEvents="box-none">
+              <View style={styles.floatingPill}>
+                <Text style={styles.floatingPillTitle}>
+                  {standaloneCheck.config.name || tLootTrade('lock.title')}
+                </Text>
+                <Text style={styles.floatingClosedLabel}>
+                  {tLootTrade(standaloneCheck.closed ? 'terminal.closedBadge' : 'terminal.accessUsed')}
+                </Text>
+              </View>
+            </View>
+          ) : (standaloneCheck.config.kind === CONTAINER_KIND.LOCK ? (
+            <LockPickingModal
+              visible
+              lock={standaloneCheck.config}
+              roomCode={standaloneCheck.roomCode}
+              onClose={closeStandalone}
+            />
+          ) : (
+            <TerminalHackingModal
+              visible
+              terminal={standaloneCheck.config}
+              roomCode={standaloneCheck.roomCode}
+              onClose={closeStandalone}
+            />
+          ))
+        ) : null}
         {terminalSelection ? (
           terminalSelection.kind === CONTAINER_KIND.LOCK ? (
             <LockPickingModal

@@ -1,5 +1,38 @@
 # Changelog
 ---
+## Lockpicking and the location window: fixes (patch 524)
+
+The owner reported: "pressed Hack — immediately 'Action failed', no bobby
+pins found, no cells, arrows do nothing. 'Leave location' is shown in the
+modal for some reason and does not work". All causes are fixed without
+weakening server protection, mini-game rules, or patches 520–523.
+
+- **One Hack press — one board.** The auto-start key no longer depends on the
+  room's `accessId` arriving late, so a second `start` is not sent. Normal
+  server replies (`TERMINAL_ALREADY_ACTIVE`, `TERMINAL_AWAITING_RETRY`,
+  `LOCK_NO_PINS`, etc.) no longer show «Action failed».
+- **Bobby pins are found.** The counter understands every inventory shape:
+  an item dictionary keyed by instance id, `equipment.items` arrays,
+  `itemId`, `catalogId`, `weaponId`, `code`, nested item snapshots and
+  quantity in different fields. One instance is never counted twice.
+- **With no bobby pins** the window plainly says to add them instead of
+  showing an empty board and a generic failure.
+- **If the character sheet has not reached the room yet**, the client
+  publishes it once and retries the hack; a clear hint replaces the generic
+  error if that also fails.
+- **Legacy room server.** Locks now have the same automatic local board
+  fallback terminals have had since patch 498: cells, pins, arrows, pin
+  breaks and the GM's Yes/No work without `terminal.action`. There is still
+  no visible «local mode» switch.
+- **The location window no longer overlaps the mini-game.** While a board is
+  open the location window is hidden, so its buttons cannot show through the
+  backdrop and appear dead.
+- **«Leave location» works immediately.** The window closes locally on tap
+  without waiting for the server; the Game Master's session stays active for
+  everyone else.
+- **A standalone lock** no longer pretends to be a location: the player goes
+  straight to the mini-game, with no point list and no «Leave location» button.
+
 ## Space hierarchy: the location graph (patch 523)
 
 The first step of plan item 13. Every owner decision is recorded in

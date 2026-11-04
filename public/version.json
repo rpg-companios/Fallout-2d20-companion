@@ -1,8 +1,10 @@
 {
-  "version": "523",
+  "version": "524",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
+      "Окно локации больше не выглядывает из-под мини-игры: «Покинуть локацию» работает с первого нажатия, а отдельно выданный замок открывается сразу своей мини-игрой без лишней кнопки выхода.",
       "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
       "У Мастера появилась кнопка «Заблокировать всё» на любом узле с вложенными точками, а взлом стал адресным: открывается только та точка, которую взломали, без цепочки.",
       "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
@@ -96,6 +98,8 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",
+      "The location window no longer shows through the mini-game: «Leave location» works on the first tap, and a standalone lock opens straight into its mini-game with no stray exit button.",
       "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",
       "The Game Master now has a «Lock everything» action on any node with children, and hacking is addressable: only the hacked point opens, with no chain reaction.",
       "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
