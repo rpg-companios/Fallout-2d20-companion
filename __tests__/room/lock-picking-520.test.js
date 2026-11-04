@@ -371,6 +371,8 @@ describe('520: пятая карточка и документы', () => {
     expect(plan).toContain('520');
     expect(plan).toContain('Осталось после патча');
     expect(read('docs/lockpicking-mini-game-design.md')).toContain('ИЛИ');
-    expect(json('public/version.json').version).toBe('520');
+    // Номер версии растёт дальше: исторический тест не стопорит цепочку.
+    const version = Number(json('public/version.json').version);
+    expect(version).toBeGreaterThanOrEqual(520);
   });
 });

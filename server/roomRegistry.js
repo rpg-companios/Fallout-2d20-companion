@@ -43,6 +43,8 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * @param {{ now?: () => number, rng?: (max: number) => number, limits?: object }} deps
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
+const { STORAGE_LIMITS, applyStorageDeposits } = require('./partyStorageRules');
+
 const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
   // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
   const lockRandom = rng ? () => rng(1000) / 1000 : Math.random;
@@ -1063,7 +1065,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Без Мастера в сети хранилище доступно только для просмотра.
     if (!isGmOnline(room)) return { error: ERROR_CODE.STORAGE_GM_OFFLINE };
     const qty = Math.floor(Number(quantity));
-    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     }
     let plain;
@@ -1072,21 +1074,30 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 518 (слово владельца): Мастер НЕ вносит вещи на общий склад.
     // Он только смотрит список и транслирует ключи.
     if (member?.role !== 'player') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
-    const entry = {
-      entryId: `st_${now()}_${++storageEntryCounter}`,
-      item: plain,
-      name: String(plain.name || name || '').trim() || 'Предмет',
-      itemType: String(plain.itemType || 'misc'),
-      quantity: qty,
-      depositedBy: clientId,
-      depositedByName: String(member?.name || name || '').trim(),
-      at: now(),
-    };
     const storage = room.partyStorage || emptyStorage();
-    storage.entries = [...storage.entries, entry];
+    // Патч 521: одинаковые предметы ложатся в одну строку, а переполнение
+    // склада возвращает ошибку ДО изменения состояния комнаты.
+    const applied = applyStorageDeposits({
+      entries: storage.entries,
+      deposits: [{ item: plain, quantity: qty, name: String(plain.name || name || '').trim() || 'Предмет' }],
+      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
+        entryId: `st_${now()}_${++storageEntryCounter}`,
+        item: putItem,
+        name: putName,
+        itemType: String(putItem.itemType || 'misc'),
+        quantity,
+        depositedBy: clientId,
+        depositedByName: String(member?.name || putName || '').trim(),
+        at,
+      }),
+      at: now(),
+    });
+    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+    storage.entries = applied.entries;
     storage.revision += 1;
     room.partyStorage = storage;
-    return { room, storage: storageSnapshot(room), entry: { ...entry } };
+    const entry = applied.added[applied.added.length - 1] || null;
+    return { room, storage: storageSnapshot(room), entry: entry ? { ...entry } : null };
   };
 
   /**
@@ -1105,7 +1116,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (putList.length === 0 && takeList.length === 0) {
       return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
     }
-    if (putList.length + takeList.length > 50) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    if (putList.length + takeList.length > STORAGE_LIMITS.MAX_TRANSFER_OPERATIONS) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
 
     const storage = room.partyStorage || emptyStorage();
     const original = storage.entries;
@@ -1115,7 +1126,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       const entryId = String(req?.entryId || '').trim();
       const qty = Math.floor(Number(req?.quantity));
       const entry = original.find((e) => e.entryId === entryId);
-      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+      if (!entry || entry.kind === 'keyItem' || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
         return { error: ERROR_CODE.STORAGE_ENTRY_NOT_FOUND };
       }
       if (qty > Number(entry.quantity)) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
@@ -1126,7 +1137,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       const qty = Math.floor(Number(req?.quantity));
       const item = req?.item;
       if (!item || typeof item !== 'object' || Array.isArray(item)
-        || !Number.isFinite(qty) || qty < 1 || qty > 999) {
+        || !Number.isFinite(qty) || qty < 1 || qty > STORAGE_LIMITS.MAX_QUANTITY_PER_OPERATION) {
         return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
       }
       let plain;
@@ -1144,24 +1155,28 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         ? entries.map((e) => (e.entryId === entry.entryId ? { ...e, quantity: rest } : e))
         : entries.filter((e) => e.entryId !== entry.entryId);
     }
-    const deposited = [];
-    for (const { plain, qty, name } of plannedPuts) {
-      const entry = {
+    // Патч 521: поступления склеиваются с существующими строками. Проверка
+    // лимита идёт здесь же, до единого изменения room.partyStorage.
+    const applied = applyStorageDeposits({
+      entries,
+      deposits: plannedPuts,
+      makeEntry: ({ item: putItem, name: putName, quantity, at }) => ({
         entryId: `st_${now()}_${++storageEntryCounter}`,
-        item: plain,
-        name,
-        itemType: String(plain.itemType || 'misc'),
-        quantity: qty,
+        item: putItem,
+        name: putName,
+        itemType: String(putItem.itemType || 'misc'),
+        quantity,
         depositedBy: clientId,
         depositedByName: String(member?.name || '').trim(),
-        at: now(),
-      };
-      entries = [...entries, entry];
-      deposited.push({ ...entry });
-    }
-    storage.entries = entries;
+        at,
+      }),
+      at: now(),
+    });
+    if (applied.error) return { error: ERROR_CODE[applied.error] || ERROR_CODE.STORAGE_BAD_MESSAGE };
+    storage.entries = applied.entries;
     storage.revision += 1;
     room.partyStorage = storage;
+    const deposited = applied.added.map((entry) => ({ ...entry }));
     return { room, storage: storageSnapshot(room), withdrawn, deposited };
   };
 
@@ -1171,6 +1186,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const storage = room.partyStorage || emptyStorage();
     const cleanId = String(keyItemId).trim();
     if (storage.entries.some((entry) => entry.kind === 'keyItem' && entry.keyItemId === cleanId)) return null;
+    if (storage.entries.length >= STORAGE_LIMITS.MAX_ENTRIES) return null;
     const entry = {
       entryId: `key_${now()}_${++storageEntryCounter}`,
       kind: 'keyItem',
@@ -1198,6 +1214,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const member = room.members.get(clientId);
     if (member?.role !== 'gm') return { error: ERROR_CODE.STORAGE_FORBIDDEN };
     if (!String(keyItemId || '').trim()) return { error: ERROR_CODE.STORAGE_BAD_MESSAGE };
+    if ((room.partyStorage?.entries || []).length >= STORAGE_LIMITS.MAX_ENTRIES) {
+      return { error: ERROR_CODE.STORAGE_FULL };
+    }
     const entry = appendKeyItem(room, { keyItemId, name, description, clientId });
     return { room, storage: storageSnapshot(room), entry, added: Boolean(entry) };
   };
@@ -1245,6 +1264,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
     const incoming = cloneStorage(storage);
+    if (incoming.entries.length > STORAGE_LIMITS.MAX_ENTRIES) {
+      return { error: ERROR_CODE.STORAGE_FULL };
+    }
     const current = room.partyStorage || emptyStorage();
     if (Number(incoming.revision) < Number(current.revision)) {
       return { room, storage: storageSnapshot(room), applied: false };

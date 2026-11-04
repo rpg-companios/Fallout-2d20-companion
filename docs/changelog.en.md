@@ -1,5 +1,25 @@
 # Changelog
 ---
+## Shared storage polish (patch 521)
+
+The last item of the live plan is done. Two of the three small bits already
+worked: deleting a key template does not erase a found record (514), and a found
+key opens a point without a mini-game or a Game Master notice (516). Stacking
+and size limits were the remaining work.
+
+- **Stacking.** Two identical machine guns with different `uniqueId` now share
+  one row: `server/partyStorageRules.js` compares an item snapshot without
+  per-instance service fields and regardless of field order. Key records never
+  stack, and anything above 999 items goes to a new row instead of vanishing.
+- **Limits.** 200 rows per storage (keys included), 999 items per stack, 50
+  operations per transfer and 999 items per operation. `STORAGE_FULL` is
+  returned **before** the room state changes, so "nothing moves until Transfer
+  is pressed" still holds on overflow.
+- **For players.** A clear localized message replaces the raw error code, and
+  an oversized imported snapshot is rejected as a whole.
+- **Plan.** Item 12 is closed; the next stage is the space hierarchy and access
+  rules from the owner's clarifications (item 13 in `docs/roadmap.md`).
+
 ## Lockpicking mini-game and OR-gates (patch 520)
 
 The owner described a separate game: a "Bobby pins: n" line counting the

@@ -1,8 +1,9 @@
 {
-  "version": "520",
+  "version": "521",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
       "Добавлена мини-игра взлома замков: отмычки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
       "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
       "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
@@ -91,6 +92,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
       "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
       "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
       "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",

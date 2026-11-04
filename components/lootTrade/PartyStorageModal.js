@@ -149,7 +149,12 @@ const PartyStorageModal = ({
       setGiveBuffer({});
       setTakeBuffer({});
     } catch (error) {
-      showRawAlert({ title: tInventory('screen.storage.failed'), message: error?.message });
+      // Патч 521: переполнение склада — отдельная, понятная причина отказа.
+      const full = String(error?.message || '').includes('STORAGE_FULL');
+      showRawAlert({
+        title: tInventory(full ? 'screen.storage.full' : 'screen.storage.failed'),
+        message: full ? undefined : error?.message,
+      });
     } finally {
       setBusy(false);
     }
