@@ -30,6 +30,8 @@ import {
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
   resolveTerminalSessionNode,
+  resolveCheckSessionNode,
+  normalizeLinkedCheckIds,
 } from '../../domain/lootTrade';
 import { describeItemBasics } from '../../domain/itemBasics';
 import {
@@ -39,6 +41,7 @@ import {
 } from '../../src/lootTrade/grantCharacterItems';
 import { showRawAlert } from '../alerts/alertService';
 import TerminalHackingModal from './TerminalHackingModal';
+import LockPickingModal from './LockPickingModal';
 import {
   terminalAccessKey,
   canHackTerminal,
@@ -359,6 +362,19 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
+    if (config.kind === CONTAINER_KIND.LOCK) {
+      return (
+        <LockPickingModal
+          visible
+          lock={config}
+          roomCode={directTerminalContext.roomCode}
+          onClose={() => {
+            markTerminalAccess(directAccessKey);
+            setDismissedTerminalId(config.containerId);
+          }}
+        />
+      );
+    }
     return (
       <TerminalHackingModal
         visible
@@ -475,14 +491,20 @@ export default function PlayerLootTradeOverlay() {
                     // Старый сервер комнат собирает узел заново и понижает
                     // `kind: 'terminal'` до 'loot'. Маркер в lockLabel и реестр
                     // терминалов комнаты восстанавливают настоящий тип узла.
-                    const { node, isTerminal: markedTerminal } = resolveTerminalSessionNode(rawNode);
+                    const { node, isTerminal: markedTerminal, isLock: markedLock } = resolveCheckSessionNode(rawNode);
                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
-                    const nodeIsTerminal = markedTerminal || Boolean(terminalState);
+                    const nodeIsTerminal = markedTerminal || Boolean(terminalState)
+                      || node.kind === CONTAINER_KIND.LOCK;
+                    // Патч 520: видимый (не привязанный как ворота) замок —
+                    // самостоятельная точка локации со своей мини-игрой.
+                    const nodeIsLock = markedLock || node.kind === CONTAINER_KIND.LOCK
+                      || terminalState?.config?.kind === 'lock';
+                    const nodeCheckKind = nodeIsLock ? CONTAINER_KIND.LOCK : CONTAINER_KIND.TERMINAL;
                     const terminalForSelection = {
                       ...node,
                       ...(terminalState?.config || {}),
-                      kind: CONTAINER_KIND.TERMINAL,
+                      kind: nodeCheckKind,
                     };
                     const nodeLocked = Boolean(node.locked);
                     // Патч 504: «Нет» Мастера оставляет карточку visible, но
@@ -523,43 +545,61 @@ export default function PlayerLootTradeOverlay() {
                       used: 'terminal.accessUsed',
                     }[accessBlockedReason] || null;
                     // Патч 519: привязанный терминал — это «замок» точки, а не
-                    // отдельная карточка. Он скрыт из списка, а нажатие на
-                    // запертую точку открывает его мини-игру. Обязательный
-                    // ключ по-прежнему не обойти взломом.
-                    const gateTerminalId = String(node.linkedCheckId || '').trim();
-                    const gateState = gateTerminalId
-                      ? rooms?.[matchedContext.roomCode]?.terminalStates?.[gateTerminalId]
-                      : null;
-                    const gateAvailable = nodeLocked
-                      && node.keyAccessState !== 'denied'
-                      && Boolean(gateTerminalId)
-                      && Boolean(gateState);
-                    const gateKey = terminalAccessKey({
-                      roomCode: matchedContext.roomCode,
-                      containerId: gateTerminalId,
-                      accessId: gateState?.accessId,
-                    });
-                    const gateClosed = Boolean(
-                      gateState?.closed || gateState?.locked
-                      || gateState?.game?.status === 'closed',
-                    );
-                    const gateAwaiting = Boolean(
-                      gateState?.awaitingGm || gateState?.game?.status === 'awaitingRetry',
-                    );
-                    const gateHackAllowed = canHackTerminal({
-                      used: usedTerminalAccess,
-                      key: gateKey,
-                      game: gateState?.game,
-                      terminalClosed: gateClosed,
-                      terminalAwaiting: gateAwaiting,
-                    });
-                    const gateSelection = {
-                      ...(gateState?.config || {}),
-                      containerId: gateTerminalId,
-                      kind: CONTAINER_KIND.TERMINAL,
-                      name: gateState?.config?.name || tLootTrade('player.gateTerminal'),
-                      difficulty: gateState?.config?.difficulty ?? 1,
-                    };
+                    // отдельная карточка. Патч 520: источников может быть два
+                    // (терминал ИЛИ замок) — они не блокируют точку одновременно.
+                    // Обязательный ключ по-прежнему не обойти взломом.
+                    const gateIds = node.keyAccessState !== 'denied'
+                      ? normalizeLinkedCheckIds(node)
+                      : [];
+                    const gateOptions = nodeLocked
+                      ? gateIds.map((id) => {
+                          const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+                          if (!state) return null;
+                          const kind = state.config?.kind === 'lock'
+                            ? CONTAINER_KIND.LOCK
+                            : CONTAINER_KIND.TERMINAL;
+                          const accessKey = terminalAccessKey({
+                            roomCode: matchedContext.roomCode,
+                            containerId: id,
+                            accessId: state?.accessId,
+                          });
+                          const closed = Boolean(
+                            state.closed || state.locked || state.game?.status === 'closed',
+                          );
+                          const awaiting = Boolean(
+                            state.awaitingGm || state.game?.status === 'awaitingRetry',
+                          );
+                          const hackAllowed = canHackTerminal({
+                            used: usedTerminalAccess,
+                            key: accessKey,
+                            game: state?.game,
+                            terminalClosed: closed,
+                            terminalAwaiting: awaiting,
+                          });
+                          const difficulty = state.config?.difficulty ?? 1;
+                          return {
+                            id,
+                            kind,
+                            accessKey,
+                            hackAllowed,
+                            label: formatLootTrade(
+                              tLootTrade(kind === CONTAINER_KIND.LOCK
+                                ? 'player.gateLockLabel'
+                                : 'player.gateTerminalLabel'),
+                              { difficulty },
+                            ),
+                            selection: {
+                              ...(state.config || {}),
+                              containerId: id,
+                              kind,
+                              name: state.config?.name || tLootTrade('player.gateTerminal'),
+                              difficulty,
+                            },
+                          };
+                        }).filter(Boolean)
+                      : [];
+                    const gateAvailable = gateOptions.length > 0;
+                    const gateHackAllowed = gateOptions.some((option) => option.hackAllowed);
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -603,7 +643,9 @@ export default function PlayerLootTradeOverlay() {
                                 ? tLootTrade('terminal.closedBadge')
                                 : (terminalAwaiting
                                   ? tLootTrade('terminal.retryWaiting')
-                                  : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                  : formatLootTrade(tLootTrade(nodeIsLock
+                                      ? 'card.lockKindLabel'
+                                      : 'card.terminalDifficulty'), {
                                       difficulty: terminalForSelection.difficulty || 0,
                                     }))}
                             </Text>
@@ -624,24 +666,50 @@ export default function PlayerLootTradeOverlay() {
                           {nodeLocked ? (
                             gateAvailable ? (
                               <View style={styles.terminalButtons}>
-                                <TouchableOpacity
-                                  testID={`gate-view-button-${node.containerId}`}
-                                  style={styles.terminalViewButton}
-                                  onPress={() => setTerminalSelection({ node: gateSelection, autoStart: false })}
-                                >
-                                  <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  testID={`gate-hack-button-${node.containerId}`}
-                                  style={[styles.terminalHackButton, !gateHackAllowed && styles.terminalButtonDisabled]}
-                                  disabled={!gateHackAllowed}
-                                  onPress={() => {
-                                    markTerminalAccess(gateKey);
-                                    setTerminalSelection({ node: gateSelection, autoStart: true });
-                                  }}
-                                >
-                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
-                                </TouchableOpacity>
+                                {gateOptions.map((option, optionIdx) => (
+                                  <View key={option.id} style={styles.terminalButtons}>
+                                    {optionIdx > 0 && (
+                                      <Text testID={`gate-or-${node.containerId}`} style={styles.hubLockedHintText}>
+                                        {tLootTrade('player.gateOr')}
+                                      </Text>
+                                    )}
+                                    <Text testID={`gate-option-${option.id}`} style={styles.hubLockedHintText}>
+                                      {option.label}
+                                    </Text>
+                                    <View style={styles.terminalButtons}>
+                                      <TouchableOpacity
+                                        testID={optionIdx === 0
+                                          ? `gate-view-button-${node.containerId}`
+                                          : `gate-view-button-${node.containerId}-${option.id}`}
+                                        style={styles.terminalViewButton}
+                                        onPress={() => setTerminalSelection({
+                                          node: option.selection,
+                                          kind: option.kind,
+                                          autoStart: false,
+                                        })}
+                                      >
+                                        <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        testID={optionIdx === 0
+                                          ? `gate-hack-button-${node.containerId}`
+                                          : `gate-hack-button-${node.containerId}-${option.id}`}
+                                        style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
+                                        disabled={!option.hackAllowed}
+                                        onPress={() => {
+                                          markTerminalAccess(option.accessKey);
+                                          setTerminalSelection({
+                                            node: option.selection,
+                                            kind: option.kind,
+                                            autoStart: true,
+                                          });
+                                        }}
+                                      >
+                                        <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                ))}
                               </View>
                             ) : (
                               <View style={styles.hubLockedBadge}>
@@ -665,7 +733,9 @@ export default function PlayerLootTradeOverlay() {
                                 disabled={Boolean(accessBlockedReason)}
                                 testID="terminal-view-button"
                                 style={[styles.terminalViewButton, accessBlockedReason && styles.terminalButtonDisabled]}
-                                onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
+                                onPress={() => setTerminalSelection({
+                                  node: terminalForSelection, kind: nodeCheckKind, autoStart: false,
+                                })}
                               >
                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
@@ -679,7 +749,9 @@ export default function PlayerLootTradeOverlay() {
                                   // Один «Взломать» на трансляцию: даже если
                                   // игрок закроет окно, кнопка не оживёт.
                                   markTerminalAccess(accessKey);
-                                  setTerminalSelection({ node: terminalForSelection, autoStart: true });
+                                  setTerminalSelection({
+                                    node: terminalForSelection, kind: nodeCheckKind, autoStart: true,
+                                  });
                                 }}
                               >
                                 <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
@@ -721,13 +793,23 @@ export default function PlayerLootTradeOverlay() {
           </View>
         </Modal>
         {terminalSelection ? (
-          <TerminalHackingModal
-            visible
-            terminal={terminalSelection.node}
-            roomCode={matchedContext.roomCode}
-            autoStart={Boolean(terminalSelection.autoStart)}
-            onClose={() => setTerminalSelection(null)}
-          />
+          terminalSelection.kind === CONTAINER_KIND.LOCK ? (
+            <LockPickingModal
+              visible
+              lock={terminalSelection.node}
+              roomCode={matchedContext.roomCode}
+              autoStart={Boolean(terminalSelection.autoStart)}
+              onClose={() => setTerminalSelection(null)}
+            />
+          ) : (
+            <TerminalHackingModal
+              visible
+              terminal={terminalSelection.node}
+              roomCode={matchedContext.roomCode}
+              autoStart={Boolean(terminalSelection.autoStart)}
+              onClose={() => setTerminalSelection(null)}
+            />
+          )
         ) : null}
       </>
     );

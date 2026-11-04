@@ -103,7 +103,9 @@ describe('514: две строки настройки в форме точки',
   it('поля уезжают в сохранение и показываются на карточке', () => {
     expect(form).toContain('requiredKeyItemId: canRequireKey ? requiredKeyItemId');
     expect(form).toContain('keyRequirement: canRequireKey && requiredKeyItemId');
-    expect(form).toContain('linkedCheckId: canRequireKey ? linkedCheckId');
+    // Патч 520: вторая строка стала списком до двух источников через «ИЛИ».
+    expect(form).toContain('linkedCheckIds: canRequireKey ? linkedCheckIds');
+    expect(form).toContain("linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '')");
     expect(screen).toContain('card-requires-key-');
     expect(screen).toContain("'card.keyRequiredBadge'");
   });

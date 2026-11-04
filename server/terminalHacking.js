@@ -69,6 +69,11 @@ const normalizeTerminalConfig = (raw = {}) => ({
   requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
   keyRequirement: String(raw.keyRequirement || 'none'),
   linkedCheckId: String(raw.linkedCheckId || '').trim(),
+  // Патч 520: общий реестр состояний проверок держит и терминалы, и замки.
+  kind: raw.kind === 'lock' ? 'lock' : 'terminal',
+  linkedCheckIds: Array.isArray(raw.linkedCheckIds)
+    ? raw.linkedCheckIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 2)
+    : [],
 });
 
 // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
@@ -886,7 +891,8 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
 
 const publicGameState = (game) => {
   if (!game) return null;
-  const { password, operatorClientId, digestEligible, ...rest } = game;
+  // secret замка (как и password терминала) игрокам не достаётся.
+  const { password, secret, operatorClientId, digestEligible, ...rest } = game;
   return {
     ...rest,
     operatorClientId,

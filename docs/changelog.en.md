@@ -1,5 +1,36 @@
 # Changelog
 ---
+## Lockpicking mini-game and OR-gates (patch 520)
+
+The owner described a separate game: a "Bobby pins: n" line counting the
+hacker's inventory pins, a row of cells with grey question marks and a four-arrow
+d-pad; the server generates a random arrow sequence that must be repeated
+position by position. He also clarified: "a lock and a terminal must not block
+a location together — treat those requirements as OR".
+
+- **Fifth card.** A lock gets its own creation tile with a lock icon, can be
+  issued standalone or live inside a location, can be dragged into one, and can
+  gate a location, chest or trader. Its form mirrors the terminal (difficulty
+  1…5); level 0 comes only from perk/magazine reductions.
+- **Cells.** `N = 12 − PER + 2·D`: PER 10 / difficulty 1 → 4 cells, PER 4 /
+  difficulty 5 → 18, two rows when `N > 8`. The owner chose Perception (the
+  canonical `LOCKPICK` attribute), not Agility.
+- **Turn.** A positional match turns the cell green and advances; a miss shows a
+  red `?`, keeps the position and hides which arrow was pressed. One pin in hand
+  survives `S` misses (`S` = `LOCKPICK` rank 0…6); Luck 4…10 gives a 5…20%
+  chance to save it at the moment it should break. On a break the sequence is
+  unchanged and solved arrows stay visible in grey.
+- **OR gates.** The second requirement row now holds up to two sources
+  (`linkedCheckIds`); either `hacked` event is enough. The form, the card and
+  the locked point show two lines "Terminal lvl 3" / "Lock lvl 5" joined by
+  "or". Both sources are hidden from players, as terminals were in patch 519.
+- **Shared registry.** Locks reuse the room's terminal states: operator, one
+  hack per broadcast, GM Yes/No, shared access events. The secret sequence never
+  reaches the client; spent pins are tracked per character in room memory.
+- **Design.** `LockPickingModal` reuses the terminal mini-game shell extracted
+  into `terminalHackingStyles.js`, per `docs/ui-modals-rules.md`; RU/EN strings
+  are paired.
+
 ## Terminal as a chest lock (patch 519)
 
 The owner built a location, put a chest in it, linked a terminal in the chest

@@ -28,6 +28,14 @@ const {
   createGame,
   applyGameAction,
 } = require('./terminalHacking');
+const {
+  createLockGame,
+  keyWonLockGame,
+  syncLockGameConfig,
+  publicLockGameState,
+  closeLockGame,
+  applyLockAction,
+} = require('./lockPicking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
 
@@ -36,6 +44,8 @@ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
  * now/rng — точки подмены для тестов (TTL, коллизии кодов).
  */
 const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = LIMITS } = {}) => {
+  // Патч 520: ядро замка ждёт rng() -> [0,1); тестовый rng(max) -> целое.
+  const lockRandom = rng ? () => rng(1000) / 1000 : Math.random;
   const rooms = new Map(); // code -> room
   const ipRoomLog = new Map(); // ip -> [ts] (создания комнат за сутки)
   const ipJoinLog = new Map(); // ip -> [ts] (входы за минуту)
@@ -66,7 +76,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
    * мини-игры. Доски нет, попытки не тратились, уведомление Мастеру не шлём:
    * Мастер сам создал ключ, связал его с точкой и выдал.
    */
-  const keyWonGame = (config, at) => ({
+  const keyWonGame = (config, at) => (config?.kind === 'lock' ? keyWonLockGame(config, at) : ({
     status: 'won',
     result: 'ACCESS GRANTED',
     scrollUp: true,
@@ -80,7 +90,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     hackedByKey: true,
     revision: 1,
     updatedAt: at,
-  });
+  }));
 
   const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
     const id = String(containerId || '').trim();
@@ -129,6 +139,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           requiredKeyItemId: entry.config?.requiredKeyItemId,
           keyRequirement: entry.config?.keyRequirement,
           linkedCheckId: entry.config?.linkedCheckId,
+          linkedCheckIds: entry.config?.linkedCheckIds,
         });
         entry.keyAccessState = decision.state;
         entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
@@ -171,6 +182,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
     accessEvents: new Map(),
+    // Патч 520: потраченные отмычки по персонажу. Снимок персонажа приходит
+    // с полным инвентарём, поэтому без этого счётчика каждый новый замок
+    // «находил» бы отмычки заново. Живёт в памяти комнаты, без файлов.
+    pinLedger: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
@@ -226,7 +241,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Признак обновлённого сервера: клиент включает синхронизированную игру,
     // а при отсутствии поля запускает мини-игру локально (старый сервер комнат
     // не знает terminal.issue/terminal.action и превращал терминал в сундук).
-    capabilities: { terminalHacking: true },
+    capabilities: { terminalHacking: true, lockPicking: true },
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -467,7 +482,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 516: состояние требования ключа для карточки терминала.
     keyAccessState: entry.keyAccessState || KEY_ACCESS.NONE,
     keyUnlocked: Boolean(entry.keyUnlocked),
-    game: publicGameState(entry.game),
+    game: entry.config?.kind === 'lock'
+      ? publicLockGameState(entry.game)
+      : publicGameState(entry.game),
     updatedAt: entry.updatedAt,
   });
 
@@ -491,7 +508,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Активную доску не пересобираем на ходу: игрок не теряет прогресс из-за
     // того, что Мастер поправил карточку. Новая сложность вступит в силу при
     // следующей новой партии — «Да» Мастера или «Взломать» другого игрока.
-    let game = previous.game ? syncGameConfig(previous.game, config) : null;
+    let game = previous.game
+      ? (config.kind === 'lock'
+          ? syncLockGameConfig(previous.game, config)
+          : syncGameConfig(previous.game, config))
+      : null;
     if (reissue && game?.status === 'closed') game = null;
     return {
       ...previous,
@@ -508,12 +529,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const syncTerminalNodes = (room, session, options = {}) => {
     if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
     for (const node of session.nodes) {
-      if (node?.kind !== 'terminal') continue;
+      // Патч 520: замки живут в том же реестре состояний проверок, что и
+      // терминалы — оператор, «Да/Нет» Мастера и общий журнал событий достаются
+      // без дублирования сетевого кода.
+      if (node?.kind !== 'terminal' && node?.kind !== 'lock') continue;
       const config = normalizeTerminalConfig({
         containerId: node.containerId,
         name: node.name,
         description: node.description,
         difficulty: node.difficulty,
+        kind: node.kind,
+        requiredKeyItemId: node.requiredKeyItemId,
+        keyRequirement: node.keyRequirement,
+        linkedCheckId: node.linkedCheckId,
+        linkedCheckIds: node.linkedCheckIds,
       });
       if (!config.containerId || !config.name) continue;
       const previous = room.terminalStates.get(config.containerId);
@@ -560,7 +589,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         if (decision === 'no') {
           // «Нет» — карточка остаётся visible, но ни взломать, ни посмотреть
           // её нельзя до новой трансляции Мастером.
-          entry.game = closeGame(entry.game, { now: now() });
+          entry.game = entry.config?.kind === 'lock'
+            ? closeLockGame(entry.game, { now: now() })
+            : closeGame(entry.game, { now: now() });
           entry.closed = true;
           entry.updatedAt = now();
           return { room, terminal: terminalPublic(id, entry) };
@@ -575,14 +606,24 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         // Сохраняем лист оператора: иначе новая доска собралась бы под
         // дефолтные ИНТ/Науку/Удачу и «Да» незаметно поменяло бы условия.
         const operatorSnapshot = entry.operatorSnapshot || published?.snapshot || {};
-        const fresh = createGame({
-          config: entry.config,
-          operatorClientId,
-          operatorCharacterId,
-          characterSnapshot: operatorSnapshot,
-          now: now(),
-          excludeWords: room.recentTerminalWords || [],
-        });
+        const fresh = entry.config?.kind === 'lock'
+          ? createLockGame({
+              config: entry.config,
+              operatorClientId,
+              operatorCharacterId,
+              characterSnapshot: operatorSnapshot,
+              now: now(),
+              rng: lockRandom,
+              spentPins: room.pinLedger?.get(operatorCharacterId) || 0,
+            })
+          : createGame({
+              config: entry.config,
+              operatorClientId,
+              operatorCharacterId,
+              characterSnapshot: operatorSnapshot,
+              now: now(),
+              excludeWords: room.recentTerminalWords || [],
+            });
         fresh.operatorName = operatorName;
         entry.game = fresh;
         entry.closed = false;
@@ -639,26 +680,44 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
     // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
     const snapshot = published.snapshot || {};
-    const result = applyGameAction({
-      game: entry.game || entry.config,
-      config: entry.config,
-      action,
-      clientId,
-      characterId: charId,
-      characterSnapshot: snapshot,
-      value,
-      now: now(),
-      excludeWords: room.recentTerminalWords || [],
-    });
+    const result = entry.config?.kind === 'lock'
+      ? applyLockAction({
+          game: entry.game,
+          config: entry.config,
+          action,
+          clientId,
+          characterId: charId,
+          characterSnapshot: snapshot,
+          value,
+          now: now(),
+          rng: lockRandom,
+          spentPins: room.pinLedger?.get(charId) || 0,
+        })
+      : applyGameAction({
+          game: entry.game || entry.config,
+          config: entry.config,
+          action,
+          clientId,
+          characterId: charId,
+          characterSnapshot: snapshot,
+          value,
+          now: now(),
+          excludeWords: room.recentTerminalWords || [],
+        });
     if (result.error) return { error: ERROR_CODE[result.error] || result.error };
     if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
+    const brokenBefore = Number(entry.game?.brokenPins || 0);
     entry.game = result.game;
-    if (action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+    if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
+      const delta = result.game.brokenPins - brokenBefore;
+      room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
+    }
+    if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
       // Держим слова последних трёх досок (по 12–20 слов каждая).
       const fresh = entry.game.wordRanges.map((range) => range.word);
       room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
     }
-    if (result.usedDigest) {
+    if (entry.config?.kind !== 'lock' && result.usedDigest) {
       const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
       const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
         ? nextSnapshot.data

@@ -30,6 +30,7 @@ import {
   KEY_REQUIREMENT,
   normalizeKeyRequirement,
   containerCanRequireKey,
+  normalizeLinkedCheckIds,
 } from '../../../../domain/lootTrade';
 import { showRawAlert } from '../../../alerts/alertService';
 
@@ -54,6 +55,7 @@ const ContainerFormModal = ({
   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
   const isHub = effectiveKind === CONTAINER_KIND.HUB;
   const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
+  const isLock = effectiveKind === CONTAINER_KIND.LOCK;
   const canRequireKey = containerCanRequireKey(effectiveKind);
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
   const initSessionKey = visible
@@ -80,7 +82,7 @@ const ContainerFormModal = ({
   const [checkQuery, setCheckQuery] = useState('');
   const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
   const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
-  const [linkedCheckId, setLinkedCheckId] = useState('');
+  const [linkedCheckIds, setLinkedCheckIds] = useState([]);
 
   useEffect(() => {
     if (!initSessionKey) return;
@@ -123,7 +125,7 @@ const ContainerFormModal = ({
     setCheckQuery('');
     setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
     setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
-    setLinkedCheckId(String(initialContainer?.linkedCheckId || '').trim());
+    setLinkedCheckIds(normalizeLinkedCheckIds(initialContainer || {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initSessionKey]);
 
@@ -138,6 +140,23 @@ const ContainerFormModal = ({
     return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
       .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
   }, [availableCheckContainers, checkQuery]);
+
+  // Патч 520: вторая строка требования — до двух точек через «ИЛИ».
+  // Терминал и замок вместе точку не блокируют: хватает любой проверки.
+  const selectedChecks = useMemo(
+    () => linkedCheckIds
+      .map((id) => (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
+        .find((c) => c?.id === id))
+      .filter(Boolean),
+    [linkedCheckIds, availableCheckContainers],
+  );
+  const toggleLinkedCheck = (id) => {
+    setLinkedCheckIds((prev) => {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      if (prev.length >= 2) return [prev[1], id];
+      return [...prev, id];
+    });
+  };
 
   const combinedHubs = useMemo(() => {
     const map = new Map();
@@ -277,19 +296,22 @@ const ContainerFormModal = ({
         ...(initialContainer || {}),
         kind: isHub
           ? CONTAINER_KIND.HUB
-          : (isTerminal ? CONTAINER_KIND.TERMINAL : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT)),
+          : (isTerminal ? CONTAINER_KIND.TERMINAL
+            : (isLock ? CONTAINER_KIND.LOCK
+              : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT))),
         name: cleanName,
         roomCode: primaryRoomCode,
         roomCodes: isHub ? selectedRoomCodes : [],
         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
         description: description.trim(),
-        difficulty: isTerminal ? Math.max(1, difficulty) : 0,
+        difficulty: isTerminal || isLock ? Math.max(1, difficulty) : 0,
         caps: resolvedCaps,
         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
         requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
         keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
-        linkedCheckId: canRequireKey ? linkedCheckId : '',
+        linkedCheckIds: canRequireKey ? linkedCheckIds : [],
+        linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '') : '',
       },
       capsRollInfo,
       isHub ? null : finalSelectedHubIds,
@@ -303,6 +325,8 @@ const ContainerFormModal = ({
     titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
   } else if (isTerminal) {
     titleKey = isEditing ? 'form.editTerminalTitle' : 'form.createTerminalTitle';
+  } else if (isLock) {
+    titleKey = isEditing ? 'form.editLockTitle' : 'form.createLockTitle';
   }
 
   const trimmedHubQuery = hubQuery.trim();
@@ -518,7 +542,7 @@ const ContainerFormModal = ({
               </>
             )}
 
-            {isTerminal && (
+            {(isTerminal || isLock) && (
               <>
                 <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
                 <View style={styles.terminalDifficultyRow}>
@@ -686,13 +710,13 @@ const ContainerFormModal = ({
                   {filteredChecks.length === 0 ? (
                     <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
                   ) : filteredChecks.map((check) => {
-                    const selected = check.id === linkedCheckId;
+                    const selected = linkedCheckIds.includes(check.id);
                     return (
                       <TouchableOpacity
                         key={check.id}
                         testID={`container-form-check-${check.id}`}
                         style={[styles.roomChip, selected && styles.roomChipActive]}
-                        onPress={() => setLinkedCheckId(selected ? '' : check.id)}
+                        onPress={() => toggleLinkedCheck(check.id)}
                       >
                         <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
                           {check.name}
@@ -704,7 +728,32 @@ const ContainerFormModal = ({
                     );
                   })}
                 </View>
+                {selectedChecks.length > 0 && (
+                  <View testID="container-form-linked-check-rows" style={styles.roomChips}>
+                    {selectedChecks.map((check, idx) => (
+                      <View key={check.id} style={styles.roomChips}>
+                        {idx > 0 && (
+                          <Text style={styles.hintText}>{tLootTrade('form.linkedCheckOr')}</Text>
+                        )}
+                        <Text testID={`linked-check-row-${idx + 1}`} style={styles.roomChipName}>
+                          {`${idx + 1}. ${check.name}`}
+                          {check.kindLabel ? ` · ${check.kindLabel}` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {(isTerminal || isLock) && (
+                  <Text testID="container-form-lock-pin-estimate" style={styles.hintText}>
+                    {formatLootTrade(tLootTrade('form.lockPinEstimate'), {
+                      count: Math.round((12 - 4 + 2 * difficulty) * 1.5),
+                    })}
+                  </Text>
+                )}
                 <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
+                <Text style={styles.hintText}>
+                  {formatLootTrade(tLootTrade('form.linkedCheckSelected'), { count: linkedCheckIds.length })}
+                </Text>
               </>
             )}
 

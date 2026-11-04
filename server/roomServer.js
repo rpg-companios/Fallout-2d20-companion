@@ -346,7 +346,11 @@ const attachRoomWebSocketServer = (httpServer, {
     const fresh = registry.recomputeKeyAccess(room?.code) || room;
     if (!fresh) return;
     if (fresh.activeSession) {
-      broadcastSessionState(fresh, exceptClientId, { session: fresh.activeSession });
+      // Патч 520: состояние сессии после взлома замка/терминала должно дойти
+      // и до инициатора — именно он стоит у запертого сундука и ждёт, что
+      // добыча откроется. Раньше его исключали, чтобы не дублировать
+      // terminal.state, но session.state — другой конверт.
+      broadcastSessionState(fresh, null, { session: fresh.activeSession });
     }
     broadcastTerminalStates(fresh, exceptClientId);
     // Патч 517: ворота — состояние событий доступа общее на всю комнату,

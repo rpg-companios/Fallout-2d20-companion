@@ -7,6 +7,24 @@
 
 const { ERROR_CODE } = require('./protocol');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+
+const normalizeLinkedCheckIds = (raw) => {
+  const ids = [
+    ...(Array.isArray(raw?.linkedCheckIds) ? raw.linkedCheckIds : []),
+    raw?.linkedCheckId,
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const value of ids) {
+    const id = String(value || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length === 2) break;
+  }
+  return out;
+};
 
 const clampNumber = (val, min, max, fallback = 0) => {
   const num = Number(val);
@@ -136,13 +154,20 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
   // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
   const marker = decodeTerminalNodeMarker(raw.lockLabel);
+  const lockMarker = decodeLockNodeMarker(raw.lockLabel);
   const explicitTerminal = raw.kind === 'terminal';
-  const kind = raw.kind === 'merchant' ? 'merchant' : (explicitTerminal || marker ? 'terminal' : 'loot');
-  const items = kind === 'terminal' ? [] : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+  const explicitLock = raw.kind === 'lock';
+  const kind = raw.kind === 'merchant' ? 'merchant'
+    : (explicitTerminal || marker ? 'terminal'
+      : (explicitLock || lockMarker ? 'lock' : 'loot'));
+  const items = kind === 'terminal' || kind === 'lock'
+    ? []
+    : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
   return {
     containerId,
     kind,
-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : (kind === 'terminal' ? 'Терминал' : 'Контейнер')),
+    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец'
+      : (kind === 'terminal' ? 'Терминал' : (kind === 'lock' ? 'Замок' : 'Контейнер'))),
     description: String(raw.description || '').trim(),
     locked: Boolean(raw.locked),
     // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
@@ -158,11 +183,17 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
       ? (marker && !explicitTerminal
           ? marker.difficulty
           : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
-      : 0,
+      : (kind === 'lock'
+          ? (lockMarker && !explicitLock
+              ? lockMarker.difficulty
+              : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+          : 0),
     items,
     // Патч 516: требование ключа у вложенной точки доступа.
     requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
     keyRequirement: String(raw.keyRequirement || 'none'),
+    linkedCheckIds: normalizeLinkedCheckIds(raw),
+    linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
@@ -187,10 +218,10 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
   // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
   // скрытого терминала состояние мини-игры (syncTerminalNodes).
   const referenced = new Set(
-    out.map((n) => String(n.linkedCheckId || '').trim()).filter(Boolean),
+    out.flatMap((n) => normalizeLinkedCheckIds(n)),
   );
   return out.map((node) => (
-    node.kind === 'terminal' && referenced.has(node.containerId)
+    (node.kind === 'terminal' || node.kind === 'lock') && referenced.has(node.containerId)
       ? { ...node, hiddenForPlayers: true }
       : node
   ));
@@ -232,6 +263,7 @@ const applyKeyAccessToSession = (session, resolve) => {
     const decision = resolve({
       requiredKeyItemId: target.requiredKeyItemId,
       keyRequirement: target.keyRequirement,
+      linkedCheckIds: target.linkedCheckIds,
       linkedCheckId: target.linkedCheckId,
     });
     const state = decision?.state || 'none';
@@ -263,7 +295,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
   // Терминальные игры всегда общие для всей комнаты, даже если мастер передал
   // локацию с терминалом как персональную раздачу.
-  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal')) targetType = 'room';
+  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal' || node.kind === 'lock')) targetType = 'room';
   const targetCharacterId = targetType === 'character' && raw.targetCharacterId
     ? String(raw.targetCharacterId)
     : null;
@@ -291,7 +323,9 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
-    difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
+    difficulty: kind === 'terminal' || kind === 'lock'
+      ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0)))
+      : 0,
     items,
     nodes,
     // Патч 516: требование ключа у самой выданной точки.
@@ -479,7 +513,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         if (payload.nodeDescription !== undefined) {
           targetNode.description = String(payload.nodeDescription || '').trim();
         }
-        if (targetNode.kind === 'terminal') {
+        if (targetNode.kind === 'terminal' || targetNode.kind === 'lock') {
           if (payload.nodeDifficulty !== undefined) {
             targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
           }
@@ -493,6 +527,12 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         if (targetNode.kind === 'terminal') {
           const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
           targetNode.lockLabel = encodeTerminalNodeMarker({
+            difficulty: targetNode.difficulty,
+            label: previousMarker ? previousMarker.label : targetNode.lockLabel,
+          });
+        } else if (targetNode.kind === 'lock') {
+          const previousMarker = decodeLockNodeMarker(targetNode.lockLabel);
+          targetNode.lockLabel = encodeLockNodeMarker({
             difficulty: targetNode.difficulty,
             label: previousMarker ? previousMarker.label : targetNode.lockLabel,
           });
