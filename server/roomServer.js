@@ -338,6 +338,19 @@ const attachRoomWebSocketServer = (httpServer, {
   };
 
   /**
+   * Патч 523: сессия локации привязана к нескольким комнатам — рассылаем
+   * ОДНО состояние всем группам, у которых есть доступ к этой локации.
+   */
+  const broadcastSessionStateForResult = (result, exceptClientId, basePayload) => {
+    const targets = Array.isArray(result?.boundRooms) && result.boundRooms.length
+      ? result.boundRooms
+      : [result.room];
+    for (const target of targets) {
+      if (target) broadcastSessionState(target, exceptClientId, basePayload);
+    }
+  };
+
+  /**
    * Патч 516: ключ мог появиться на складе одновременно с перезаписью
    * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
    * по текущему состоянию комнаты и шлём свежие состояния точек.
@@ -861,6 +874,8 @@ const attachRoomWebSocketServer = (httpServer, {
             clientId,
           );
           broadcastKeyAccessState(result.room, clientId);
+          // Патч 523: остальные привязанные комнаты сразу видят ту же локацию.
+          broadcastSessionStateForResult(result, clientId, { session: result.session });
           break;
         }
 
@@ -892,7 +907,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, {
+          broadcastSessionStateForResult(result, clientId, {
             session: result.session,
           });
           broadcastTerminalStates(result.room);
@@ -932,7 +947,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, closePayload);
+          broadcastSessionStateForResult(result, clientId, closePayload);
           break;
         }
 
@@ -969,7 +984,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, clientId, {
+          broadcastSessionStateForResult(result, clientId, {
             session: result.session,
             ...closeMeta,
           });
@@ -1026,7 +1041,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, null, {
+          broadcastSessionStateForResult(result, null, {
             session: result.session,
             ...closeMeta,
           });
@@ -1081,7 +1096,7 @@ const attachRoomWebSocketServer = (httpServer, {
             canonical,
             clientId,
           );
-          broadcastSessionState(result.room, null, {
+          broadcastSessionStateForResult(result, null, {
             session: result.session,
           });
           break;

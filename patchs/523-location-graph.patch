@@ -1,0 +1,1837 @@
+diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
+index 0551c40..23a1e2a 100644
+--- a/__tests__/room/container-gates-517.test.js
++++ b/__tests__/room/container-gates-517.test.js
+@@ -81,7 +81,9 @@ describe('517: сервер ведёт общий журнал событий',
+ 
+     const events = registry.getAccessEvents(room.code);
+     expect(events.a).toMatchObject({ containerId: 'a', kind: 'hacked' });
+-    expect(events.b).toMatchObject({ containerId: 'b', kind: 'hacked' });
++    // Патч 523: взлом адресный, без каскада. Точка B открыта ЯВНОЙ ссылкой
++    // на A, но сама не становится новым источником события для следующей точки.
++    expect(events.b).toBeUndefined();
+     expect(registry.getState(room.code).accessEvents.a).toBeTruthy();
+   });
+ 
+diff --git a/__tests__/room/gate-terminal-519.test.js b/__tests__/room/gate-terminal-519.test.js
+index f5f5f5e..b562f7b 100644
+--- a/__tests__/room/gate-terminal-519.test.js
++++ b/__tests__/room/gate-terminal-519.test.js
+@@ -97,7 +97,8 @@ describe('519: интерфейс игрока и документы', () => {
+   it('сервер скрывает узел и сохраняет состояние мини-игры', () => {
+     const session = read('server/lootTradeSession.js');
+     expect(session).toContain('hiddenForPlayers');
+-    expect(session).toContain('.filter((node) => !node.hiddenForPlayers)');
++    // Патч 523: фильтр дополнился скрытием потомков запертых узлов.
++    expect(session).toContain('!node.hiddenForPlayers');
+     expect(read('server/roomRegistry.js')).toContain('syncTerminalNodes(room, normalized');
+   });
+ 
+diff --git a/__tests__/room/item-stacking-522.test.js b/__tests__/room/item-stacking-522.test.js
+index 0dc56c2..51cc39c 100644
+--- a/__tests__/room/item-stacking-522.test.js
++++ b/__tests__/room/item-stacking-522.test.js
+@@ -282,8 +282,9 @@ describe('522: двухпанельное окно склада не измен
+ 
+ describe('522: документы и версия', () => {
+   it('версия, план и заметки ведут на 522', () => {
+-    expect(JSON.parse(read('public/version.json')).version).toBe('522');
+-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
++    // Номер растёт дальше по цепочке: правила 522 обязаны сохраняться.
++    expect(Number(JSON.parse(read('public/version.json')).version)).toBeGreaterThanOrEqual(522);
++    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(522);
+     expect(read('docs/roadmap.md')).toContain('522');
+     expect(read('docs/changelog.ru.md')).toContain('522');
+     expect(read('docs/changelog.en.md')).toContain('522');
+diff --git a/__tests__/room/location-graph-523.test.js b/__tests__/room/location-graph-523.test.js
+new file mode 100644
+index 0000000..d96f0da
+--- /dev/null
++++ b/__tests__/room/location-graph-523.test.js
+@@ -0,0 +1,243 @@
++// Приёмочный тест 523: граф пространств, вложенность, циклы, несколько
++// родителей, общие коды комнат, граница видимости по замку и адресный взлом.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import graph from '../../domain/locationGraph.js';
++import {
++  CONTAINER_KIND,
++  normalizeContainerEntity,
++  buildLocationSessionNodes,
++  effectiveLocationRoomCodes,
++} from '../../domain/lootTrade.js';
++import {
++  normalizeActiveSession,
++  sanitizeSessionForMember,
++  applySessionLockAll,
++  applySessionUnlock,
++  applySessionUpdate,
++} from '../../server/lootTradeSession.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const CARDS = [
++  { id: 'factory', kind: 'hub', name: 'Завод', roomCodes: ['R1'], links: [
++    { containerId: 'hall' }, { containerId: 'chest' },
++  ] },
++  { id: 'hall', kind: 'hub', name: 'Цех', roomCodes: ['R2'], links: [
++    { containerId: 'locker' }, { containerId: 'factory' }, // цикл A–B–A
++  ] },
++  { id: 'locker', kind: 'loot', name: 'Шкаф', links: [
++    { containerId: 'box' }, // контейнер в контейнере
++  ] },
++  { id: 'box', kind: 'loot', name: 'Коробка', links: [] },
++  { id: 'chest', kind: 'loot', name: 'Сундук', links: [] },
++  { id: 'otherHub', kind: 'hub', name: 'Склад', roomCodes: ['R3'], links: [
++    { containerId: 'chest' }, // несколько родителей у одного сундука
++  ] },
++];
++
++const g = () => graph.buildLocationGraph(CARDS);
++
++describe('523: граф локаций', () => {
++  it('циклы A–B–A разрешены и обход не зацикливается', () => {
++    const gr = g();
++    expect(graph.hasCycleAt(gr, 'factory')).toBe(true);
++    const descendants = graph.descendantsOf(gr, 'factory');
++    expect(new Set(descendants).size).toBe(descendants.length);
++    expect(descendants).toContain('hall');
++    expect(descendants).toContain('box');
++    expect(graph.ancestorsOf(gr, 'box')).toContain('factory');
++  });
++
++  it('несколько родителей сохраняются, «верхнего родителя» нет', () => {
++    const gr = g();
++    expect(graph.parentIdsOf(gr, 'chest').sort()).toEqual(['factory', 'otherHub']);
++    // «Заблокировать всё» доступно на каждом узле с детьми, а не только на корне.
++    expect(graph.hasChildren(gr, 'locker')).toBe(true);
++    expect(graph.hasChildren(gr, 'box')).toBe(false);
++    expect(graph.lockAllTargets(gr, 'locker')).toEqual(['box']);
++    expect(graph.lockAllTargets(gr, 'factory')).toContain('chest');
++  });
++
++  it('коды комнат наследуются как объединение кодов ВСЕХ родителей', () => {
++    const gr = g();
++    // цикл factory→hall→factory делает hall предком factory, поэтому R2 тоже наследуется
++    expect(graph.effectiveRoomCodes(gr, 'chest')).toEqual(['R1', 'R2', 'R3']);
++    expect(graph.effectiveRoomCodes(gr, 'box')).toEqual(['R1', 'R2']);
++    expect(effectiveLocationRoomCodes(CARDS[0], CARDS)).toEqual(['R1', 'R2']);
++  });
++
++  it('плоский список сессии несёт parentIds, childIds, depth и коды', () => {
++    const flat = graph.flattenForSession(g(), 'factory');
++    const byId = new Map(flat.map((n) => [n.id, n]));
++    // в сессии с корнем factory достижим только родитель factory;
++    // второй родитель живёт в глобальном графе (проверяется отдельно)
++    expect(byId.get('chest').parentIds).toEqual(['factory']);
++    expect(byId.get('box').childIds).toEqual([]);
++    expect(byId.get('box').depth).toBe(3);
++    expect(byId.get('box').roomCodes).toEqual(['R1', 'R2']);
++    expect(byId.has('factory')).toBe(false); // корень — сама сессия
++  });
++
++  it('замок — граница видимости: потомки скрыты, Мастер видит всё', () => {
++    const gr = g();
++    const hidden = graph.hiddenBehindLock(gr, { lockedIds: ['hall'], rootId: 'factory' });
++    expect(hidden).toContain('locker');
++    expect(hidden).toContain('box');
++    expect(hidden).not.toContain('hall'); // сама «дверь» видна
++    expect(graph.hiddenBehindLock(gr, { lockedIds: ['hall'], isGm: true, rootId: 'factory' })).toEqual([]);
++  });
++});
++
++describe('523: вложенные карточки Мастера', () => {
++  it('ссылки разрешены у ЛЮБОГО узла, а не только у локации', () => {
++    const loot = normalizeContainerEntity({ id: 'c1', kind: CONTAINER_KIND.LOOT, links: [{ containerId: 'c2' }] });
++    expect(loot.links).toHaveLength(1);
++    expect(loot.links[0].containerId).toBe('c2');
++  });
++
++  it('сессия собирает локацию в локации и контейнер в контейнер', () => {
++    const nodes = buildLocationSessionNodes(CARDS[0], CARDS);
++    const ids = nodes.map((n) => n.containerId);
++    expect(ids).toContain('hall'); // локация внутри локации
++    expect(ids).toContain('locker');
++    expect(ids).toContain('box'); // контейнер внутри контейнера
++    expect(nodes.find((n) => n.containerId === 'hall').kind).toBe(CONTAINER_KIND.HUB);
++    expect(nodes.find((n) => n.containerId === 'chest').parentIds).toEqual(['factory']);
++    expect(nodes.find((n) => n.containerId === 'box').roomCodes).toEqual(['R1', 'R2']);
++  });
++});
++
++describe('523: серверная сессия и доступ', () => {
++  const session = (nodes) => normalizeActiveSession({
++    sessionId: 's1', containerId: 'factory', kind: 'hub', name: 'Завод',
++    targetType: 'room', roomCodes: ['R1', 'R2'],
++    linkedCheckIds: ['t1', 'k1'], linkedCheckId: 't1',
++    nodes,
++  }, 1000);
++
++  const nodes = [
++    { containerId: 'hall', kind: 'hub', name: 'Цех', locked: true, parentIds: ['factory'], childIds: ['locker'], depth: 1, roomCodes: ['R1', 'R2'] },
++    { containerId: 'locker', kind: 'loot', name: 'Шкаф', parentIds: ['hall'], childIds: ['box'], depth: 2, roomCodes: ['R1', 'R2'], items: [{ entryId: 'e1', name: 'Патроны', quantity: 2 }] },
++    { containerId: 'box', kind: 'loot', name: 'Коробка', parentIds: ['locker'], childIds: [], depth: 3, roomCodes: ['R1', 'R2'] },
++    { containerId: 'chest', kind: 'loot', name: 'Сундук', parentIds: ['factory'], childIds: [], depth: 1, roomCodes: ['R1'] },
++  ];
++
++  it('сессия больше не теряет linkedCheckIds и хранит коды комнат', () => {
++    const s = session(nodes);
++    expect(s.linkedCheckIds).toEqual(['t1', 'k1']);
++    expect(s.roomCodes).toEqual(['R1', 'R2']);
++    expect(s.nodes.find((n) => n.containerId === 'hall').kind).toBe('hub');
++    expect(s.nodes.find((n) => n.containerId === 'box').parentIds).toEqual(['locker']);
++  });
++
++  it('игрок не видит содержимое запертой локации, Мастер видит', () => {
++    const s = session(nodes);
++    const player = sanitizeSessionForMember(s, { isGm: false });
++    expect(player.nodes.map((n) => n.containerId)).toEqual(['hall', 'chest']);
++    expect(player.nodes.find((n) => n.containerId === 'hall').items).toEqual([]);
++    expect(sanitizeSessionForMember(s, { isGm: true }).nodes).toHaveLength(4);
++  });
++
++  it('«заблокировать всё» работает на узле с детьми и только по потомкам', () => {
++    const s = session(nodes);
++    const result = applySessionLockAll(s, 'locker');
++    expect(result.error).toBeUndefined();
++    expect(result.session.nodes.find((n) => n.containerId === 'box').locked).toBe(true);
++    expect(result.session.nodes.find((n) => n.containerId === 'chest').locked).toBe(false);
++    expect(result.session.nodes.find((n) => n.containerId === 'locker').locked).toBe(false);
++  });
++
++  it('адресный взлом открывает ровно одну точку без каскада', () => {
++    const s = session(nodes);
++    const opened = applySessionUnlock(s, 'hall').session;
++    expect(opened.nodes.find((n) => n.containerId === 'hall').locked).toBe(false);
++    // потомки остаются как были — автоматического каскада нет
++    expect(opened.nodes.find((n) => n.containerId === 'box').locked).toBe(false);
++    expect(applySessionUnlock(s, 'missing').error).toBeTruthy();
++  });
++
++  it('команды Мастера доходят через session.updateRates', () => {
++    const s = session(nodes);
++    const locked = applySessionUpdate(s, { lockAll: 'factory' }, 1000).session;
++    expect(locked.nodes.every((n) => n.locked)).toBe(true);
++    const opened = applySessionUpdate(locked, { unlock: 'chest' }, 1000).session;
++    expect(opened.nodes.find((n) => n.containerId === 'chest').locked).toBe(false);
++    expect(opened.nodes.find((n) => n.containerId === 'box').locked).toBe(true);
++  });
++
++  it('ворота больше не дают транзитивного каскада (517 → 523)', () => {
++    const registry = createRoomRegistry({ now: () => 1000 });
++    const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол', ownerToken: 't' });
++    registry.joinRoom({ code: room.code, clientId: 'gm', name: 'GM', role: 'gm' });
++    registry.openSession({
++      code: room.code, clientId: 'gm',
++      session: {
++        name: 'Бункер', kind: 'hub', targetType: 'room', roomCodes: [room.code],
++        nodes: [
++          { containerId: 'a', kind: 'loot', name: 'Сейф', requiredKeyItemId: 'k1', keyRequirement: 'required' },
++          { containerId: 'b', kind: 'loot', name: 'Дверь', linkedCheckId: 'a' },
++          { containerId: 'c', kind: 'loot', name: 'Люк', linkedCheckId: 'b' },
++        ],
++      },
++    });
++    registry.addKeyItemToStorage({ code: room.code, clientId: 'gm', keyItemId: 'k1', name: 'Ключ' });
++    const events = registry.getAccessEvents(room.code);
++    expect(events.a).toBeTruthy();
++    expect(events.b).toBeUndefined(); // открытая воротами точка не становится источником
++    const s = registry.getRoom(room.code).activeSession;
++    expect(s.nodes.find((n) => n.containerId === 'b').keyAccessState).toBe('open');
++    expect(s.nodes.find((n) => n.containerId === 'c').keyAccessState).toBe('needs-check');
++  });
++});
++
++describe('523: состояние локации общее для привязанных комнат', () => {
++  it('покупка/правка в одной комнате видна в другой, третья не видит ничего', () => {
++    const registry = createRoomRegistry({ now: () => 1000 });
++    const a = registry.createRoom({ clientId: 'gm', name: 'A', ownerToken: 'ta' }).room;
++    const b = registry.createRoom({ clientId: 'gm', name: 'B', ownerToken: 'tb' }).room;
++    const c = registry.createRoom({ clientId: 'gm', name: 'C', ownerToken: 'tc' }).room;
++    for (const r of [a, b, c]) {
++      registry.joinRoom({ code: r.code, clientId: 'gm', name: 'GM', role: 'gm' });
++    }
++    const opened = registry.openSession({
++      code: a.code, clientId: 'gm',
++      session: {
++        sessionId: 'shared-1', containerId: 'factory', kind: 'hub', name: 'Завод',
++        targetType: 'room', roomCodes: [a.code, b.code],
++        nodes: [{ containerId: 'box', kind: 'loot', name: 'Коробка', items: [{ entryId: 'e1', name: 'Патроны', quantity: 5 }] }],
++      },
++    });
++    expect(opened.boundRooms.map((r) => r.code).sort()).toEqual([a.code, b.code].sort());
++    expect(registry.getRoom(b.code).activeSession.sessionId).toBe('shared-1');
++    expect(registry.getRoom(c.code).activeSession).toBeNull();
++
++    const updated = registry.updateSession({
++      code: a.code, clientId: 'gm', payload: { sessionId: 'shared-1', lockAll: 'factory' },
++    });
++    expect(updated.boundRooms).toHaveLength(2);
++    expect(registry.getRoom(b.code).activeSession.nodes[0].locked).toBe(true);
++    expect(registry.getRoom(c.code).activeSession).toBeNull();
++
++    const closed = registry.closeSession({ code: a.code, clientId: 'gm', sessionId: 'shared-1' });
++    expect(closed.boundRooms).toHaveLength(2);
++    expect(registry.getRoom(b.code).activeSession).toBeNull();
++  });
++});
++
++describe('523: документы и версия', () => {
++  it('дизайн, план, заметки и установка ведут на 523', () => {
++    expect(read('docs/location-hierarchy-design.md')).toContain('523');
++    expect(read('docs/roadmap.md')).toContain('523');
++    expect(read('docs/changelog.ru.md')).toContain('523');
++    expect(read('docs/changelog.en.md')).toContain('523');
++    expect(read('docs/patch-523-install.md')).toContain('523');
++    expect(JSON.parse(read('public/version.json')).version).toBe('523');
++    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('523');
++    expect(read('patchs/523-location-graph.patch')).toContain('server/locationGraph.js');
++  });
++});
+diff --git a/__tests__/room/storage-polish-521.test.js b/__tests__/room/storage-polish-521.test.js
+index 4823b82..e9a604f 100644
+--- a/__tests__/room/storage-polish-521.test.js
++++ b/__tests__/room/storage-polish-521.test.js
+@@ -175,8 +175,8 @@ describe('521 → 522: стаканье «Общего хранилища» бе
+ 
+   it('план и версия ведут на 522, а иерархия всё ещё в плане', () => {
+     expect(read('docs/roadmap.md')).toContain('522');
+-    expect(JSON.parse(read('public/version.json')).version).toBe('522');
+-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
++    expect(Number(JSON.parse(read('public/version.json')).version)).toBeGreaterThanOrEqual(522);
++    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(522);
+     expect(read('docs/roadmap.md')).toContain('Иерархия');
+   });
+ });
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 6e8caad..60c0c12 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -89,6 +89,9 @@ export default function PlayerLootTradeOverlay() {
+   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
+   const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
+   const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
++  // Патч 523: стек вложенных локаций. Одна сессия живёт, пока игрок не вышел
++  // из родительской локации или не нажал «Покинуть локацию».
++  const [parentStack, setParentStack] = useState([]);
+   const [busy, setBusy] = useState(false);
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+   const [terminalSelection, setTerminalSelection] = useState(null);
+@@ -202,6 +205,7 @@ export default function PlayerLootTradeOverlay() {
+     if (!session || !matchedContext) return;
+     setTerminalSelection(null);
+     setDismissedTerminalId(null);
++    setParentStack([]);
+     try {
+       await useRoomStore.getState().playerCloseRoomSession({
+         code: matchedContext.roomCode,
+@@ -439,7 +443,16 @@ export default function PlayerLootTradeOverlay() {
+ 
+   // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
+   if (isHubSession && !viewTarget) {
+-    const hubNodes = activeSession.nodes || [];
++    const rootId = activeSession.containerId || '';
++    const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
++    // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
++    // считаются детьми корня. Запертые потомки уже скрыты сервером.
++    const hubNodes = (activeSession.nodes || []).filter((node) => {
++      const parents = Array.isArray(node.parentIds) && node.parentIds.length
++        ? node.parentIds
++        : [rootId];
++      return parents.includes(currentParentId);
++    });
+     return (
+       <>
+         <Modal
+@@ -464,6 +477,15 @@ export default function PlayerLootTradeOverlay() {
+                   >
+                     <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                   </TouchableOpacity>
++                  {parentStack.length > 0 && (
++                    <TouchableOpacity
++                      testID="hub-back-button"
++                      style={styles.minimizeBtn}
++                      onPress={() => setParentStack((stack) => stack.slice(0, -1))}
++                    >
++                      <Text style={styles.minimizeBtnText}>{tLootTrade('player.backToParent')}</Text>
++                    </TouchableOpacity>
++                  )}
+                   <TouchableOpacity
+                     testID="leave-hub-button"
+                     accessibilityRole="button"
+@@ -765,7 +787,17 @@ export default function PlayerLootTradeOverlay() {
+                                 setBuyBuffer({});
+                                 setSellBuffer({});
+                                 setMobileTab('merchant');
+-                                setSelectedHubNodeId(node.containerId);
++                                // Патч 523: узел с детьми — это вложенная
++                                // локация/контейнер, входим внутрь, а не
++                                // открываем содержимое сразу.
++                                const hasChildren = Array.isArray(node.childIds)
++                                  ? node.childIds.length > 0
++                                  : node.kind === CONTAINER_KIND.HUB;
++                                if (hasChildren) {
++                                  setParentStack((stack) => [...stack, node.containerId]);
++                                } else {
++                                  setSelectedHubNodeId(node.containerId);
++                                }
+                               }}
+                             >
+                               <Text style={styles.takeAllRowBtnText}>
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 629596b..75f606d 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -37,6 +37,8 @@ import {
+   addOrMergeContainerItem,
+   analyzeHubDeletion,
+   buildHubSessionNodes,
++  buildLocationSessionNodes,
++  effectiveLocationRoomCodes,
+   buildStandaloneTerminalSessionNode,
+   buildStandaloneLockSessionNode,
+   decodeTerminalNodeMarker,
+@@ -713,7 +715,7 @@ export default function LootTradeScreen() {
+             sessionId: live.sessionId,
+             name: saved.name,
+             description: saved.description,
+-            nodes: buildHubSessionNodes(saved, freshList),
++            nodes: buildLocationSessionNodes(saved, freshList),
+           });
+         } else {
+           await useRoomStore.getState().updateRoomSessionRates({
+@@ -1163,7 +1165,7 @@ export default function LootTradeScreen() {
+     }
+ 
+     if (container.kind === CONTAINER_KIND.HUB) {
+-      const resolvedNodes = buildHubSessionNodes(container, containers);
++      const resolvedNodes = buildLocationSessionNodes(container, containers);
+       if (resolvedNodes.length === 0) {
+         showRawAlert({ title: tLootTrade('detail.hubIssueEmptyWarn') });
+         return;
+@@ -1252,7 +1254,16 @@ export default function LootTradeScreen() {
+             buyDepreciationPercent: freshSource.buyDepreciationPercent,
+             characterOverrides: {},
+             items: isHub ? [] : freshSource.items,
+-            ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
++            ...(isHub ? {
++              nodes: buildLocationSessionNodes(freshSource, freshAllContainers || containers),
++              // Патч 523: коды комнат задают видимость групп; состояние и
++              // ресурсы локации общи для всех привязанных комнат.
++              roomCodes: effectiveLocationRoomCodes(freshSource, freshAllContainers || containers),
++              requiredKeyItemId: freshSource.requiredKeyItemId || '',
++              keyRequirement: freshSource.keyRequirement || 'none',
++              linkedCheckIds: freshSource.linkedCheckIds || [],
++              linkedCheckId: freshSource.linkedCheckId || '',
++            } : {}),
+           },
+         });
+       }
+@@ -1439,6 +1450,32 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  /**
++   * Патч 523: «заблокировать всё» на любом узле с детьми. Верхнего родителя
++   * как структуры нет — команда доступна на каждой точке графа, у которой
++   * есть потомки. Блокируются только запираемые узлы.
++   */
++  const handleLockAll = async (containerId) => {
++    if (!activeContainer) return;
++    const targetId = String(containerId || activeContainer.id || '').trim();
++    if (!targetId) return;
++    const liveEntries = getActiveLiveEntriesForContainer(activeContainer);
++    for (const { roomCode: liveCode, session: live } of liveEntries) {
++      if (live && live.kind === CONTAINER_KIND.HUB) {
++        try {
++          await ensureGmRoomConnected(liveCode);
++          await useRoomStore.getState().updateRoomSessionRates({
++            code: liveCode,
++            sessionId: live.sessionId,
++            lockAll: targetId,
++          });
++        } catch (error) {
++          debugLog('lootTrade.lockAll:failed', { message: error?.message });
++        }
++      }
++    }
++  };
++
+   const handleUpdateHubChildLockLabel = async (childId, nextLabel) => {
+     if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
+     const cleanLabel = String(nextLabel || '');
+@@ -2111,6 +2148,13 @@ export default function LootTradeScreen() {
+               {activeLiveSession.kind === CONTAINER_KIND.HUB && Array.isArray(activeLiveSession.nodes) && (
+                 <>
+                   <Text style={styles.liveScopeLabel}>{tLootTrade('livePanel.hubLiveLocksLabel')}</Text>
++                  <TouchableOpacity
++                    testID="live-lock-all-button"
++                    style={styles.scopeChip}
++                    onPress={() => { void handleLockAll(activeLiveSession.containerId); }}
++                  >
++                    <Text style={styles.scopeChipText}>{tLootTrade('livePanel.lockAll')}</Text>
++                  </TouchableOpacity>
+                   <View style={styles.scopeChipsRow}>
+                     {activeLiveSession.nodes.map((node) => (
+                       <TouchableOpacity
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fb7b00d..223749c 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,29 @@
+ # Changelog
+ ---
++## Space hierarchy: the location graph (patch 523)
++
++The first step of plan item 13. Every owner decision is recorded in
++`docs/location-hierarchy-design.md`; server protection, keys and mini-games
++were not weakened.
++
++- **A graph, not a tree.** Locations inside locations and containers inside
++  containers, multiple parents and cycles are allowed. Traversals are
++  cycle-safe. Room codes are inherited as the union of the node's codes and
++  every parent's codes.
++- **One set of resources for all bound rooms.** A location session is a single
++  object: edits, loot picks, trades and closing are visible in every room from
++  `roomCodes`. A room whose code is not listed sees nothing.
++- **A lock is a visibility boundary.** The player sees the locked point itself,
++  but the server hides all of its descendants; the Game Master sees everything.
++- **«Lock everything»** works on any node with children, not just on a
++  «topmost parent». Only lockable descendants are blocked.
++- **Addressable hacking.** Exactly one point opens; the transitive A → B → C
++  cascade is gone, while explicit OR references to already-created points still
++  work. A key can still be assigned to many points, pointwise.
++- **One session.** Players walk nested locations with a «Back» button; the
++  session survives returning to a parent and ends only on «Leave location» or
++  when the Game Master closes it.
++
+ ## One item everywhere (patch 522)
+ 
+ The owner clarified: "There are no weight or quantity limits, an item in the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 06fe396..726dc90 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,29 @@
+ # История изменений
+ 
+ ---
++## Иерархия пространств: граф локаций (патч 523)
++
++Первый шаг тринадцатого тезиса плана. Все решения владельца зафиксированы в
++`docs/location-hierarchy-design.md`; защита сервера, ключи и мини-игры не
++ослаблены.
++
++- **Граф вместо дерева.** Локация в локации и контейнер в контейнере, несколько
++  родителей и циклы разрешены. Обходы защищены от зацикливания. Коды комнат
++  наследуются как объединение кодов узла и всех родителей.
++- **Одни ресурсы на все привязанные комнаты.** Сессия локации — один объект:
++  правки, взятие добычи, сделка и закрытие видны во всех комнатах из
++  `roomCodes`. Комната без кода в списке не видит локацию вообще.
++- **Замок — граница видимости.** Игрок видит саму запертую точку, но сервер
++  скрывает всех её потомков; Мастер видит всё.
++- **«Заблокировать всё»** доступно на любом узле с детьми, а не только на
++  «верхнем родителе». Блокируются только запираемые потомки.
++- **Взлом адресный.** Открывается ровно одна точка; транзитивного каскада
++  A → B → C больше нет, а явные ссылки на уже созданные точки через «ИЛИ»
++  работают. Ключ по-прежнему можно назначить многим точкам поточечно.
++- **Одна сессия.** Игрок ходит по вложенным локациям с кнопкой «Назад»; сессия
++  не гаснет при возврате к родителю и закрывается только «Покинуть локацию»
++  или Мастером.
++
+ ## Один предмет на всех экранах (патч 522)
+ 
+ Владелец уточнил: «Ограничений на вес и количество нет, предмет из
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+new file mode 100644
+index 0000000..09ae3be
+--- /dev/null
++++ b/docs/location-hierarchy-design.md
+@@ -0,0 +1,103 @@
++# Иерархия пространств и доступ (тезис 13)
++
++Ревизия: 2026-11-04, патч **523** — первый шаг этапа. Документ фиксирует слово
++владельца, принятые технические допущения и границу сделанного.
++
++## 1. Слово владельца (окончательные решения)
++
++- **Граф, а не дерево.** Локация может содержать локации, в которых тоже
++  локации; пол, этаж, шкаф могут быть локациями. Контейнер может содержать
++  контейнеры. Разрешены **несколько родителей** и **циклы** A–B–C–A,
++  ветвящиеся лабиринты.
++- **Наследование кодов:** «все те же коды от каждого родителя» — объединение
++  `roomCodes` узла и всех его родителей. `roomCodes` задают **видимость групп**,
++  а состояние и ресурсы локации **общи** для всех привязанных комнат: взлом в
++  партии 1 виден партии 2, покупка в партии 2 опустошает торговца партии 1,
++  крышки торговца общи, партия 3 не видит ничего, пока её код не добавят.
++  Серверные комнаты только объединяют игроков и разделяют группы.
++- **Вложенность задаётся** вручную или переносом карточки внутрь; перенесённый
++  ребёнок автоматически привязывается к комнате (комнатам) родителя.
++- **«Верхнего родителя» нет.** Любой узел, у которого есть хотя бы один ребёнок,
++  может «заблокировать всё». Блокируются только запираемые вещи; на заводе всё
++  может быть изначально открыто.
++- **Замок — граница видимости.** Не вошёл в локацию — не знаешь, что за ней;
++  запертый сундук скрывает содержимое. Взлом **локации даёт вход**, взлом
++  **контейнера — содержимое**.
++- **Взлом адресный, без каскада.** Открывается ровно та точка, к которой
++  применён взлом; транзитивной цепочки A → B → C нет.
++- **Ключ не знает область, точка знает свой ключ.** Ключ может быть назначен
++  многим точкам («поточечно»), но не открывает каскад. Ключ не исчезает и
++  открывает дверь повторно, если Мастер запер её снова. Взлом без одобрения
++  Мастера не повторяется.
++- **Одна сессия** живёт, пока игрок не вышел из родительской локации или не
++  нажал «Покинуть локацию»; Мастер закрывает сцену сам.
++- **Вторая строка «проверка»** ссылается на уже созданные точки в той же
++  комнате (до двух, через «ИЛИ»), а не создаёт новую точку из формы. Мастер
++  может открыть доступ вручную, сняв блокировку узла локации.
++
++## 2. Технические допущения (предложены ассистентом, приняты в 523)
++
++Владелец не возражал после явного перечисления; любое можно поправить
++следующим обновлением, не переделывая граф.
++
++1. Одна доска мини-игры на локацию, один оператор; остальные наблюдают.
++2. Канон — локальная БД Мастера + Google Drive; сервер держит снимок в памяти;
++   без Мастера в сети игроки видят только чтение. Офлайн-очередей,
++   конфликтов и `baseRevision` нет.
++3. Узлы без замка остаются открытыми.
++4. Повторный выбор того же источника взлома запрещён; ключи и «ИЛИ»-ворота
++   не являются источниками каскада.
++
++## 3. Что сделано в 523
++
++- **`server/locationGraph.js`** (канон CommonJS) и **`domain/locationGraph.js`**
++  (клиентская точка входа). Канон лежит в `server/`, потому что лёгкий деплой
++  NetAngels копирует в `app/` только `server/` + `ws`. Чистые функции:
++  `buildLocationGraph`, `descendantsOf`, `ancestorsOf`, `effectiveRoomCodes`,
++  `hasChildren`, `lockAllTargets`, `hiddenBehindLock`, `flattenForSession`,
++  `buildGraphFromSession`, `addressableUnlock`. Обходы защищены от циклов.
++- **Вложенность у любого узла.** `normalizeContainerEntity` больше не
++  ограничивает `links` только локациями. Новый `buildLocationSessionNodes`
++  собирает сессию по всему графу: локация в локации, контейнер в контейнере,
++  несколько родителей через `parentIds`, `childIds`, `depth`, эффективные
++  `roomCodes`. Прежний `buildHubSessionNodes` сохранён для совместимости.
++- **Сервер сессий.** Узлы и сама сессия хранят `parentIds`/`childIds`/`depth`/
++  `roomCodes`; `linkedCheckIds` на уровне сессии больше не теряется; вложенная
++  локация сохраняет `kind: 'hub'`. `sanitizeSessionForMember` скрывает всех
++  потомков запертого узла — замок стал границей видимости.
++- **«Заблокировать всё» и адресное открытие.** `applySessionLockAll`,
++  `applySessionUnlock`, команды `lockAll` / `unlock` в `session.updateRates`
++  (только владелец комнаты), кнопка в живой панели Мастера, парные строки
++  RU/EN. Блокируются только запираемые потомки.
++- **Без каскада.** Точка, открытая чужим событием через явную ссылку, больше не
++  становится новым источником: событие порождает только ключ или собственная
++  мини-игра. Явные ссылки «ИЛИ» на уже созданные точки работают.
++- **Общие состояние и ресурсы.** Реестр рассылает ОДИН объект сессии всем
++  привязанным комнатам (`boundRooms`), и каждая мутация (правки, взятие добычи,
++  сделка, закрытие) обновляет его во всех комнатах. Комната, чей код не в
++  `roomCodes`, не видит сессию вообще.
++- **Одна сессия.** Игрок ходит по стеку вложенных локаций («← Назад»); сессия
++  не гаснет при возврате к родителю. «Покинуть локацию» сбрасывает стек и
++  отключает только этого игрока, сцена остаётся открытой для остальных.
++
++## 4. Что осталось за границей 523
++
++- Адресный взлом **локации как вход** и **контейнера как содержимое**: сейчас
++  взлом снимает `locked` с точки, но явная семантика «вход / содержимое» в UI
++  ещё не разведена.
++- Общая доска мини-игры для всех привязанных комнат: `terminalStates` и
++  `accessEvents` пока живут на комнате, а не на локации.
++- «Заблокировать всё» пока действует на живую сессию; persisted-состояние
++  карточек Мастера при перевыдаче берётся из БД Мастера.
++- Ручное связывание «второй строки проверки» с уже созданными точками в форме
++  и запрет повторного выбора источника.
++- Настройка «заблокировать всё» на конкретном узле из карточки (сейчас кнопка
++  в живой панели работает от корня сессии; сервер принимает любой узел с
++  детьми).
++
++## 5. Связанные документы
++
++- `docs/roadmap.md` — живой план, тезис 13.
++- `docs/key-items-and-gates-design.md` — контракт ключей и ворот.
++- `docs/lockpicking-mini-game-design.md` — мини-игра взлома замков.
++- `docs/patch-523-install.md` — установка и проверки.
+diff --git a/docs/patch-523-install.md b/docs/patch-523-install.md
+new file mode 100644
+index 0000000..91b0b49
+--- /dev/null
++++ b/docs/patch-523-install.md
+@@ -0,0 +1,90 @@
++# Установка патча 523: граф пространств
++
++Патч подготовлен от состояния **версии 522** (коммит `6fcd14e`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–523
++цепочкой.
++
++> Владелец: «Локация может содержать локации, в которых тоже локации...
++> контейнеры в контейнерах, несколько родителей, циклы A–B–C–A... Замок как
++> граница видимости... взлом адресный, без каскада... «заблокировать всё» на
++> любом узле с детьми... коды комнат задают видимость групп, а состояние
++> локации общее для всех привязанных комнат». Полный контракт —
++> `docs/location-hierarchy-design.md`.
++
++## Что добавлено
++
++### 1. Граф вместо дерева
++
++`server/locationGraph.js` (канон CommonJS) + `domain/locationGraph.js` (точка
++входа для клиента). Канон в `server/` — лёгкий деплой NetAngels копирует в
++`app/` только `server/` + `ws`, дубля правил нет.
++
++- рёбра `links` разрешены у **любого** узла (`normalizeContainerEntity`);
++- `buildLocationGraph`, `descendantsOf`, `ancestorsOf`, `effectiveRoomCodes`,
++  `hasChildren`, `lockAllTargets`, `hiddenBehindLock`, `flattenForSession`,
++  `buildGraphFromSession`, `addressableUnlock`;
++- циклы и несколько родителей допустимы, все обходы защищены множеством
++  посещённых узлов;
++- коды комнат узла = объединение собственных кодов и кодов всех родителей;
++- новый `buildLocationSessionNodes` собирает сессию по всему графу, прежний
++  `buildHubSessionNodes` сохранён для совместимости.
++
++### 2. Замок как граница видимости
++
++`sanitizeSessionForMember` скрывает игроку **всех потомков** запертого узла,
++а не только его содержимое. Сама «дверь» видна. Мастер получает полное
++состояние. `applySessionLockAll` блокирует только запираемых потомков любого
++узла с детьми; `applySessionUnlock` открывает ровно одну точку.
++
++Команды `lockAll` / `unlock` идут в уже существующем `session.updateRates`
++(проверка владельца комнаты на сервере сохранена), кнопка «Заблокировать всё»
++— в живой панели Мастера, парные строки RU/EN.
++
++### 3. Адресный взлом без каскада
++
++Точка, открытая чужим событием через явную ссылку «ИЛИ», больше **не**
++становится новым источником: событие порождает только найденный ключ или
++собственная мини-игра. Исторический тест 517 приведён к новому закону.
++Ключ по-прежнему можно назначить многим точкам — каждая открывается им
++независимо, поточечно.
++
++### 4. Общие состояние и ресурсы локации
++
++Реестр хранит **один объект сессии** и рассылает его всем комнатам из
++`roomCodes` (`boundRooms`). Правки, взятие добычи, сделка и закрытие
++обновляют состояние во всех привязанных комнатах; комната без кода в списке
++не видит локацию вообще. Протокол и лимиты сообщений не менялись.
++
++### 5. Одна сессия и навигация
++
++Узлы и сессия несут `parentIds`, `childIds`, `depth`, `roomCodes`;
++`linkedCheckIds` на уровне сессии больше не теряется, вложенная локация
++сохраняет `kind: 'hub'`. Игрок ходит по стеку вложенных локаций с кнопкой
++«← Назад»; возврат к родителю сессию не гасит. «Покинуть локацию» сбрасывает
++стек и отключает только этого игрока.
++
++## Проверка
++
++```bash
++./apply-patch.sh            # или ./apply-patch.sh --status
++cat public/version.json     # "version": "523"
++npm run typecheck
++npm test
++npm run build
++npm run serve:app           # перезапустить комнатный сервер (менялся server/)
++```
++
++Приёмочный тест `__tests__/room/location-graph-523.test.js` проверяет циклы,
++несколько родителей, наследование кодов, границу видимости, «заблокировать
++всё», адресный взлом и общую сессию для двух комнат при невидящей третьей.
++
++`patchs/baseline.json` = `523`, заметки релиза парные (91 / 91), `dist/`
++пересобран. Живой план — `docs/roadmap.md`: тезис 13 в работе, оставшиеся
++подпункты перечислены в разделе «Осталось после патча 523».
++
++## Важно
++
++Защита сервера, хранение склада, мини-игры взлома и механика предметов из 522
++**не менялись**. Четыре технических допущения ассистента приняты по умолчанию
++и записаны в спецификации; владелец может поправить их следующим обновлением.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index fb82715..8cd9cd5 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **522**.
++Дата ревизии: 2026-11-04. Текущая версия: **523**.
+ 
+ ## Тезисы
+ 
+@@ -24,23 +24,47 @@
+ | 10 | **Общее хранилище:** отдельная карточка Мастера (только просмотр и выдача ключей), кнопка в инвентаре игрока, двупанельное окно по дизайну торговца без цен и настроек, перенос по кнопке «Перенести» атомарно | ✅ сделано | **518** |
+ | 11 | **Мини-игра взлома замков:** пятая карточка, отдельно / в локации / как преграда, отмычки и ячейки по PER, терминал **ИЛИ** замок в требованиях, нейтральное событие `hacked` | ✅ сделано | **520** |
+ | 12 | Мелочи склада и единый предмет: без игровых лимитов веса/количества, один закон стаканья для инвентаря/склада/торговцев, поля не обрезаются, цена и вес считаются с модов; поведение при удалении записи-шаблона и тихое срабатывание ключа | ✅ сделано | **521–522** |
+-| 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | ⏳ осталось | — |
+-
+-## Осталось после патча 522
+-
+-1. **Иерархия пространств и доступ** — все уточнения владельца, зафиксированные
+-   в обсуждении, одним следующим этапом: граф локаций с циклами и несколькими
+-   родителями, локация в локации и контейнер в контейнере; замок как граница
+-   видимости; взлом локации даёт вход, взлом контейнера — содержимое; взлом
+-   адресный, без каскада; ключ не знает область, точка знает свой ключ;
+-   «заблокировать всё» на любом узле с детьми; одна сессия до выхода из
+-   родительской локации; коды комнат задают видимость групп, а состояние
+-   локации общее для всех привязанных комнат.
++| 13 | Иерархия пространств и доступ: вложенные локации и контейнеры, замок как граница видимости, адресный взлом без каскада, общие ресурсы локации для нескольких серверных комнат | 🔧 в работе | **523–…** |
++
++## Осталось после патча 523
++
++1. **Иерархия пространств и доступ** (в работе, первый шаг сделан в 523) —
++   все уточнения владельца одним этапом: граф локаций с циклами и несколькими
++   родителями ✅, локация в локации и контейнер в контейнере ✅; замок как
++   граница видимости ✅; взлом адресный, без каскада ✅; ключ не знает область,
++   точка знает свой ключ; «заблокировать всё» на любом узле с детьми ✅; одна
++   сессия до выхода из родительской локации ✅; коды комнат задают видимость
++   групп, а состояние локации общее для всех привязанных комнат ✅.
++   Осталось довести до конца:
++   - развести в интерфейсе семантику «взлом локации = вход» и «взлом контейнера
++     = содержимое»;
++   - общая доска мини-игры и общий журнал событий для всех привязанных комнат
++     (сейчас `terminalStates` / `accessEvents` живут на комнате);
++   - ручное связывание второй строки «проверка» с уже созданными точками через
++     «ИЛИ» и запрет повторного выбора источника взлома;
++   - «Заблокировать всё» с сохранением в карточке Мастера и выбор конкретного
++     узла из карточки, а не только из живой панели.
+ 
+ Открытая развилка: вторая строка «проверка» ссылается на уже созданные точки
+ в той же комнате (до двух, через «ИЛИ»), а не создаёт новую из формы. Мастер
+ по-прежнему может открыть доступ вручную, сняв блокировку узла локации.
+-Спецификация мини-игры — `docs/lockpicking-mini-game-design.md`.
++Четыре технических допущения ассистента (общая доска на локацию с одним
++оператором; БД Мастера + Drive / снимок в памяти / только чтение без Мастера;
++узлы без замка открыты; запрет повторного источника) приняты в 523 и записаны
++в спецификации — владелец может поправить их следующим обновлением.
++Спецификация — `docs/location-hierarchy-design.md`, мини-игры —
++`docs/lockpicking-mini-game-design.md`.
++
++## Граф пространств (реализовано в 523)
++
++- Канон `server/locationGraph.js`, точка входа `domain/locationGraph.js`:
++  циклы, несколько родителей, `effectiveRoomCodes`, `lockAllTargets`,
++  `hiddenBehindLock`, `flattenForSession`, `addressableUnlock`.
++- `buildLocationSessionNodes` собирает сессию по всему графу; узлы несут
++  `parentIds`, `childIds`, `depth`, `roomCodes`. Игрок ходит по стеку
++  вложенных локаций, сервер скрывает потомков запертых узлов.
++- Реестр рассылает один объект сессии всем привязанным комнатам; неподключённая
++  комната не видит локацию. Взлом адресный, каскад ворот убран.
+ 
+ ## Единый предмет и склад (реализовано в 522)
+ 
+@@ -106,6 +130,7 @@
+ - `docs/key-items-and-gates-design.md` — полный контракт ключей, требований и ворот (Обновление 7, раздел 10; задел под замки — раздел 7).
+ - `docs/lockpicking-mini-game-design.md` — спецификация мини-игры взлома замков (к пачу 520).
+ - `docs/patch-522-install.md` — установка обновления 522 и его проверки.
++- `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/domain/locationGraph.js b/domain/locationGraph.js
+new file mode 100644
+index 0000000..726920c
+--- /dev/null
++++ b/domain/locationGraph.js
+@@ -0,0 +1,8 @@
++'use strict';
++
++/**
++ * Патч 523: клиентская точка входа к единому графу пространств.
++ * Канон живёт в `server/locationGraph.js` — лёгкий деплой NetAngels
++ * раскладывает в app/ только `server/` + `ws`, дубля правил нет.
++ */
++module.exports = require('../server/locationGraph.js');
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 3c4cd98..5582517 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -8,6 +8,7 @@
+ // - дублирование контейнеров и слияние одинаковых позиций.
+ 
+ import itemStacking from './itemStacking.js';
++import locationGraph from './locationGraph.js';
+ import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
+ import {
+   AMMO_FOUND_BY_ID,
+@@ -592,19 +593,8 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
+  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
+  * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
+  */
+-export const buildHubSessionNodes = (hub, allContainers = []) => {
+-  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
+-  const byId = new Map(
+-    (Array.isArray(allContainers) ? allContainers : [])
+-      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
+-      .map((c) => [c.id, c]),
+-  );
+-  const links = normalizeHubLinks(hub.links);
+-  const nodes = [];
+-  for (const link of links) {
+-    const child = byId.get(link.containerId);
+-    if (!child) continue;
+-    const node = {
++/** Один узел сессии: одинаковая форма для старого и графового построителя. */
++const makeSessionNode = (child, link = {}) => ({
+       containerId: child.id,
+       kind: child.kind,
+       name: child.name,
+@@ -628,23 +618,86 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+       // Патч 520: до двух источников через «ИЛИ».
+       linkedCheckIds: normalizeLinkedCheckIds(child),
+       characterOverrides: {},
+-      items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+-        ? []
+-        : (Array.isArray(child.items)
+-        ? child.items.map((entry) => ({
+-            ...entry,
+-            itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+-          }))
+-        : []),
+-    };
+-    // Маркер переживает нормализацию узла на старом сервере комнат.
+-    if (child.kind === CONTAINER_KIND.TERMINAL) nodes.push(withTerminalNodeMarker(node));
+-    else if (child.kind === CONTAINER_KIND.LOCK) nodes.push(withLockNodeMarker(node));
+-    else nodes.push(node);
++  items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
++    ? []
++    : (Array.isArray(child.items)
++    ? child.items.map((entry) => ({
++        ...entry,
++        itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
++      }))
++    : []),
++});
++
++const stampSessionNode = (node) => {
++  if (node.kind === CONTAINER_KIND.TERMINAL) return withTerminalNodeMarker(node);
++  if (node.kind === CONTAINER_KIND.LOCK) return withLockNodeMarker(node);
++  return node;
++};
++
++/** Прежний построитель: ровно один уровень, только точки выдачи. Сохранён для совместимости. */
++export const buildHubSessionNodes = (hub, allContainers = []) => {
++  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
++  const byId = new Map(
++    (Array.isArray(allContainers) ? allContainers : [])
++      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
++      .map((c) => [c.id, c]),
++  );
++  const links = normalizeHubLinks(hub.links);
++  const nodes = [];
++  for (const link of links) {
++    const child = byId.get(link.containerId);
++    if (!child) continue;
++    nodes.push(stampSessionNode(makeSessionNode(child, link)));
+   }
+   return nodes;
+ };
+ 
++/**
++ * Патч 523: графовый построитель сессии. Обходит ВСЮ вложенность
++ * (локация в локации, контейнер в контейнере), переносит несколько родителей
++ * через `parentIds`, не зацикливается и считает эффективные коды комнат как
++ * объединение кодов узла и всех его родителей.
++ */
++export const buildLocationSessionNodes = (root, allContainers = []) => {
++  if (!root || !root.id) return [];
++  const list = Array.isArray(allContainers) ? allContainers : [];
++  const byId = new Map(list.filter((c) => c && c.id).map((c) => [String(c.id), c]));
++  const graph = locationGraph.buildLocationGraph(list);
++  const flat = locationGraph.flattenForSession(graph, String(root.id));
++
++  // Замок на ребре родителя — граница видимости для ребёнка.
++  const linkByChild = new Map();
++  for (const container of list) {
++    for (const link of normalizeHubLinks(container.links)) {
++      const prev = linkByChild.get(link.containerId);
++      if (!prev || (link.locked && !prev.locked)) linkByChild.set(link.containerId, link);
++    }
++  }
++
++  return flat
++    .map((entry) => {
++      const child = byId.get(entry.id);
++      if (!child) return null;
++      const link = linkByChild.get(entry.id) || {};
++      const node = {
++        ...makeSessionNode(child, link),
++        parentIds: entry.parentIds,
++        childIds: entry.childIds,
++        depth: entry.depth,
++        roomCodes: entry.roomCodes,
++        locked: Boolean(link.locked || entry.locked),
++      };
++      return stampSessionNode(node);
++    })
++    .filter(Boolean);
++};
++
++/** Эффективные коды комнат корня: состояние и ресурсы общи для всех привязанных комнат. */
++export const effectiveLocationRoomCodes = (root, allContainers = []) => {
++  const graph = locationGraph.buildLocationGraph(Array.isArray(allContainers) ? allContainers : []);
++  return locationGraph.effectiveRoomCodes(graph, String(root?.id || ''));
++};
++
+ const deduplicateContainerItems = (rawItems, now = Date.now()) => {
+   if (!Array.isArray(rawItems)) return [];
+   const seenEntryIds = new Set();
+@@ -677,9 +730,11 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+     || kind === CONTAINER_KIND.LOCK
+     ? []
+     : deduplicateContainerItems(raw.items, now);
+-  const links = kind === CONTAINER_KIND.HUB
+-    ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
+-    : [];
++  // Патч 523: вложенность разрешена у ЛЮБОГО узла — локация в локации,
++  // контейнер в контейнере. Ссылку на самого себя не держим (цикл из одного
++  // узла не имеет смысла), а циклы из нескольких узлов — разрешены.
++  const links = normalizeHubLinks(raw.links)
++    .filter((lnk) => lnk.containerId !== String(raw.id || ''));
+   const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
+   const primaryRoomCode = roomCodes[0] || '';
+   const inRoot = kind === CONTAINER_KIND.HUB
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index cc83e06..c5b9447 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -219,7 +219,8 @@
+     "saleMarkupControl": "Sale %",
+     "buyDeprControl": "Buyback depr. %",
+     "merchantCapsControl": "Register {CAP}",
+-    "applyRates": "Apply"
++    "applyRates": "Apply",
++    "lockAll": "🔒 Lock everything"
+   },
+   "player": {
+     "minimizedLoot": "📦 Loot: {name}",
+@@ -278,7 +279,8 @@
+     "gateOptionsTitle": "Open with either check:",
+     "gateOr": "or",
+     "gateTerminalLabel": "Terminal lvl {difficulty}",
+-    "gateLockLabel": "Lock lvl {difficulty}"
++    "gateLockLabel": "Lock lvl {difficulty}",
++    "backToParent": "← Back"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 9272e2c..1aeb8a0 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -219,7 +219,8 @@
+     "saleMarkupControl": "% продажи",
+     "buyDeprControl": "% обесценивания скупки",
+     "merchantCapsControl": "Касса {CAP}",
+-    "applyRates": "Применить"
++    "applyRates": "Применить",
++    "lockAll": "🔒 Заблокировать всё"
+   },
+   "player": {
+     "minimizedLoot": "📦 Добыча: {name}",
+@@ -278,7 +279,8 @@
+     "gateOptionsTitle": "Открыть одним из способов:",
+     "gateOr": "или",
+     "gateTerminalLabel": "Терминал ур. {difficulty}",
+-    "gateLockLabel": "Замок ур. {difficulty}"
++    "gateLockLabel": "Замок ур. {difficulty}",
++    "backToParent": "← Назад"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6f6432d..13a8691 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "522"
++  "baseline": "523"
+ }
+diff --git a/public/version.json b/public/version.json
+index 391b228..e7c8c37 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "522",
++  "version": "523",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
++      "У Мастера появилась кнопка «Заблокировать всё» на любом узле с вложенными точками, а взлом стал адресным: открывается только та точка, которую взломали, без цепочки.",
+       "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
+       "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
+       "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
+@@ -94,6 +96,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",
++      "The Game Master now has a «Lock everything» action on any node with children, and hacking is addressable: only the hacked point opens, with no chain reaction.",
+       "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
+       "An item is now identical in your inventory, in storage and at a trader: a modified weapon keeps its mods, durability and charges, and its price and weight are calculated from the installed mods.",
+       "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
+diff --git a/server/locationGraph.js b/server/locationGraph.js
+new file mode 100644
+index 0000000..24126f7
+--- /dev/null
++++ b/server/locationGraph.js
+@@ -0,0 +1,304 @@
++'use strict';
++
++/**
++ * Патч 523: граф пространств «Добыча / Торговля».
++ *
++ * Слово владельца: «Локация может содержать локации, в которых тоже локации...
++ * пол/шкаф может быть локацией. Контейнер может содержать контейнеры...
++ * несколько родителей, циклы A–B–C–A и ветвящиеся лабиринты разрешены.
++ * Наследование — "все те же коды от каждого родителя". "Верхний родитель" не
++ * структурный: любой узел, у которого есть хотя бы один ребёнок, может
++ * "заблокировать всё". Замок — граница видимости: не вошёл в локацию — не
++ * знаешь, что за ней; запертый сундук скрывает содержимое».
++ *
++ * Модуль CommonJS и без зависимостей: канон живёт в server/, чтобы лёгкий
++ * деплой NetAngels (app/ = server/ + ws) оставался автономным. Клиентская
++ * точка входа — domain/locationGraph.js. Чистые функции, циклы безопасны.
++ */
++
++const LOCKABLE_KINDS = Object.freeze(new Set([
++  'loot', 'merchant', 'hub', 'terminal', 'lock',
++]));
++
++const isLockableKind = (kind) => LOCKABLE_KINDS.has(String(kind || ''));
++
++const normalizeId = (value) => String(value || '').trim();
++
++const normalizeRoomCodes = (raw) => {
++  const list = Array.isArray(raw?.roomCodes)
++    ? raw.roomCodes
++    : (raw?.roomCode ? [raw.roomCode] : []);
++  const seen = new Set();
++  const out = [];
++  for (const value of list) {
++    const code = normalizeId(value);
++    if (!code || seen.has(code)) continue;
++    seen.add(code);
++    out.push(code);
++  }
++  return out;
++};
++
++const normalizeLinks = (raw) => {
++  if (!Array.isArray(raw?.links)) return [];
++  const seen = new Set();
++  const out = [];
++  for (const link of raw.links) {
++    const containerId = normalizeId(link?.containerId || link?.id);
++    if (!containerId || seen.has(containerId)) continue;
++    seen.add(containerId);
++    out.push({
++      containerId,
++      locked: Boolean(link?.locked),
++      lockLabel: String(link?.lockLabel || '').trim(),
++    });
++  }
++  return out;
++};
++
++/** Узел графа: только то, что важно для связей и видимости. */
++const normalizeGraphNode = (raw) => {
++  if (!raw || typeof raw !== 'object') return null;
++  const id = normalizeId(raw.id || raw.containerId);
++  if (!id) return null;
++  return {
++    id,
++    kind: String(raw.kind || 'loot'),
++    roomCodes: normalizeRoomCodes(raw),
++    locked: Boolean(raw.locked),
++    links: normalizeLinks(raw),
++  };
++};
++
++/**
++ * Собрать граф из карточек Мастера. Рёбра — `links` ЛЮБОГО узла, а не только
++ * локации: контейнер может содержать контейнер, локация — локацию.
++ * Несколько родителей и циклы допустимы и сохраняются как есть.
++ */
++const buildLocationGraph = (containers = []) => {
++  const list = Array.isArray(containers) ? containers : [];
++  const byId = new Map();
++  const children = new Map();
++  const parents = new Map();
++
++  for (const raw of list) {
++    const node = normalizeGraphNode(raw);
++    if (!node || byId.has(node.id)) continue;
++    byId.set(node.id, node);
++    children.set(node.id, []);
++    parents.set(node.id, []);
++  }
++  for (const node of byId.values()) {
++    for (const link of node.links) {
++      if (!byId.has(link.containerId)) continue;
++      if (!children.get(node.id).includes(link.containerId)) {
++        children.get(node.id).push(link.containerId);
++      }
++      if (!parents.get(link.containerId).includes(node.id)) {
++        parents.get(link.containerId).push(node.id);
++      }
++    }
++  }
++  return { byId, children, parents };
++};
++
++/** Обход по рёбрам с защитой от циклов. Возвращает все достижимые id, кроме старта. */
++const reachable = (graph, startId, direction = 'children') => {
++  const start = normalizeId(startId);
++  const adjacency = direction === 'parents' ? graph.parents : graph.children;
++  if (!start || !graph.byId.has(start)) return { ids: [], hasCycle: false };
++  const visited = new Set([start]);
++  const queue = [start];
++  const ids = [];
++  let hasCycle = false;
++  while (queue.length) {
++    const current = queue.shift();
++    for (const next of adjacency.get(current) || []) {
++      if (next === start) hasCycle = true;
++      if (visited.has(next)) continue;
++      visited.add(next);
++      ids.push(next);
++      queue.push(next);
++    }
++  }
++  return { ids, hasCycle };
++};
++
++const descendantsOf = (graph, id) => reachable(graph, id, 'children').ids;
++const ancestorsOf = (graph, id) => reachable(graph, id, 'parents').ids;
++const hasCycleAt = (graph, id) => reachable(graph, id, 'children').hasCycle;
++
++/**
++ * Эффективные коды комнат узла = объединение его собственных кодов и кодов
++ * ВСЕХ родителей (наследование «все те же коды от каждого родителя»).
++ * Коды комнат задают видимость групп, а состояние локации и её ресурсы общи
++ * для всех привязанных комнат.
++ */
++const effectiveRoomCodes = (graph, id) => {
++  const start = normalizeId(id);
++  if (!start || !graph.byId.has(start)) return [];
++  const ids = [start, ...ancestorsOf(graph, start)];
++  const seen = new Set();
++  const out = [];
++  for (const nodeId of ids) {
++    for (const code of graph.byId.get(nodeId)?.roomCodes || []) {
++      if (seen.has(code)) continue;
++      seen.add(code);
++      out.push(code);
++    }
++  }
++  return out.sort();
++};
++
++const childIdsOf = (graph, id) => [...(graph.children.get(normalizeId(id)) || [])];
++const parentIdsOf = (graph, id) => [...(graph.parents.get(normalizeId(id)) || [])];
++const hasChildren = (graph, id) => childIdsOf(graph, id).length > 0;
++const isLockable = (graph, id) => isLockableKind(graph.byId.get(normalizeId(id))?.kind);
++
++/**
++ * «Заблокировать всё» доступно на ЛЮБОМ узле с детьми, а не только на
++ * «верхнем родителе». Блокируются только запираемые узлы-потомки.
++ */
++const lockAllTargets = (graph, id) => descendantsOf(graph, id)
++  .filter((nodeId) => isLockable(graph, nodeId));
++
++/**
++ * Замок — граница видимости. Игрок видит сам запертый узел («дверь»), но не
++ * знает, что за ним: все потомки скрыты. Мастер видит всё. Цикл A–B–C–A
++ * не взрывает обход: посещённые узлы не пересчитываются повторно.
++ */
++const hiddenBehindLock = (graph, { lockedIds = [], isGm = false, rootId = '' } = {}) => {
++  if (isGm) return [];
++  const hidden = new Set();
++  const locked = new Set((Array.isArray(lockedIds) ? lockedIds : []).map(normalizeId).filter(Boolean));
++  for (const lockedId of locked) {
++    for (const nodeId of descendantsOf(graph, lockedId)) hidden.add(nodeId);
++  }
++  // Корень сессии всегда виден игроку.
++  hidden.delete(normalizeId(rootId));
++  return [...hidden];
++};
++
++/**
++ * Плоский список узлов сессии для сервера и клиента. Один и тот же узел может
++ * иметь НЕСКОЛЬКО родителей — поэтому `parentIds` — массив, а не строка.
++ * `childIds` и `roomCodes` (эффективные) едут вместе с узлом.
++ */
++const flattenForSession = (graph, rootId) => {
++  const root = normalizeId(rootId);
++  if (!root || !graph.byId.has(root)) return [];
++  const result = new Map();
++  const queue = [{ id: root, parentId: '', depth: 0 }];
++  const visited = new Set();
++  while (queue.length) {
++    const { id, parentId, depth } = queue.shift();
++    if (visited.has(id)) {
++      const existing = result.get(id);
++      if (existing && parentId && !existing.parentIds.includes(parentId)) {
++        existing.parentIds.push(parentId);
++        existing.depth = Math.min(existing.depth, depth);
++      }
++      continue;
++    }
++    visited.add(id);
++    const node = graph.byId.get(id);
++    const entry = {
++      id,
++      kind: node.kind,
++      parentIds: parentId ? [parentId] : [],
++      depth,
++      childIds: childIdsOf(graph, id),
++      roomCodes: effectiveRoomCodes(graph, id),
++      locked: node.locked,
++    };
++    if (id !== root) result.set(id, entry);
++    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1 });
++  }
++  return [...result.values()];
++};
++
++/**
++ * Граф из уже нормализованных узлов сессии (у них есть `parentIds`/`childIds`).
++ * Нужен на сервере, чтобы граница видимости и «заблокировать всё» работали
++ * с тем же законом, что и граф карточек Мастера.
++ */
++const buildGraphFromSession = (rootId = '', nodes = []) => {
++  const byId = new Map();
++  const children = new Map();
++  const parents = new Map();
++  const root = normalizeId(rootId);
++  if (root) {
++    byId.set(root, { id: root, kind: 'hub', roomCodes: [], locked: false, links: [] });
++    children.set(root, []);
++    parents.set(root, []);
++  }
++  const list = Array.isArray(nodes) ? nodes : [];
++  const nodeId = (node) => normalizeId(node?.containerId || node?.id);
++  for (const node of list) {
++    const id = nodeId(node);
++    if (!id || byId.has(id)) continue;
++    byId.set(id, {
++      id,
++      kind: String(node.kind || 'loot'),
++      roomCodes: normalizeRoomCodes(node),
++      locked: Boolean(node.locked),
++      links: [],
++    });
++    children.set(id, []);
++    parents.set(id, []);
++  }
++  for (const node of list) {
++    const id = nodeId(node);
++    if (!byId.has(id)) continue;
++    // Старые сессии (516–522) не носили parentIds: считаем их детьми корня.
++    const rawParentIds = Array.isArray(node.parentIds) ? node.parentIds : [];
++    const parentIds = rawParentIds.length === 0 && root ? [root] : rawParentIds;
++    const childIds = Array.isArray(node.childIds) ? node.childIds : [];
++    for (const parent of parentIds.map(normalizeId).filter(Boolean)) {
++      if (!byId.has(parent)) byId.set(parent, { id: parent, kind: 'hub', roomCodes: [], locked: false, links: [] });
++      if (!children.has(parent)) children.set(parent, []);
++      if (!parents.has(parent)) parents.set(parent, []);
++      if (!children.get(parent).includes(id)) children.get(parent).push(id);
++      if (!parents.get(id).includes(parent)) parents.get(id).push(parent);
++    }
++    for (const child of childIds.map(normalizeId).filter(Boolean)) {
++      if (!byId.has(child)) continue;
++      if (!children.get(id).includes(child)) children.get(id).push(child);
++      if (!parents.get(child).includes(id)) parents.get(child).push(id);
++    }
++  }
++  return { byId, children, parents };
++};
++
++/** Адресный взлом: открыть РОВНО одну точку, без каскада по потомкам. */
++const addressableUnlock = (nodes = [], containerId) => {
++  const id = normalizeId(containerId);
++  return (Array.isArray(nodes) ? nodes : []).map((node) => (
++    normalizeId(node.containerId || node.id) === id
++      ? { ...node, locked: false }
++      : node
++  ));
++};
++
++module.exports = {
++  LOCKABLE_KINDS,
++  isLockableKind,
++  normalizeId,
++  normalizeRoomCodes,
++  normalizeLinks,
++  normalizeGraphNode,
++  buildLocationGraph,
++  descendantsOf,
++  ancestorsOf,
++  hasCycleAt,
++  effectiveRoomCodes,
++  childIdsOf,
++  parentIdsOf,
++  hasChildren,
++  isLockable,
++  lockAllTargets,
++  hiddenBehindLock,
++  flattenForSession,
++  buildGraphFromSession,
++  addressableUnlock,
++};
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index a94c251..b4871ab 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -11,6 +11,7 @@ const {
+   effectiveItemCost,
+   effectiveItemWeight,
+ } = require('./itemStacking.js');
++const locationGraph = require('./locationGraph.js');
+ const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+ 
+@@ -155,16 +156,18 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+   const explicitTerminal = raw.kind === 'terminal';
+   const explicitLock = raw.kind === 'lock';
+   const kind = raw.kind === 'merchant' ? 'merchant'
+-    : (explicitTerminal || marker ? 'terminal'
+-      : (explicitLock || lockMarker ? 'lock' : 'loot'));
+-  const items = kind === 'terminal' || kind === 'lock'
++    : (raw.kind === 'hub' ? 'hub'
++      : (explicitTerminal || marker ? 'terminal'
++        : (explicitLock || lockMarker ? 'lock' : 'loot')));
++  const items = kind === 'terminal' || kind === 'lock' || kind === 'hub'
+     ? []
+     : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+   return {
+     containerId,
+     kind,
+     name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец'
+-      : (kind === 'terminal' ? 'Терминал' : (kind === 'lock' ? 'Замок' : 'Контейнер'))),
++      : (kind === 'hub' ? 'Локация'
++        : (kind === 'terminal' ? 'Терминал' : (kind === 'lock' ? 'Замок' : 'Контейнер')))),
+     description: String(raw.description || '').trim(),
+     locked: Boolean(raw.locked),
+     // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
+@@ -190,13 +193,24 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+     requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+     keyRequirement: String(raw.keyRequirement || 'none'),
+     linkedCheckIds: normalizeLinkedCheckIds(raw),
+-    linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
+     // Патч 519: терминал, привязанный к другой точке как замок, не должен
+     // торчать отдельной карточкой в локации у игроков.
+     hiddenForPlayers: Boolean(raw.hiddenForPlayers),
++    // Патч 523: граф пространств. Несколько родителей, глубина, дети и
++    // эффективные коды комнат (объединение кодов всех родителей).
++    parentIds: Array.isArray(raw.parentIds)
++      ? [...new Set(raw.parentIds.map((id) => String(id || '').trim()).filter(Boolean))]
++      : [],
++    childIds: Array.isArray(raw.childIds)
++      ? [...new Set(raw.childIds.map((id) => String(id || '').trim()).filter(Boolean))]
++      : [],
++    depth: Math.max(0, Math.floor(Number(raw.depth) || 0)),
++    roomCodes: Array.isArray(raw.roomCodes)
++      ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
++      : [],
+   };
+ };
+ 
+@@ -230,10 +244,20 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
+  */
+ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   if (!session || isGm || session.kind !== 'hub') return session;
++  const nodes = session.nodes || [];
++  // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
++  // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
++  const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
++  const lockedIds = nodes.filter((node) => node.locked).map((node) => node.containerId);
++  const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
++    lockedIds,
++    isGm,
++    rootId: session.containerId,
++  }));
+   return {
+     ...session,
+-    nodes: (session.nodes || [])
+-      .filter((node) => !node.hiddenForPlayers)
++    nodes: nodes
++      .filter((node) => !node.hiddenForPlayers && !hidden.has(node.containerId))
+       .map((node) => {
+       if (!node.locked) return node;
+       return {
+@@ -328,7 +352,12 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+     // Патч 516: требование ключа у самой выданной точки.
+     requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
+     keyRequirement: String(raw.keyRequirement || 'none'),
++    linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
++    // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
++    roomCodes: Array.isArray(raw.roomCodes)
++      ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
++      : [],
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
+     closedByClientIds,
+@@ -443,6 +472,52 @@ const applyMerchantRatePatch = (target, payload = {}) => {
+   }
+ };
+ 
++/**
++ * Патч 523: «заблокировать всё» на ЛЮБОМ узле с детьми. Блокируются только
++ * запираемые потомки; сам узел-инициатор остаётся как есть.
++ */
++const applySessionLockAll = (session, containerId) => {
++  if (!session || session.kind !== 'hub') return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  const targetId = String(containerId || '').trim();
++  const graph = locationGraph.buildGraphFromSession(session.containerId, session.nodes || []);
++  if (targetId && targetId !== session.containerId && !graph.byId.has(targetId)) {
++    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  }
++  const targets = new Set(locationGraph.lockAllTargets(graph, targetId || session.containerId));
++  if (targets.size === 0) return { session };
++  return {
++    session: {
++      ...session,
++      nodes: (session.nodes || []).map((node) => (
++        targets.has(node.containerId) ? { ...node, locked: true } : node
++      )),
++      revision: session.revision + 1,
++      updatedAt: Date.now(),
++    },
++  };
++};
++
++/**
++ * Патч 523: адресный взлом. Открывается РОВНО одна точка, каскада по детям и
++ * по воротам нет. Ключ при этом может быть назначен многим точкам — каждая
++ * открывается им независимо («поточечно»).
++ */
++const applySessionUnlock = (session, containerId) => {
++  if (!session || session.kind !== 'hub') return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  const targetId = String(containerId || '').trim();
++  if (!targetId) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  const found = (session.nodes || []).some((node) => node.containerId === targetId);
++  if (!found) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  return {
++    session: {
++      ...session,
++      nodes: locationGraph.addressableUnlock(session.nodes, targetId),
++      revision: session.revision + 1,
++      updatedAt: Date.now(),
++    },
++  };
++};
++
+ /**
+  * Живое обновление процентов/кассы/содержимого/замков открытой сессии Мастером.
+  */
+@@ -471,6 +546,17 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+   };
+ 
+   if (next.kind === 'hub') {
++    // Патч 523: команды Мастера «заблокировать всё» и адресное открытие.
++    if (payload.lockAll !== undefined) {
++      const result = applySessionLockAll(next, payload.lockAll);
++      if (result.error) return result;
++      return { session: result.session };
++    }
++    if (payload.unlock !== undefined) {
++      const result = applySessionUnlock(next, payload.unlock);
++      if (result.error) return result;
++      return { session: result.session };
++    }
+     if (payload.name !== undefined && String(payload.name).trim()) {
+       next.name = String(payload.name).trim();
+     }
+@@ -854,6 +940,8 @@ module.exports = {
+   computeMerchantSellPriceToPlayer,
+   computeMerchantBuybackPriceFromPlayer,
+   applySessionUpdate,
++  applySessionLockAll,
++  applySessionUnlock,
+   applyAtomicLootTake,
+   applyAtomicTradeCommit,
+   applyKeyAccessToSession,
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 0cffb77..60ec0b9 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -120,25 +120,26 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!room) return;
+     const resolve = resolveForRoom(room);
+ 
+-    // Патч 517: открытая точка сама становится источником события для
+-    // следующих ворот. Событие идемпотентно и общее на всю комнату.
++    // Патч 523: взлом АДРЕСНЫЙ. Событие порождает только та точка, которая
++    // реально открыта ключом или своей мини-игрой. Точка, открытая чужим
++    // событием через явную ссылку («ИЛИ»), НЕ становится новым источником —
++    // транзитивного каскада A → B → C больше нет. Ключ при этом может быть
++    // назначен многим точкам: каждая открывается им независимо, поточечно.
+     const recordFromSession = (session) => {
+       let added = false;
+-      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
+-        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
++      if (session.keyUnlocked && session.containerId) {
++        if (recordAccessEvent(room, session.containerId, 'hacked', 'key')) added = true;
+       }
+       for (const node of session.nodes || []) {
+-        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
+-          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
++        if (node.keyUnlocked && node.containerId) {
++          if (recordAccessEvent(room, node.containerId, 'hacked', 'key')) added = true;
+         }
+       }
+       return added;
+     };
+ 
+-    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
+-    // появившиеся события открывают следующую точку. Ограничение защищает
+-    // от циклических ссылок, заданных Мастером.
+-    for (let pass = 0; pass < 4; pass += 1) {
++    // Один проход: явные ссылки на уже созданные точки работают, цепочка — нет.
++    for (let pass = 0; pass < 1; pass += 1) {
+       let added = false;
+       if (room.activeSession) {
+         room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
+@@ -444,6 +445,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     room.emptySince = null;
+   };
+ 
++  /**
++   * Патч 523: локация, привязанная к нескольким серверным комнатам, имеет
++   * ОДНО состояние и ОДНИ ресурсы. Коды комнат задают только видимость групп:
++   * взлом/покупка/касса в партии 1 сразу видны партии 2, а партия 3 не видит
++   * ничего, пока её код не добавят. Объект сессии общий для всех комнат.
++   */
++  const boundRoomsForSession = (session, fallbackCode = '') => {
++    if (!session || session.kind !== 'hub') return [];
++    const codes = Array.isArray(session.roomCodes) && session.roomCodes.length
++      ? session.roomCodes
++      : [fallbackCode].filter(Boolean);
++    const out = [];
++    const seen = new Set();
++    for (const raw of codes) {
++      const code = String(raw || '').trim().toUpperCase();
++      if (!code || seen.has(code)) continue;
++      seen.add(code);
++      const target = rooms.get(code);
++      if (target) out.push(target);
++    }
++    return out;
++  };
++
++  const propagateSharedSession = (session, fallbackCode = '') => {
++    const bound = boundRoomsForSession(session, fallbackCode);
++    for (const target of bound) target.activeSession = session;
++    return bound;
++  };
++
++  const withBoundRooms = (result, session, fallbackCode = '') => {
++    const bound = session ? propagateSharedSession(session, fallbackCode) : [];
++    return { ...result, boundRooms: bound.length ? bound : [result.room] };
++  };
++
+   /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
+   const openSession = ({ code, clientId, session, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+@@ -459,7 +494,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
+     syncTerminalNodes(room, normalized, { reissue: true });
+     room.lastClosedSession = null;
+-    return { room, session: room.activeSession || normalized };
++    // Привязанные комнаты видят ТУ ЖЕ сессию (общие ресурсы локации).
++    return withBoundRooms(
++      { room, session: room.activeSession || normalized },
++      room.activeSession || normalized,
++      code,
++    );
+   };
+ 
+   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
+@@ -473,7 +513,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = result.session;
+     syncTerminalNodes(room, result.session);
+-    return { room, session: result.session };
++    return withBoundRooms({ room, session: result.session }, result.session, code);
+   };
+ 
+   const terminalPublic = (terminalId, entry) => ({
+@@ -761,11 +801,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (sessionId && previous && previous.sessionId !== String(sessionId)) {
+       return { room, session: previous };
+     }
++    const bound = previous ? boundRoomsForSession(previous, code) : [];
++    for (const target of bound) target.activeSession = null;
+     room.activeSession = null;
+     if (previous) {
+       room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
+     }
+-    return { room, session: null, closedSession: previous };
++    return {
++      room,
++      session: null,
++      closedSession: previous,
++      boundRooms: bound.length ? bound : [room],
++    };
+   };
+ 
+   /**
+@@ -886,6 +933,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           session: null,
+           closedSession,
+           autoClosedReason: 'loot_emptied',
++          boundRooms: boundRoomsForSession(closedSession, code),
+         };
+       }
+       const updatedSession = {
+@@ -893,20 +941,23 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         closedByClientIds: [...closedSet],
+       };
+       room.activeSession = updatedSession;
+-      return {
+-        room,
+-        granted: result.granted,
+-        session: updatedSession,
+-      };
++      const updated = withBoundRooms(
++        { room, granted: result.granted, session: updatedSession },
++        updatedSession,
++        code,
++      );
++      room.activeSession = updatedSession;
++      return updated;
+     }
+ 
+-    room.activeSession = result.session;
+-    return {
++    const finalResult = withBoundRooms({
+       room,
+       granted: result.granted,
+       emptiedNodeContainerId: result.emptiedNodeContainerId || null,
+       session: result.session,
+-    };
++    }, result.session, code);
++    room.activeSession = result.session;
++    return finalResult;
+   };
+ 
+   /** Атомарная бартерная сделка игрока с торговцем. */
+@@ -916,7 +967,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const result = applyAtomicTradeCommit(room.activeSession, payload, now());
+     if (result.error) return result;
+     room.activeSession = result.session;
+-    return { room, committed: result.committed, session: result.session };
++    return withBoundRooms(
++      { room, committed: result.committed, session: result.session },
++      result.session,
++      code,
++    );
+   };
+ 
+   /** Отправить команду Мастера группе или выбранному персонажу (с очередью для офлайн-телефонов). */
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 23587de..33cf849 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -337,6 +337,19 @@ const attachRoomWebSocketServer = (httpServer, {
+     }
+   };
+ 
++  /**
++   * Патч 523: сессия локации привязана к нескольким комнатам — рассылаем
++   * ОДНО состояние всем группам, у которых есть доступ к этой локации.
++   */
++  const broadcastSessionStateForResult = (result, exceptClientId, basePayload) => {
++    const targets = Array.isArray(result?.boundRooms) && result.boundRooms.length
++      ? result.boundRooms
++      : [result.room];
++    for (const target of targets) {
++      if (target) broadcastSessionState(target, exceptClientId, basePayload);
++    }
++  };
++
+   /**
+    * Патч 516: ключ мог появиться на складе одновременно с перезаписью
+    * сессии (взятие добычи), поэтому перед рассылкой пересчитываем доступ
+@@ -861,6 +874,8 @@ const attachRoomWebSocketServer = (httpServer, {
+             clientId,
+           );
+           broadcastKeyAccessState(result.room, clientId);
++          // Патч 523: остальные привязанные комнаты сразу видят ту же локацию.
++          broadcastSessionStateForResult(result, clientId, { session: result.session });
+           break;
+         }
+ 
+@@ -892,7 +907,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, clientId, {
++          broadcastSessionStateForResult(result, clientId, {
+             session: result.session,
+           });
+           broadcastTerminalStates(result.room);
+@@ -932,7 +947,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, clientId, closePayload);
++          broadcastSessionStateForResult(result, clientId, closePayload);
+           break;
+         }
+ 
+@@ -969,7 +984,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, clientId, {
++          broadcastSessionStateForResult(result, clientId, {
+             session: result.session,
+             ...closeMeta,
+           });
+@@ -1026,7 +1041,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, null, {
++          broadcastSessionStateForResult(result, null, {
+             session: result.session,
+             ...closeMeta,
+           });
+@@ -1081,7 +1096,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             canonical,
+             clientId,
+           );
+-          broadcastSessionState(result.room, null, {
++          broadcastSessionStateForResult(result, null, {
+             session: result.session,
+           });
+           break;
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 063ecee..c337678 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -145,6 +145,9 @@ interface RoomStoreState {
+     nodeDifficulty?: number;
+     locked?: boolean;
+     lockLabel?: string;
++    // Патч 523: «заблокировать всё» на узле с детьми и адресное открытие.
++    lockAll?: string | null;
++    unlock?: string | null;
+   }) => Promise<ActiveLootTradeSession>;
+   closeRoomSession: (input: {
+     code: string;

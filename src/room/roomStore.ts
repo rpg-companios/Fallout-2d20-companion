@@ -145,6 +145,9 @@ interface RoomStoreState {
     nodeDifficulty?: number;
     locked?: boolean;
     lockLabel?: string;
+    // Патч 523: «заблокировать всё» на узле с детьми и адресное открытие.
+    lockAll?: string | null;
+    unlock?: string | null;
   }) => Promise<ActiveLootTradeSession>;
   closeRoomSession: (input: {
     code: string;

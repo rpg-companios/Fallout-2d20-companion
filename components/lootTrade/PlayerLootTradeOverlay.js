@@ -89,6 +89,9 @@ export default function PlayerLootTradeOverlay() {
   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
   const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
   const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
+  // Патч 523: стек вложенных локаций. Одна сессия живёт, пока игрок не вышел
+  // из родительской локации или не нажал «Покинуть локацию».
+  const [parentStack, setParentStack] = useState([]);
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
   const [terminalSelection, setTerminalSelection] = useState(null);
@@ -202,6 +205,7 @@ export default function PlayerLootTradeOverlay() {
     if (!session || !matchedContext) return;
     setTerminalSelection(null);
     setDismissedTerminalId(null);
+    setParentStack([]);
     try {
       await useRoomStore.getState().playerCloseRoomSession({
         code: matchedContext.roomCode,
@@ -439,7 +443,16 @@ export default function PlayerLootTradeOverlay() {
 
   // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
   if (isHubSession && !viewTarget) {
-    const hubNodes = activeSession.nodes || [];
+    const rootId = activeSession.containerId || '';
+    const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
+    // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
+    // считаются детьми корня. Запертые потомки уже скрыты сервером.
+    const hubNodes = (activeSession.nodes || []).filter((node) => {
+      const parents = Array.isArray(node.parentIds) && node.parentIds.length
+        ? node.parentIds
+        : [rootId];
+      return parents.includes(currentParentId);
+    });
     return (
       <>
         <Modal
@@ -464,6 +477,15 @@ export default function PlayerLootTradeOverlay() {
                   >
                     <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
                   </TouchableOpacity>
+                  {parentStack.length > 0 && (
+                    <TouchableOpacity
+                      testID="hub-back-button"
+                      style={styles.minimizeBtn}
+                      onPress={() => setParentStack((stack) => stack.slice(0, -1))}
+                    >
+                      <Text style={styles.minimizeBtnText}>{tLootTrade('player.backToParent')}</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     testID="leave-hub-button"
                     accessibilityRole="button"
@@ -765,7 +787,17 @@ export default function PlayerLootTradeOverlay() {
                                 setBuyBuffer({});
                                 setSellBuffer({});
                                 setMobileTab('merchant');
-                                setSelectedHubNodeId(node.containerId);
+                                // Патч 523: узел с детьми — это вложенная
+                                // локация/контейнер, входим внутрь, а не
+                                // открываем содержимое сразу.
+                                const hasChildren = Array.isArray(node.childIds)
+                                  ? node.childIds.length > 0
+                                  : node.kind === CONTAINER_KIND.HUB;
+                                if (hasChildren) {
+                                  setParentStack((stack) => [...stack, node.containerId]);
+                                } else {
+                                  setSelectedHubNodeId(node.containerId);
+                                }
                               }}
                             >
                               <Text style={styles.takeAllRowBtnText}>

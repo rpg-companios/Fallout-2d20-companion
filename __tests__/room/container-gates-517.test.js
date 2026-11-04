@@ -81,7 +81,9 @@ describe('517: сервер ведёт общий журнал событий', 
 
     const events = registry.getAccessEvents(room.code);
     expect(events.a).toMatchObject({ containerId: 'a', kind: 'hacked' });
-    expect(events.b).toMatchObject({ containerId: 'b', kind: 'hacked' });
+    // Патч 523: взлом адресный, без каскада. Точка B открыта ЯВНОЙ ссылкой
+    // на A, но сама не становится новым источником события для следующей точки.
+    expect(events.b).toBeUndefined();
     expect(registry.getState(room.code).accessEvents.a).toBeTruthy();
   });
 

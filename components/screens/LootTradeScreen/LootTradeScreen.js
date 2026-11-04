@@ -37,6 +37,8 @@ import {
   addOrMergeContainerItem,
   analyzeHubDeletion,
   buildHubSessionNodes,
+  buildLocationSessionNodes,
+  effectiveLocationRoomCodes,
   buildStandaloneTerminalSessionNode,
   buildStandaloneLockSessionNode,
   decodeTerminalNodeMarker,
@@ -713,7 +715,7 @@ export default function LootTradeScreen() {
             sessionId: live.sessionId,
             name: saved.name,
             description: saved.description,
-            nodes: buildHubSessionNodes(saved, freshList),
+            nodes: buildLocationSessionNodes(saved, freshList),
           });
         } else {
           await useRoomStore.getState().updateRoomSessionRates({
@@ -1163,7 +1165,7 @@ export default function LootTradeScreen() {
     }
 
     if (container.kind === CONTAINER_KIND.HUB) {
-      const resolvedNodes = buildHubSessionNodes(container, containers);
+      const resolvedNodes = buildLocationSessionNodes(container, containers);
       if (resolvedNodes.length === 0) {
         showRawAlert({ title: tLootTrade('detail.hubIssueEmptyWarn') });
         return;
@@ -1252,7 +1254,16 @@ export default function LootTradeScreen() {
             buyDepreciationPercent: freshSource.buyDepreciationPercent,
             characterOverrides: {},
             items: isHub ? [] : freshSource.items,
-            ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
+            ...(isHub ? {
+              nodes: buildLocationSessionNodes(freshSource, freshAllContainers || containers),
+              // Патч 523: коды комнат задают видимость групп; состояние и
+              // ресурсы локации общи для всех привязанных комнат.
+              roomCodes: effectiveLocationRoomCodes(freshSource, freshAllContainers || containers),
+              requiredKeyItemId: freshSource.requiredKeyItemId || '',
+              keyRequirement: freshSource.keyRequirement || 'none',
+              linkedCheckIds: freshSource.linkedCheckIds || [],
+              linkedCheckId: freshSource.linkedCheckId || '',
+            } : {}),
           },
         });
       }
@@ -1434,6 +1445,32 @@ export default function LootTradeScreen() {
           });
         } catch (error) {
           debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
+        }
+      }
+    }
+  };
+
+  /**
+   * Патч 523: «заблокировать всё» на любом узле с детьми. Верхнего родителя
+   * как структуры нет — команда доступна на каждой точке графа, у которой
+   * есть потомки. Блокируются только запираемые узлы.
+   */
+  const handleLockAll = async (containerId) => {
+    if (!activeContainer) return;
+    const targetId = String(containerId || activeContainer.id || '').trim();
+    if (!targetId) return;
+    const liveEntries = getActiveLiveEntriesForContainer(activeContainer);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
+      if (live && live.kind === CONTAINER_KIND.HUB) {
+        try {
+          await ensureGmRoomConnected(liveCode);
+          await useRoomStore.getState().updateRoomSessionRates({
+            code: liveCode,
+            sessionId: live.sessionId,
+            lockAll: targetId,
+          });
+        } catch (error) {
+          debugLog('lootTrade.lockAll:failed', { message: error?.message });
         }
       }
     }
@@ -2111,6 +2148,13 @@ export default function LootTradeScreen() {
               {activeLiveSession.kind === CONTAINER_KIND.HUB && Array.isArray(activeLiveSession.nodes) && (
                 <>
                   <Text style={styles.liveScopeLabel}>{tLootTrade('livePanel.hubLiveLocksLabel')}</Text>
+                  <TouchableOpacity
+                    testID="live-lock-all-button"
+                    style={styles.scopeChip}
+                    onPress={() => { void handleLockAll(activeLiveSession.containerId); }}
+                  >
+                    <Text style={styles.scopeChipText}>{tLootTrade('livePanel.lockAll')}</Text>
+                  </TouchableOpacity>
                   <View style={styles.scopeChipsRow}>
                     {activeLiveSession.nodes.map((node) => (
                       <TouchableOpacity

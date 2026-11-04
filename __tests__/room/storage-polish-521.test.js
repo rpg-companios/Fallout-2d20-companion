@@ -175,8 +175,8 @@ describe('521 → 522: стаканье «Общего хранилища» бе
 
   it('план и версия ведут на 522, а иерархия всё ещё в плане', () => {
     expect(read('docs/roadmap.md')).toContain('522');
-    expect(JSON.parse(read('public/version.json')).version).toBe('522');
-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
+    expect(Number(JSON.parse(read('public/version.json')).version)).toBeGreaterThanOrEqual(522);
+    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(522);
     expect(read('docs/roadmap.md')).toContain('Иерархия');
   });
 });

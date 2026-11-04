@@ -8,6 +8,7 @@
 // - дублирование контейнеров и слияние одинаковых позиций.
 
 import itemStacking from './itemStacking.js';
+import locationGraph from './locationGraph.js';
 import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
 import {
   AMMO_FOUND_BY_ID,
@@ -592,19 +593,8 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
  * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
  */
-export const buildHubSessionNodes = (hub, allContainers = []) => {
-  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
-  const byId = new Map(
-    (Array.isArray(allContainers) ? allContainers : [])
-      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
-      .map((c) => [c.id, c]),
-  );
-  const links = normalizeHubLinks(hub.links);
-  const nodes = [];
-  for (const link of links) {
-    const child = byId.get(link.containerId);
-    if (!child) continue;
-    const node = {
+/** Один узел сессии: одинаковая форма для старого и графового построителя. */
+const makeSessionNode = (child, link = {}) => ({
       containerId: child.id,
       kind: child.kind,
       name: child.name,
@@ -628,21 +618,84 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
       // Патч 520: до двух источников через «ИЛИ».
       linkedCheckIds: normalizeLinkedCheckIds(child),
       characterOverrides: {},
-      items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
-        ? []
-        : (Array.isArray(child.items)
-        ? child.items.map((entry) => ({
-            ...entry,
-            itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
-          }))
-        : []),
-    };
-    // Маркер переживает нормализацию узла на старом сервере комнат.
-    if (child.kind === CONTAINER_KIND.TERMINAL) nodes.push(withTerminalNodeMarker(node));
-    else if (child.kind === CONTAINER_KIND.LOCK) nodes.push(withLockNodeMarker(node));
-    else nodes.push(node);
+  items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+    ? []
+    : (Array.isArray(child.items)
+    ? child.items.map((entry) => ({
+        ...entry,
+        itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+      }))
+    : []),
+});
+
+const stampSessionNode = (node) => {
+  if (node.kind === CONTAINER_KIND.TERMINAL) return withTerminalNodeMarker(node);
+  if (node.kind === CONTAINER_KIND.LOCK) return withLockNodeMarker(node);
+  return node;
+};
+
+/** Прежний построитель: ровно один уровень, только точки выдачи. Сохранён для совместимости. */
+export const buildHubSessionNodes = (hub, allContainers = []) => {
+  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
+  const byId = new Map(
+    (Array.isArray(allContainers) ? allContainers : [])
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(c.kind))
+      .map((c) => [c.id, c]),
+  );
+  const links = normalizeHubLinks(hub.links);
+  const nodes = [];
+  for (const link of links) {
+    const child = byId.get(link.containerId);
+    if (!child) continue;
+    nodes.push(stampSessionNode(makeSessionNode(child, link)));
   }
   return nodes;
+};
+
+/**
+ * Патч 523: графовый построитель сессии. Обходит ВСЮ вложенность
+ * (локация в локации, контейнер в контейнере), переносит несколько родителей
+ * через `parentIds`, не зацикливается и считает эффективные коды комнат как
+ * объединение кодов узла и всех его родителей.
+ */
+export const buildLocationSessionNodes = (root, allContainers = []) => {
+  if (!root || !root.id) return [];
+  const list = Array.isArray(allContainers) ? allContainers : [];
+  const byId = new Map(list.filter((c) => c && c.id).map((c) => [String(c.id), c]));
+  const graph = locationGraph.buildLocationGraph(list);
+  const flat = locationGraph.flattenForSession(graph, String(root.id));
+
+  // Замок на ребре родителя — граница видимости для ребёнка.
+  const linkByChild = new Map();
+  for (const container of list) {
+    for (const link of normalizeHubLinks(container.links)) {
+      const prev = linkByChild.get(link.containerId);
+      if (!prev || (link.locked && !prev.locked)) linkByChild.set(link.containerId, link);
+    }
+  }
+
+  return flat
+    .map((entry) => {
+      const child = byId.get(entry.id);
+      if (!child) return null;
+      const link = linkByChild.get(entry.id) || {};
+      const node = {
+        ...makeSessionNode(child, link),
+        parentIds: entry.parentIds,
+        childIds: entry.childIds,
+        depth: entry.depth,
+        roomCodes: entry.roomCodes,
+        locked: Boolean(link.locked || entry.locked),
+      };
+      return stampSessionNode(node);
+    })
+    .filter(Boolean);
+};
+
+/** Эффективные коды комнат корня: состояние и ресурсы общи для всех привязанных комнат. */
+export const effectiveLocationRoomCodes = (root, allContainers = []) => {
+  const graph = locationGraph.buildLocationGraph(Array.isArray(allContainers) ? allContainers : []);
+  return locationGraph.effectiveRoomCodes(graph, String(root?.id || ''));
 };
 
 const deduplicateContainerItems = (rawItems, now = Date.now()) => {
@@ -677,9 +730,11 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     || kind === CONTAINER_KIND.LOCK
     ? []
     : deduplicateContainerItems(raw.items, now);
-  const links = kind === CONTAINER_KIND.HUB
-    ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
-    : [];
+  // Патч 523: вложенность разрешена у ЛЮБОГО узла — локация в локации,
+  // контейнер в контейнере. Ссылку на самого себя не держим (цикл из одного
+  // узла не имеет смысла), а циклы из нескольких узлов — разрешены.
+  const links = normalizeHubLinks(raw.links)
+    .filter((lnk) => lnk.containerId !== String(raw.id || ''));
   const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
   const primaryRoomCode = roomCodes[0] || '';
   const inRoot = kind === CONTAINER_KIND.HUB

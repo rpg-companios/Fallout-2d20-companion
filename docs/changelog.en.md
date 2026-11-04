@@ -1,5 +1,29 @@
 # Changelog
 ---
+## Space hierarchy: the location graph (patch 523)
+
+The first step of plan item 13. Every owner decision is recorded in
+`docs/location-hierarchy-design.md`; server protection, keys and mini-games
+were not weakened.
+
+- **A graph, not a tree.** Locations inside locations and containers inside
+  containers, multiple parents and cycles are allowed. Traversals are
+  cycle-safe. Room codes are inherited as the union of the node's codes and
+  every parent's codes.
+- **One set of resources for all bound rooms.** A location session is a single
+  object: edits, loot picks, trades and closing are visible in every room from
+  `roomCodes`. A room whose code is not listed sees nothing.
+- **A lock is a visibility boundary.** The player sees the locked point itself,
+  but the server hides all of its descendants; the Game Master sees everything.
+- **«Lock everything»** works on any node with children, not just on a
+  «topmost parent». Only lockable descendants are blocked.
+- **Addressable hacking.** Exactly one point opens; the transitive A → B → C
+  cascade is gone, while explicit OR references to already-created points still
+  work. A key can still be assigned to many points, pointwise.
+- **One session.** Players walk nested locations with a «Back» button; the
+  session survives returning to a parent and ends only on «Leave location» or
+  when the Game Master closes it.
+
 ## One item everywhere (patch 522)
 
 The owner clarified: "There are no weight or quantity limits, an item in the

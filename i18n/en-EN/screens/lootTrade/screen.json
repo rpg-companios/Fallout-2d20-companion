@@ -219,7 +219,8 @@
     "saleMarkupControl": "Sale %",
     "buyDeprControl": "Buyback depr. %",
     "merchantCapsControl": "Register {CAP}",
-    "applyRates": "Apply"
+    "applyRates": "Apply",
+    "lockAll": "🔒 Lock everything"
   },
   "player": {
     "minimizedLoot": "📦 Loot: {name}",
@@ -278,7 +279,8 @@
     "gateOptionsTitle": "Open with either check:",
     "gateOr": "or",
     "gateTerminalLabel": "Terminal lvl {difficulty}",
-    "gateLockLabel": "Lock lvl {difficulty}"
+    "gateLockLabel": "Lock lvl {difficulty}",
+    "backToParent": "← Back"
   },
   "keyItems": {
     "title": "Keys and notes",

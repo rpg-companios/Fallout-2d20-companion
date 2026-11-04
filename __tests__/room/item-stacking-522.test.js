@@ -282,8 +282,9 @@ describe('522: двухпанельное окно склада не измен�
 
 describe('522: документы и версия', () => {
   it('версия, план и заметки ведут на 522', () => {
-    expect(JSON.parse(read('public/version.json')).version).toBe('522');
-    expect(JSON.parse(read('patchs/baseline.json')).baseline).toBe('522');
+    // Номер растёт дальше по цепочке: правила 522 обязаны сохраняться.
+    expect(Number(JSON.parse(read('public/version.json')).version)).toBeGreaterThanOrEqual(522);
+    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(522);
     expect(read('docs/roadmap.md')).toContain('522');
     expect(read('docs/changelog.ru.md')).toContain('522');
     expect(read('docs/changelog.en.md')).toContain('522');

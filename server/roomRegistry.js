@@ -120,25 +120,26 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!room) return;
     const resolve = resolveForRoom(room);
 
-    // Патч 517: открытая точка сама становится источником события для
-    // следующих ворот. Событие идемпотентно и общее на всю комнату.
+    // Патч 523: взлом АДРЕСНЫЙ. Событие порождает только та точка, которая
+    // реально открыта ключом или своей мини-игрой. Точка, открытая чужим
+    // событием через явную ссылку («ИЛИ»), НЕ становится новым источником —
+    // транзитивного каскада A → B → C больше нет. Ключ при этом может быть
+    // назначен многим точкам: каждая открывается им независимо, поточечно.
     const recordFromSession = (session) => {
       let added = false;
-      if (['open-by-key', 'open'].includes(session.keyAccessState) && session.containerId) {
-        if (recordAccessEvent(room, session.containerId, 'hacked', 'gm')) added = true;
+      if (session.keyUnlocked && session.containerId) {
+        if (recordAccessEvent(room, session.containerId, 'hacked', 'key')) added = true;
       }
       for (const node of session.nodes || []) {
-        if (['open-by-key', 'open'].includes(node.keyAccessState) && node.containerId) {
-          if (recordAccessEvent(room, node.containerId, 'hacked', 'gm')) added = true;
+        if (node.keyUnlocked && node.containerId) {
+          if (recordAccessEvent(room, node.containerId, 'hacked', 'key')) added = true;
         }
       }
       return added;
     };
 
-    // Цепочка ворот A → B → C должна раскрыться за несколько проходов: на каждом
-    // появившиеся события открывают следующую точку. Ограничение защищает
-    // от циклических ссылок, заданных Мастером.
-    for (let pass = 0; pass < 4; pass += 1) {
+    // Один проход: явные ссылки на уже созданные точки работают, цепочка — нет.
+    for (let pass = 0; pass < 1; pass += 1) {
       let added = false;
       if (room.activeSession) {
         room.activeSession = applyKeyAccessToSession(room.activeSession, resolve);
@@ -444,6 +445,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     room.emptySince = null;
   };
 
+  /**
+   * Патч 523: локация, привязанная к нескольким серверным комнатам, имеет
+   * ОДНО состояние и ОДНИ ресурсы. Коды комнат задают только видимость групп:
+   * взлом/покупка/касса в партии 1 сразу видны партии 2, а партия 3 не видит
+   * ничего, пока её код не добавят. Объект сессии общий для всех комнат.
+   */
+  const boundRoomsForSession = (session, fallbackCode = '') => {
+    if (!session || session.kind !== 'hub') return [];
+    const codes = Array.isArray(session.roomCodes) && session.roomCodes.length
+      ? session.roomCodes
+      : [fallbackCode].filter(Boolean);
+    const out = [];
+    const seen = new Set();
+    for (const raw of codes) {
+      const code = String(raw || '').trim().toUpperCase();
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      const target = rooms.get(code);
+      if (target) out.push(target);
+    }
+    return out;
+  };
+
+  const propagateSharedSession = (session, fallbackCode = '') => {
+    const bound = boundRoomsForSession(session, fallbackCode);
+    for (const target of bound) target.activeSession = session;
+    return bound;
+  };
+
+  const withBoundRooms = (result, session, fallbackCode = '') => {
+    const bound = session ? propagateSharedSession(session, fallbackCode) : [];
+    return { ...result, boundRooms: bound.length ? bound : [result.room] };
+  };
+
   /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
   const openSession = ({ code, clientId, session, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
@@ -459,7 +494,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
     syncTerminalNodes(room, normalized, { reissue: true });
     room.lastClosedSession = null;
-    return { room, session: room.activeSession || normalized };
+    // Привязанные комнаты видят ТУ ЖЕ сессию (общие ресурсы локации).
+    return withBoundRooms(
+      { room, session: room.activeSession || normalized },
+      room.activeSession || normalized,
+      code,
+    );
   };
 
   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
@@ -473,7 +513,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = result.session;
     syncTerminalNodes(room, result.session);
-    return { room, session: result.session };
+    return withBoundRooms({ room, session: result.session }, result.session, code);
   };
 
   const terminalPublic = (terminalId, entry) => ({
@@ -761,11 +801,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (sessionId && previous && previous.sessionId !== String(sessionId)) {
       return { room, session: previous };
     }
+    const bound = previous ? boundRoomsForSession(previous, code) : [];
+    for (const target of bound) target.activeSession = null;
     room.activeSession = null;
     if (previous) {
       room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
     }
-    return { room, session: null, closedSession: previous };
+    return {
+      room,
+      session: null,
+      closedSession: previous,
+      boundRooms: bound.length ? bound : [room],
+    };
   };
 
   /**
@@ -886,6 +933,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           session: null,
           closedSession,
           autoClosedReason: 'loot_emptied',
+          boundRooms: boundRoomsForSession(closedSession, code),
         };
       }
       const updatedSession = {
@@ -893,20 +941,23 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         closedByClientIds: [...closedSet],
       };
       room.activeSession = updatedSession;
-      return {
-        room,
-        granted: result.granted,
-        session: updatedSession,
-      };
+      const updated = withBoundRooms(
+        { room, granted: result.granted, session: updatedSession },
+        updatedSession,
+        code,
+      );
+      room.activeSession = updatedSession;
+      return updated;
     }
 
-    room.activeSession = result.session;
-    return {
+    const finalResult = withBoundRooms({
       room,
       granted: result.granted,
       emptiedNodeContainerId: result.emptiedNodeContainerId || null,
       session: result.session,
-    };
+    }, result.session, code);
+    room.activeSession = result.session;
+    return finalResult;
   };
 
   /** Атомарная бартерная сделка игрока с торговцем. */
@@ -916,7 +967,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const result = applyAtomicTradeCommit(room.activeSession, payload, now());
     if (result.error) return result;
     room.activeSession = result.session;
-    return { room, committed: result.committed, session: result.session };
+    return withBoundRooms(
+      { room, committed: result.committed, session: result.session },
+      result.session,
+      code,
+    );
   };
 
   /** Отправить команду Мастера группе или выбранному персонажу (с очередью для офлайн-телефонов). */

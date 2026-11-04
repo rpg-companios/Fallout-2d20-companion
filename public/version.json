@@ -1,8 +1,10 @@
 {
-  "version": "522",
+  "version": "523",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
+      "У Мастера появилась кнопка «Заблокировать всё» на любом узле с вложенными точками, а взлом стал адресным: открывается только та точка, которую взломали, без цепочки.",
       "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
       "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
       "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
@@ -94,6 +96,8 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",
+      "The Game Master now has a «Lock everything» action on any node with children, and hacking is addressable: only the hacked point opens, with no chain reaction.",
       "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
       "An item is now identical in your inventory, in storage and at a trader: a modified weapon keeps its mods, durability and charges, and its price and weight are calculated from the installed mods.",
       "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",

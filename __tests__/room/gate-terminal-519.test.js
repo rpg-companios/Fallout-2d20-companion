@@ -97,7 +97,8 @@ describe('519: интерфейс игрока и документы', () => {
   it('сервер скрывает узел и сохраняет состояние мини-игры', () => {
     const session = read('server/lootTradeSession.js');
     expect(session).toContain('hiddenForPlayers');
-    expect(session).toContain('.filter((node) => !node.hiddenForPlayers)');
+    // Патч 523: фильтр дополнился скрытием потомков запертых узлов.
+    expect(session).toContain('!node.hiddenForPlayers');
     expect(read('server/roomRegistry.js')).toContain('syncTerminalNodes(room, normalized');
   });
 
