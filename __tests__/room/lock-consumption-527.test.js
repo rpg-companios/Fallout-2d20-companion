@@ -101,29 +101,42 @@ describe('527: заколки уходят из настоящего инвен�
     expect(countBobbyPins(next)).toBe(4);
   });
 
-  it('сервер комнаты списывает сломанную заколку из опубликованного снимка', () => {
+  it('528: сервер НЕ правит снимок, а отдаёт команду на списание', () => {
     const { act, state, published, registry, code } = setup();
     expect(act('start').error).toBeUndefined();
     expect(state().game.pinsTotal).toBe(5);
-    expect(act('press', 'left').error).toBeUndefined();
+    const press = act('press', 'left');
+    expect(press.error).toBeUndefined();
     expect(state().game.brokenPins).toBe(1);
     expect(state().game.result).toBe('PIN BROKEN');
-    // Не ledger, а сам лист: на следующем подходе заколок уже 4.
+    // Владелец инвентаря — клиент: сервер только сообщает «спиши 1».
+    expect(press.pinsToSpend).toBe(1);
+    expect(press.characterId).toBe('ch1');
     expect(published().snapshot.data.equipment.items[0]).toMatchObject({
-      name: 'Заколка', quantity: 4,
+      name: 'Заколка', quantity: 5, // снимок НЕ тронут
     });
     expect(registry._rooms.get(code).pinLedger.get('ch1')).toBe(1); // диагностика
+    // Клиент списал штатными средствами и опубликовал обновлённый лист.
+    registry.putSnapshot({
+      code, characterId: 'ch1', revision: 3, snapshot: snapshot(4),
+      fromClientId: 'p1', fromName: 'Игрок',
+    });
     expect(act('newAttempt').error).toBeUndefined();
     expect(state().game.pinsTotal).toBe(4);
     expect(state().game.spentPins).toBe(0); // двойного вычета нет
   });
 
-  it('последняя заколка исчезает, и новый подход честно говорит «Заколки закончились»', () => {
-    const { act, state, published } = setup(1);
+  it('528: после публикации листа без заколок новый подход честно говорит «Заколки закончились»', () => {
+    const { act, state, published, registry, code } = setup(1);
     act('start');
-    act('press', 'left');
-    expect(countBobbyPins(published().snapshot)).toBe(0);
+    const press = act('press', 'left');
+    expect(press.pinsToSpend).toBe(1);
+    expect(lockStats(published().snapshot).pins).toBe(1); // сервер не трогал лист
     expect(state().game.result).toBe('OUT OF PINS');
+    registry.putSnapshot({
+      code, characterId: 'ch1', revision: 3, snapshot: snapshot(0),
+      fromClientId: 'p1', fromName: 'Игрок',
+    });
     act('newAttempt');
     expect(state().game.status).toBe('awaitingRetry');
     expect(state().game.result).toBe('OUT OF PINS');

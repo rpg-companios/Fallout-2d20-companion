@@ -16,6 +16,7 @@ import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
 import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
+import CharSpendCommandHost from './components/lootTrade/CharSpendCommandHost';
 // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
 // /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
@@ -371,6 +372,8 @@ function App() {
           <AlertHost />
           {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
           <TerminalRetryPromptHost />
+          {/* Патч 528: списание заколки и обновление листа по командам сервера. */}
+          <CharSpendCommandHost />
           <SurvivalClock />
       </SafeAreaProvider>
     </PaperProvider>

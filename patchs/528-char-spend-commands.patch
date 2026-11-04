@@ -1,0 +1,1499 @@
+diff --git a/App.js b/App.js
+index 4228785..599d154 100644
+--- a/App.js
++++ b/App.js
+@@ -16,6 +16,7 @@ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
+ import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
++import CharSpendCommandHost from './components/lootTrade/CharSpendCommandHost';
+ // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
+ // /version.json + описание релиза (логика — src/utils/appVersion.js).
+ import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
+@@ -371,6 +372,8 @@ function App() {
+           <AlertHost />
+           {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
+           <TerminalRetryPromptHost />
++          {/* Патч 528: списание заколки и обновление листа по командам сервера. */}
++          <CharSpendCommandHost />
+           <SurvivalClock />
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/__tests__/lootTrade/lock-arrows-527.test.js b/__tests__/lootTrade/lock-arrows-527.test.js
+index 1ae6d71..beb707e 100644
+--- a/__tests__/lootTrade/lock-arrows-527.test.js
++++ b/__tests__/lootTrade/lock-arrows-527.test.js
+@@ -168,29 +168,25 @@ describe('527: подсказка и область стрелок', () => {
+   });
+ });
+ 
+-describe('527: сломанная заколка списывается из живого инвентаря', () => {
+-  it('первое наблюдение за доской не списывает уже сломанные заколки повторно', async () => {
++describe('528: в сетевом режиме списание делают команды сервера', () => {
++  it('модалка сама не трогает инвентарь: char.spend / char.refresh приходят отдельно', async () => {
+     useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(2)) } });
+     const renderer = await render();
+     expect(spendBobbyPins).not.toHaveBeenCalled();
+     await act(async () => renderer.unmount());
+   });
+ 
+-  it('рост brokenPins вызывает spendBobbyPins ровно на дельту', async () => {
++  it('рост brokenPins не вызывает локального списания (иначе было бы дважды)', async () => {
+     const renderer = await render();
+     await act(async () => {
+       useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(1)) } });
+       await Promise.resolve();
+     });
+-    expect(spendBobbyPins).toHaveBeenCalledTimes(1);
+-    expect(spendBobbyPins.mock.calls[0][0]).toBe(1);
+-    expect(spendBobbyPins.mock.calls[0][1]).toMatchObject({ characterId: 'ch1' });
+     await act(async () => {
+       useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(3)) } });
+       await Promise.resolve();
+     });
+-    expect(spendBobbyPins).toHaveBeenCalledTimes(2);
+-    expect(spendBobbyPins.mock.calls[1][0]).toBe(2);
++    expect(spendBobbyPins).not.toHaveBeenCalled();
+     await act(async () => renderer.unmount());
+   });
+ });
+diff --git a/__tests__/lootTrade/lock-break-pause-528.test.js b/__tests__/lootTrade/lock-break-pause-528.test.js
+new file mode 100644
+index 0000000..974576c
+--- /dev/null
++++ b/__tests__/lootTrade/lock-break-pause-528.test.js
+@@ -0,0 +1,207 @@
++// Патч 528: «Если ячейка красится в красный и заколка ломается, сделай
++// небольшую паузу перед обновлением цветов. Но если заколка не сломалась,
++// красный остается».
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { createLockGame, applyLockAction, BREAK_HIGHLIGHT_MS, CELL_STATE } from '../../server/lockPicking.js';
++import { initialLocalLockState, applyLocalLockAction } from '../../components/lootTrade/localLockGame.js';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 390, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({
++  spendBobbyPins: vi.fn(async () => 1),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import { lockLightStyles } from '../../components/lootTrade/lockPickingStyles';
++
++const LOW_SKILL = {
++  data: {
++    attributes: { PER: { value: 10 }, LCK: { value: 4 } },
++    skills: [{ name: 'LOCKPICK', value: 0 }],
++    items: [{ itemId: 'item_bobby_pin', quantity: 5 }],
++  },
++};
++const HELD_SKILL = {
++  data: { ...LOW_SKILL.data, skills: [{ name: 'LOCKPICK', value: 6 }] },
++};
++
++const LOCK = { containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock' };
++
++const boardGame = (overrides = {}) => ({
++  status: 'playing',
++  kind: 'lock',
++  result: 'PIN BROKEN',
++  cells: [
++    { arrow: null, state: 'red' },
++    { arrow: 'left', state: 'grey' },
++    { arrow: null, state: 'hidden' },
++    { arrow: null, state: 'hidden' },
++  ],
++  rows: [4],
++  cellCount: 4,
++  cursor: 0,
++  per: 10,
++  luck: 4,
++  skill: 0,
++  difficulty: 1,
++  pinsRemaining: 3,
++  pinActive: true,
++  brokenPins: 1,
++  breakHighlight: { durationMs: 15 },
++  revision: 7,
++  operatorClientId: 'client-1',
++  operatorCharacterId: 'ch1',
++  ...overrides,
++});
++
++const roomWith = (game) => ({
++  joined: true,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    l1: {
++      containerId: 'l1', accessId: 'broadcast-1', config: LOCK,
++      game, closed: false, locked: false, awaitingGm: false,
++    },
++  },
++});
++
++const renderers = [];
++const render = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++    );
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++const pause = async (ms = 60) => {
++  await act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
++};
++const cell = (renderer, idx) => renderer.root.findAllByProps({ testID: `lock-cell-${idx}` })[0];
++const cellText = (node) => {
++  const text = node.findAllByType('Text')[0];
++  return Object.assign({}, ...[].concat(text.props.style).filter(Boolean));
++};
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1', characterName: 'Сталкер',
++    items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } },
++  });
++  useRoomStore.setState({
++    clientId: 'client-1',
++    rooms: { ROOM1: roomWith(boardGame()) },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++
++afterEach(async () => {
++  for (const renderer of renderers.splice(0)) {
++    try { await act(async () => renderer.unmount()); } catch { /* уже снято */ }
++  }
++});
++
++describe('528: сервер помечает поломку паузой, но не поломку без паузы', () => {
++  it('на поломке появляется breakHighlight, красная ячейка сохраняется', () => {
++    const game = createLockGame({ config: { difficulty: 1 }, characterSnapshot: LOW_SKILL, rng: () => 0 });
++    const broken = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
++    expect(broken.brokenPins).toBe(1);
++    expect(broken.breakHighlight).toEqual({ durationMs: BREAK_HIGHLIGHT_MS });
++    expect(broken.cells[0]).toEqual({ arrow: null, state: CELL_STATE.RED });
++  });
++
++  it('если заколка НЕ сломалась — паузы нет, красный остаётся', () => {
++    const game = createLockGame({ config: { difficulty: 1 }, characterSnapshot: HELD_SKILL, rng: () => 0 });
++    const wrong = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
++    expect(wrong.brokenPins).toBe(0);
++    expect(wrong.breakHighlight).toBeNull();
++    expect(wrong.cells[0]).toEqual({ arrow: null, state: CELL_STATE.RED });
++  });
++
++  it('следующее нажатие снимает метку паузы и стирает старый красный', () => {
++    const game = createLockGame({ config: { difficulty: 1 }, characterSnapshot: LOW_SKILL, rng: () => 0 });
++    const broken = applyLockAction({ game, config: {}, action: 'press', value: 'up', rng: () => 0.99 }).game;
++    const again = applyLockAction({ game: broken, config: {}, action: 'press', value: 'left', rng: () => 0.99 }).game;
++    expect(again.breakHighlight).toBeNull();
++    expect(again.cells.filter((c) => c.state === CELL_STATE.RED).length).toBeLessThanOrEqual(1);
++  });
++
++  it('локальный резерв доски тоже отдаёт breakHighlight клиенту', () => {
++    let state = initialLocalLockState();
++    state = applyLocalLockAction(state, 'start', undefined, {
++      lock: LOCK, characterId: 'ch1', characterSnapshot: LOW_SKILL, rng: () => 0,
++    });
++    state = applyLocalLockAction(state, 'press', 'up', {
++      lock: LOCK, characterId: 'ch1', characterSnapshot: LOW_SKILL, rng: () => 0.99,
++    });
++    expect(state.view.brokenPins).toBe(1);
++    expect(state.view.breakHighlight).toEqual({ durationMs: BREAK_HIGHLIGHT_MS });
++  });
++});
++
++describe('528: пауза в окне замка', () => {
++  it('красный «?» виден сразу и гаснет только после паузы', async () => {
++    const renderer = await render();
++    expect(cellText(cell(renderer, 0)).color).toBe('#c1121f');
++    await pause();
++    expect(cellText(cell(renderer, 0)).color).not.toBe('#c1121f');
++  });
++
++  it('на время паузы не перескакиваем в «Подход завершён» даже без заколок', async () => {
++    useRoomStore.setState({ rooms: { ROOM1: roomWith(boardGame({
++      status: 'awaitingRetry', result: 'OUT OF PINS', pinsRemaining: 0, pinActive: false,
++    })) } });
++    const renderer = await render();
++    expect(renderer.root.findAllByProps({ testID: 'lock-cells-board' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'lock-approach-finished' })).toHaveLength(0);
++    expect(cellText(cell(renderer, 0)).color).toBe('#c1121f');
++    await pause();
++    expect(renderer.root.findAllByProps({ testID: 'lock-approach-finished' }).length).toBeGreaterThan(0);
++  });
++
++  it('без поломки красный остаётся сколь угодно долго', async () => {
++    useRoomStore.setState({ rooms: { ROOM1: roomWith(boardGame({
++      result: 'TRY AGAIN', breakHighlight: null, brokenPins: 0,
++      cells: [
++        { arrow: null, state: 'red' }, { arrow: null, state: 'hidden' },
++        { arrow: null, state: 'hidden' }, { arrow: null, state: 'hidden' },
++      ],
++    })) } });
++    const renderer = await render();
++    expect(cellText(cell(renderer, 0)).color).toBe('#c1121f');
++    await pause();
++    expect(cellText(cell(renderer, 0)).color).toBe('#c1121f');
++    expect(cell(renderer, 0).props.style).toEqual(expect.arrayContaining([lockLightStyles.cellRed]));
++  });
++});
+diff --git a/__tests__/room/char-spend-commands-528.test.js b/__tests__/room/char-spend-commands-528.test.js
+new file mode 100644
+index 0000000..26eb998
+--- /dev/null
++++ b/__tests__/room/char-spend-commands-528.test.js
+@@ -0,0 +1,156 @@
++// Приёмочный тест патча 528. Владелец: «Заколки удаляются не из снапшота,
++// а клиенту посылается команда на списание заколки из инвентаря, штатными
++// средствами. И после списания посылается команда на обновление снапшота».
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { MESSAGE as SERVER_MESSAGE } from '../../server/protocol.js';
++import { ROOM_MESSAGE as CLIENT_MESSAGE } from '../../src/room/roomProtocol';
++import { applyCharSpendCommand, resetAppliedPinSpendsForTests } from '../../components/lootTrade/CharSpendCommandHost.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const setup = () => {
++  const registry = createRoomRegistry({ now: () => 1000 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1,
++    snapshot: { items: { p: { weaponId: 'item_bobby_pin', quantity: 5 } } },
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  return { registry, code, room: registry._rooms.get(code) };
++};
++
++describe('528: протокол команд списания', () => {
++  it('char.spend / char.refresh зеркально есть на сервере и клиенте', () => {
++    expect(SERVER_MESSAGE.CHAR_SPEND).toBe('char.spend');
++    expect(SERVER_MESSAGE.CHAR_REFRESH).toBe('char.refresh');
++    expect(CLIENT_MESSAGE.CHAR_SPEND).toBe(SERVER_MESSAGE.CHAR_SPEND);
++    expect(CLIENT_MESSAGE.CHAR_REFRESH).toBe(SERVER_MESSAGE.CHAR_REFRESH);
++  });
++
++  it('реестр хранит команду до публикации листа и повторяет её после реконнекта', () => {
++    const { registry, code } = setup();
++    const entry = registry.registerPinSpend({
++      code, characterId: 'ch1', clientId: 'p1', count: 1, spendId: 'pin-a1',
++    });
++    expect(entry).toMatchObject({
++      spendId: 'pin-a1', characterId: 'ch1', clientId: 'p1', count: 1, itemId: 'item_bobby_pin',
++    });
++    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(1);
++    expect(registry.pendingSpendsForClient(code, 'another-tab')).toHaveLength(0);
++    expect(registry.getState(code).pendingSpends).toHaveLength(1);
++    // Обычная публикация листа (вторая команда) снимает неподтверждённые.
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 5,
++      snapshot: { items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } } },
++      fromClientId: 'p1', fromName: 'Игрок',
++    });
++    expect(registry.getState(code).pendingSpends).toHaveLength(0);
++    expect(registry.pendingSpendsForClient(code, 'p1')).toHaveLength(0);
++  });
++
++  it('сервер больше не правит чужой снимок', () => {
++    const registrySource = read('server/roomRegistry.js');
++    const serverSource = read('server/roomServer.js');
++    expect(registrySource).not.toContain('consumeBobbyPins(');
++    expect(registrySource).toContain('pinsToSpend');
++    expect(serverSource).toContain('sendPinSpendCommands');
++    expect(serverSource).toContain('MESSAGE.CHAR_SPEND');
++    expect(serverSource).toContain('MESSAGE.CHAR_REFRESH');
++  });
++});
++
++describe('528: клиент применяет команды в строгом порядке', () => {
++  const deps = (overrides = {}) => {
++    const spend = vi.fn(async () => 1);
++    const publish = vi.fn(async () => true);
++    return {
++      spend,
++      publish,
++      d: {
++        spendBobbyPins: spend,
++        publish,
++        getCharacterId: () => 'ch1',
++        isApplied: async () => false,
++        setApplied: vi.fn(async () => true),
++        log: vi.fn(),
++        ...overrides,
++      },
++    };
++  };
++
++  it('char.spend списывает штатным вызовом и НЕ публикует лист сам', async () => {
++    const { spend, d } = deps();
++    const result = await applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { spendId: 's1', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
++    }, new Map(), d);
++    expect(result).toMatchObject({ ok: true, started: true });
++    expect(spend).toHaveBeenCalledWith(1, { characterId: 'ch1', publish: false });
++  });
++
++  it('char.refresh ждёт окончания списания и только потом обновляет снимок', async () => {
++    let resolveSpend;
++    const spend = vi.fn(() => new Promise((resolve) => { resolveSpend = resolve; }));
++    const publish = vi.fn(async () => true);
++    const d = {
++      spendBobbyPins: spend,
++      publish,
++      getCharacterId: () => 'ch1',
++      isApplied: async () => false,
++      setApplied: vi.fn(async () => true),
++      log: vi.fn(),
++    };
++    const jobs = new Map();
++    const base = { spendId: 's2', characterId: 'ch1' };
++    await applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { ...base, itemId: 'item_bobby_pin', count: 1 },
++    }, jobs, d);
++    const refreshing = applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_REFRESH, payload: base,
++    }, jobs, d);
++    expect(publish).not.toHaveBeenCalled();
++    resolveSpend(1);
++    await refreshing;
++    expect(publish).toHaveBeenCalledWith('ch1');
++    expect(jobs.has('s2')).toBe(false);
++  });
++
++  it('повтор команды после реконнекта не списывает заколку дважды', async () => {
++    const { spend, d } = deps({ isApplied: async () => true });
++    const result = await applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { spendId: 's3', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
++    }, new Map(), d);
++    expect(result.duplicate).toBe(true);
++    expect(spend).not.toHaveBeenCalled();
++  });
++
++  it('команда для другого персонажа или другого предмета игнорируется', async () => {
++    const { spend, d } = deps({ getCharacterId: () => 'ch2' });
++    expect((await applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { spendId: 's4', characterId: 'ch1', itemId: 'item_bobby_pin', count: 1 },
++    }, new Map(), d)).reason).toBe('other-character');
++    const wrongItem = await applyCharSpendCommand({
++      type: CLIENT_MESSAGE.CHAR_SPEND,
++      payload: { spendId: 's5', characterId: 'ch1', itemId: 'caps', count: 1 },
++    }, new Map(), deps().d);
++    expect(wrongItem.reason).toBe('wrong-item');
++    expect(spend).not.toHaveBeenCalled();
++  });
++
++  it('хост смонтирован поверх всех экранов, чтобы лист обновился и при закрытом окне', () => {
++    expect(read('App.js')).toContain('<CharSpendCommandHost />');
++    expect(read('src/room/roomStore.ts')).toContain('onRoomCharSpend');
++    resetAppliedPinSpendsForTests();
++  });
++});
+diff --git a/__tests__/room/lock-consumption-527.test.js b/__tests__/room/lock-consumption-527.test.js
+index 924fc29..3bd9653 100644
+--- a/__tests__/room/lock-consumption-527.test.js
++++ b/__tests__/room/lock-consumption-527.test.js
+@@ -101,29 +101,42 @@ describe('527: заколки уходят из настоящего инвен
+     expect(countBobbyPins(next)).toBe(4);
+   });
+ 
+-  it('сервер комнаты списывает сломанную заколку из опубликованного снимка', () => {
++  it('528: сервер НЕ правит снимок, а отдаёт команду на списание', () => {
+     const { act, state, published, registry, code } = setup();
+     expect(act('start').error).toBeUndefined();
+     expect(state().game.pinsTotal).toBe(5);
+-    expect(act('press', 'left').error).toBeUndefined();
++    const press = act('press', 'left');
++    expect(press.error).toBeUndefined();
+     expect(state().game.brokenPins).toBe(1);
+     expect(state().game.result).toBe('PIN BROKEN');
+-    // Не ledger, а сам лист: на следующем подходе заколок уже 4.
++    // Владелец инвентаря — клиент: сервер только сообщает «спиши 1».
++    expect(press.pinsToSpend).toBe(1);
++    expect(press.characterId).toBe('ch1');
+     expect(published().snapshot.data.equipment.items[0]).toMatchObject({
+-      name: 'Заколка', quantity: 4,
++      name: 'Заколка', quantity: 5, // снимок НЕ тронут
+     });
+     expect(registry._rooms.get(code).pinLedger.get('ch1')).toBe(1); // диагностика
++    // Клиент списал штатными средствами и опубликовал обновлённый лист.
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 3, snapshot: snapshot(4),
++      fromClientId: 'p1', fromName: 'Игрок',
++    });
+     expect(act('newAttempt').error).toBeUndefined();
+     expect(state().game.pinsTotal).toBe(4);
+     expect(state().game.spentPins).toBe(0); // двойного вычета нет
+   });
+ 
+-  it('последняя заколка исчезает, и новый подход честно говорит «Заколки закончились»', () => {
+-    const { act, state, published } = setup(1);
++  it('528: после публикации листа без заколок новый подход честно говорит «Заколки закончились»', () => {
++    const { act, state, published, registry, code } = setup(1);
+     act('start');
+-    act('press', 'left');
+-    expect(countBobbyPins(published().snapshot)).toBe(0);
++    const press = act('press', 'left');
++    expect(press.pinsToSpend).toBe(1);
++    expect(lockStats(published().snapshot).pins).toBe(1); // сервер не трогал лист
+     expect(state().game.result).toBe('OUT OF PINS');
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 3, snapshot: snapshot(0),
++      fromClientId: 'p1', fromName: 'Игрок',
++    });
+     act('newAttempt');
+     expect(state().game.status).toBe('awaitingRetry');
+     expect(state().game.result).toBe('OUT OF PINS');
+diff --git a/components/lootTrade/CharSpendCommandHost.js b/components/lootTrade/CharSpendCommandHost.js
+new file mode 100644
+index 0000000..93258a1
+--- /dev/null
++++ b/components/lootTrade/CharSpendCommandHost.js
+@@ -0,0 +1,130 @@
++/**
++ * Патч 528: штатное списание заколки по команде сервера.
++ *
++ * Сервер больше НЕ уменьшает quantity в опубликованном снимке листа. При
++ * поломке он шлёт оператору две команды подряд (порядок кадров WebSocket
++ * гарантирован):
++ *
++ *   1. `char.spend`   — «спиши заколку из инвентаря штатными средствами»;
++ *   2. `char.refresh` — «после списания обнови снимок» (обычный char.publish).
++ *
++ * Здесь команды применяются последовательно: вторая всегда дожидается первой.
++ * Списание идёт через общий `spendItemStacks` + `saveCharacter`, публикация —
++ * через штатный `pushSavedCharacterToBoundRoomIfAny`. `spendId` дедуплицирует
++ * повтор команды после реконнекта, чтобы не списать заколку дважды.
++ *
++ * Монтируется один раз в App.js: игрок мог уже закрыть окно мини-игры, а лист
++ * всё равно должен обновиться. Компонент ничего не рисует.
++ */
++
++import React, { useEffect } from 'react';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import useCharacterStore from '../../src/store/characterStore';
++import { onRoomCharSpend } from '../../src/room/roomStore';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
++import { debugLog } from '../../src/debug/falloutDebug';
++import { spendBobbyPins } from './spendBobbyPins';
++
++const APPLIED_KEY = 'positronium_applied_pin_spends_v1';
++const MAX_APPLIED = 200;
++const applied = new Set();
++let hydrated = false;
++
++const hydrateOnce = async () => {
++  if (hydrated) return;
++  hydrated = true;
++  try {
++    const raw = await AsyncStorage.getItem(APPLIED_KEY);
++    const list = raw ? JSON.parse(raw) : [];
++    if (Array.isArray(list)) list.forEach((id) => { if (typeof id === 'string') applied.add(id); });
++  } catch { /* нет хранилища — дедуплицируем в памяти сессии */ }
++};
++
++const markApplied = async (spendId) => {
++  applied.add(spendId);
++  try {
++    await AsyncStorage.setItem(APPLIED_KEY, JSON.stringify([...applied].slice(-MAX_APPLIED)));
++  } catch { /* не блокируем списание */ }
++};
++
++/** Точка сброса для тестов. */
++export const resetAppliedPinSpendsForTests = () => {
++  applied.clear();
++  hydrated = false;
++};
++
++/** Чистый обработчик кадра — экспортирован для приёмочных тестов. */
++export const applyCharSpendCommand = async (message, jobs, deps = {}) => {
++  const {
++    spendBobbyPins: spend = spendBobbyPins,
++    publish = pushSavedCharacterToBoundRoomIfAny,
++    getCharacterId = () => useCharacterStore.getState().currentCharacterId,
++    isApplied = async (id) => { await hydrateOnce(); return applied.has(id); },
++    setApplied = markApplied,
++    log = debugLog,
++  } = deps;
++  const type = message?.type;
++  const payload = message?.payload || {};
++  const spendId = String(payload.spendId || '').trim();
++  if (!spendId) return { ok: false, reason: 'no-spend-id' };
++
++  if (type === ROOM_MESSAGE.CHAR_SPEND) {
++    if (await isApplied(spendId)) return { ok: true, duplicate: true };
++    const characterId = String(payload.characterId || '').trim();
++    if (!characterId) return { ok: false, reason: 'no-character' };
++    const current = getCharacterId();
++    if (current && current !== characterId) {
++      // Другая вкладка/персонаж: команда адресована не этому листу.
++      return { ok: false, reason: 'other-character' };
++    }
++    if (String(payload.itemId || 'item_bobby_pin') !== 'item_bobby_pin') {
++      return { ok: false, reason: 'wrong-item' };
++    }
++    const job = (async () => {
++      const spent = await spend(Math.max(1, Math.floor(Number(payload.count) || 1)), {
++        characterId,
++        publish: false, // публикация — вторая команда char.refresh
++      });
++      await setApplied(spendId);
++      return spent;
++    })().catch((error) => {
++      log('lock.charSpend:failed', { spendId, message: error?.message });
++      return 0;
++    });
++    jobs.set(spendId, job);
++    return { ok: true, started: true };
++  }
++
++  if (type === ROOM_MESSAGE.CHAR_REFRESH) {
++    // Вторая команда приходит сразу за первой, но списание асинхронно:
++    // явно ждём его, чтобы в комнату ушёл УЖЕ обновлённый лист.
++    const job = jobs.get(spendId) || Promise.resolve(0);
++    await job;
++    const characterId = String(payload.characterId || '').trim();
++    if (characterId) {
++      try { await publish(characterId); } catch (error) {
++        log('lock.charRefresh:failed', { spendId, message: error?.message });
++      }
++    }
++    jobs.delete(spendId);
++    return { ok: true, refreshed: true };
++  }
++  return { ok: false, reason: 'unknown-type' };
++};
++
++const CharSpendCommandHost = () => {
++  useEffect(() => {
++    const jobs = new Map();
++    const unsubscribe = onRoomCharSpend((message) => {
++      void applyCharSpendCommand(message, jobs);
++    });
++    return () => {
++      unsubscribe();
++      jobs.clear();
++    };
++  }, []);
++  return null;
++};
++
++export default CharSpendCommandHost;
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index d40fb58..8f71ef6 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -74,6 +74,8 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   const [busy, setBusy] = useState(false);
+   const [localState, setLocalState] = useState(initialLocalLockState);
+   const [forceLocal, setForceLocal] = useState(false);
++  // Патч 528: красный «?» на поломке живёт недолго, потом гаснет.
++  const [breakRedFaded, setBreakRedFaded] = useState(false);
+   const autoStartRef = useRef('');
+   const republishRef = useRef(false);
+   const brokenPinsRef = useRef(null);
+@@ -114,9 +116,39 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+     const broken = Math.max(0, Number(game.brokenPins) || 0);
+     const previous = brokenPinsRef.current;
+     brokenPinsRef.current = broken;
++    // Патч 528: в сетевом режиме списание делает CharSpendCommandHost по
++    // командам char.spend → char.refresh; здесь остаётся ТОЛЬКО локальный
++    // резерв старого сервера, иначе заколка списалась бы дважды.
++    if (!localMode) return;
+     if (previous === null || broken <= previous || !isOperator) return;
+     void spendBobbyPins(broken - previous, { characterId });
+-  }, [game?.brokenPins, isOperator, visible, containerId, characterId]);
++  }, [game?.brokenPins, isOperator, visible, containerId, characterId, localMode]);
++
++  // Патч 528: если на этом нажатии заколка сломалась, сервер помечает доску
++  // breakHighlight. Держим красный «?» видимым durationMs, затем локально
++  // гасим его (цвета обновляются). Если поломки НЕ было, breakHighlight нет —
++  // красный остаётся до следующего нажатия, как просил владелец.
++  useEffect(() => {
++    if (!visible || !game?.breakHighlight) {
++      setBreakRedFaded(false);
++      return undefined;
++    }
++    setBreakRedFaded(false);
++    const ms = Math.max(0, Number(game.breakHighlight.durationMs) || 650);
++    const timer = setTimeout(() => setBreakRedFaded(true), ms);
++    return () => clearTimeout(timer);
++  }, [visible, game?.revision, game?.breakHighlight?.durationMs]);
++
++  const displayCells = useMemo(() => {
++    const cells = game?.cells || [];
++    if (!breakRedFaded) return cells;
++    return cells.map((cell) => (cell?.state === CELL_STATE.RED
++      ? { arrow: null, state: CELL_STATE.HIDDEN }
++      : cell));
++  }, [game?.cells, breakRedFaded]);
++  // На время паузы не перескакиваем в панель «Подход завершён»: игрок должен
++  // увидеть именно красную ячейку, даже если это была последняя заколка.
++  const holdBoard = Boolean(game?.breakHighlight) && !breakRedFaded;
+ 
+   const localStep = (state, action, value) => {
+     const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
+@@ -232,7 +264,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   }, [visible, autoStart, freshAttempt, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
+ 
+   const rows = useMemo(() => {
+-    const cells = game?.cells || [];
++    const cells = displayCells;
+     const sizes = game?.rows || [cells.length];
+     const out = [];
+     let at = 0;
+@@ -241,7 +273,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+       at += size;
+     }
+     return out;
+-  }, [game?.cells, game?.rows]);
++  }, [displayCells, game?.rows]);
+ 
+   const resultLabel = {
+     'PIN BROKEN': 'lock.pinBroken',
+@@ -376,13 +408,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
+               {newAttemptButton}
+             </View>
+-          ) : isClosed ? (
++          ) : (isClosed && !holdBoard) ? (
+             <View style={styles.accessPanel}>
+               <Text style={styles.closedText}>{tLootTrade('lock.approachFinished')}</Text>
+               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
+               {newAttemptButton}
+             </View>
+-          ) : awaitingGm ? (
++          ) : (awaitingGm && !holdBoard) ? (
+             // Патч 526: замки не блокируются. Вместо «Ожидание решения
+             // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
+             // начать ли новый (купил заколки, прокачал PER/LOCKPICK).
+@@ -437,12 +469,12 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               {viewOnly ? (
+                 <Text style={styles.spectatorNotice}>{tLootTrade('lock.viewOnly')}</Text>
+               ) : null}
+-              {game.cells?.some((c) => c.state === CELL_STATE.GREY) ? (
++              {displayCells.some((c) => c.state === CELL_STATE.GREY) ? (
+                 <Text style={styles.statusHint}>{tLootTrade('lock.greyHint')}</Text>
+               ) : null}
+               <Text style={styles.statusHint}>
+                 {formatLootTrade(tLootTrade('lock.progress'), {
+-                  done: game.cells.filter((c) => c.state === CELL_STATE.GREEN).length,
++                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
+                   total: game.cellCount,
+                 })}
+               </Text>
+diff --git a/components/lootTrade/spendBobbyPins.js b/components/lootTrade/spendBobbyPins.js
+index ef2edb2..82be62c 100644
+--- a/components/lootTrade/spendBobbyPins.js
++++ b/components/lootTrade/spendBobbyPins.js
+@@ -18,7 +18,7 @@ import engine from '../../server/lockPicking';
+ 
+ export const BOBBY_PIN_ITEM_ID = 'item_bobby_pin';
+ 
+-export const spendBobbyPins = async (count, { characterId } = {}) => {
++export const spendBobbyPins = async (count, { characterId, publish = true } = {}) => {
+   const delta = Math.max(0, Math.floor(Number(count) || 0));
+   if (delta <= 0) return 0;
+   const store = useCharacterStore.getState();
+@@ -61,11 +61,16 @@ export const spendBobbyPins = async (count, { characterId } = {}) => {
+   } catch (error) {
+     debugLog('lock.spendBobbyPins:saveFailed', { message: error?.message });
+   }
+-  try {
+-    const id = characterId || useCharacterStore.getState().currentCharacterId;
+-    if (id) await pushSavedCharacterToBoundRoomIfAny(id);
+-  } catch (error) {
+-    debugLog('lock.spendBobbyPins:publishFailed', { message: error?.message });
++  // Патч 528: в сетевом режиме публикацию делает вторая команда сервера
++  // (`char.refresh`), поэтому здесь её можно отключить. В локальном резерве
++  // серверных команд нет — лист публикуется сразу.
++  if (publish) {
++    try {
++      const id = characterId || useCharacterStore.getState().currentCharacterId;
++      if (id) await pushSavedCharacterToBoundRoomIfAny(id);
++    } catch (error) {
++      debugLog('lock.spendBobbyPins:publishFailed', { message: error?.message });
++    }
+   }
+   return spent;
+ };
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d32b137..a726c3f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,82 @@
+ # Changelog
+ ---
++## Spend commands and a pause before the colours update (patch 528)
++
++The owner clarified the patch 527 architecture: "Bobby pins are removed not
++from the snapshot; instead the client is sent a command to spend a pin from the
++inventory using the standard tools. And after the spend a command is sent to
++update the snapshot." Plus: "If a cell turns red and a pin breaks, make a small
++pause before updating the colours. But if the pin did not break, the red stays."
++
++### 1. The server no longer edits someone else's inventory
++
++On a break `server/roomRegistry.js` no longer calls `consumeBobbyPins()` against
++`room.lastSnapshots`; it only returns `pinsToSpend` (the `brokenPins` delta),
++`characterId` and `clientId`. `server/roomServer.js` registers the command and
++sends the operator two frames in a row:
++
++- `char.spend` — spend the pin with the standard inventory tools;
++- `char.refresh` — after the spend, update the snapshot.
++
++Both messages are mirrored in `server/protocol.js` and
++`src/room/roomProtocol.ts`; message caps, roles and validation are intact.
++`putSnapshot()` clears unacknowledged commands and `room.state` carries
++`pendingSpends`, so commands are replayed on reconnect.
++
++### 2. The client applies them in strict order
++
++The new `components/lootTrade/CharSpendCommandHost.js` is mounted once in
++`App.js` above every screen (the mini-game window may already be closed). The
++`onRoomCharSpend` subscription in `src/room/roomStore.ts` receives both frames:
++
++1. `char.spend` → `spendBobbyPins()` uses the standard
++   `useCharacterStore.spendItemStacks` (plus a legacy-snapshot fallback) and
++   `saveCharacter()`, but deliberately does **not** publish (`publish: false`);
++2. `char.refresh` → explicitly awaits the spend, then the standard
++   `pushSavedCharacterToBoundRoomIfAny()` sends the ordinary `char.publish`.
++
++WebSocket frame order is guaranteed and the await is explicit, so the room
++receives an ALREADY updated sheet. `spendId` is deduplicated (memory +
++AsyncStorage), so a replay after reconnect never deducts twice. Commands for a
++different character or a different `itemId` are ignored. With the old-server
++local fallback the effect in `LockPickingModal` still spends — and only there,
++so there is no double deduction.
++
++`consumeBobbyPins()` remains a pure helper for the client fallback and tests;
++the server no longer uses it.
++
++### 3. Pause before the colours update
++
++- `server/lockPicking.js` puts `breakHighlight = { durationMs: 650 }` into the
++  board state on a break and keeps the red «?» in `cells`. The next press clears
++  the marker and wipes old red cells (exactly one red cell — the current
++  mistake).
++- `components/lootTrade/LockPickingModal.js` shows the red «?» during the pause,
++  then locally hides it after `durationMs`; the grey guessed arrows remain. The
++  window does NOT jump to «Attempt finished» during the pause even if it was the
++  last pin. The marker lives in the board state, so spectators and reconnected
++  tabs see the same pause; `localLockGame.js` forwards it through
++  `publicLockGameState`.
++- If the pin did **not** break there is no `breakHighlight` — the red «?» stays
++  until the next press, as requested.
++
++### What is preserved
++
++Laws 520–527: PER/Luck/LOCKPICK, four terminal attempts, unlimited explicit
++player attempts, no automatic restart after ACCESS GRANTED, GM Yes/No only for
++terminals, the `shouldBlockLock()` hook, the 525 light palette and entry modal,
++the 527 «Заколка» canon, darkened arrow area and hint. Server protection (roles,
++message caps, validation, atomicity) was not weakened.
++
++### Checks
++
++`npm run typecheck`, `npm run build`, `npm test` (257 files, 2318 tests),
++`git apply --check`, installer from the exact `a62ec71` base and from version
++527 with byte comparison, live WS probe. Acceptance tests:
++`__tests__/room/char-spend-commands-528.test.js`,
++`__tests__/lootTrade/lock-break-pause-528.test.js`; historical 527 tests were
++updated for the new spend law.
++
+ ## Bobby pins, arrows and honest consumption (patch 527)
+ 
+ Four notes from the owner about the lock mini-game: the Russian item name, the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ace5e0f..99e1b9a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,86 @@
+ # История изменений
+ 
+ ---
++## Команды списания и пауза перед сбросом цветов (патч 528)
++
++Владелец уточнил архитектуру патча 527: «Заколки удаляются не из снапшота, а
++клиенту посылается команда на списание заколки из инвентаря, штатными
++средствами. И после списания посылается команда на обновление снапшота». И
++добавил: «Если ячейка красится в красный и заколка ломается, сделай небольшую
++паузу перед обновлением цветов. Но если заколка не сломалась, красный
++остается».
++
++### 1. Сервер больше не правит чужой инвентарь
++
++`server/roomRegistry.js` при поломке больше НЕ вызывает `consumeBobbyPins()` для
++`room.lastSnapshots`: он лишь возвращает `pinsToSpend` (дельту `brokenPins`),
++`characterId` и `clientId`. Сетевой слой `server/roomServer.js` регистрирует
++команду (`registerPinSpend`) и шлёт оператору два кадра подряд:
++
++- `char.spend` — «спиши заколку из инвентаря штатными средствами»;
++- `char.refresh` — «после списания обнови снимок».
++
++Новые сообщения добавлены в `server/protocol.js` и зеркало
++`src/room/roomProtocol.ts`; лимиты сообщений, роли и валидация не ослаблены.
++`putSnapshot()` снимает неподтверждённые команды, а `room.state` содержит
++`pendingSpends` — при переподключении команды повторяются.
++
++### 2. Клиент применяет команды в строгом порядке
++
++Новый `components/lootTrade/CharSpendCommandHost.js` смонтирован один раз в
++`App.js` поверх любых экранов (окно мини-игры могло быть уже закрыто).
++Подписка `onRoomCharSpend` в `src/room/roomStore.ts` ловит оба кадра:
++
++1. `char.spend` → `spendBobbyPins()` вызывает штатный
++   `useCharacterStore.spendItemStacks` (с резервом для легаси-форм снимка) и
++   `saveCharacter()`, но **не** публикует лист сам (`publish: false`);
++2. `char.refresh` → явно дожидается окончания списания, затем штатный
++   `pushSavedCharacterToBoundRoomIfAny()` отправляет обычный `char.publish`.
++
++Порядок кадров WebSocket гарантирован, а ожидание прописано явно — в комнату
++уходит УЖЕ обновлённый лист. `spendId` дедуплицируется (память +
++`AsyncStorage`), поэтому повтор после реконнекта не спишет заколку дважды.
++Команда для другого персонажа или другого `itemId` игнорируется. В локальном
++резерве старого сервера (нет протокола) списание по-прежнему делает эффект в
++`LockPickingModal`, но только там — двойного вычета нет.
++
++`consumeBobbyPins()` остался чистым помощником для клиентского резерва и
++тестов; сервер его больше не использует.
++
++### 3. Пауза перед обновлением цветов
++
++- `server/lockPicking.js`: на поломке в состояние доски кладётся
++  `breakHighlight = { durationMs: 650 }`; красный «?» в `cells` сохраняется.
++  При любом следующем нажатии метка снимается, а старые красные ячейки
++  стираются (ровно одна красная — текущая ошибка).
++- `components/lootTrade/LockPickingModal.js`: пока пауза идёт, красный «?»
++  рисуется как есть; по истечении `durationMs` он локально гаснет (ячейка
++  становится скрытой), а серые угаданные стрелки остаются. На время паузы окно
++  НЕ перескакивает в панель «Подход завершён», даже если это была последняя
++  заколка. Метка живёт в состоянии доски, поэтому паузу видят и зрители, и
++  переподключившиеся вкладки; `localLockGame.js` отдаёт её через
++  `publicLockGameState`.
++- Если заколка **не** сломалась, `breakHighlight` отсутствует — красный «?»
++  остаётся до следующего нажатия, как просил владелец.
++
++### Что сохранено
++
++Законы 520–527: PER/Удача/LOCKPICK, четыре попытки терминала, сколько угодно
++явных подходов игрока, запрет автоматического рестарта после ACCESS GRANTED,
++«Да/Нет» Мастера только для терминала, `shouldBlockLock()` как задел под
++будущую блокировку, светлая гамма и входная модалка 525, канон «Заколка»,
++затемнённая область стрелок и подсказка 527. Защита сервера (роли, лимиты
++сообщений, валидация, атомарность) не ослаблялась.
++
++### Проверки
++
++`npm run typecheck`, `npm run build`, `npm test` (257 файлов, 2318 тестов),
++`git apply --check`, установщик от точной базы `a62ec71` и от версии 527 с
++побайтовым сравнением деревьев, живая WS-проба. Приёмочные тесты:
++`__tests__/room/char-spend-commands-528.test.js`,
++`__tests__/lootTrade/lock-break-pause-528.test.js`; исторические тесты 527
++обновлены под новый закон списания.
++
+ ## Заколки, стрелки и честное списание (патч 527)
+ 
+ Четыре замечания владельца к мини-игре замка: русское имя предмета, вид блока
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 7537e06..230507c 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -314,3 +314,45 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ `shouldBlockLock()` для будущей блокировки замков, светлая гамма и двухшаговый
+ вход 525. Защита сервера (роли, размеры сообщений, валидация, атомарность)
+ не ослаблялась.
++
++## 14. Уточнение 528: команды списания и пауза перед сбросом цветов
++
++Владелец поправил архитектуру раздела 13: «Заколки удаляются не из снапшота, а
++клиенту посылается команда на списание заколки из инвентаря, штатными
++средствами. И после списания посылается команда на обновление снапшота».
++
++**Владение листом.** Сервер больше НЕ вызывает `consumeBobbyPins()` для
++`room.lastSnapshots`. `terminalAction()` возвращает только `pinsToSpend`
++(дельту `brokenPins`), а сетевой слой шлёт оператору два кадра подряд:
++
++| Кадр | Смысл | Что делает клиент |
++| --- | --- | --- |
++| `char.spend` | «спиши заколку штатными средствами» | `spendBobbyPins()` → `spendItemStacks` + `saveCharacter`, без публикации |
++| `char.refresh` | «после списания обнови снимок» | ждёт окончания списания, затем штатный `pushSavedCharacterToBoundRoomIfAny()` → `char.publish` |
++
++`CharSpendCommandHost` смонтирован один раз в `App.js` поверх всех экранов.
++`spendId` дедуплицируется (память + AsyncStorage), `pendingSpends` в
++`room.state` повторяет команды после реконнекта, `putSnapshot()` снимает
++неподтверждённые. Команда для чужого персонажа/предмета игнорируется. В
++локальном резерве (старый сервер без протокола) списание остаётся в эффекте
++`LockPickingModal`, и только там — двойного вычета нет. `consumeBobbyPins()`
++живёт как чистый помощник клиентского резерва и тестов.
++
++Следствие для баланса: число заколок для новой доски по-прежнему берётся из
++ТЕКУЩЕГО опубликованного листа, но этот лист обновляется клиентом сразу после
++списания. `pinLedger` — только диагностика; `spentPins` при сборке `0`.
++
++**Пауза.** `Если ячейка красится в красный и заколка ломается, сделай
++небольшую паузу перед обновлением цветов. Но если заколка не сломалась,
++красный остается`. На поломке в состояние доски кладётся
++`breakHighlight = { durationMs: 650 }`, а красный «?» сохраняется в `cells`.
++Клиент держит красный видимым `durationMs`, затем локально скрывает ячейку;
++серые угаданные стрелки остаются. На время паузы окно не перескакивает в
++«Подход завершён» (важно для последней заколки). Метка живёт в состоянии,
++поэтому её видят зрители и переподключившиеся вкладки; следующее нажатие
++снимает метку и стирает старые красные ячейки. Без поломки метки нет — красный
++остаётся до следующего нажатия.
++
++Регрессии: явные подходы 526, светлая гамма 525, канон «Заколка» и область
++стрелок 527, четыре попытки терминала, `shouldBlockLock()`, защита сервера —
++без изменений.
+diff --git a/docs/patch-528-install.md b/docs/patch-528-install.md
+new file mode 100644
+index 0000000..04b893e
+--- /dev/null
++++ b/docs/patch-528-install.md
+@@ -0,0 +1,92 @@
++# Установка патча 528: команды списания и пауза перед сбросом цветов
++
++Патч подготовлен от состояния **версии 527** (коммит `90cdeaf`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–528
++цепочкой. Файл установки: `patchs/528-char-spend-commands.patch`.
++
++> Владелец: «Заколки удаляются не из снапшота, а клиенту посылается команда на
++> списание заколки из инвентаря, штатными средствами. И после списания
++> посылается команда на обновление снапшота. Так не проще?» И: «Если ячейка
++> красится в красный и заколка ломается, сделай небольшую паузу перед
++> обновлением цветов. Но если заколка не сломалась, красный остается».
++
++## Что изменено
++
++### 1. Сервер перестал править чужой инвентарь
++
++- `server/roomRegistry.js`: при росте `brokenPins` больше НЕ вызывается
++  `consumeBobbyPins()` для `room.lastSnapshots`. `terminalAction()` возвращает
++  `pinsToSpend` (дельту), `characterId` и `clientId`. Неподтверждённые команды
++  живут в `room.pendingPinSpends`, `putSnapshot()` их снимает, `room.state`
++  отдаёт `pendingSpends` для повтора после реконнекта. Новые методы:
++  `registerPinSpend()` и `pendingSpendsForClient()`.
++- `server/roomServer.js`: новый `sendPinSpendCommands()` шлёт оператору два
++  кадра подряд — `char.spend` (spendId, characterId, itemId, count) и
++  `char.refresh` (spendId, characterId). Порядок кадров WebSocket
++  гарантирован. При `room.join` неподтверждённые команды повторяются.
++- `server/protocol.js` / `src/room/roomProtocol.ts`: `CHAR_SPEND`
++  (`char.spend`) и `CHAR_REFRESH` (`char.refresh`). Лимиты сообщений, проверки
++  роли/членства и валидация не ослаблены.
++- `consumeBobbyPins()` остался чистым помощником: его использует клиентский
++  резерв для легаси-форм снимка и приёмочные тесты.
++
++### 2. Клиент применяет команды штатными средствами
++
++- `src/room/roomStore.ts`: подписка `onRoomCharSpend` для обоих кадров.
++- `components/lootTrade/CharSpendCommandHost.js` (новый, смонтирован в
++  `App.js` поверх всех экранов): `char.spend` → `spendBobbyPins()` вызывает
++  `useCharacterStore.spendItemStacks` и `saveCharacter()` **без** публикации;
++  `char.refresh` явно дожидается списания и публикует лист штатным
++  `pushSavedCharacterToBoundRoomIfAny()` → обычный `char.publish`.
++  `spendId` дедуплицируется (память + AsyncStorage): повтор команды после
++  реконнекта не спишет заколку дважды. Команда чужому персонажу или с другим
++  `itemId` игнорируется.
++- `components/lootTrade/spendBobbyPins.js`: опция `publish: false` для
++  сетевого режима; в локальном резерве лист публикуется как раньше.
++- `components/lootTrade/LockPickingModal.js`: эффект списания оставлен
++  **только** для локального резерва старого сервера, чтобы не было двойного
++  вычета.
++
++### 3. Пауза перед обновлением цветов
++
++- `server/lockPicking.js`: константа `BREAK_HIGHLIGHT_MS = 650`; на поломке
++  `breakHighlight = { durationMs: 650 }`, красный «?» в `cells` сохраняется;
++  следующее нажатие снимает метку и стирает старые красные ячейки.
++  `publicLockGameState()` пробрасывает метку клиенту и зрителям.
++- `components/lootTrade/LockPickingModal.js`: `breakRedFaded` гасит красный
++  только по истечении `durationMs`; `holdBoard` удерживает доску на экране на
++  время паузы, даже когда заколки кончились. Без `breakHighlight` красный
++  остаётся до следующего нажатия.
++- `components/lootTrade/localLockGame.js`: локальный резерв доски отдаёт метку
++  через тот же `publicLockGameState`.
++
++## Что сохранено
++
++- Защита сервера: лимиты сообщений, роли/владелец/членство, валидация JSON,
++  целые положительные количества, атомарность переносов.
++- Законы 520–527: PER/Удача/LOCKPICK, четыре попытки терминала, сколько
++  угодно явных подходов игрока, запрет автоматического рестарта после ACCESS
++  GRANTED, «Да/Нет» Мастера только для терминала, `shouldBlockLock()`,
++  светлая гамма и входная модалка 525, канон «Заколка», затемнённая область
++  стрелок, точная подсказка и красная ошибка 527.
++- Законы 522 (единый предмет, без игровых лимитов, поля не обрезаются) и 523
++  (граф, граница видимости, адресный взлом, общие ресурсы).
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`, `npm test` (полный набор: 257 файлов,
++  2318 тестов).
++- `git apply --check patchs/528-char-spend-commands.patch` от дерева 527.
++- `./apply-patch.sh 528` от версии 527 и полная цепочка 493–528 от чистого
++  `main` `a62ec71`; побайтовое сравнение установленных деревьев.
++- Приёмочные тесты: `__tests__/room/char-spend-commands-528.test.js` (зеркало
++  протокола, команды реестра, строгий порядок `spend → refresh`, дедупликация,
++  отказ чужому персонажу/предмету), `__tests__/lootTrade/lock-break-pause-528.test.js`
++  (метка паузы в ядре и локальном резерве, красный виден сразу и гаснет после
++  паузы, панель не перескакивает, без поломки красный остаётся). Исторические
++  тесты 527 обновлены под новый закон.
++- Живой сервер комнат: `/version.json` = 528/4/105+105 и WS-проба с парой
++  команд `char.spend`/`char.refresh` и последующим `char.publish`.
++- После установки на боевой площадке перезапустить процесс сервера комнат,
++  чтобы подхватить обновлённые файлы `server/`.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index d876fa9..505ab85 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **527**.
++Дата ревизии: 2026-11-04. Текущая версия: **528**.
+ 
+ ## Тезисы
+ 
+@@ -29,14 +29,15 @@
+ | 15 | Двухшаговый вход в мини-игру: сначала модалка точки по образцу локации с «Взломать»/«Смотреть» и без «Покинуть локацию», доска монтируется уже готовой; светлая гамма взлома замка из палитры модалок | ✅ сделано | **525** |
+ | 16 | Подходы игрока без «билета»: сколько угодно явных попыток по своему усмотрению (купил отмычки / прокачался), без автоматического рестарта после победы; терминал после блокировки — по решению Мастера, замки пока не блокируются с заделом под будущее условие | ✅ сделано | **526** |
+ | 17 | Исправление мини-игры замка: русское имя предмета «Заколка» (не шпилька/отмычка/булавка), затемнённая область стрелок с крупными разведёнными стрелками и точной подсказкой под счётчиком, списание сломанных заколок из настоящего инвентаря, красный «?» при ошибке | ✅ сделано | **527** |
++| 18 | Списание заколки командами клиенту (`char.spend` → `char.refresh` → штатный `char.publish`), сервер не правит чужой снимок; пауза перед обновлением цветов на поломке, красный остаётся если заколка цела | ✅ сделано | **528** |
+ 
+-## Осталось после патча 527
++## Осталось после патча 528
+ 
+-Патчи 524–527 закрыли сбой мини-игры замка, окна локации, входа в игру,
+-правило подходов, а также терминологию, вид стрелок, списание заколок из
+-инвентаря и красную ошибку — не меняя порядок тринадцатого тезиса: граф,
+-граница видимости, адресный взлом, общие ресурсы и одна сессия из 523 остаются
+-регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
++Патчи 524–528 закрыли сбой мини-игры замка, окна локации, входа в игру,
++правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
++красную ошибку и паузу перед её сбросом — не меняя порядок тринадцатого
++тезиса: граф, граница видимости, адресный взлом, общие ресурсы и одна сессия
++из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+ после ACCESS GRANTED, а не про запрет новых подходов игрока; «один взлом на
+@@ -148,6 +149,7 @@
+ - `docs/patch-525-install.md` — установка обновления 525 и его проверки.
+ - `docs/patch-526-install.md` — установка обновления 526 и его проверки.
+ - `docs/patch-527-install.md` — установка исправления 527 и его проверки.
++- `docs/patch-528-install.md` — установка обновления 528 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index a218dbf..061324a 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "527"
++  "baseline": "528"
+ }
+diff --git a/public/version.json b/public/version.json
+index 84dc87b..1102d9c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "527",
++  "version": "528",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Сломанная заколка теперь списывается штатными средствами самого игрока: сервер больше не правит снимок чужого листа, а посылает команды «спиши предмет» и «обнови снимок».",
++      "Сначала клиент списывает заколку из инвентаря и сохраняет лист, и только после этого публикует обновлённый снимок в комнату Мастера.",
++      "Если на нажатии заколка сломалась, красный «?» остаётся видимым ещё мгновение и лишь потом гаснет; если заколка не сломалась, красный остаётся до следующего нажатия.",
++      "Команды списания переживают переподключение вкладки и не списывают заколку дважды.",
+       "Предмет для взлома по-русски теперь называется «Заколка» — не «шпилька», не «отмычка» и не «булавка». «Электронная отмычка» осталась отдельным предметом, а все подписи замка говорят про заколки.",
+       "Область стрелок на компьютере и телефоне стала чуть темнее окна: стрелки крупнее и расставлены шире, линии их больше не пересекают. Под счётчиком заколок появилась точная подсказка про зелёный, красный и поломку заколки.",
+       "Сломанная заколка теперь действительно исчезает из инвентаря персонажа: и из локального листа игрока, и из опубликованного снимка в комнате Мастера, а не только из счётчика мини-игры.",
+@@ -106,6 +110,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A broken bobby pin is now spent by the player's own standard inventory tools: the server no longer edits the published sheet, it sends a «spend item» command and then a «refresh snapshot» command.",
++      "The client first removes the pin from the inventory and saves the sheet, and only then publishes the updated snapshot to the Game Master's room.",
++      "When a pin breaks on a press, the red «?» stays visible for a short pause before the colours update; if the pin did not break, the red mark stays until the next press.",
++      "Spend commands survive a tab reconnect and never deduct the same pin twice.",
+       "The Russian name of the lockpicking item is now exactly «Заколка» — not «шпилька», «отмычка» or «булавка». The Electronic Lockpick remains a separate item, and every lock label now says «заколки».",
+       "The arrow area is slightly darker than the window on desktop and phone: arrows are bolder and more widely spaced, no lines crossing them. An exact hint under the pin counter explains green, red and a broken bobby pin.",
+       "A broken bobby pin now really leaves the character's inventory — both the local player sheet and the published snapshot in the Game Master's room — instead of only decrementing the mini-game counter.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index bdaf9d5..f69dfff 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -21,6 +21,12 @@
+ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+ 
+ const ARROWS = Object.freeze(['left', 'up', 'right', 'down']);
++// Патч 528: когда на нажатии сломалась заколка, красный «?» показывается
++// ещё недолго, и только потом цвета обновляются (красный гаснет, угаданные
++// стрелки уже серые). Если заколка НЕ сломалась — красный остаётся до
++// следующего нажатия. Длительность живёт в состоянии доски, поэтому её видят
++// и зрители, и переподключившиеся вкладки.
++const BREAK_HIGHLIGHT_MS = 650;
+ const CELL_STATE = Object.freeze({
+   HIDDEN: 'hidden',
+   GREEN: 'green',
+@@ -508,6 +514,7 @@ const applyLockAction = ({
+     ...game,
+     cells,
+     pressedArrows,
++    breakHighlight: null,
+     revision: game.revision + 1,
+     updatedAt: now,
+   };
+@@ -541,6 +548,9 @@ const applyLockAction = ({
+   next.brokenPins = (game.brokenPins || 0) + 1;
+   next.pinFailures = 0;
+   next.cursor = 0;
++  // Пауза перед обновлением цветов: сервер сохраняет красный «?» в cells, а
++  // клиент по истечении breakHighlight.durationMs рисует его скрытым.
++  next.breakHighlight = { durationMs: BREAK_HIGHLIGHT_MS };
+   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
+   // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
+   // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
+@@ -566,6 +576,7 @@ const applyLockAction = ({
+ 
+ module.exports = {
+   ARROWS,
++  BREAK_HIGHLIGHT_MS,
+   CELL_STATE,
+   LOCK_NODE_MARKER,
+   encodeLockNodeMarker,
+diff --git a/server/protocol.js b/server/protocol.js
+index c2f28bb..9c40715 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -20,6 +20,11 @@ const MESSAGE = Object.freeze({
+   PRESENCE_PONG: 'presence.pong',
+   CHAR_PUBLISH: 'char.publish',
+   CHAR_FOCUS: 'char.focus',
++  // Патч 528: сломанная заколка списывается КОМАНДОЙ клиенту, а не правкой
++  // чужого снимка на сервере. Сначала «спиши предмет штатными средствами»,
++  // затем «обнови снимок» (клиент публикует лист обычным char.publish).
++  CHAR_SPEND: 'char.spend',
++  CHAR_REFRESH: 'char.refresh',
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 623920f..4d44ef2 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -36,7 +36,6 @@ const {
+   closeLockGame,
+   applyLockAction,
+   shouldBlockLock,
+-  consumeBobbyPins,
+ } = require('./lockPicking');
+ 
+ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+@@ -195,11 +194,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+     accessEvents: new Map(),
+-    // Патч 520/527: диагностический счётчик сломанных заколок по персонажу.
+-    // С 527 число заколок для доски читается напрямую из опубликованного
+-    // снимка листа: при поломке снимок уменьшается сервером, а клиент
+-    // списывает заколку из локального инвентаря. Живёт в памяти комнаты.
++    // Патч 520/527/528: диагностический счётчик сломанных заколок. С 528
++    // сервер НЕ правит опубликованный снимок листа: он шлёт клиенту команду
++    // char.spend (списать предмет штатными средствами) и char.refresh
++    // (обновить снимок), а снимок меняется только обычным char.publish.
+     pinLedger: new Map(),
++    // Неподтверждённые команды списания: до публикации свежего листа. Нужны,
++    // чтобы повторить команду при переподключении вкладки оператора.
++    pendingPinSpends: new Map(),
+     partyStorage: emptyStorage(),
+     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+     recentTerminalWords: [],
+@@ -241,6 +243,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       fromName: entry.fromName,
+     })),
+     activeSession: room.activeSession || null,
++    // Патч 528: команды, которые клиент обязан применить после реконнекта.
++    pendingSpends: [...(room.pendingPinSpends?.values() || [])].map((entry) => ({ ...entry })),
+     terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
+       id,
+       terminalPublic(id, entry),
+@@ -420,6 +424,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     room.lastSnapshots.set(characterId, {
+       characterId, revision: Number(revision) || 0, snapshot, fromClientId, fromName, updatedAt: now(),
+     });
++    // Патч 528: свежий лист уже учёл списание — повторять команду не надо.
++    // Это же снимает гонку, если char.refresh/char.spendAck потерялся.
++    for (const [spendId, pending] of room.pendingPinSpends || []) {
++      if (pending.characterId === characterId) room.pendingPinSpends.delete(spendId);
++    }
+     return { room, stored: true, currentRevision: Number(revision) || 0 };
+   };
+ 
+@@ -798,24 +807,15 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
+     const brokenBefore = Number(entry.game?.brokenPins || 0);
+     entry.game = result.game;
++    let pinsToSpend = 0;
+     if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
+       const delta = result.game.brokenPins - brokenBefore;
+-      // Патч 527: сломанная заколка исчезает из инвентаря. Сервер уменьшает
+-      // quantity в опубликованном снимке листа (источник истины для доски),
+-      // клиент зеркально списывает её из локального инвентаря и сохраняет лист.
+-      // pinLedger оставлен как диагностический счётчик, но доступность заколок
+-      // больше из него не считается — иначе списание учлось бы дважды.
++      // Патч 528: сервер НЕ трогает инвентарь в опубликованном снимке. Он лишь
++      // сообщает сетевому слою, сколько заколок надо списать: тому клиенту
++      // уйдут char.spend и char.refresh, а снимок обновится штатным
++      // char.publish уже после списания. Владелец листа — клиент.
++      pinsToSpend = delta;
+       room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
+-      const consumed = consumeBobbyPins(published.snapshot || {}, delta);
+-      if (consumed.consumed > 0) {
+-        room.lastSnapshots.set(charId, {
+-          ...published,
+-          snapshot: consumed.snapshot,
+-          revision: (Number(published.revision) || 0) + 1,
+-          updatedAt: now(),
+-        });
+-        entry.operatorSnapshot = consumed.snapshot;
+-      }
+     }
+     if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+       // Держим слова последних трёх досок (по 12–20 слов каждая).
+@@ -842,7 +842,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+     // для которых ключ был необязательным.
+     refreshKeyAccess(room);
+-    return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
++    return {
++      room,
++      terminal: terminalPublic(id, entry),
++      usedDigest: Boolean(result.usedDigest),
++      pinsToSpend,
++      characterId: charId,
++      clientId,
++    };
+   };
+ 
+   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
+@@ -1405,9 +1412,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return removed;
+   };
+ 
++  /**
++   * Патч 528: зарегистрировать команду списания заколки для оператора.
++   * Возвращает её идентификатор; команда живёт до публикации свежего листа.
++   */
++  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => {
++    const room = rooms.get(code);
++    if (!room || !spendId || !characterId) return null;
++    const entry = {
++      spendId: String(spendId),
++      characterId: String(characterId),
++      clientId: String(clientId || ''),
++      count: Math.max(1, Math.floor(Number(count) || 1)),
++      itemId: 'item_bobby_pin',
++      at: now(),
++    };
++    room.pendingPinSpends.set(entry.spendId, entry);
++    return entry;
++  };
++
++  /** Команды, которые надо повторить конкретному клиенту после реконнекта. */
++  const pendingSpendsForClient = (code, clientId, characterId = null) => {
++    const room = rooms.get(code);
++    if (!room) return [];
++    return [...(room.pendingPinSpends?.values() || [])]
++      .filter((entry) => entry.clientId === clientId
++        || (characterId && entry.characterId === characterId))
++      .map((entry) => ({ ...entry }));
++  };
++
+   return {
+     createRoom,
+     joinRoom,
++    registerPinSpend,
++    pendingSpendsForClient,
+     leaveRoom,
+     putSnapshot,
+     isOwner,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 33cf849..a532a25 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -7,6 +7,7 @@
+ // requestId в payload эхом возвращается в ответах create/join/error).
+ 
+ const http = require('node:http');
++const crypto = require('node:crypto');
+ const fs = require('node:fs');
+ const path = require('node:path');
+ const zlib = require('node:zlib');
+@@ -276,6 +277,26 @@ const attachRoomWebSocketServer = (httpServer, {
+     sendEnvelope(ws, MESSAGE.ERROR, { code, requestId }, roomCode, clientId);
+   };
+ 
++  /**
++   * Патч 528: две команды оператору. Порядок кадров WebSocket гарантирует,
++   * что клиент сначала спишет заколку штатным spendItemStacks + saveCharacter,
++   * и ТОЛЬКО ПОСЛЕ этого опубликует свежий снимок (char.publish).
++   * Сервер сам никогда не правит чужой инвентарь.
++   */
++  const sendPinSpendCommands = (ws, code, clientId, entry) => {
++    if (!entry) return;
++    sendEnvelope(ws, MESSAGE.CHAR_SPEND, {
++      spendId: entry.spendId,
++      characterId: entry.characterId,
++      itemId: entry.itemId,
++      count: entry.count,
++    }, code, clientId);
++    sendEnvelope(ws, MESSAGE.CHAR_REFRESH, {
++      spendId: entry.spendId,
++      characterId: entry.characterId,
++    }, code, clientId);
++  };
++
+   const broadcastMembers = (room, exceptClientId = null) => {
+     const members = [...room.members.values()].map((member) => ({
+       clientId: member.clientId, name: member.name, role: member.role,
+@@ -508,6 +529,11 @@ const attachRoomWebSocketServer = (httpServer, {
+             requestId: payload.requestId || null,
+           }, canonical, clientId);
+           broadcastMembers(result.room, clientId);
++          // Патч 528: вкладка оператора могла уйти до публикации листа.
++          // Повторяем обе команды — клиент дедуплицирует по spendId.
++          for (const pending of registry.pendingSpendsForClient(canonical, clientId)) {
++            sendPinSpendCommands(ws, canonical, clientId, pending);
++          }
+           break;
+         }
+ 
+@@ -742,6 +768,18 @@ const attachRoomWebSocketServer = (httpServer, {
+           // Патч 516: взлом привязанного терминала открывает точки с
+           // необязательным ключом.
+           broadcastKeyAccessState(result.room, clientId);
++          // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
++          // Никакой правки room.lastSnapshots здесь больше нет.
++          if (result.pinsToSpend > 0) {
++            const entry = registry.registerPinSpend({
++              code: canonical,
++              characterId: result.characterId || payload.characterId,
++              clientId,
++              count: result.pinsToSpend,
++              spendId: `pin-${crypto.randomBytes(8).toString('hex')}`,
++            });
++            sendPinSpendCommands(ws, canonical, clientId, entry);
++          }
+           break;
+         }
+ 
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 0123d6d..913f620 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -17,6 +17,9 @@ export const ROOM_MESSAGE = {
+   PRESENCE_PONG: 'presence.pong',
+   CHAR_PUBLISH: 'char.publish',
+   CHAR_FOCUS: 'char.focus',
++  // Патч 528: команды списания заколки и последующего обновления снимка.
++  CHAR_SPEND: 'char.spend',
++  CHAR_REFRESH: 'char.refresh',
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index c337678..a80313b 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -234,6 +234,8 @@ const publishListeners = new Set<(message: RoomEnvelope) => void>();
+ const sessionListeners = new Set<(message: RoomEnvelope) => void>();
+ const storageListeners = new Set<(message: RoomEnvelope) => void>();
+ const directiveListeners = new Set<(message: RoomEnvelope) => void>();
++/** Патч 528: команды списания предмета и обновления снимка (char.spend / char.refresh). */
++const charSpendListeners = new Set<(message: RoomEnvelope) => void>();
+ 
+ const getWebTabSessionSuffix = (): string => {
+   if (typeof window === 'undefined') return '';
+@@ -307,6 +309,12 @@ export const onRoomStorageState = (listener: (message: RoomEnvelope) => void) =>
+   return () => { storageListeners.delete(listener); };
+ };
+ 
++/** Патч 528: подписка на char.spend / char.refresh для штатного списания заколки. */
++export const onRoomCharSpend = (listener: (message: RoomEnvelope) => void) => {
++  charSpendListeners.add(listener);
++  return () => { charSpendListeners.delete(listener); };
++};
++
+ /** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
+ export const onRoomDirective = (listener: (message: RoomEnvelope) => void) => {
+   directiveListeners.add(listener);
+@@ -462,6 +470,19 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     ) {
+       applyDirectiveEnvelopeToStore(message);
+     }
++    // Патч 528: сервер НЕ правит снимок — он командует клиенту списать
++    // заколку, а затем обновить лист. Обработчик намеренно вызывается до
++    // разбора requestId: у этих кадров его нет и они ни с чем не сопоставляются.
++    if (
++      message.type === ROOM_MESSAGE.CHAR_SPEND
++      || message.type === ROOM_MESSAGE.CHAR_REFRESH
++    ) {
++      charSpendListeners.forEach((listener) => {
++        try { listener(message); } catch (error) {
++          debugLog('room.charSpendListener:failed', { message: (error as Error)?.message });
++        }
++      });
++    }
+     if (requestId && pendingRequests.has(requestId)) {
+       const pending = pendingRequests.get(requestId)!;
+       pendingRequests.delete(requestId);

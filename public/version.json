@@ -1,8 +1,12 @@
 {
-  "version": "527",
+  "version": "528",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Сломанная заколка теперь списывается штатными средствами самого игрока: сервер больше не правит снимок чужого листа, а посылает команды «спиши предмет» и «обнови снимок».",
+      "Сначала клиент списывает заколку из инвентаря и сохраняет лист, и только после этого публикует обновлённый снимок в комнату Мастера.",
+      "Если на нажатии заколка сломалась, красный «?» остаётся видимым ещё мгновение и лишь потом гаснет; если заколка не сломалась, красный остаётся до следующего нажатия.",
+      "Команды списания переживают переподключение вкладки и не списывают заколку дважды.",
       "Предмет для взлома по-русски теперь называется «Заколка» — не «шпилька», не «отмычка» и не «булавка». «Электронная отмычка» осталась отдельным предметом, а все подписи замка говорят про заколки.",
       "Область стрелок на компьютере и телефоне стала чуть темнее окна: стрелки крупнее и расставлены шире, линии их больше не пересекают. Под счётчиком заколок появилась точная подсказка про зелёный, красный и поломку заколки.",
       "Сломанная заколка теперь действительно исчезает из инвентаря персонажа: и из локального листа игрока, и из опубликованного снимка в комнате Мастера, а не только из счётчика мини-игры.",
@@ -106,6 +110,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "A broken bobby pin is now spent by the player's own standard inventory tools: the server no longer edits the published sheet, it sends a «spend item» command and then a «refresh snapshot» command.",
+      "The client first removes the pin from the inventory and saves the sheet, and only then publishes the updated snapshot to the Game Master's room.",
+      "When a pin breaks on a press, the red «?» stays visible for a short pause before the colours update; if the pin did not break, the red mark stays until the next press.",
+      "Spend commands survive a tab reconnect and never deduct the same pin twice.",
       "The Russian name of the lockpicking item is now exactly «Заколка» — not «шпилька», «отмычка» or «булавка». The Electronic Lockpick remains a separate item, and every lock label now says «заколки».",
       "The arrow area is slightly darker than the window on desktop and phone: arrows are bolder and more widely spaced, no lines crossing them. An exact hint under the pin counter explains green, red and a broken bobby pin.",
       "A broken bobby pin now really leaves the character's inventory — both the local player sheet and the published snapshot in the Game Master's room — instead of only decrementing the mini-game counter.",

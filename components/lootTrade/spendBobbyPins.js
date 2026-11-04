@@ -18,7 +18,7 @@ import engine from '../../server/lockPicking';
 
 export const BOBBY_PIN_ITEM_ID = 'item_bobby_pin';
 
-export const spendBobbyPins = async (count, { characterId } = {}) => {
+export const spendBobbyPins = async (count, { characterId, publish = true } = {}) => {
   const delta = Math.max(0, Math.floor(Number(count) || 0));
   if (delta <= 0) return 0;
   const store = useCharacterStore.getState();
@@ -61,11 +61,16 @@ export const spendBobbyPins = async (count, { characterId } = {}) => {
   } catch (error) {
     debugLog('lock.spendBobbyPins:saveFailed', { message: error?.message });
   }
-  try {
-    const id = characterId || useCharacterStore.getState().currentCharacterId;
-    if (id) await pushSavedCharacterToBoundRoomIfAny(id);
-  } catch (error) {
-    debugLog('lock.spendBobbyPins:publishFailed', { message: error?.message });
+  // Патч 528: в сетевом режиме публикацию делает вторая команда сервера
+  // (`char.refresh`), поэтому здесь её можно отключить. В локальном резерве
+  // серверных команд нет — лист публикуется сразу.
+  if (publish) {
+    try {
+      const id = characterId || useCharacterStore.getState().currentCharacterId;
+      if (id) await pushSavedCharacterToBoundRoomIfAny(id);
+    } catch (error) {
+      debugLog('lock.spendBobbyPins:publishFailed', { message: error?.message });
+    }
   }
   return spent;
 };

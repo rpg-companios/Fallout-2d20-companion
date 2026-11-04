@@ -21,6 +21,12 @@
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 const ARROWS = Object.freeze(['left', 'up', 'right', 'down']);
+// Патч 528: когда на нажатии сломалась заколка, красный «?» показывается
+// ещё недолго, и только потом цвета обновляются (красный гаснет, угаданные
+// стрелки уже серые). Если заколка НЕ сломалась — красный остаётся до
+// следующего нажатия. Длительность живёт в состоянии доски, поэтому её видят
+// и зрители, и переподключившиеся вкладки.
+const BREAK_HIGHLIGHT_MS = 650;
 const CELL_STATE = Object.freeze({
   HIDDEN: 'hidden',
   GREEN: 'green',
@@ -508,6 +514,7 @@ const applyLockAction = ({
     ...game,
     cells,
     pressedArrows,
+    breakHighlight: null,
     revision: game.revision + 1,
     updatedAt: now,
   };
@@ -541,6 +548,9 @@ const applyLockAction = ({
   next.brokenPins = (game.brokenPins || 0) + 1;
   next.pinFailures = 0;
   next.cursor = 0;
+  // Пауза перед обновлением цветов: сервер сохраняет красный «?» в cells, а
+  // клиент по истечении breakHighlight.durationMs рисует его скрытым.
+  next.breakHighlight = { durationMs: BREAK_HIGHLIGHT_MS };
   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
   // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
   // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
@@ -566,6 +576,7 @@ const applyLockAction = ({
 
 module.exports = {
   ARROWS,
+  BREAK_HIGHLIGHT_MS,
   CELL_STATE,
   LOCK_NODE_MARKER,
   encodeLockNodeMarker,

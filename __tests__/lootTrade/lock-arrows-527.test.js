@@ -168,29 +168,25 @@ describe('527: подсказка и область стрелок', () => {
   });
 });
 
-describe('527: сломанная заколка списывается из живого инвентаря', () => {
-  it('первое наблюдение за доской не списывает уже сломанные заколки повторно', async () => {
+describe('528: в сетевом режиме списание делают команды сервера', () => {
+  it('модалка сама не трогает инвентарь: char.spend / char.refresh приходят отдельно', async () => {
     useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(2)) } });
     const renderer = await render();
     expect(spendBobbyPins).not.toHaveBeenCalled();
     await act(async () => renderer.unmount());
   });
 
-  it('рост brokenPins вызывает spendBobbyPins ровно на дельту', async () => {
+  it('рост brokenPins не вызывает локального списания (иначе было бы дважды)', async () => {
     const renderer = await render();
     await act(async () => {
       useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(1)) } });
       await Promise.resolve();
     });
-    expect(spendBobbyPins).toHaveBeenCalledTimes(1);
-    expect(spendBobbyPins.mock.calls[0][0]).toBe(1);
-    expect(spendBobbyPins.mock.calls[0][1]).toMatchObject({ characterId: 'ch1' });
     await act(async () => {
       useRoomStore.setState({ rooms: { ROOM1: roomWith(playing(3)) } });
       await Promise.resolve();
     });
-    expect(spendBobbyPins).toHaveBeenCalledTimes(2);
-    expect(spendBobbyPins.mock.calls[1][0]).toBe(2);
+    expect(spendBobbyPins).not.toHaveBeenCalled();
     await act(async () => renderer.unmount());
   });
 });

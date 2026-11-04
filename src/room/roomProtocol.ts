@@ -17,6 +17,9 @@ export const ROOM_MESSAGE = {
   PRESENCE_PONG: 'presence.pong',
   CHAR_PUBLISH: 'char.publish',
   CHAR_FOCUS: 'char.focus',
+  // Патч 528: команды списания заколки и последующего обновления снимка.
+  CHAR_SPEND: 'char.spend',
+  CHAR_REFRESH: 'char.refresh',
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',

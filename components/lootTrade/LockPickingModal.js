@@ -74,6 +74,8 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   const [busy, setBusy] = useState(false);
   const [localState, setLocalState] = useState(initialLocalLockState);
   const [forceLocal, setForceLocal] = useState(false);
+  // Патч 528: красный «?» на поломке живёт недолго, потом гаснет.
+  const [breakRedFaded, setBreakRedFaded] = useState(false);
   const autoStartRef = useRef('');
   const republishRef = useRef(false);
   const brokenPinsRef = useRef(null);
@@ -114,9 +116,39 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     const broken = Math.max(0, Number(game.brokenPins) || 0);
     const previous = brokenPinsRef.current;
     brokenPinsRef.current = broken;
+    // Патч 528: в сетевом режиме списание делает CharSpendCommandHost по
+    // командам char.spend → char.refresh; здесь остаётся ТОЛЬКО локальный
+    // резерв старого сервера, иначе заколка списалась бы дважды.
+    if (!localMode) return;
     if (previous === null || broken <= previous || !isOperator) return;
     void spendBobbyPins(broken - previous, { characterId });
-  }, [game?.brokenPins, isOperator, visible, containerId, characterId]);
+  }, [game?.brokenPins, isOperator, visible, containerId, characterId, localMode]);
+
+  // Патч 528: если на этом нажатии заколка сломалась, сервер помечает доску
+  // breakHighlight. Держим красный «?» видимым durationMs, затем локально
+  // гасим его (цвета обновляются). Если поломки НЕ было, breakHighlight нет —
+  // красный остаётся до следующего нажатия, как просил владелец.
+  useEffect(() => {
+    if (!visible || !game?.breakHighlight) {
+      setBreakRedFaded(false);
+      return undefined;
+    }
+    setBreakRedFaded(false);
+    const ms = Math.max(0, Number(game.breakHighlight.durationMs) || 650);
+    const timer = setTimeout(() => setBreakRedFaded(true), ms);
+    return () => clearTimeout(timer);
+  }, [visible, game?.revision, game?.breakHighlight?.durationMs]);
+
+  const displayCells = useMemo(() => {
+    const cells = game?.cells || [];
+    if (!breakRedFaded) return cells;
+    return cells.map((cell) => (cell?.state === CELL_STATE.RED
+      ? { arrow: null, state: CELL_STATE.HIDDEN }
+      : cell));
+  }, [game?.cells, breakRedFaded]);
+  // На время паузы не перескакиваем в панель «Подход завершён»: игрок должен
+  // увидеть именно красную ячейку, даже если это была последняя заколка.
+  const holdBoard = Boolean(game?.breakHighlight) && !breakRedFaded;
 
   const localStep = (state, action, value) => {
     const snapshot = buildLocalLockSnapshot(useCharacterStore.getState());
@@ -232,7 +264,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   }, [visible, autoStart, freshAttempt, containerId, roomCode, characterId, localMode, game?.status, game?.operatorCharacterId, isClosed, awaitingGm]);
 
   const rows = useMemo(() => {
-    const cells = game?.cells || [];
+    const cells = displayCells;
     const sizes = game?.rows || [cells.length];
     const out = [];
     let at = 0;
@@ -241,7 +273,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       at += size;
     }
     return out;
-  }, [game?.cells, game?.rows]);
+  }, [displayCells, game?.rows]);
 
   const resultLabel = {
     'PIN BROKEN': 'lock.pinBroken',
@@ -376,13 +408,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
-          ) : isClosed ? (
+          ) : (isClosed && !holdBoard) ? (
             <View style={styles.accessPanel}>
               <Text style={styles.closedText}>{tLootTrade('lock.approachFinished')}</Text>
               <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
-          ) : awaitingGm ? (
+          ) : (awaitingGm && !holdBoard) ? (
             // Патч 526: замки не блокируются. Вместо «Ожидание решения
             // Мастера» с «Да/Нет» игрок видит результат подхода и сам решает,
             // начать ли новый (купил заколки, прокачал PER/LOCKPICK).
@@ -437,12 +469,12 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               {viewOnly ? (
                 <Text style={styles.spectatorNotice}>{tLootTrade('lock.viewOnly')}</Text>
               ) : null}
-              {game.cells?.some((c) => c.state === CELL_STATE.GREY) ? (
+              {displayCells.some((c) => c.state === CELL_STATE.GREY) ? (
                 <Text style={styles.statusHint}>{tLootTrade('lock.greyHint')}</Text>
               ) : null}
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('lock.progress'), {
-                  done: game.cells.filter((c) => c.state === CELL_STATE.GREEN).length,
+                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
                   total: game.cellCount,
                 })}
               </Text>

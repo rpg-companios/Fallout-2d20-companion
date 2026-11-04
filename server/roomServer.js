@@ -7,6 +7,7 @@
 // requestId в payload эхом возвращается в ответах create/join/error).
 
 const http = require('node:http');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
@@ -276,6 +277,26 @@ const attachRoomWebSocketServer = (httpServer, {
     sendEnvelope(ws, MESSAGE.ERROR, { code, requestId }, roomCode, clientId);
   };
 
+  /**
+   * Патч 528: две команды оператору. Порядок кадров WebSocket гарантирует,
+   * что клиент сначала спишет заколку штатным spendItemStacks + saveCharacter,
+   * и ТОЛЬКО ПОСЛЕ этого опубликует свежий снимок (char.publish).
+   * Сервер сам никогда не правит чужой инвентарь.
+   */
+  const sendPinSpendCommands = (ws, code, clientId, entry) => {
+    if (!entry) return;
+    sendEnvelope(ws, MESSAGE.CHAR_SPEND, {
+      spendId: entry.spendId,
+      characterId: entry.characterId,
+      itemId: entry.itemId,
+      count: entry.count,
+    }, code, clientId);
+    sendEnvelope(ws, MESSAGE.CHAR_REFRESH, {
+      spendId: entry.spendId,
+      characterId: entry.characterId,
+    }, code, clientId);
+  };
+
   const broadcastMembers = (room, exceptClientId = null) => {
     const members = [...room.members.values()].map((member) => ({
       clientId: member.clientId, name: member.name, role: member.role,
@@ -508,6 +529,11 @@ const attachRoomWebSocketServer = (httpServer, {
             requestId: payload.requestId || null,
           }, canonical, clientId);
           broadcastMembers(result.room, clientId);
+          // Патч 528: вкладка оператора могла уйти до публикации листа.
+          // Повторяем обе команды — клиент дедуплицирует по spendId.
+          for (const pending of registry.pendingSpendsForClient(canonical, clientId)) {
+            sendPinSpendCommands(ws, canonical, clientId, pending);
+          }
           break;
         }
 
@@ -742,6 +768,18 @@ const attachRoomWebSocketServer = (httpServer, {
           // Патч 516: взлом привязанного терминала открывает точки с
           // необязательным ключом.
           broadcastKeyAccessState(result.room, clientId);
+          // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
+          // Никакой правки room.lastSnapshots здесь больше нет.
+          if (result.pinsToSpend > 0) {
+            const entry = registry.registerPinSpend({
+              code: canonical,
+              characterId: result.characterId || payload.characterId,
+              clientId,
+              count: result.pinsToSpend,
+              spendId: `pin-${crypto.randomBytes(8).toString('hex')}`,
+            });
+            sendPinSpendCommands(ws, canonical, clientId, entry);
+          }
           break;
         }
 

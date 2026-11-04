@@ -1,5 +1,82 @@
 # Changelog
 ---
+## Spend commands and a pause before the colours update (patch 528)
+
+The owner clarified the patch 527 architecture: "Bobby pins are removed not
+from the snapshot; instead the client is sent a command to spend a pin from the
+inventory using the standard tools. And after the spend a command is sent to
+update the snapshot." Plus: "If a cell turns red and a pin breaks, make a small
+pause before updating the colours. But if the pin did not break, the red stays."
+
+### 1. The server no longer edits someone else's inventory
+
+On a break `server/roomRegistry.js` no longer calls `consumeBobbyPins()` against
+`room.lastSnapshots`; it only returns `pinsToSpend` (the `brokenPins` delta),
+`characterId` and `clientId`. `server/roomServer.js` registers the command and
+sends the operator two frames in a row:
+
+- `char.spend` — spend the pin with the standard inventory tools;
+- `char.refresh` — after the spend, update the snapshot.
+
+Both messages are mirrored in `server/protocol.js` and
+`src/room/roomProtocol.ts`; message caps, roles and validation are intact.
+`putSnapshot()` clears unacknowledged commands and `room.state` carries
+`pendingSpends`, so commands are replayed on reconnect.
+
+### 2. The client applies them in strict order
+
+The new `components/lootTrade/CharSpendCommandHost.js` is mounted once in
+`App.js` above every screen (the mini-game window may already be closed). The
+`onRoomCharSpend` subscription in `src/room/roomStore.ts` receives both frames:
+
+1. `char.spend` → `spendBobbyPins()` uses the standard
+   `useCharacterStore.spendItemStacks` (plus a legacy-snapshot fallback) and
+   `saveCharacter()`, but deliberately does **not** publish (`publish: false`);
+2. `char.refresh` → explicitly awaits the spend, then the standard
+   `pushSavedCharacterToBoundRoomIfAny()` sends the ordinary `char.publish`.
+
+WebSocket frame order is guaranteed and the await is explicit, so the room
+receives an ALREADY updated sheet. `spendId` is deduplicated (memory +
+AsyncStorage), so a replay after reconnect never deducts twice. Commands for a
+different character or a different `itemId` are ignored. With the old-server
+local fallback the effect in `LockPickingModal` still spends — and only there,
+so there is no double deduction.
+
+`consumeBobbyPins()` remains a pure helper for the client fallback and tests;
+the server no longer uses it.
+
+### 3. Pause before the colours update
+
+- `server/lockPicking.js` puts `breakHighlight = { durationMs: 650 }` into the
+  board state on a break and keeps the red «?» in `cells`. The next press clears
+  the marker and wipes old red cells (exactly one red cell — the current
+  mistake).
+- `components/lootTrade/LockPickingModal.js` shows the red «?» during the pause,
+  then locally hides it after `durationMs`; the grey guessed arrows remain. The
+  window does NOT jump to «Attempt finished» during the pause even if it was the
+  last pin. The marker lives in the board state, so spectators and reconnected
+  tabs see the same pause; `localLockGame.js` forwards it through
+  `publicLockGameState`.
+- If the pin did **not** break there is no `breakHighlight` — the red «?» stays
+  until the next press, as requested.
+
+### What is preserved
+
+Laws 520–527: PER/Luck/LOCKPICK, four terminal attempts, unlimited explicit
+player attempts, no automatic restart after ACCESS GRANTED, GM Yes/No only for
+terminals, the `shouldBlockLock()` hook, the 525 light palette and entry modal,
+the 527 «Заколка» canon, darkened arrow area and hint. Server protection (roles,
+message caps, validation, atomicity) was not weakened.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test` (257 files, 2318 tests),
+`git apply --check`, installer from the exact `a62ec71` base and from version
+527 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/char-spend-commands-528.test.js`,
+`__tests__/lootTrade/lock-break-pause-528.test.js`; historical 527 tests were
+updated for the new spend law.
+
 ## Bobby pins, arrows and honest consumption (patch 527)
 
 Four notes from the owner about the lock mini-game: the Russian item name, the

@@ -36,7 +36,6 @@ const {
   closeLockGame,
   applyLockAction,
   shouldBlockLock,
-  consumeBobbyPins,
 } = require('./lockPicking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
@@ -195,11 +194,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
     accessEvents: new Map(),
-    // Патч 520/527: диагностический счётчик сломанных заколок по персонажу.
-    // С 527 число заколок для доски читается напрямую из опубликованного
-    // снимка листа: при поломке снимок уменьшается сервером, а клиент
-    // списывает заколку из локального инвентаря. Живёт в памяти комнаты.
+    // Патч 520/527/528: диагностический счётчик сломанных заколок. С 528
+    // сервер НЕ правит опубликованный снимок листа: он шлёт клиенту команду
+    // char.spend (списать предмет штатными средствами) и char.refresh
+    // (обновить снимок), а снимок меняется только обычным char.publish.
     pinLedger: new Map(),
+    // Неподтверждённые команды списания: до публикации свежего листа. Нужны,
+    // чтобы повторить команду при переподключении вкладки оператора.
+    pendingPinSpends: new Map(),
     partyStorage: emptyStorage(),
     // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
     recentTerminalWords: [],
@@ -241,6 +243,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
+    // Патч 528: команды, которые клиент обязан применить после реконнекта.
+    pendingSpends: [...(room.pendingPinSpends?.values() || [])].map((entry) => ({ ...entry })),
     terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [
       id,
       terminalPublic(id, entry),
@@ -420,6 +424,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     room.lastSnapshots.set(characterId, {
       characterId, revision: Number(revision) || 0, snapshot, fromClientId, fromName, updatedAt: now(),
     });
+    // Патч 528: свежий лист уже учёл списание — повторять команду не надо.
+    // Это же снимает гонку, если char.refresh/char.spendAck потерялся.
+    for (const [spendId, pending] of room.pendingPinSpends || []) {
+      if (pending.characterId === characterId) room.pendingPinSpends.delete(spendId);
+    }
     return { room, stored: true, currentRevision: Number(revision) || 0 };
   };
 
@@ -798,24 +807,15 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (action === 'start') entry.operatorSnapshot = published.snapshot || {};
     const brokenBefore = Number(entry.game?.brokenPins || 0);
     entry.game = result.game;
+    let pinsToSpend = 0;
     if (entry.config?.kind === 'lock' && result.game?.brokenPins > brokenBefore) {
       const delta = result.game.brokenPins - brokenBefore;
-      // Патч 527: сломанная заколка исчезает из инвентаря. Сервер уменьшает
-      // quantity в опубликованном снимке листа (источник истины для доски),
-      // клиент зеркально списывает её из локального инвентаря и сохраняет лист.
-      // pinLedger оставлен как диагностический счётчик, но доступность заколок
-      // больше из него не считается — иначе списание учлось бы дважды.
+      // Патч 528: сервер НЕ трогает инвентарь в опубликованном снимке. Он лишь
+      // сообщает сетевому слою, сколько заколок надо списать: тому клиенту
+      // уйдут char.spend и char.refresh, а снимок обновится штатным
+      // char.publish уже после списания. Владелец листа — клиент.
+      pinsToSpend = delta;
       room.pinLedger?.set(charId, (room.pinLedger?.get(charId) || 0) + delta);
-      const consumed = consumeBobbyPins(published.snapshot || {}, delta);
-      if (consumed.consumed > 0) {
-        room.lastSnapshots.set(charId, {
-          ...published,
-          snapshot: consumed.snapshot,
-          revision: (Number(published.revision) || 0) + 1,
-          updatedAt: now(),
-        });
-        entry.operatorSnapshot = consumed.snapshot;
-      }
     }
     if (entry.config?.kind !== 'lock' && action === 'start' && Array.isArray(entry.game?.wordRanges)) {
       // Держим слова последних трёх досок (по 12–20 слов каждая).
@@ -842,7 +842,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
     // для которых ключ был необязательным.
     refreshKeyAccess(room);
-    return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
+    return {
+      room,
+      terminal: terminalPublic(id, entry),
+      usedDigest: Boolean(result.usedDigest),
+      pinsToSpend,
+      characterId: charId,
+      clientId,
+    };
   };
 
   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
@@ -1405,9 +1412,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return removed;
   };
 
+  /**
+   * Патч 528: зарегистрировать команду списания заколки для оператора.
+   * Возвращает её идентификатор; команда живёт до публикации свежего листа.
+   */
+  const registerPinSpend = ({ code, characterId, clientId, count, spendId }) => {
+    const room = rooms.get(code);
+    if (!room || !spendId || !characterId) return null;
+    const entry = {
+      spendId: String(spendId),
+      characterId: String(characterId),
+      clientId: String(clientId || ''),
+      count: Math.max(1, Math.floor(Number(count) || 1)),
+      itemId: 'item_bobby_pin',
+      at: now(),
+    };
+    room.pendingPinSpends.set(entry.spendId, entry);
+    return entry;
+  };
+
+  /** Команды, которые надо повторить конкретному клиенту после реконнекта. */
+  const pendingSpendsForClient = (code, clientId, characterId = null) => {
+    const room = rooms.get(code);
+    if (!room) return [];
+    return [...(room.pendingPinSpends?.values() || [])]
+      .filter((entry) => entry.clientId === clientId
+        || (characterId && entry.characterId === characterId))
+      .map((entry) => ({ ...entry }));
+  };
+
   return {
     createRoom,
     joinRoom,
+    registerPinSpend,
+    pendingSpendsForClient,
     leaveRoom,
     putSnapshot,
     isOwner,
