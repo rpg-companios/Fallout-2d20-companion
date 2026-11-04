@@ -49,6 +49,11 @@ vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
     containerId: terminal?.containerId, visible, autoStart,
   }),
 }));
+vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
+  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
+    visible, onHack, onView,
+  }),
+}));
 
 import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
 import useCharacterStore from '../../src/store/characterStore';
@@ -141,11 +146,15 @@ describe('524: окно локации и «Покинуть локацию»', 
     await act(async () => renderer.unmount());
   });
 
-  it('одиночный замок, выданный как локация, открывается сразу мини-игрой без «Покинуть локацию»', async () => {
+  it('отдельный замок сначала даёт входную модалку, доска — только по «Взломать» (525)', async () => {
     const renderer = await mount(standaloneLock());
     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
+    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
+    const entry = renderer.root.findByType('StandaloneCheckModal');
+    expect(entry.props.visible).toBe(true);
+    await act(async () => { entry.props.onHack(); await Promise.resolve(); });
     const modal = renderer.root.findByType('LockPickingModal');
-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true });
+    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
     const texts = renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? ''));
     expect(texts.some((t) => t.includes('Покинуть локацию'))).toBe(false);
     await act(async () => renderer.unmount());

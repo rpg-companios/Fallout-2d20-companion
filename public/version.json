@@ -1,8 +1,10 @@
 {
-  "version": "524",
+  "version": "525",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
+      "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
       "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, отмычки находятся в инвентаре, ячейки и стрелки сразу доступны.",
       "Окно локации больше не выглядывает из-под мини-игры: «Покинуть локацию» работает с первого нажатия, а отдельно выданный замок открывается сразу своей мини-игрой без лишней кнопки выхода.",
       "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
@@ -98,6 +100,8 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
+      "The lockpicking window now uses the light modal palette: light cells and arrows instead of the green terminal look.",
       "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",
       "The location window no longer shows through the mini-game: «Leave location» works on the first tap, and a standalone lock opens straight into its mini-game with no stray exit button.",
       "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",

@@ -43,6 +43,7 @@ import {
 import { showRawAlert } from '../alerts/alertService';
 import TerminalHackingModal from './TerminalHackingModal';
 import LockPickingModal from './LockPickingModal';
+import StandaloneCheckModal from './StandaloneCheckModal';
 import {
   terminalAccessKey,
   canHackTerminal,
@@ -370,7 +371,11 @@ export default function PlayerLootTradeOverlay() {
       accessId: directTerminalContext.terminalState?.accessId,
     });
     const directUsed = Boolean(usedTerminalAccess[directAccessKey]);
-    if (dismissedTerminalId === config.containerId || directUsed) {
+    const directSelection = terminalSelection?.node?.containerId === config.containerId
+      && terminalSelection?.accessKey === directAccessKey
+      ? terminalSelection
+      : null;
+    if ((dismissedTerminalId === config.containerId || directUsed) && !directSelection) {
       return (
         <View style={styles.floatingBar} pointerEvents="box-none">
           <TouchableOpacity
@@ -386,29 +391,50 @@ export default function PlayerLootTradeOverlay() {
         </View>
       );
     }
-    if (config.kind === CONTAINER_KIND.LOCK) {
-      return (
-        <LockPickingModal
-          visible
-          lock={config}
-          roomCode={directTerminalContext.roomCode}
+    // Патч 525: сначала входная модалка точки (как окно локации, но без
+    // «Покинуть локацию»), и только по «Взломать» монтируется мини-игра с
+    // уже собранной доской. Пустой «как бы запущенной» игры больше нет.
+    const directKind = config.kind === CONTAINER_KIND.LOCK
+      ? CONTAINER_KIND.LOCK
+      : CONTAINER_KIND.TERMINAL;
+    const openDirect = (autoStart) => {
+      if (autoStart) markTerminalAccess(directAccessKey);
+      setTerminalSelection({ node: config, kind: directKind, autoStart, accessKey: directAccessKey });
+    };
+    return (
+      <>
+        <StandaloneCheckModal
+          visible={!directSelection}
+          check={config}
+          isLock={directKind === CONTAINER_KIND.LOCK}
+          blocked={directUsed}
+          badge={directUsed ? tLootTrade('terminal.accessUsed') : null}
+          onView={() => openDirect(false)}
+          onHack={() => openDirect(true)}
           onClose={() => {
             markTerminalAccess(directAccessKey);
             setDismissedTerminalId(config.containerId);
+            setTerminalSelection(null);
           }}
         />
-      );
-    }
-    return (
-      <TerminalHackingModal
-        visible
-        terminal={config}
-        roomCode={directTerminalContext.roomCode}
-        onClose={() => {
-          markTerminalAccess(directAccessKey);
-          setDismissedTerminalId(config.containerId);
-        }}
-      />
+        {directSelection ? (directSelection.kind === CONTAINER_KIND.LOCK ? (
+          <LockPickingModal
+            visible
+            lock={config}
+            roomCode={directTerminalContext.roomCode}
+            autoStart={Boolean(directSelection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        ) : (
+          <TerminalHackingModal
+            visible
+            terminal={config}
+            roomCode={directTerminalContext.roomCode}
+            autoStart={Boolean(directSelection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        )) : null}
+      </>
     );
   }
   if (!matchedContext || !activeSession) return null;
@@ -460,41 +486,83 @@ export default function PlayerLootTradeOverlay() {
     );
   }
 
+  // ── Патч 525: отдельно выданная проверка (замок / терминал) ───────────────
+  // Это НЕ локация: сначала входная модалка точки с «Взломать»/«Смотреть»
+  // и без «Покинуть локацию», и только по «Взломать» монтируется мини-игра
+  // с уже собранной доской. Пустая «как бы запущенная» игра убрана.
+  if (standaloneCheckSession && matchedContext) {
+    const roomCode = matchedContext.roomCode;
+    const node = standaloneCheckSession.node;
+    const state = rooms?.[roomCode]?.terminalStates?.[node.containerId];
+    const config = {
+      ...node,
+      ...(state?.config || {}),
+      containerId: node.containerId,
+      kind: standaloneCheckSession.kind,
+    };
+    const accessKey = terminalAccessKey({
+      roomCode,
+      containerId: config.containerId,
+      accessId: state?.accessId || activeSession.sessionId,
+    });
+    const closed = Boolean(state?.closed || state?.locked || state?.game?.status === 'closed');
+    const used = Boolean(usedTerminalAccess[accessKey]);
+    const isLock = standaloneCheckSession.kind === CONTAINER_KIND.LOCK;
+    const selection = terminalSelection?.node?.containerId === config.containerId
+      && terminalSelection?.accessKey === accessKey
+      ? terminalSelection
+      : null;
+    const badge = closed
+      ? tLootTrade('terminal.closedBadge')
+      : (used ? tLootTrade('terminal.accessUsed') : null);
+    const openStandalone = (autoStart) => {
+      if (autoStart) markTerminalAccess(accessKey);
+      setTerminalSelection({
+        node: config,
+        kind: standaloneCheckSession.kind,
+        autoStart,
+        accessKey,
+      });
+    };
+    return (
+      <>
+        <StandaloneCheckModal
+          visible={!selection}
+          check={config}
+          isLock={isLock}
+          blocked={closed || used}
+          badge={badge}
+          onView={() => openStandalone(false)}
+          onHack={() => openStandalone(true)}
+          onClose={() => {
+            markTerminalAccess(accessKey);
+            markSessionClosedLocally(activeSession.sessionId);
+            setTerminalSelection(null);
+          }}
+        />
+        {selection ? (selection.kind === CONTAINER_KIND.LOCK ? (
+          <LockPickingModal
+            visible
+            lock={config}
+            roomCode={roomCode}
+            autoStart={Boolean(selection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        ) : (
+          <TerminalHackingModal
+            visible
+            terminal={config}
+            roomCode={roomCode}
+            autoStart={Boolean(selection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        )) : null}
+      </>
+    );
+  }
+
   // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
   if (isHubSession && !viewTarget) {
-    // Патч 524: одиночная проверка, выданная как локация, сразу открывает
-    // мини-игру. Ни списка точек, ни «Покинуть локацию» игрок не видит.
-    // Мини-игра остаётся СОСЕДОМ окна локации (правило пача 493), а само
-    // окно в этом случае не рендерится.
-    const standaloneCheck = (() => {
-      if (!standaloneCheckSession) return null;
-      const roomCode = matchedContext.roomCode;
-      const state = rooms?.[roomCode]?.terminalStates?.[standaloneCheckSession.node.containerId];
-      const config = {
-        ...standaloneCheckSession.node,
-        ...(state?.config || {}),
-        containerId: standaloneCheckSession.node.containerId,
-        kind: standaloneCheckSession.kind,
-      };
-      const accessKey = terminalAccessKey({
-        roomCode,
-        containerId: config.containerId,
-        accessId: state?.accessId || activeSession.sessionId,
-      });
-      return {
-        roomCode,
-        config,
-        accessKey,
-        closed: Boolean(state?.closed || state?.locked || state?.game?.status === 'closed'),
-        used: Boolean(usedTerminalAccess[accessKey]),
-      };
-    })();
-    const closeStandalone = () => {
-      if (!standaloneCheck) return;
-      markTerminalAccess(standaloneCheck.accessKey);
-      markSessionClosedLocally(activeSession.sessionId);
-    };
-
     const rootId = activeSession.containerId || '';
     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
     // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
@@ -508,7 +576,7 @@ export default function PlayerLootTradeOverlay() {
     return (
       <>
         <Modal
-          visible={!terminalSelection && !standaloneCheck}
+          visible={!terminalSelection}
           transparent
           animationType="slide"
           onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
@@ -877,34 +945,6 @@ export default function PlayerLootTradeOverlay() {
             </View>
           </View>
         </Modal>
-        {standaloneCheck ? (
-          standaloneCheck.closed || standaloneCheck.used ? (
-            <View style={styles.floatingBar} pointerEvents="box-none">
-              <View style={styles.floatingPill}>
-                <Text style={styles.floatingPillTitle}>
-                  {standaloneCheck.config.name || tLootTrade('lock.title')}
-                </Text>
-                <Text style={styles.floatingClosedLabel}>
-                  {tLootTrade(standaloneCheck.closed ? 'terminal.closedBadge' : 'terminal.accessUsed')}
-                </Text>
-              </View>
-            </View>
-          ) : (standaloneCheck.config.kind === CONTAINER_KIND.LOCK ? (
-            <LockPickingModal
-              visible
-              lock={standaloneCheck.config}
-              roomCode={standaloneCheck.roomCode}
-              onClose={closeStandalone}
-            />
-          ) : (
-            <TerminalHackingModal
-              visible
-              terminal={standaloneCheck.config}
-              roomCode={standaloneCheck.roomCode}
-              onClose={closeStandalone}
-            />
-          ))
-        ) : null}
         {terminalSelection ? (
           terminalSelection.kind === CONTAINER_KIND.LOCK ? (
             <LockPickingModal

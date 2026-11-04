@@ -342,11 +342,18 @@ describe('520: пятая карточка и документы', () => {
     expect(overlay).toContain('CONTAINER_KIND.LOCK');
   });
 
-  it('модалка замка берёт каркас терминальной, а не свой набор базовых стилей', () => {
+  it('модалка замка берёт светлый каркас модалок, а не гамму терминала (525)', () => {
     const modal = read('components/lootTrade/LockPickingModal.js');
-    expect(modal).toContain("from './terminalHackingStyles'");
-    expect(modal).toContain('terminalHackingStyles.window');
-    expect(modal).not.toContain('backdrop: {');
+    // Владелец в 525 отказался от зелёного «терминала»: замок теперь светлый
+    // и переиспользует lootTradeFormStyles, а не рисует базовые стили заново.
+    expect(modal).toContain("from './lockPickingStyles'");
+    expect(modal).toContain('modalStyles.card');
+    expect(modal).not.toContain('terminalHackingStyles');
+    expect(modal).not.toContain('StyleSheet.create');
+    const shared = read('components/lootTrade/lockPickingStyles.js');
+    expect(shared).toContain('lootTradeFormStyles');
+    expect(shared).toContain('ADMIN_MODAL_PALETTE');
+    // Терминал остался при своей гамме — менялась только мини-игра замка.
     expect(read('components/lootTrade/TerminalHackingModal.js'))
       .toContain('const styles = terminalHackingStyles;');
     expect(modal).toContain('lock-pins-count');

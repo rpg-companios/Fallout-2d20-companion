@@ -201,9 +201,12 @@ describe('524: документы, строки и регрессионные з
 
   it('окно локации скрыто под мини-игрой, выход работает локально', () => {
     const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
-    expect(overlay).toContain('visible={!terminalSelection && !standaloneCheck}');
+    expect(overlay).toContain('visible={!terminalSelection}');
     expect(overlay).toContain('markSessionClosedLocally(session.sessionId)');
     expect(overlay).toContain('standaloneCheckSession');
+    // Патч 525: отдельная точка сначала показывает входную модалку.
+    expect(overlay).toContain('<StandaloneCheckModal');
+    expect(read('components/lootTrade/StandaloneCheckModal.js')).toContain('check-hack-button');
     expect(overlay).toContain("tLootTrade('player.leaveHub')");
   });
 
@@ -218,7 +221,7 @@ describe('524: документы, строки и регрессионные з
     expect(read('docs/roadmap.md')).toContain('524');
     expect(read('docs/changelog.ru.md')).toContain('524');
     expect(read('docs/changelog.en.md')).toContain('524');
-    expect(read('patchs/baseline.json')).toContain('524');
+    expect(Number(JSON.parse(read('patchs/baseline.json')).baseline)).toBeGreaterThanOrEqual(524);
     expect(read('docs/patch-524-install.md')).toContain('524');
   });
 });

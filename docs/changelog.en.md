@@ -1,5 +1,38 @@
 # Changelog
 ---
+## Two-step mini-game entry and the light lock window (patch 525)
+
+The owner: "The hacking mini-game should not appear right away. Right now the
+interface looks like the game has started, but then you have to press 'Hack'
+inside it before the game loads. Also the lockpicking palette should be light,
+not like the terminal... For the hack game, first show a modal like for a
+location, with 'Hack' buttons, just without the 'Leave location' button".
+
+- **A point window comes first.** A standalone lock or terminal no longer opens
+  the mini-game immediately. `StandaloneCheckModal` follows the location
+  window structure: a point card, difficulty, «View» and «Hack» buttons. The
+  «Leave location» and «Minimize» buttons are gone — a standalone point is not
+  a location.
+- **The board only after «Hack».** The press mounts the mini-game with
+  `autoStart`: the board, bobby pins and arrows arrive already built. There is
+  no second «Hack» button inside the board window and no empty "as if
+  running" layout; a clear hint is shown instead.
+- **One hack per broadcast kept.** «Hack» consumes the access immediately,
+  «View» does not; after the board is closed the entry window shows
+  «ACCESS USED». The Game Master's session stays active.
+- **Light palette.** `lockPickingStyles.js` reuses the `lootTradeFormStyles`
+  skeleton and `ADMIN_MODAL_PALETTE`: light card, dark text, light cells and
+  buttons. The green terminal look is gone for locks; `TerminalHackingModal`
+  keeps its own palette.
+- **No duplicated skeleton.** Base keys (`overlay`, `card`, `title`, `label`,
+  `footer`, `btn`, `saveBtn`, `cancelBtn`) are not redefined — the rule in
+  `docs/ui-modals-rules.md`; the new module holds only cells, arrows, the
+  status row and the point card.
+
+Patch 520 rules (PER, bobby pins, cells, the GM's Yes/No), the 522/523 laws
+and the 524 fixes (one `start`, pin detection, legacy-server fallback, working
+«Leave location» in a real location) are preserved.
+
 ## Lockpicking and the location window: fixes (patch 524)
 
 The owner reported: "pressed Hack — immediately 'Action failed', no bobby
