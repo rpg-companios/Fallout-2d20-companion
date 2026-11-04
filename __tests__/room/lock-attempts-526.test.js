@@ -212,7 +212,7 @@ describe('526: терминал сохраняет решение Мастера
 });
 
 describe('526: локальный резерв и строки', () => {
-  it('newAttempt в локальной доске берёт текущий снимок и хранит spentPins', () => {
+  it('532: newAttempt в локальной доске продолжает взлом, свежий лист меняет только заколки/навык', () => {
     const ctx = (store) => ({
       lock: LOCK_CONFIG,
       characterId: 'ch1',
@@ -231,9 +231,12 @@ describe('526: локальный резерв и строки', () => {
       items: { p: { weaponId: 'item_bobby_pin', quantity: 9 } },
     };
     const fresh = applyLocalLockAction(state, 'newAttempt', undefined, ctx(strong));
-    expect(fresh.view.per).toBe(10);
+    // Патч 532: PER/число ячеек зафиксированы на время взлома, чтобы новая
+    // длина комбинации не обесценила уже угаданные позиции.
+    expect(fresh.view.per).toBe(4);
     expect(fresh.view.pinsTotal).toBe(9);
-    expect(fresh.view.cellCount).toBeLessThan(state.view.cellCount);
+    expect(fresh.view.cellCount).toBe(state.view.cellCount);
+    expect(fresh.view.knownPositions).toBe(0);
   });
 
   it('парные RU/EN строки нового подхода и уведомления о замке', () => {

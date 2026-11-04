@@ -20,6 +20,7 @@ import { modalStyles, lockLightStyles, LOCK_PALETTE } from './lockPickingStyles'
 import { CELL_STATE } from './lockPickingConstants';
 import {
   initialLocalLockState,
+  saveLocalLockState,
   applyLocalLockAction,
   buildLocalLockSnapshot,
 } from './localLockGame';
@@ -68,19 +69,22 @@ const isNewAttempt = (action) => action === 'newAttempt';
 
 const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
   useLocale();
+  const containerId = String(lock?.containerId || '').trim();
   const characterId = useCharacterStore((state) => state.currentCharacterId);
   const myClientId = useRoomStore((state) => state.clientId);
   const rooms = useRoomStore((state) => state.rooms);
   const [busy, setBusy] = useState(false);
-  const [localState, setLocalState] = useState(initialLocalLockState);
+  // Патч 532: локальная доска поднимается из памяти модуля по containerId,
+  // поэтому закрытие/повторное открытие окна не теряет угаданные позиции.
+  const [localState, setLocalState] = useState(() => initialLocalLockState(containerId));
   const [forceLocal, setForceLocal] = useState(false);
   // Патч 528: красный «?» на поломке живёт недолго, потом гаснет.
   const [breakRedFaded, setBreakRedFaded] = useState(false);
   const autoStartRef = useRef('');
   const republishRef = useRef(false);
   const brokenPinsRef = useRef(null);
+  const localBoardKeyRef = useRef(containerId);
 
-  const containerId = String(lock?.containerId || '').trim();
   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
   // Патч 524: как и у терминала, при отсутствии протокола комнаты доска
   // собирается локально. Никакого переключателя «локальный режим» в UI нет.
@@ -110,6 +114,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   useEffect(() => {
     brokenPinsRef.current = null;
   }, [containerId, visible]);
+
+  // Патч 532: при смене точки поднимаем её запомненную локальную доску.
+  useEffect(() => {
+    if (localBoardKeyRef.current === containerId) return;
+    localBoardKeyRef.current = containerId;
+    setLocalState(initialLocalLockState(containerId));
+  }, [containerId]);
 
   useEffect(() => {
     if (!visible || !game) return;
@@ -158,6 +169,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       characterSnapshot: snapshot,
     });
     setLocalState(next);
+    saveLocalLockState(containerId, next);
     if ((action === 'start' || isNewAttempt(action))
       && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
       showRawAlert({
@@ -198,7 +210,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       // доску тем же безмолвным способом, что и мини-игра терминала.
       if (code === 'UNKNOWN_TYPE' || code === 'TERMINAL_NOT_ISSUED') {
         setForceLocal(true);
-        localStep(initialLocalLockState(), 'start');
+        localStep(initialLocalLockState(containerId), 'start');
         return;
       }
       // Лист персонажа мог ещё не уехать в комнату (первый вход, реконнект).
@@ -428,6 +440,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                   {tLootTrade('lock.noPinsHint')}
                 </Text>
               ) : null}
+              {Number(game?.knownPositions) > 0 ? (
+                <Text style={styles.hintText} testID="lock-progress-saved">
+                  {formatLootTrade(tLootTrade('lock.progressSaved'), {
+                    count: game.knownPositions, total: game.cellCount,
+                  })}
+                </Text>
+              ) : null}
               <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
@@ -474,7 +493,10 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               ) : null}
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('lock.progress'), {
-                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
+                  // Патч 532: серые ячейки — уже угаданные и запомненные
+                  // позиции, они тоже входят в прогресс.
+                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN
+                    || c.state === CELL_STATE.GREY).length,
                   total: game.cellCount,
                 })}
               </Text>

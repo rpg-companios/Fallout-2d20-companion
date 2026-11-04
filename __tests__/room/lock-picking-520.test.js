@@ -167,7 +167,10 @@ describe('520: механика нажатий и отмычек', () => {
     expect(broken.cells[0]).toEqual({ arrow: 'left', state: 'grey' });
     // Патч 527: ошибочный «?» остаётся КРАСНЫМ и на ходе с поломкой.
     expect(broken.cells[1]).toEqual({ arrow: null, state: 'red' });
-    expect(broken.cursor).toBe(0);
+    // Патч 532: курсор остаётся на первой неотгаданной ячейке — повторять
+    // уже угаданный префикс больше не нужно.
+    expect(broken.cursor).toBe(1);
+    expect(broken.knownPositions).toBe(1);
     expect(broken.brokenPins).toBe(1);
     expect(broken.pinsRemaining).toBe(game.pinsRemaining - 1);
     expect(broken.secret).toEqual(game.secret);

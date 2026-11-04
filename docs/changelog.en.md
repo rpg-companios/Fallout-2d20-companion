@@ -1,5 +1,72 @@
 # Changelog
 ---
+
+## Remembering solved positions (patch 532)
+
+The owner: "And let's make solved positions remembered? A broken bobby pin does
+not take progress away, you still need to finish the hack to get access, or
+break off if you run out of pins. But progress must not be lost. It's just that
+with low PER it takes a long time to guess the sequence, and then a lot more
+time to repeat it."
+
+Clarifications from the owner: progress lives **for the whole hack on the point**
+(pin break, running out of pins, "Another attempt", reopening the window); it
+resets on **ACCESS GRANTED or a GM reissue**; it is **shared by everyone on the
+point**, including bound rooms.
+
+### 1. What was wrong
+
+After a pin broke, the combination stayed the same but the cursor went back to
+`0` and the solved arrows turned grey: the player had to press the whole known
+prefix again. With low PER the board is long (up to 18 cells), so "guess" and
+"repeat" became two equally slow jobs. An explicit "Another attempt" even
+regenerated the secret and lost progress entirely.
+
+### 2. Law 532
+
+- `server/lockPicking.js`: on a break, `cursor` stays on the first unsolved
+  cell and solved cells stay visible as `grey`; the red «?» and the 528 pause
+  are preserved. Added pure `guessedLockPositions()`, `rememberedLockCells()`,
+  `isResumableLockGame()`, `resumeLockGame()` and the `knownPositions` field.
+- `resumeLockGame()` continues the hack: **same secret**, same solved prefix,
+  cursor on the first unsolved cell. A fresh sheet only updates bobby pins, the
+  `LOCKPICK` skill and Luck; PER, difficulty and cell count are fixed for the
+  duration of the hack, otherwise a new sequence length would invalidate the
+  solved positions. A win (`won`), closing (`closed`) or a GM reissue resets
+  the memory and builds a board with a new secret.
+- `server/roomRegistry.js`: `newAttempt` and `start` from another character
+  continue the shared board instead of wiping it; `unlock/reset/reissue` and
+  `issueTerminal({ reissue: true })` clear the memory. The lock board is copied
+  to bound rooms (`boundRoomsForTerminal()` / `propagateLockGame()`), and
+  `server/roomServer.js` broadcasts fresh point states and access events to
+  them.
+- `components/lootTrade/localLockGame.js`: the legacy-server fallback keeps the
+  board in module memory by `containerId`, so closing the window no longer
+  loses progress; `saveLocalLockState()` clears it after a win.
+- `components/lootTrade/LockPickingModal.js`: the "Solved N of M" counter now
+  counts both green and grey cells; the "Approach finished" panel says solved
+  positions are kept. The `arrowsHint`, `greyHint` and `newAttemptHint` hints no
+  longer tell the player to start over, and a paired `progressSaved` string was
+  added (RU/EN).
+
+### What is preserved
+
+Laws 524–531: the «Заколка» canon, the light palette, the pre-light-theme arrow
+drawing, `char.command` → `char.refresh` → `char.publish`, the **529 snapshot
+law** (the server never edits the published sheet), the 650 ms pause before
+fading the red «?», unlimited explicit player attempts with no automatic
+restart after ACCESS GRANTED, the 530 location/container hack semantics,
+server protection and protocol limits. Access is still granted only after the
+full hack: remembered positions alone do not open the point.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test`, forward and reverse `git
+apply --check`, installer from the exact `a62ec71` base (493–532 chain) and
+from version 531 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/lock-progress-532.test.js` (engine, registry, OUT OF PINS,
+operator switch, bound rooms, GM reset, local fallback, strings).
+
 ## Arrows without stripes and a wrapping hint (patch 531)
 
 The owner inspected the arrows in the browser and found the clue: "If you

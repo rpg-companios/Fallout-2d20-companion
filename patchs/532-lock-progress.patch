@@ -1,0 +1,1706 @@
+diff --git a/__tests__/room/lock-attempts-526.test.js b/__tests__/room/lock-attempts-526.test.js
+index 56a933f..6449f62 100644
+--- a/__tests__/room/lock-attempts-526.test.js
++++ b/__tests__/room/lock-attempts-526.test.js
+@@ -212,7 +212,7 @@ describe('526: терминал сохраняет решение Мастера
+ });
+ 
+ describe('526: локальный резерв и строки', () => {
+-  it('newAttempt в локальной доске берёт текущий снимок и хранит spentPins', () => {
++  it('532: newAttempt в локальной доске продолжает взлом, свежий лист меняет только заколки/навык', () => {
+     const ctx = (store) => ({
+       lock: LOCK_CONFIG,
+       characterId: 'ch1',
+@@ -231,9 +231,12 @@ describe('526: локальный резерв и строки', () => {
+       items: { p: { weaponId: 'item_bobby_pin', quantity: 9 } },
+     };
+     const fresh = applyLocalLockAction(state, 'newAttempt', undefined, ctx(strong));
+-    expect(fresh.view.per).toBe(10);
++    // Патч 532: PER/число ячеек зафиксированы на время взлома, чтобы новая
++    // длина комбинации не обесценила уже угаданные позиции.
++    expect(fresh.view.per).toBe(4);
+     expect(fresh.view.pinsTotal).toBe(9);
+-    expect(fresh.view.cellCount).toBeLessThan(state.view.cellCount);
++    expect(fresh.view.cellCount).toBe(state.view.cellCount);
++    expect(fresh.view.knownPositions).toBe(0);
+   });
+ 
+   it('парные RU/EN строки нового подхода и уведомления о замке', () => {
+diff --git a/__tests__/room/lock-consumption-527.test.js b/__tests__/room/lock-consumption-527.test.js
+index 1b1010e..c56c112 100644
+--- a/__tests__/room/lock-consumption-527.test.js
++++ b/__tests__/room/lock-consumption-527.test.js
+@@ -21,7 +21,9 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+ const json = (rel) => JSON.parse(read(rel));
+ 
+-const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.';
++// Патч 532: подсказка больше не говорит «начать сначала» — угаданные
++// позиции сохраняются. Точная формулировка по-прежнему фиксируется тестом.
++const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки.';
+ 
+ const snapshot = (pins) => ({
+   characterName: 'Сталкер',
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index 5b75c19..444c9b6 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -167,7 +167,10 @@ describe('520: механика нажатий и отмычек', () => {
+     expect(broken.cells[0]).toEqual({ arrow: 'left', state: 'grey' });
+     // Патч 527: ошибочный «?» остаётся КРАСНЫМ и на ходе с поломкой.
+     expect(broken.cells[1]).toEqual({ arrow: null, state: 'red' });
+-    expect(broken.cursor).toBe(0);
++    // Патч 532: курсор остаётся на первой неотгаданной ячейке — повторять
++    // уже угаданный префикс больше не нужно.
++    expect(broken.cursor).toBe(1);
++    expect(broken.knownPositions).toBe(1);
+     expect(broken.brokenPins).toBe(1);
+     expect(broken.pinsRemaining).toBe(game.pinsRemaining - 1);
+     expect(broken.secret).toEqual(game.secret);
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+new file mode 100644
+index 0000000..783f6a7
+--- /dev/null
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -0,0 +1,447 @@
++// Приёмочный тест патча 532. Владелец: «И давай сделаем запоминание
++// угаданных позиций? Сломанная заколка не лишает прогресса, всё ещё нужно
++// закончить взлом, чтобы получить доступ или прерваться, если кончились
++// заколки. Но прогресс не слетит. Просто когда маленькая ВОС, то сначала
++// много времени надо чтобы угадать последовательность, а потом ещё куча
++// времени на повторение».
++//
++// Уточнения владельца (ответы на вопросы): прогресс живёт НА ВЕСЬ ВЗЛОМ
++// ТОЧКИ (поломка, «кончились заколки», «Ещё подход», повторное открытие окна);
++// сбрасывается ACCESS GRANTED или повторной выдачей Мастера; принадлежит не
++// оператору, а точке — общий для всех игроков, включая привязанные комнаты.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++import {
++  ARROWS,
++  CELL_STATE,
++  createLockGame,
++  applyLockAction,
++  resumeLockGame,
++  guessedLockPositions,
++  isResumableLockGame,
++  closeLockGame,
++  publicLockGameState,
++} from '../../server/lockPicking.js';
++import {
++  initialLocalLockState,
++  saveLocalLockState,
++  clearLocalLockState,
++  applyLocalLockAction,
++  buildLocalLockSnapshot,
++} from '../../components/lootTrade/localLockGame.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const LOCK = {
++  containerId: 'l1', name: 'Замок', description: '', difficulty: 0, kind: 'lock',
++  requiredKeyItemId: '', keyRequirement: 'none', linkedCheckId: '', linkedCheckIds: [],
++};
++
++const snapshot = (per, luck, skill, pins) => ({
++  characterName: 'Сталкер',
++  data: {
++    attributes: [{ name: 'PER', value: per }, { name: 'LCK', value: luck }],
++    skills: [{ name: 'LOCKPICK', value: skill }],
++    equipment: { items: [{ id: 'pin', weaponId: 'item_bobby_pin', quantity: pins }] },
++  },
++});
++
++// rng 0 → секрет сплошь 'left'; rng 0.99 → спас-бросок Удачи НЕ срабатывает.
++const press = (game, value, rng = () => 0.99) => applyLockAction({
++  game, config: LOCK, action: 'press', value, rng,
++}).game;
++const correctAt = (game) => ARROWS[game.secret[game.cursor]];
++const wrongAt = (game) => ARROWS[(game.secret[game.cursor] + 1) % ARROWS.length];
++
++const newGame = (overrides = {}) => createLockGame({
++  config: LOCK,
++  characterSnapshot: snapshot(4, 4, 0, 5),
++  rng: () => 0,
++  ...overrides,
++});
++
++const setupRoom = ({ pins = 5, per = 4, luck = 4, skill = 0 } = {}) => {
++  const registry = createRoomRegistry({ now: () => 1000, rng: () => 990 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок 1', role: 'player' });
++  registry.joinRoom({ code, clientId: 'p2', name: 'Игрок 2', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1, snapshot: snapshot(per, luck, skill, pins),
++    fromClientId: 'p1', fromName: 'Игрок 1',
++  });
++  registry.putSnapshot({
++    code, characterId: 'ch2', revision: 1, snapshot: snapshot(per, luck, skill, pins),
++    fromClientId: 'p2', fromName: 'Игрок 2',
++  });
++  registry.issueTerminal({ code, clientId: 'gm', config: LOCK });
++  const act = (action, value, clientId = 'p1', characterId = 'ch1') => registry.terminalAction({
++    code, clientId, characterId, containerId: 'l1', action, value,
++  });
++  const entry = () => registry._rooms.get(code).terminalStates.get('l1');
++  const publish = (characterId, clientId, pinsLeft, revision = 2, perValue = per) => registry.putSnapshot({
++    code, characterId, revision,
++    snapshot: snapshot(perValue, luck, skill, pinsLeft),
++    fromClientId: clientId, fromName: clientId === 'p1' ? 'Игрок 1' : 'Игрок 2',
++  });
++  return { registry, code, act, entry, publish };
++};
++
++describe('532: поломка заколки не стирает угаданные позиции', () => {
++  it('курсор остаётся на первой неотгаданной ячейке, префикс сереет и виден', () => {
++    let game = newGame();
++    game = press(game, correctAt(game));
++    game = press(game, correctAt(game));
++    expect(game.cursor).toBe(2);
++    expect(game.knownPositions).toBe(2);
++
++    const secret = [...game.secret];
++    const broken = press(game, wrongAt(game));
++    expect(broken.brokenPins).toBe(1);
++    expect(broken.result).toBe('PIN BROKEN');
++    expect(broken.cursor).toBe(2);
++    expect(broken.knownPositions).toBe(2);
++    expect(broken.cells.slice(0, 2)).toEqual([
++      { arrow: 'left', state: CELL_STATE.GREY },
++      { arrow: 'left', state: CELL_STATE.GREY },
++    ]);
++    expect(broken.cells[2]).toEqual({ arrow: null, state: CELL_STATE.RED });
++    expect(broken.secret).toEqual(secret);
++    expect(broken.breakHighlight.durationMs).toBeGreaterThan(0);
++
++    // Следующее нажатие сразу продолжает с ячейки 2 — повторять 0 и 1 не нужно.
++    const continued = press(broken, correctAt(broken));
++    expect(continued.cursor).toBe(3);
++    expect(continued.knownPositions).toBe(3);
++    expect(continued.cells[2]).toEqual({ arrow: 'left', state: CELL_STATE.GREEN });
++    expect(continued.cells[0].state).toBe(CELL_STATE.GREY);
++  });
++
++  it('префикс из серых стрелок не теряется при следующей поломке', () => {
++    let game = newGame();
++    game = press(game, correctAt(game));
++    game = press(game, wrongAt(game)); // поломка на ячейке 1
++    expect(game.knownPositions).toBe(1);
++    game = press(game, correctAt(game)); // ячейка 1 стала green
++    game = press(game, wrongAt(game)); // поломка на ячейке 2
++    expect(game.knownPositions).toBe(2);
++    expect(game.cursor).toBe(2);
++    expect(game.cells.slice(0, 2).every((c) => c.state === CELL_STATE.GREY)).toBe(true);
++    expect(guessedLockPositions(game)).toEqual(['left', 'left']);
++  });
++});
++
++describe('532: «Ещё подход» продолжает взлом, а не собирает новую доску', () => {
++  it('тот же секрет и угаданный префикс, свежий лист меняет только заколки/навык/удачу', () => {
++    let game = newGame();
++    game = press(game, correctAt(game));
++    game = press(game, correctAt(game));
++    const secret = [...game.secret];
++    const resumed = applyLockAction({
++      game, config: LOCK, action: 'newAttempt',
++      characterSnapshot: snapshot(10, 10, 6, 12), rng: () => 0,
++    }).game;
++    expect(resumed.secret).toEqual(secret);
++    expect(resumed.cursor).toBe(2);
++    expect(resumed.knownPositions).toBe(2);
++    expect(resumed.cells.slice(0, 2).map((c) => c.state)).toEqual([
++      CELL_STATE.GREY, CELL_STATE.GREY,
++    ]);
++    expect(resumed.pinsTotal).toBe(12);
++    expect(resumed.skill).toBe(6);
++    expect(resumed.luck).toBe(10);
++    expect(resumed.luckSave).toBeCloseTo(0.2);
++    // PER/сложность/длина комбинации зафиксированы на время взлома.
++    expect(resumed.per).toBe(game.per);
++    expect(resumed.cellCount).toBe(game.cellCount);
++    expect(resumed.status).toBe('playing');
++    expect(resumed.pinFailures).toBe(0);
++    expect(resumed.revision).toBeGreaterThan(game.revision);
++    expect(publicLockGameState(resumed)).not.toHaveProperty('secret');
++  });
++
++  it('кончились заколки → купили новые → продолжаем с того же места и выигрываем', () => {
++    const { act, entry, publish } = setupRoom({ pins: 1, per: 10 });
++    act('start');
++    let game = entry().game;
++    expect(game.cellCount).toBe(2);
++    act('press', correctAt(game));
++    const secret = [...entry().game.secret];
++    act('press', wrongAt(entry().game));
++    expect(entry().game.status).toBe('awaitingRetry');
++    expect(entry().game.result).toBe('OUT OF PINS');
++    expect(entry().game.knownPositions).toBe(1);
++
++    publish('ch1', 'p1', 3);
++    expect(act('newAttempt').error).toBeUndefined();
++    const resumed = entry().game;
++    expect(resumed.status).toBe('playing');
++    expect(resumed.pinsTotal).toBe(3);
++    expect(resumed.secret).toEqual(secret);
++    expect(resumed.cursor).toBe(1);
++    expect(resumed.knownPositions).toBe(1);
++    // Одно верное нажатие завершает взлом: повторять префикс не потребовалось.
++    act('press', correctAt(entry().game));
++    expect(entry().game.status).toBe('won');
++    expect(entry().game.result).toBe('ACCESS GRANTED');
++  });
++
++  it('победа и закрытие Мастером сбрасывают память: следующий взлом — новый секрет', () => {
++    let game = newGame();
++    while (game.status === 'playing') game = press(game, correctAt(game));
++    expect(game.status).toBe('won');
++    expect(isResumableLockGame(game)).toBe(false);
++    const fresh = resumeLockGame({
++      game, config: LOCK, characterSnapshot: snapshot(4, 4, 0, 5), rng: () => 0.9,
++    });
++    expect(fresh.secret).not.toEqual(game.secret);
++    expect(fresh.knownPositions).toBe(0);
++    expect(fresh.cursor).toBe(0);
++    expect(fresh.cells.every((c) => c.state === CELL_STATE.HIDDEN)).toBe(true);
++
++    const closed = closeLockGame(newGame(), { now: () => 1000 });
++    expect(isResumableLockGame(closed)).toBe(false);
++    expect(resumeLockGame({
++      game: closed, config: LOCK, characterSnapshot: snapshot(4, 4, 0, 5), rng: () => 0.9,
++    }).secret).not.toEqual(closed.secret);
++  });
++
++  it('после ACCESS GRANTED автоматический start по-прежнему запрещён (регрессия 505)', () => {
++    const { act, entry } = setupRoom({ pins: 5, per: 10 });
++    act('start');
++    while (entry().game.status === 'playing') act('press', correctAt(entry().game));
++    expect(entry().game.status).toBe('won');
++    expect(act('start').error).toBe(ERROR_CODE.TERMINAL_ALREADY_ACTIVE);
++    expect(entry().game.status).toBe('won');
++  });
++});
++
++describe('532: прогресс точки общий для всех игроков', () => {
++  it('другой персонаж продолжает ту же комбинацию через newAttempt', () => {
++    const { act, entry } = setupRoom({ pins: 5, per: 10 });
++    act('start');
++    act('press', correctAt(entry().game));
++    const secret = [...entry().game.secret];
++    const known = entry().game.knownPositions;
++    expect(act('newAttempt', undefined, 'p2', 'ch2').error).toBeUndefined();
++    const shared = entry().game;
++    expect(shared.secret).toEqual(secret);
++    expect(shared.knownPositions).toBe(known);
++    expect(shared.operatorClientId).toBe('p2');
++    expect(shared.operatorCharacterId).toBe('ch2');
++    expect(shared.status).toBe('playing');
++    // Новый оператор может давить стрелки сразу с первой неотгаданной ячейки.
++    expect(act('press', correctAt(entry().game), 'p2', 'ch2').error).toBeUndefined();
++    expect(entry().game.cursor).toBe(known + 1);
++  });
++
++  it('start от другого персонажа тоже продолжает общий прогресс (а не пересобирает доску)', () => {
++    const { act, entry } = setupRoom({ pins: 5, per: 10 });
++    act('start');
++    act('press', correctAt(entry().game));
++    const secret = [...entry().game.secret];
++    const result = act('start', undefined, 'p2', 'ch2');
++    expect(result.error).toBeUndefined();
++    expect(entry().game.secret).toEqual(secret);
++    expect(entry().game.knownPositions).toBe(1);
++    expect(entry().game.operatorCharacterId).toBe('ch2');
++  });
++
++  it('повторная выдача Мастером сбрасывает прогресс и даёт новый секрет', () => {
++    const { registry, code, act, entry } = setupRoom({ pins: 5, per: 10 });
++    act('start');
++    act('press', correctAt(entry().game));
++    const secret = [...entry().game.secret];
++    const gm = registry.terminalAction({
++      code, clientId: 'gm', characterId: 'ch1', containerId: 'l1', action: 'reissue',
++    });
++    expect(gm.error).toBeUndefined();
++    expect(entry().game).toBeNull();
++    expect(act('newAttempt').error).toBeUndefined();
++    // Свежая доска: revision 1, пустой префикс, все ячейки скрыты.
++    // (Секрет при фиксированном rng теста может совпасть случайно.)
++    expect(entry().game.revision).toBe(1);
++    expect(entry().game.knownPositions).toBe(0);
++    expect(entry().game.cursor).toBe(0);
++    expect(entry().game.cells.every((c) => c.state === CELL_STATE.HIDDEN)).toBe(true);
++  });
++});
++
++describe('532: привязанные комнаты видят один и тот же прогресс', () => {
++  it('доска копируется в связанную комнату, сброс Мастера тоже общий', () => {
++    const registry = createRoomRegistry({ now: () => 1000, rng: () => 990 });
++    const a = registry.createRoom({ clientId: 'gm-R1', name: 'A', requestedCode: 'R1' }).room;
++    const b = registry.createRoom({ clientId: 'gm-R2', name: 'B', requestedCode: 'R2' }).room;
++    for (const room of [a, b]) {
++      registry.joinRoom({ code: room.code, clientId: `gm-${room.code}`, name: 'GM', role: 'gm' });
++      registry.joinRoom({ code: room.code, clientId: `p-${room.code}`, name: 'Игрок', role: 'player' });
++      registry.putSnapshot({
++        code: room.code, characterId: `ch-${room.code}`, revision: 1,
++        snapshot: snapshot(10, 4, 0, 5), fromClientId: `p-${room.code}`, fromName: 'Игрок',
++      });
++      registry.issueTerminal({ code: room.code, clientId: `gm-${room.code}`, config: LOCK });
++    }
++    registry.openSession({
++      code: a.code, clientId: 'gm-R1',
++      session: {
++        sessionId: 'bound-532', containerId: 'hub', kind: 'hub', name: 'Бункер',
++        targetType: 'room', roomCodes: [a.code, b.code, 'R3'],
++        nodes: [{ containerId: 'l1', kind: 'lock', name: 'Замок', difficulty: 0 }],
++      },
++    });
++    const inA = (action, value) => registry.terminalAction({
++      code: a.code, clientId: 'p-R1', characterId: 'ch-R1', containerId: 'l1', action, value,
++    });
++    const inB = (action, value) => registry.terminalAction({
++      code: b.code, clientId: 'p-R2', characterId: 'ch-R2', containerId: 'l1', action, value,
++    });
++    const gameA = () => registry.getRoom(a.code).terminalStates.get('l1').game;
++    const gameB = () => registry.getRoom(b.code).terminalStates.get('l1').game;
++
++    expect(inA('start').error).toBeUndefined();
++    const secret = [...gameA().secret];
++    inA('press', correctAt(gameA()));
++    expect(gameB()).toBeTruthy();
++    expect(gameB().secret).toEqual(secret);
++    expect(gameB().knownPositions).toBe(1);
++    expect(gameB().cells[0].state).toBe(CELL_STATE.GREEN);
++
++    // Комната, которой точку выдали ПОЗЖЕ, подхватывает уже идущий взлом.
++    const c = registry.createRoom({ clientId: 'gm-R3', name: 'C', requestedCode: 'R3' }).room;
++    registry.joinRoom({ code: c.code, clientId: 'gm-R3', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: c.code, clientId: 'p-R3', name: 'Игрок', role: 'player' });
++    registry.putSnapshot({
++      code: c.code, characterId: 'ch-R3', revision: 1,
++      snapshot: snapshot(10, 4, 0, 5), fromClientId: 'p-R3', fromName: 'Игрок',
++    });
++    registry.issueTerminal({ code: c.code, clientId: 'gm-R3', config: LOCK });
++    const inC = (action, value) => registry.terminalAction({
++      code: c.code, clientId: 'p-R3', characterId: 'ch-R3', containerId: 'l1', action, value,
++    });
++    const gameC = () => registry.getRoom(c.code).terminalStates.get('l1').game;
++    expect(inC('start').error).toBeUndefined();
++    expect(gameC().secret).toEqual(secret);
++    expect(gameC().knownPositions).toBe(1);
++
++    // Игрок из второй комнаты продолжает ту же комбинацию.
++    expect(inB('newAttempt').error).toBeUndefined();
++    expect(gameB().secret).toEqual(secret);
++    expect(gameB().knownPositions).toBe(1);
++    expect(gameA().secret).toEqual(secret);
++    expect(gameA().knownPositions).toBe(1);
++    while (gameB().status === 'playing') inB('press', correctAt(gameB()));
++    expect(gameB().status).toBe('won');
++    expect(gameA().status).toBe('won');
++    expect(registry.getAccessEvents(a.code).l1).toMatchObject({ kind: 'hacked' });
++    expect(registry.getAccessEvents(b.code).l1).toMatchObject({ kind: 'hacked' });
++
++    // Повторная выдача Мастером очищает память в ОБЕИХ комнатах.
++    expect(registry.terminalAction({
++      code: a.code, clientId: 'gm-R1', characterId: 'ch-R1', containerId: 'l1', action: 'reissue',
++    }).error).toBeUndefined();
++    expect(gameA()).toBeNull();
++    expect(gameB()).toBeNull();
++    expect(inB('newAttempt').error).toBeUndefined();
++    expect(gameB().revision).toBe(1);
++    expect(gameB().knownPositions).toBe(0);
++    expect(gameB().cursor).toBe(0);
++    expect(gameB().cells.every((c) => c.state === CELL_STATE.HIDDEN)).toBe(true);
++  });
++});
++
++describe('532: локальный резерв помнит доску между открытиями окна', () => {
++  it('initialLocalLockState поднимает сохранённую доску, победа очищает память', () => {
++    const id = 'local-532';
++    clearLocalLockState(id);
++    const store = {
++      attributes: { PER: { base: 10 } }, skills: { LOCKPICK: { base: 0 } },
++      items: { p: { weaponId: 'item_bobby_pin', quantity: 5 } },
++    };
++    const ctx = {
++      lock: LOCK, characterId: 'ch1',
++      characterSnapshot: buildLocalLockSnapshot(store), rng: () => 0,
++    };
++    let state = applyLocalLockAction(initialLocalLockState(id), 'start', undefined, ctx);
++    state = applyLocalLockAction(state, 'press', correctAt(state.game), ctx);
++    saveLocalLockState(id, state);
++    const restored = initialLocalLockState(id);
++    expect(restored.game.secret).toEqual(state.game.secret);
++    expect(restored.game.cursor).toBe(1);
++    expect(restored.game.knownPositions).toBe(1);
++    const resumed = applyLocalLockAction(restored, 'newAttempt', undefined, ctx);
++    expect(resumed.game.secret).toEqual(state.game.secret);
++    expect(resumed.game.knownPositions).toBe(1);
++
++    let won = resumed;
++    while (won.game.status === 'playing') {
++      won = applyLocalLockAction(won, 'press', correctAt(won.game), ctx);
++    }
++    saveLocalLockState(id, won);
++    expect(initialLocalLockState(id).game).toBeNull();
++    clearLocalLockState(id);
++  });
++});
++
++describe('532: строки, документы и версия', () => {
++  it('подсказки больше не велят начинать сначала, RU/EN пары равны', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
++    expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
++    expect(ru.arrowsHint).toContain('сохраняются');
++    expect(ru.arrowsHint).not.toContain('начать сначала');
++    expect(en.arrowsHint).toContain('bobby pin breaks');
++    expect(en.arrowsHint).toContain('solved positions are kept');
++    expect(ru.greyHint).toContain('сохраняются');
++    expect(en.greyHint).toContain('already solved');
++    expect(ru.progressSaved).toContain('{count}');
++    expect(en.progressSaved).toContain('{count}');
++    expect(ru.newAttemptHint).toContain('сохраняются');
++    expect(en.newAttemptHint).toContain('solved positions are kept');
++    expect(JSON.stringify(ru)).not.toMatch(/отмычк|шпильк|булавк/i);
++  });
++
++  it('клиент считает серые ячейки прогрессом и показывает сохранение при паузе', () => {
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain('CELL_STATE.GREY');
++    expect(modal).toContain('lock-progress-saved');
++    expect(modal).toContain("tLootTrade('lock.progressSaved')");
++    expect(modal).toContain('saveLocalLockState');
++    expect(modal).toContain('initialLocalLockState(containerId)');
++  });
++
++  it('движок, реестр, локальный резерв и сетевой слой используют один закон', () => {
++    expect(read('server/lockPicking.js')).toContain('resumeLockGame');
++    expect(read('server/roomRegistry.js')).toContain('resumeLockGame');
++    expect(read('server/roomRegistry.js')).toContain('propagateLockGame');
++    expect(read('server/roomServer.js')).toContain('broadcastTerminalRooms');
++    expect(read('components/lootTrade/localLockGame.js')).toContain('resumeLockGame');
++    expect(read('components/lootTrade/localLockGame.js')).toContain('localBoards');
++    // Закон снимка 529: сервер по-прежнему не правит опубликованный лист.
++    expect(read('server/roomRegistry.js')).toContain('pinsToSpend');
++    // Единственный писатель снимка — putSnapshot (закон 529).
++    expect(read('server/roomRegistry.js').match(/room\.lastSnapshots\.set\(/g)).toHaveLength(1);
++  });
++
++  it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
++    const version = json('public/version.json');
++    expect(version.version).toBe('532');
++    expect(version.release).toBe(4);
++    expect(version.notes['ru-RU']).toHaveLength(121);
++    expect(version.notes['en-EN']).toHaveLength(121);
++    expect(json('patchs/baseline.json').baseline).toBe('532');
++    expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
++    const roadmap = read('docs/roadmap.md');
++    expect(roadmap).toContain('Текущая версия: **532**');
++    expect(roadmap).toContain('| 22 |');
++    expect(roadmap).toContain('Осталось после патча 532');
++    expect(read('docs/patch-532-install.md')).toContain('532');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 17.');
++  });
++});
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 92643fd..85c095f 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -20,6 +20,7 @@ import { modalStyles, lockLightStyles, LOCK_PALETTE } from './lockPickingStyles'
+ import { CELL_STATE } from './lockPickingConstants';
+ import {
+   initialLocalLockState,
++  saveLocalLockState,
+   applyLocalLockAction,
+   buildLocalLockSnapshot,
+ } from './localLockGame';
+@@ -68,19 +69,22 @@ const isNewAttempt = (action) => action === 'newAttempt';
+ 
+ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
+   useLocale();
++  const containerId = String(lock?.containerId || '').trim();
+   const characterId = useCharacterStore((state) => state.currentCharacterId);
+   const myClientId = useRoomStore((state) => state.clientId);
+   const rooms = useRoomStore((state) => state.rooms);
+   const [busy, setBusy] = useState(false);
+-  const [localState, setLocalState] = useState(initialLocalLockState);
++  // Патч 532: локальная доска поднимается из памяти модуля по containerId,
++  // поэтому закрытие/повторное открытие окна не теряет угаданные позиции.
++  const [localState, setLocalState] = useState(() => initialLocalLockState(containerId));
+   const [forceLocal, setForceLocal] = useState(false);
+   // Патч 528: красный «?» на поломке живёт недолго, потом гаснет.
+   const [breakRedFaded, setBreakRedFaded] = useState(false);
+   const autoStartRef = useRef('');
+   const republishRef = useRef(false);
+   const brokenPinsRef = useRef(null);
++  const localBoardKeyRef = useRef(containerId);
+ 
+-  const containerId = String(lock?.containerId || '').trim();
+   const terminalState = rooms?.[roomCode]?.terminalStates?.[containerId] || null;
+   // Патч 524: как и у терминала, при отсутствии протокола комнаты доска
+   // собирается локально. Никакого переключателя «локальный режим» в UI нет.
+@@ -111,6 +115,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+     brokenPinsRef.current = null;
+   }, [containerId, visible]);
+ 
++  // Патч 532: при смене точки поднимаем её запомненную локальную доску.
++  useEffect(() => {
++    if (localBoardKeyRef.current === containerId) return;
++    localBoardKeyRef.current = containerId;
++    setLocalState(initialLocalLockState(containerId));
++  }, [containerId]);
++
+   useEffect(() => {
+     if (!visible || !game) return;
+     const broken = Math.max(0, Number(game.brokenPins) || 0);
+@@ -158,6 +169,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+       characterSnapshot: snapshot,
+     });
+     setLocalState(next);
++    saveLocalLockState(containerId, next);
+     if ((action === 'start' || isNewAttempt(action))
+       && next.view?.status === 'awaitingRetry' && next.view?.result === 'OUT OF PINS') {
+       showRawAlert({
+@@ -198,7 +210,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+       // доску тем же безмолвным способом, что и мини-игра терминала.
+       if (code === 'UNKNOWN_TYPE' || code === 'TERMINAL_NOT_ISSUED') {
+         setForceLocal(true);
+-        localStep(initialLocalLockState(), 'start');
++        localStep(initialLocalLockState(containerId), 'start');
+         return;
+       }
+       // Лист персонажа мог ещё не уехать в комнату (первый вход, реконнект).
+@@ -428,6 +440,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+                   {tLootTrade('lock.noPinsHint')}
+                 </Text>
+               ) : null}
++              {Number(game?.knownPositions) > 0 ? (
++                <Text style={styles.hintText} testID="lock-progress-saved">
++                  {formatLootTrade(tLootTrade('lock.progressSaved'), {
++                    count: game.knownPositions, total: game.cellCount,
++                  })}
++                </Text>
++              ) : null}
+               <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
+               {newAttemptButton}
+             </View>
+@@ -474,7 +493,10 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               ) : null}
+               <Text style={styles.statusHint}>
+                 {formatLootTrade(tLootTrade('lock.progress'), {
+-                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
++                  // Патч 532: серые ячейки — уже угаданные и запомненные
++                  // позиции, они тоже входят в прогресс.
++                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN
++                    || c.state === CELL_STATE.GREY).length,
+                   total: game.cellCount,
+                 })}
+               </Text>
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 4350fb1..eddbeb2 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -474,7 +474,8 @@ export default function PlayerLootTradeOverlay() {
+         kind: directKind,
+         autoStart,
+         accessKey: directAccessKey,
+-        // Замок: явное «Взломать» собирает новую доску по текущему листу.
++        // Замок: явное «Взломать» продолжает взлом (память позиций 532).
++        // Свежий лист обновляет заколки/навык/удачу, комбинация та же.
+         freshAttempt: Boolean(autoStart && directIsLock),
+       });
+     };
+@@ -1003,8 +1004,8 @@ export default function PlayerLootTradeOverlay() {
+                                 testID="terminal-hack-button"
+                                 style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
+                                 onPress={() => {
+-                                  // Патч 526: явный подход игрока. У замка
+-                                  // он собирает новую доску по текущему листу.
++                                  // Патч 526/532: явный подход игрока. У замка
++                                  // он продолжает ту же доску с угаданными позициями.
+                                   setTerminalSelection({
+                                     node: terminalForSelection,
+                                     kind: nodeCheckKind,
+diff --git a/components/lootTrade/localLockGame.js b/components/lootTrade/localLockGame.js
+index 0c4f091..3473b76 100644
+--- a/components/lootTrade/localLockGame.js
++++ b/components/lootTrade/localLockGame.js
+@@ -43,7 +43,37 @@ const finish = (game, spentPins, error = null) => ({
+   error,
+ });
+ 
+-export const initialLocalLockState = () => finish(null, 0);
++/**
++ * Патч 532: локальный резерв тоже помнит угаданные позиции между открытиями
++ * окна. `useState` в модалке живёт только до размонтирования, поэтому доска
++ * хранится здесь, в памяти модуля, по containerId точки. После ACCESS GRANTED
++ * память очищается — следующий взлом начинает новую комбинацию.
++ */
++const localBoards = new Map();
++
++export const initialLocalLockState = (containerId = '') => {
++  const id = String(containerId || '').trim();
++  const saved = id ? localBoards.get(id) : null;
++  return saved ? finish(saved.game, saved.spentPins) : finish(null, 0);
++};
++
++export const saveLocalLockState = (containerId, state) => {
++  const id = String(containerId || '').trim();
++  if (!id || !state) return;
++  if (state.game?.status === 'won' || state.game?.status === 'closed') {
++    localBoards.delete(id);
++    return;
++  }
++  localBoards.set(id, {
++    game: state.game || null,
++    spentPins: Math.max(0, Math.floor(Number(state.spentPins) || 0)),
++  });
++};
++
++export const clearLocalLockState = (containerId) => {
++  const id = String(containerId || '').trim();
++  if (id) localBoards.delete(id);
++};
+ 
+ const localConfig = (lock) => ({
+   containerId: String(lock?.containerId || lock?.id || '').trim(),
+@@ -73,7 +103,9 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+   if (decision) {
+     if (!game || game.status !== 'awaitingRetry') return finish(game, carried, 'LOCK_NOT_ACTIVE');
+     if (decision === 'no') return finish(engine.closeLockGame(game, { now }), carried);
+-    const fresh = engine.createLockGame({
++    // Патч 532: «Да» Мастера в локальной партии продолжает ту же доску.
++    const fresh = engine.resumeLockGame({
++      game,
+       config,
+       operatorClientId: LOCAL_LOCK_OPERATOR,
+       operatorCharacterId: characterId || 'local',
+@@ -89,13 +121,14 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+     return finish(fresh, carried);
+   }
+ 
+-  // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
+-  // сервера: свежая доска по текущему листу, сломанные заколки не
+-  // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
++  // Патч 526/532: явный новый подход игрока. Свежий лист обновляет заколки,
++  // навык и удачу, но угаданные позиции и комбинация остаются (закон 532).
++  // Сломанные заколки не возвращаются, блокировки пока нет.
+   if (action === 'newAttempt') {
+     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
+     if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
+-    const fresh = engine.createLockGame({
++    const fresh = engine.resumeLockGame({
++      game,
+       config,
+       operatorClientId: LOCAL_LOCK_OPERATOR,
+       operatorCharacterId: characterId || 'local',
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 8628474..361ddfd 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,72 @@
+ # Changelog
+ ---
++
++## Remembering solved positions (patch 532)
++
++The owner: "And let's make solved positions remembered? A broken bobby pin does
++not take progress away, you still need to finish the hack to get access, or
++break off if you run out of pins. But progress must not be lost. It's just that
++with low PER it takes a long time to guess the sequence, and then a lot more
++time to repeat it."
++
++Clarifications from the owner: progress lives **for the whole hack on the point**
++(pin break, running out of pins, "Another attempt", reopening the window); it
++resets on **ACCESS GRANTED or a GM reissue**; it is **shared by everyone on the
++point**, including bound rooms.
++
++### 1. What was wrong
++
++After a pin broke, the combination stayed the same but the cursor went back to
++`0` and the solved arrows turned grey: the player had to press the whole known
++prefix again. With low PER the board is long (up to 18 cells), so "guess" and
++"repeat" became two equally slow jobs. An explicit "Another attempt" even
++regenerated the secret and lost progress entirely.
++
++### 2. Law 532
++
++- `server/lockPicking.js`: on a break, `cursor` stays on the first unsolved
++  cell and solved cells stay visible as `grey`; the red «?» and the 528 pause
++  are preserved. Added pure `guessedLockPositions()`, `rememberedLockCells()`,
++  `isResumableLockGame()`, `resumeLockGame()` and the `knownPositions` field.
++- `resumeLockGame()` continues the hack: **same secret**, same solved prefix,
++  cursor on the first unsolved cell. A fresh sheet only updates bobby pins, the
++  `LOCKPICK` skill and Luck; PER, difficulty and cell count are fixed for the
++  duration of the hack, otherwise a new sequence length would invalidate the
++  solved positions. A win (`won`), closing (`closed`) or a GM reissue resets
++  the memory and builds a board with a new secret.
++- `server/roomRegistry.js`: `newAttempt` and `start` from another character
++  continue the shared board instead of wiping it; `unlock/reset/reissue` and
++  `issueTerminal({ reissue: true })` clear the memory. The lock board is copied
++  to bound rooms (`boundRoomsForTerminal()` / `propagateLockGame()`), and
++  `server/roomServer.js` broadcasts fresh point states and access events to
++  them.
++- `components/lootTrade/localLockGame.js`: the legacy-server fallback keeps the
++  board in module memory by `containerId`, so closing the window no longer
++  loses progress; `saveLocalLockState()` clears it after a win.
++- `components/lootTrade/LockPickingModal.js`: the "Solved N of M" counter now
++  counts both green and grey cells; the "Approach finished" panel says solved
++  positions are kept. The `arrowsHint`, `greyHint` and `newAttemptHint` hints no
++  longer tell the player to start over, and a paired `progressSaved` string was
++  added (RU/EN).
++
++### What is preserved
++
++Laws 524–531: the «Заколка» canon, the light palette, the pre-light-theme arrow
++drawing, `char.command` → `char.refresh` → `char.publish`, the **529 snapshot
++law** (the server never edits the published sheet), the 650 ms pause before
++fading the red «?», unlimited explicit player attempts with no automatic
++restart after ACCESS GRANTED, the 530 location/container hack semantics,
++server protection and protocol limits. Access is still granted only after the
++full hack: remembered positions alone do not open the point.
++
++### Checks
++
++`npm run typecheck`, `npm run build`, `npm test`, forward and reverse `git
++apply --check`, installer from the exact `a62ec71` base (493–532 chain) and
++from version 531 with byte comparison, live WS probe. Acceptance tests:
++`__tests__/room/lock-progress-532.test.js` (engine, registry, OUT OF PINS,
++operator switch, bound rooms, GM reset, local fallback, strings).
++
+ ## Arrows without stripes and a wrapping hint (patch 531)
+ 
+ The owner inspected the arrows in the browser and found the clue: "If you
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8d2ebe9..0f12968 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,73 @@
+ # История изменений
+ 
+ ---
++
++## Память угаданных позиций (патч 532)
++
++Владелец: «И давай сделаем запоминание угаданных позиций? Сломанная заколка
++не лишает прогресса, всё ещё нужно закончить взлом, чтобы получить доступ или
++прерваться, если кончились заколки. Но прогресс не слетит. Просто когда
++маленькая ВОС, то сначала много времени надо чтобы угадать последовательность,
++а потом ещё куча времени на повторение».
++
++Ответы владельца на уточняющие вопросы: прогресс живёт **на весь взлом точки**
++(поломка, «кончились заколки», «Ещё подход», повторное открытие окна);
++сбрасывается **ACCESS GRANTED или повторной выдачей Мастера**; он **общий для
++всех игроков точки**, включая привязанные комнаты.
++
++### 1. Что было не так
++
++После поломки заколки комбинация оставалась прежней, но курсор откатывался в
++`0`, а угаданные стрелки серели: игроку приходилось заново нажимать весь уже
++найденный префикс. При маленькой ВОС доска длинная (до 18 ячеек), поэтому
++«угадать» и «повторить» превращались в две одинаково долгие работы. Явный
++«Ещё подход» и вовсе перегенерировал секрет, теряя прогресс полностью.
++
++### 2. Закон 532
++
++- `server/lockPicking.js`: на поломке `cursor` остаётся на первой
++  неотгаданной ячейке, угаданные ячейки остаются видимыми `grey`, красный «?»
++  и пауза 528 сохранены. Добавлены чистые `guessedLockPositions()`,
++  `rememberedLockCells()`, `isResumableLockGame()`, `resumeLockGame()` и поле
++  `knownPositions` в состоянии доски.
++- `resumeLockGame()` продолжает взлом: **тот же секрет**, тот же угаданный
++  префикс, курсор на первой неотгаданной ячейке. Свежий лист обновляет только
++  заколки, навык `LOCKPICK` и Удачу; `PER`, сложность и число ячеек
++  зафиксированы на время взлома, иначе новая длина комбинации обесценила бы
++  уже угаданные позиции. Сброс — победа (`won`), закрытие (`closed`) или
++  повторная выдача Мастером: тогда собирается доска с новым секретом.
++- `server/roomRegistry.js`: `newAttempt` и `start` от другого персонажа
++  продолжают общую доску, а не обнуляют её; `unlock/reset/reissue` и
++  `issueTerminal({ reissue: true })` очищают память. Доска замка копируется в
++  привязанные комнаты (`boundRoomsForTerminal()` / `propagateLockGame()`), а
++  `server/roomServer.js` рассылает им свежие состояния точек и журнал доступа.
++- `components/lootTrade/localLockGame.js`: локальный резерв старого сервера
++  хранит доску в памяти модуля по `containerId`, поэтому закрытие окна не
++  стирает прогресс; `saveLocalLockState()` очищает память после победы.
++- `components/lootTrade/LockPickingModal.js`: прогресс «Отгадано N из M»
++  считает и зелёные, и серые ячейки; при «Подход завершён» показывается
++  «Угаданные позиции сохранены». Подсказки `arrowsHint`, `greyHint`,
++  `newAttemptHint` больше не велят начинать сначала, добавлена парная строка
++  `progressSaved` (RU/EN).
++
++### Что сохранено
++
++Законы 524–531: «Заколка», светлая гамма, до-светлое начертание стрелок,
++команды `char.command` → `char.refresh` → `char.publish`, **закон снимка 529**
++(сервер не трогает опубликованный лист), пауза 650 мс перед сбросом красного
++«?», явные подходы игрока без автоматического рестарта после ACCESS GRANTED,
++семантика взлома локации/контейнера 530, защита сервера и лимиты протокола.
++Доступ по-прежнему выдаётся только после полного взлома: remembering-позиции
++сами по себе не открывают точку.
++
++### Проверки
++
++`npm run typecheck`, `npm run build`, `npm test`, `git apply --check` вперёд и
++назад, установщик от точной базы `a62ec71` цепочкой 493–532 и от версии 531 с
++побайтовым сравнением, живая WS-проба. Приёмочные тесты:
++`__tests__/room/lock-progress-532.test.js` (ядро, реестр, OUT OF PINS, смена
++оператора, привязанные комнаты, сброс Мастером, локальный резерв, строки).
++
+ ## Стрелки без «полос» и перенос подсказки (патч 531)
+ 
+ Владелец проверил стрелки в браузере и нашёл зацепку: «Если отключить стиль
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index d2fe319..2d82321 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -88,12 +88,13 @@ D  ∈ [0, 5]  (Мастер создаёт 1…5; 0 приходит тольк
+ 
+ | Состояние | Вид | Как получается |
+ | --- | --- | --- |
+-| `hidden` | серый `?` | начало / после поломки заколки |
++| `hidden` | серый `?` | начало / ещё не угаданная ячейка |
+ | `green` | зелёная нужная стрелка | нажатая стрелка совпала с ответом текущей ячейки; курсор сдвигается |
+ | `red` | красный `?` | провал; курсор остаётся, нажатая стрелка интерфейсом не показывается |
+-| `grey` | серая стрелка (видна) | была зелёной, заколка сломалась |
++| `grey` | серая стрелка (видна) | была зелёной, заколка сломалась; с 532 — **запомненная** позиция, повторять её не нужно |
+ 
+-Победа — все `N` ячеек зелёные. Тогда на комнату публикуется нейтральное
++С патча 532 курсор после поломки НЕ откатывается в начало (см. §17).
++Победа — все `N` ячеек решены (зелёные или запомненные серые). Тогда на комнату публикуется нейтральное
+ событие `hacked` (контракт пачей 516–517), узел локации снимает `locked`,
+ добыча становится доступна. Успех **не сбрасывается**, одна победа на
+ `accessId`.
+@@ -119,10 +120,11 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+   Спас-бросок **не сбрасывает** счётчик провалов: заколка переживает этот
+   конкретный момент, следующий провал снова кидает шанс. Ожидаемая жизнь
+   заколки `S + 1/(1−p)` провалов.
+-- При поломке: все зелёные ячейки → `grey` (стрелки видны), курсор
+-  возвращается на первую ячейку, комбинация **не перегенерируется**, игрок
+-  повторяет последовательность; правильные нажатия снова красят в зелёный.
+-  Берётся следующая заколка из инвентаря.
++- При поломке: все решённые ячейки → `grey` (стрелки видны), комбинация
++  **не перегенерируется**. До 532 курсор возвращался на первую ячейку и игрок
++  повторял последовательность; **с 532** курсор остаётся на первой
++  неотгаданной ячейке, угаданный префикс запоминается и не требует повтора
++  (§17). Берётся следующая заколка из инвентаря.
+ - `n = 0` → кнопка взлома недоступна с подсказкой «Нет заколок»; Мастер
+   по-прежнему может открыть доступ вручную. Отрицательного счётчика нет.
+ 
+@@ -401,3 +403,57 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ 
+ Регрессии: законы 527–530 (канон «Заколка», команды списания, закон снимка,
+ пауза красного «?», семантика взлома) и защита сервера не тронуты.
++
++## 17. Уточнение 532: память угаданных позиций на весь взлом точки
++
++Владелец: «Сломанная заколка не лишает прогресса, всё ещё нужно закончить
++взлом, чтобы получить доступ или прерваться, если кончились заколки. Но
++прогресс не слетит. Просто когда маленькая ВОС, то сначала много времени надо
++чтобы угадать последовательность, а потом ещё куча времени на повторение».
++Уточнения: прогресс живёт **весь взлом точки**, сбрасывается **победой или
++повторной выдачей Мастера**, и он **общий для всех игроков точки** (включая
++привязанные комнаты).
++
++**Проблема.** Доска при PER = 4 и D = 5 достигает 18 ячеек. Раньше поломка
++заколки оставляла комбинацию, но откатывала `cursor = 0`: весь уже найденный
++префикс приходилось нажимать заново. Явный «Ещё подход» (`newAttempt`) и
++смена оператора пересобирали доску с **новым** секретом, стирая прогресс
++полностью.
++
++**Закон.** Состояние доски несёт `knownPositions` — длину непрерывного
++префикса угаданных ячеек. На поломке `cursor = knownPositions`, решённые
++ячейки остаются `grey`, красный «?» и пауза 528 сохраняются. Чистые функции
++`guessedLockPositions()`, `rememberedLockCells()`, `isResumableLockGame()` и
++`resumeLockGame()` в `server/lockPicking.js` продолжают взлом:
++
++- секрет, `cellCount`, `rows`, `per` и сложность **не меняются** до конца
++  взлома, иначе новая длина комбинации обесценила бы найденные позиции;
++- свежий опубликованный лист обновляет только заколки (`pinsTotal`,
++  `pinsRemaining`, `pinActive`), `skill`, `luck`/`luckSave`;
++- сбрасываются `pinFailures`, `breakHighlight` и красные ячейки; курсор встаёт
++  на первую неотгаданную ячейку; `revision` растёт;
++- сброс памяти: `status = 'won'` (ACCESS GRANTED), `status = 'closed'` или
++  повторная выдача Мастером (`unlock/reset/reissue`, `issueTerminal({reissue})`,
++  новая трансляция локации). Тогда собирается доска с новым секретом.
++
++**Область памяти.** `terminalStates` по-прежнему принадлежат комнате (общая
++доска мини-игры — отдельный пункт плана 13), но доска замка копируется в
++привязанные комнаты: `boundRoomsForTerminal()` / `propagateLockGame()` в
++`server/roomRegistry.js`, `adoptSharedLockGame()` для точки, выданной позже
++начала взлома, рассылка — `broadcastTerminalRooms()` в
++`server/roomServer.js`. `newAttempt` и `start` от другого персонажа
++продолжают ту же точку, меняя только оператора и его лист. Локальный резерв
++старого сервера хранит доску в модуле `localLockGame.js` по `containerId`,
++поэтому закрытие окна тоже не стирает прогресс.
++
++**Интерфейс.** Счётчик «Отгадано N из M» считает `green` + `grey`; в панели
++«Подход завершён» показывается `lock.progressSaved`. Подсказки обновлены:
++`arrowsHint` больше не говорит «взлом необходимо начать сначала», `greyHint`
++сообщает, что серые стрелки сохраняются, `newAttemptHint` — что подход
++продолжает взлом. RU/EN пары равны, канон «Заколка» соблюдён.
++
++**Регрессии.** Законы 524–531 и закон снимка 529: сервер по-прежнему не
++правит `room.lastSnapshots`, списание заколок идёт командами
++`char.command` → `char.refresh` → `char.publish`, `shouldBlockLock()` выключен,
++автоматического рестарта после ACCESS GRANTED нет. Доступ выдаётся только
++после полного взлома — сама по себе память позиций точку не открывает.
+diff --git a/docs/patch-532-install.md b/docs/patch-532-install.md
+new file mode 100644
+index 0000000..dcd45c6
+--- /dev/null
++++ b/docs/patch-532-install.md
+@@ -0,0 +1,99 @@
++# Установка патча 532: память угаданных позиций замка
++
++Патч подготовлен от состояния **версии 531** (коммит `a8431a3`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–532
++цепочкой. Файл установки: `patchs/532-lock-progress.patch`.
++
++> Владелец: «И давай сделаем запоминание угаданных позиций? Сломанная заколка
++> не лишает прогресса, всё ещё нужно закончить взлом, чтобы получить доступ
++> или прерваться, если кончились заколки. Но прогресс не слетит. Просто когда
++> маленькая ВОС, то сначала много времени надо чтобы угадать
++> последовательность, а потом ещё куча времени на повторение».
++>
++> Уточнения владельца: прогресс живёт на весь взлом точки; сбрасывается
++> ACCESS GRANTED или повторной выдачей Мастера; общий для всех игроков точки,
++> включая привязанные комнаты.
++
++## Что было не так
++
++При поломке заколки секрет оставался прежним, но `cursor` откатывался в `0`,
++а угаданные ячейки серели — их приходилось нажимать заново. При PER = 4 и
++D = 5 доска содержит 18 ячеек, поэтому «угадать» и «повторить» становились
++двумя одинаково долгими работами. Явный «Ещё подход» (`newAttempt`) вообще
++перегенерировал секрет и стирал прогресс; то же делал `start` от другого
++персонажа.
++
++## Что изменено
++
++### 1. Ядро мини-игры (`server/lockPicking.js`)
++
++- На поломке курсор остаётся на первой неотгаданной ячейке, решённые ячейки
++  остаются видимыми `grey`; красный «?» и пауза `breakHighlight` 650 мс из 528
++  сохранены. Никакого `cursor = 0`.
++- Добавлены `guessedLockPositions()`, `rememberedLockCells()`,
++  `isResumableLockGame()`, `resumeLockGame()` и поле `knownPositions` в
++  состоянии доски (в публичном состоянии секрета по-прежнему нет).
++- `resumeLockGame()` продолжает взлом: тот же секрет и угаданный префикс,
++  курсор на первой неотгаданной ячейке. Свежий лист меняет только заколки,
++  `LOCKPICK` и Удачу; `PER`, сложность и число ячеек зафиксированы на время
++  взлома. Сброс — `won`, `closed` или повторная выдача Мастером.
++- `applyLockAction('newAttempt')` теперь зовёт `resumeLockGame()`, а не
++  `createLockGame()`. `start` при активной доске по-прежнему запрещён,
++  автоматического рестарта после ACCESS GRANTED нет.
++
++### 2. Реестр и сеть (`server/roomRegistry.js`, `server/roomServer.js`)
++
++- `newAttempt` и `start` от другого персонажа продолжают общую доску с его
++  листом: оператор меняется, секрет и `knownPositions` — нет.
++- `unlock/reset/reissue` и `issueTerminal({ reissue: true })` очищают память.
++  Живая правка карточки Мастером доску не трогает (правило 504).
++- `boundRoomsForTerminal()` / `propagateLockGame()` копируют доску замка в
++  привязанные комнаты; `adoptSharedLockGame()` подхватывает уже идущий взлом,
++  если точку выдали комнате позже; `broadcastTerminalRooms()` рассылает им
++  свежие состояния точек и журнал доступа. Полного объединения
++  `terminalStates` / `accessEvents` в этом патче НЕТ — это отдельный пункт
++  плана 13.
++
++### 3. Клиент и локальный резерв
++
++- `components/lootTrade/localLockGame.js`: доска хранится в памяти модуля по
++  `containerId` (`initialLocalLockState`, `saveLocalLockState`,
++  `clearLocalLockState`), поэтому закрытие окна не стирает прогресс; после
++  победы память очищается.
++- `components/lootTrade/LockPickingModal.js`: счётчик «Отгадано N из M»
++  считает `green` + `grey`; в панели «Подход завершён» выводится
++  `lock.progressSaved` с числом сохранённых позиций.
++- `i18n/ru-RU` / `i18n/en-EN`: обновлены `arrowsHint`, `greyHint`,
++  `newAttemptHint`, добавлена парная строка `progressSaved`. Текст больше не
++  велит «начать сначала»; канон «Заколка» и запрет «отмычек» соблюдены.
++
++## Что сохранено
++
++Законы 524–531: «Заколка», светлая гамма и до-светлое начертание стрелок,
++команды `char.command` → `char.refresh` → `char.publish`, **закон снимка 529**
++(сервер не трогает `room.lastSnapshots`), пауза перед сбросом красного «?»,
++неограниченные явные подходы игрока без автоматического рестарта после
++победы, семантика взлома локации/контейнера 530, `shouldBlockLock()`,
++защита сервера, лимиты сообщений и проверки роли/членства. Доступ выдаётся
++только после полного взлома: запомненные позиции сами точку не открывают.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`: успешно; `dist/version.json` =
++  532/4/121+121.
++- `npm test`: полный набор зелёный, включая
++  `__tests__/room/lock-progress-532.test.js` (ядро, OUT OF PINS → покупка
++  заколок → победа, смена оператора, привязанные комнаты, сброс Мастером,
++  локальный резерв, RU/EN строки, версия/документы).
++- `git apply --check` вперёд от дерева 531 и в обратную сторону от 532.
++- `./apply-patch.sh 532` от версии 531 и полная цепочка 493–532 от чистого
++  `main` `a62ec71`; побайтовое сравнение с итоговым деревом патча.
++- Живой сервер комнат перезапущен на 532: `/version.json` = 532/4/121+121 и
++  WS-проба мини-игры (закон снимка 529, списание заколок командами, пауза
++  перед сбросом красного «?»).
++
++**Важно:** в патче менялся `server/` (`lockPicking.js`, `roomRegistry.js`,
++`roomServer.js`), поэтому на боевой площадке после установки нужно
++перезапустить процесс сервера комнат. PWA-кэш тоже обновится — имя бандла
++изменилось.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 9f9bc32..c838c31 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **531**.
++Дата ревизии: 2026-11-04. Текущая версия: **532**.
+ 
+ ## Тезисы
+ 
+@@ -33,15 +33,16 @@
+ | 19 | **Закон снимка на всё пространство Мастера:** сервер не трогает лист игрока, изменения — команды `char.command` → `char.refresh` → `char.publish`; снимок как наблюдение между сессиями; эффект журнала «Программиста» переведён на команду | ✅ сделано | **529** |
+ | 20 | **Семантика взлома в иерархии:** «взлом локации = вход» и «взлом контейнера = содержимое», подписи/подсказки, адресный исход ACCESS GRANTED с паузой, кнопка доступа после закрытия мини-игры | ✅ сделано | **530** |
+ | 21 | Артефакт «полосы через центр» у стрелок: убран `flex: 0 1 0%`, фон/рамки/жёсткие размеры кнопки, возвращено до-светлое начертание иконок с центрированием; длинная подсказка переносится внутри модалки | ✅ сделано | **531** |
++| 22 | Память угаданных позиций замка на весь взлом точки: поломка заколки не откатывает курсор, «Ещё подход»/«кончились заколки»/смена оператора продолжают ту же комбинацию, прогресс общий для привязанных комнат; сброс — победа или повторная выдача Мастером | ✅ сделано | **532** |
+ 
+-## Осталось после патча 531
++## Осталось после патча 532
+ 
+-Патчи 524–531 закрыли сбой мини-игры замка, окна локации, входа в игру,
++Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+ красную ошибку, паузу перед её сбросом, закрепили закон снимка для всего
+-пространства Мастера, развели семантику взлома локации/контейнера и убрали
+-артефакт стрелок — не меняя порядок тринадцатого тезиса: граф, граница
+-видимости, адресный взлом,
++пространства Мастера, развели семантику взлома локации/контейнера, убрали
++артефакт стрелок и добавили память угаданных позиций на весь взлом точки — не
++меняя порядок тринадцатого тезиса: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+@@ -59,7 +60,9 @@
+    - ~~развести в интерфейсе семантику «взлом локации = вход» и «взлом
+      контейнера = содержимое»~~ ✅ **530**;
+    - общая доска мини-игры и общий журнал событий для всех привязанных комнат
+-     (сейчас `terminalStates` / `accessEvents` живут на комнате);
++     (сейчас `terminalStates` / `accessEvents` живут на комнате; патч 532
++     синхронизирует только доску ЗАМКА — память угаданных позиций и секрет,
++     полного объединения состояний ещё нет);
+    - ручное связывание второй строки «проверка» с уже созданными точками через
+      «ИЛИ» и запрет повторного выбора источника взлома;
+    - «Заблокировать всё» с сохранением в карточке Мастера и выбор конкретного
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 02b68b8..5235d17 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -387,7 +387,7 @@
+     "actionFailed": "Action failed",
+     "newAttempt": "Another attempt",
+     "approachFinished": "Attempt finished",
+-    "newAttemptHint": "Start a new attempt whenever you buy bobby pins or improve your stats.",
++    "newAttemptHint": "Another attempt continues the same lock: solved positions are kept. Start one whenever you buy bobby pins or improve your stats.",
+     "stateOutOfPins": "Out of bobby pins",
+     "hackedTitle": "Lock picked",
+     "hackedMessage": "{name}: access granted. Operator — {operator}. The player can start another attempt on their own.",
+@@ -395,11 +395,12 @@
+     "sessionNotPublished": "The character sheet has not reached the room yet. Open the character and try again.",
+     "ready": "Lock is ready",
+     "progress": "Solved {done} of {total}",
+-    "greyHint": "Repeat the grey arrows",
++    "greyHint": "Grey arrows are already solved and stay for the rest of the lock",
++    "progressSaved": "Solved positions ({count} of {total}) are kept: the next attempt continues this lock.",
+     "arrowLeft": "Left",
+     "arrowUp": "Up",
+     "arrowRight": "Right",
+     "arrowDown": "Down",
+-    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, you have to start the lockpicking over."
++    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell."
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index e2f071b..a950f6b 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -388,7 +388,7 @@
+     "actionFailed": "Действие не выполнено",
+     "newAttempt": "Ещё подход",
+     "approachFinished": "Подход завершён",
+-    "newAttemptHint": "Начните новый подход, когда купите заколки или улучшите характеристики.",
++    "newAttemptHint": "Новый подход продолжает тот же взлом: угаданные позиции сохраняются. Начните его, когда купите заколки или улучшите характеристики.",
+     "stateOutOfPins": "Нет заколок",
+     "hackedTitle": "Замок взломан",
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Игрок может начать новый подход сам.",
+@@ -396,11 +396,12 @@
+     "sessionNotPublished": "Лист персонажа ещё не передан в комнату. Откройте персонажа и повторите взлом.",
+     "ready": "Замок готов к взлому",
+     "progress": "Отгадано {done} из {total}",
+-    "greyHint": "Серые стрелки нужно повторить",
++    "greyHint": "Серые стрелки уже угаданы и сохраняются до конца взлома",
++    "progressSaved": "Угаданные позиции ({count} из {total}) сохранены: следующий подход продолжит взлом.",
+     "arrowLeft": "Влево",
+     "arrowUp": "Вверх",
+     "arrowRight": "Вправо",
+     "arrowDown": "Вниз",
+-    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала."
++    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки."
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6058484..55e0e68 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "531"
++  "baseline": "532"
+ }
+diff --git a/public/version.json b/public/version.json
+index 6309daf..1158e89 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "531",
++  "version": "532",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Угаданные позиции замка теперь запоминаются: при поломке заколки курсор остаётся на первой неотгаданной ячейке, а уже найденные стрелки остаются серыми на доске — повторять всю последовательность не нужно.",
++      "Прогресс взлома не слетает при «Ещё подход», когда закончились заколки, при закрытии и повторном открытии окна: купите заколки и продолжайте ту же комбинацию с того же места.",
++      "Комбинация и угаданные позиции общие для всех игроков точки, включая привязанные комнаты: другой персонаж продолжает тот же взлом со своим листом.",
++      "Доступ по-прежнему выдаётся только после полного взлома. Память позиций сбрасывается победой ACCESS GRANTED или повторной выдачей точки Мастером; подсказки обновлены.",
+       "По зацепке владельца нашли причину «полос через центр»: стиль flex: 0 (в браузере flex: 0 1 0%) схлопывал кнопку стрелки. Убрали его вместе с собственным фоном, рамками и жёсткими width/height кнопки; фоном служит затемнённая область стрелок.",
+       "Вернули начертание стрелок до светлой темы: иконки arrow-*-bold размера 22 с явным центрированием по обеим осям. Цветовая гамма осталась светлой — тёмная стрелка на светлой области, а не зелёная на тёмной.",
+       "Починили перенос длинной подсказки о правилах: левая колонка строки статуса теперь сжимается до ширины карточки, текст переносится внутри модалки и не уходит за её границы одной строкой.",
+@@ -122,6 +126,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Solved positions on a lock are now remembered: when a bobby pin breaks, the cursor stays on the first unsolved cell and the known arrows remain grey on the board — no need to repeat the whole sequence.",
++      "Hack progress survives «Another attempt», running out of bobby pins, and closing or reopening the window: buy more pins and continue the same combination from the same spot.",
++      "The combination and solved positions are shared by everyone on the point, including bound rooms: another character continues the same lock with their own sheet.",
++      "Access is still granted only after the full hack. Solved positions reset on ACCESS GRANTED or when the Game Master reissues the point; hints were updated.",
+       "The owner's clue found the cause of the stripes through the center: flex: 0 (rendered as flex: 0 1 0% in the browser) collapsed the arrow button. Removed it along with the button's own background, borders and fixed width/height; the darker arrow area is the background now.",
+       "Restored the pre-light-theme arrow drawing: arrow-*-bold icons at size 22, explicitly centered on both axes. The palette stays light — a dark arrow on the light area instead of green on dark.",
+       "Fixed wrapping of the long rules hint: the left column of the status row now shrinks to the card width, so the text wraps inside the modal instead of overflowing in a single line.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index f69dfff..7da3a2f 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -14,8 +14,16 @@
+  *   угадывание по позиции, четыре стрелки; провал остаётся в ячейке;
+  *   одна заколка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
+  *   в момент поломки Удача 4…10 даёт 5…20% спасти заколку;
+- *   при поломке комбинация та же, зелёные стрелки сереют и остаются видны;
++ *   при поломке комбинация та же, угаданные позиции ЗАПОМИНАЮТСЯ и серыми
++ *   стрелками остаются видны, курсор остаётся на первой неотгаданной ячейке;
+  *   победа любого источника открывает точку через общее событие `hacked`.
++ *
++ * Патч 532: «Сломанная заколка не лишает прогресса ... Но прогресс не
++ * слетит». Память живёт весь взлом точки: поломка, «кончились заколки»,
++ * «Ещё подход», закрытие окна и смена оператора НЕ перегенерируют секрет и
++ * НЕ стирают угаданный префикс. Свежий лист при новом подходе обновляет
++ * только заколки/навык/удачу. Сброс — ACCESS GRANTED или повторная выдача
++ * Мастером. Прогресс общий для всех игроков точки (в т.ч. привязанных комнат).
+  */
+ 
+ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+@@ -369,6 +377,8 @@ const createLockGame = ({
+     secret,
+     cells: Array.from({ length: cellCount }, () => ({ arrow: null, state: CELL_STATE.HIDDEN })),
+     cursor: 0,
++    // Патч 532: сколько позиций уже угадано и запомнено на этой точке.
++    knownPositions: 0,
+     per: stats.per,
+     luck: stats.luck,
+     skill: stats.skill,
+@@ -391,6 +401,103 @@ const createLockGame = ({
+   };
+ };
+ 
++// ---------------------------------------------------------------------------
++// Патч 532: память угаданных позиций на весь взлом точки.
++// ---------------------------------------------------------------------------
++
++/** Непрерывный префикс уже угаданных ячеек (green/grey) слева направо. */
++const guessedLockPositions = (game) => {
++  const cells = Array.isArray(game?.cells) ? game.cells : [];
++  const guessed = [];
++  for (const cell of cells) {
++    if (!cell || !ARROWS.includes(cell.arrow)) break;
++    if (cell.state !== CELL_STATE.GREEN && cell.state !== CELL_STATE.GREY) break;
++    guessed.push(cell.arrow);
++  }
++  return guessed;
++};
++
++/** Ячейки для продолжения: угаданные -> grey, красные/пустые -> hidden. */
++const rememberedLockCells = (game) => {
++  const count = clamp(Math.floor(Number(game?.cellCount) || 0), 0, 18);
++  return Array.from({ length: count }, (_, idx) => {
++    const cell = Array.isArray(game?.cells) ? game.cells[idx] : null;
++    if (!cell || !ARROWS.includes(cell.arrow)) return { arrow: null, state: CELL_STATE.HIDDEN };
++    if (cell.state === CELL_STATE.GREEN || cell.state === CELL_STATE.GREY) {
++      return { arrow: cell.arrow, state: CELL_STATE.GREY };
++    }
++    return { arrow: null, state: CELL_STATE.HIDDEN };
++  });
++};
++
++/** Доска ещё не выиграна и не закрыта Мастером — её можно продолжить. */
++const isResumableLockGame = (game) => Boolean(
++  game
++  && game.kind === 'lock'
++  && Array.isArray(game.secret)
++  && game.secret.length > 0
++  && game.status !== 'won'
++  && game.status !== 'closed',
++);
++
++/**
++ * Продолжить взлом: ТОТ ЖЕ секрет и угаданный префикс, курсор на первой
++ * неотгаданной ячейке. Обновляются только заколки, навык, удача, оператор и
++ * служебные счётчики хода. PER/сложность/число ячеек зафиксированы на время
++ * взлома, иначе новая длина комбинации обесценила бы уже угаданные позиции.
++ *
++ * Если продолжать нечего (первый взлом, победа, повторная выдача Мастером) —
++ * собирается свежая доска с новым секретом.
++ */
++const resumeLockGame = ({
++  game = null,
++  config = {},
++  operatorClientId = null,
++  operatorCharacterId = null,
++  characterSnapshot = {},
++  now = Date.now(),
++  rng = Math.random,
++  spentPins = 0,
++} = {}) => {
++  if (!isResumableLockGame(game)) {
++    return createLockGame({
++      config, operatorClientId, operatorCharacterId,
++      characterSnapshot, now, rng, spentPins,
++    });
++  }
++  const stats = lockStats(characterSnapshot);
++  stats.luckSave = luckSaveChance(stats.luck);
++  const alreadySpent = clamp(Math.floor(Number(spentPins) || 0), 0, 100000);
++  const availablePins = Math.max(0, stats.pins - alreadySpent);
++  const hasPin = availablePins > 0;
++  const cells = rememberedLockCells(game);
++  const known = guessedLockPositions({ ...game, cells });
++  const next = {
++    ...game,
++    cells,
++    cursor: known.length,
++    knownPositions: known.length,
++    status: hasPin ? 'playing' : 'awaitingRetry',
++    result: hasPin ? '' : 'OUT OF PINS',
++    scrollUp: false,
++    pinsTotal: availablePins,
++    pinsRemaining: hasPin ? availablePins - 1 : 0,
++    spentPins: alreadySpent,
++    pinActive: hasPin,
++    pinFailures: 0,
++    skill: stats.skill,
++    luck: stats.luck,
++    luckSave: stats.luckSave,
++    pressedArrows: Array.isArray(game.pressedArrows) ? game.pressedArrows.slice(-24) : [],
++    breakHighlight: null,
++    operatorClientId,
++    operatorCharacterId,
++    revision: (Number(game.revision) || 0) + 1,
++    updatedAt: now,
++  };
++  return syncLockGameConfig(next, config);
++};
++
+ const keyWonLockGame = (config, now = Date.now()) => ({
+   status: 'won',
+   kind: 'lock',
+@@ -404,6 +511,7 @@ const keyWonLockGame = (config, now = Date.now()) => ({
+   secret: [],
+   cells: [],
+   cursor: 0,
++  knownPositions: 0,
+   per: 4,
+   luck: 4,
+   skill: 0,
+@@ -485,9 +593,12 @@ const applyLockAction = ({
+   // нажатию кнопки, а start запрещён при won/playing.
+   if (action === 'newAttempt') {
+     if (shouldBlockLock({ game, config })) return { error: 'LOCK_BLOCKED' };
++    // Патч 532: явный подход ПРОДОЛЖАЕТ тот же взлом, а не собирает новую
++    // комбинацию. Свежий лист меняет заколки/навык/удачу, угаданные позиции
++    // остаются. Победа и повторная выдача Мастера дают новый секрет.
+     return {
+-      game: createLockGame({
+-        config, operatorClientId: clientId, operatorCharacterId: characterId,
++      game: resumeLockGame({
++        game, config, operatorClientId: clientId, operatorCharacterId: characterId,
+         characterSnapshot, now, rng, spentPins,
+       }),
+     };
+@@ -510,10 +621,14 @@ const applyLockAction = ({
+       : { ...cell }
+   ));
+   const pressedArrows = [...(game.pressedArrows || []), arrow].slice(-24);
++  // Патч 532: сколько позиций уже угадано ДО этого нажатия. Именно столько
++  // останется в памяти, если нажатие сломает заколку.
++  const knownBefore = guessedLockPositions({ ...game, cells }).length;
+   let next = {
+     ...game,
+     cells,
+     pressedArrows,
++    knownPositions: knownBefore,
+     breakHighlight: null,
+     revision: game.revision + 1,
+     updatedAt: now,
+@@ -522,6 +637,7 @@ const applyLockAction = ({
+   if (ARROWS.indexOf(arrow) === game.secret[idx]) {
+     cells[idx] = { arrow, state: CELL_STATE.GREEN };
+     next.cursor = idx + 1;
++    next.knownPositions = next.cursor;
+     next.result = '';
+     if (next.cursor >= game.cellCount) {
+       next.status = 'won';
+@@ -547,18 +663,24 @@ const applyLockAction = ({
+ 
+   next.brokenPins = (game.brokenPins || 0) + 1;
+   next.pinFailures = 0;
+-  next.cursor = 0;
++  // Патч 532: курсор НЕ откатывается в начало. Угаданные позиции запомнены,
++  // игрок продолжает с той же ячейки, в которой ошибся. Повторять префикс
++  // больше не нужно — именно это отнимало время при маленькой ВОС.
++  next.cursor = idx;
++  next.knownPositions = knownBefore;
+   // Пауза перед обновлением цветов: сервер сохраняет красный «?» в cells, а
+   // клиент по истечении breakHighlight.durationMs рисует его скрытым.
+   next.breakHighlight = { durationMs: BREAK_HIGHLIGHT_MS };
+   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
+   // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
+   // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
+-  // красный не показывался вообще).
++  // красный не показывался вообще). Патч 532: уже серые стрелки тоже остаются
++  // серыми, а не исчезают — это память позиций между заколками.
+   next.cells = cells.map((cell, cellIdx) => (
+     cellIdx === idx
+       ? { arrow: null, state: CELL_STATE.RED }
+-      : (cell.state === CELL_STATE.GREEN
++      : ((cell.state === CELL_STATE.GREEN || cell.state === CELL_STATE.GREY)
++        && ARROWS.includes(cell.arrow)
+         ? { arrow: cell.arrow, state: CELL_STATE.GREY }
+         : { arrow: null, state: CELL_STATE.HIDDEN })
+   ));
+@@ -591,6 +713,10 @@ module.exports = {
+   consumeBobbyPins,
+   effectiveDifficulty,
+   createLockGame,
++  guessedLockPositions,
++  rememberedLockCells,
++  isResumableLockGame,
++  resumeLockGame,
+   keyWonLockGame,
+   publicLockGameState,
+   syncLockGameConfig,
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index a275fdb..752b69b 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -30,6 +30,8 @@ const {
+ } = require('./terminalHacking');
+ const {
+   createLockGame,
++  isResumableLockGame,
++  resumeLockGame,
+   keyWonLockGame,
+   syncLockGameConfig,
+   publicLockGameState,
+@@ -488,6 +490,72 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return out;
+   };
+ 
++  /**
++   * Патч 532: угаданные позиции замка ОБЩИЕ для всех игроков точки, включая
++   * привязанные комнаты. `terminalStates` по-прежнему живут на комнате (общая
++   * доска мини-игры — отдельный пункт плана 13), но доска замка копируется в
++   * связанные комнаты: любой игрок продолжает ТУ ЖЕ комбинацию и тот же
++   * угаданный префикс.
++   */
++  const boundRoomsForTerminal = (room, containerId) => {
++    const id = String(containerId || '').trim();
++    if (!id) return [room];
++    const codes = new Set([room.code]);
++    const addSessionCodes = (session) => {
++      if (!Array.isArray(session?.roomCodes)) return;
++      for (const raw of session.roomCodes) {
++        const code = String(raw || '').trim().toUpperCase();
++        if (code) codes.add(code);
++      }
++    };
++    addSessionCodes(room.activeSession);
++    for (const other of rooms.values()) {
++      const session = other.activeSession;
++      if (!session) continue;
++      const mentions = session === room.activeSession
++        || (Array.isArray(session.roomCodes)
++          && session.roomCodes.some((raw) => String(raw || '').trim().toUpperCase() === room.code));
++      if (!mentions) continue;
++      addSessionCodes(session);
++      codes.add(other.code);
++    }
++    return [...codes]
++      .map((code) => rooms.get(code))
++      .filter((target) => target && target.terminalStates.has(id));
++  };
++
++  /**
++   * Патч 532: комната, которой точку выдали ПОЗЖЕ начала взлома, подхватывает
++   * уже идущую доску из привязанной комнаты, чтобы не начать другой секрет.
++   */
++  const adoptSharedLockGame = (room, containerId) => {
++    const id = String(containerId || '').trim();
++    for (const target of boundRoomsForTerminal(room, id)) {
++      if (target === room) continue;
++      const other = target.terminalStates.get(id);
++      if (other?.config?.kind === 'lock' && isResumableLockGame(other.game)) {
++        return { ...other.game };
++      }
++    }
++    return null;
++  };
++
++  /** Разослать доску замка в привязанные комнаты. game=null — сброс Мастера. */
++  const propagateLockGame = (room, containerId, game, closed = false) => {
++    const id = String(containerId || '').trim();
++    const targets = boundRoomsForTerminal(room, id);
++    for (const target of targets) {
++      if (target === room) continue;
++      const entry = target.terminalStates.get(id);
++      if (!entry || entry.config?.kind !== 'lock') continue;
++      entry.game = game ? { ...game } : null;
++      entry.closed = Boolean(closed);
++      entry.updatedAt = now();
++      refreshKeyAccess(target);
++    }
++    return targets;
++  };
++
+   const propagateSharedSession = (session, fallbackCode = '') => {
+     const bound = boundRoomsForSession(session, fallbackCode);
+     for (const target of bound) target.activeSession = session;
+@@ -589,7 +657,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           ? syncLockGameConfig(previous.game, config)
+           : syncGameConfig(previous.game, config))
+       : null;
+-    if (reissue && game?.status === 'closed') game = null;
++    // Патч 532: повторная выдача Мастером сбрасывает память угаданных
++    // позиций замка (обычная правка карточки — нет).
++    if (reissue && (game?.status === 'closed' || config.kind === 'lock')) game = null;
+     return {
+       ...previous,
+       config,
+@@ -626,6 +696,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         config.containerId,
+         mergeTerminalConfig(previous, config, options),
+       );
++      // Патч 532: новая трансляция Мастера сбрасывает прогресс и в
++      // привязанных комнатах, иначе там осталась бы старая комбинация.
++      if (options.reissue && config.kind === 'lock') {
++        propagateLockGame(room, config.containerId, null, false);
++      }
+     }
+   };
+ 
+@@ -642,7 +717,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
+     room.terminalStates.set(config.containerId, entry);
+     refreshKeyAccess(room);
+-    return { room, terminal: terminalPublic(config.containerId, entry) };
++    // Патч 532: явная повторная выдача точки Мастером — сброс прогресса во
++    // всех привязанных комнатах. Живая правка карточки доску не трогает.
++    const terminalRooms = reissue && config.kind === 'lock'
++      ? propagateLockGame(room, config.containerId, null, false)
++      : null;
++    return {
++      room,
++      terminal: terminalPublic(config.containerId, entry),
++      ...(terminalRooms ? { terminalRooms } : {}),
++    };
+   };
+ 
+   /** Выполнить синхронизированное действие терминала. */
+@@ -716,11 +800,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         return { room, terminal: terminalPublic(id, entry) };
+       }
+       // unlock/reset/reissue — повторная трансляция терминала.
++      // Патч 532: у замка это ещё и сброс запомненных позиций.
+       entry.closed = false;
+       entry.game = null;
+       entry.accessId = newBroadcastId();
+       entry.updatedAt = now();
+-      return { room, terminal: terminalPublic(id, entry) };
++      const terminalRooms = entry.config?.kind === 'lock'
++        ? propagateLockGame(room, id, null, false)
++        : null;
++      return {
++        room,
++        terminal: terminalPublic(id, entry),
++        ...(terminalRooms ? { terminalRooms } : {}),
++      };
+     }
+     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+     // не запускается вообще — игрок получает понятный отказ.
+@@ -747,7 +839,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       if (shouldBlockLock({ game: entry.game, config: entry.config })) {
+         return { error: ERROR_CODE.LOCK_BLOCKED };
+       }
+-      const fresh = createLockGame({
++      // Патч 532: явный подход ПРОДОЛЖАЕТ взлом точки. Секрет и угаданные
++      // позиции общие для всех игроков, обновляется только лист оператора.
++      const fresh = resumeLockGame({
++        game: entry.game || adoptSharedLockGame(room, id),
+         config: entry.config,
+         operatorClientId: clientId,
+         operatorCharacterId: charId,
+@@ -762,7 +857,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       entry.operatorSnapshot = published.snapshot || {};
+       entry.updatedAt = now();
+       refreshKeyAccess(room);
+-      return { room, terminal: terminalPublic(id, entry) };
++      const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
++      return { room, terminal: terminalPublic(id, entry), terminalRooms };
+     }
+     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
+     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
+@@ -783,10 +879,57 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+     }
+     if (action === 'start' && switchingOperator) {
++      if (entry.config?.kind === 'lock' && isResumableLockGame(entry.game)) {
++        // Патч 532: другой игрок НЕ начинает новый взлом, а продолжает общий
++        // прогресс точки со своим листом. Секрет и угаданные позиции те же.
++        const resumed = resumeLockGame({
++          game: entry.game,
++          config: entry.config,
++          operatorClientId: clientId,
++          operatorCharacterId: charId,
++          characterSnapshot: snapshot,
++          now: now(),
++          rng: lockRandom,
++          spentPins: 0,
++        });
++        resumed.operatorName = String(published.fromName || snapshot?.name || '').trim();
++        entry.game = resumed;
++        entry.closed = false;
++        entry.operatorSnapshot = published.snapshot || {};
++        entry.updatedAt = now();
++        refreshKeyAccess(room);
++        const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
++        return { room, terminal: terminalPublic(id, entry), terminalRooms };
++      }
+       // Доска пересобирается createGame() из конфигурации терминала, а не из
+       // чужого состояния: число слов, скобки и удача берутся из нового листа.
+       entry.game = null;
+     }
++    // Патч 532: точка выдана этой комнате позже, а взлом уже идёт в
++    // привязанной — продолжаем общую доску, а не начинаем новый секрет.
++    if (action === 'start' && !entry.game && entry.config?.kind === 'lock') {
++      const shared = adoptSharedLockGame(room, id);
++      if (shared) {
++        const resumed = resumeLockGame({
++          game: shared,
++          config: entry.config,
++          operatorClientId: clientId,
++          operatorCharacterId: charId,
++          characterSnapshot: snapshot,
++          now: now(),
++          rng: lockRandom,
++          spentPins: 0,
++        });
++        resumed.operatorName = String(published.fromName || snapshot?.name || '').trim();
++        entry.game = resumed;
++        entry.closed = false;
++        entry.operatorSnapshot = published.snapshot || {};
++        entry.updatedAt = now();
++        refreshKeyAccess(room);
++        const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
++        return { room, terminal: terminalPublic(id, entry), terminalRooms };
++      }
++    }
+     const result = entry.config?.kind === 'lock'
+       ? applyLockAction({
+           game: entry.game,
+@@ -848,6 +991,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+     // для которых ключ был необязательным.
+     refreshKeyAccess(room);
++    const terminalRooms = entry.config?.kind === 'lock'
++      ? propagateLockGame(room, id, entry.game, entry.closed)
++      : null;
+     return {
+       room,
+       terminal: terminalPublic(id, entry),
+@@ -856,6 +1002,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       digestCommand,
+       characterId: charId,
+       clientId,
++      ...(terminalRooms ? { terminalRooms } : {}),
+     };
+   };
+ 
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 7b8b99b..8cb0031 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -397,6 +397,19 @@ const attachRoomWebSocketServer = (httpServer, {
+     });
+   };
+ 
++  /**
++   * Патч 532: угаданные позиции замка общие для привязанных комнат. Реестр
++   * уже скопировал доску в их `terminalStates`; здесь рассылаем свежие
++   * состояния точек и журнал доступа всем участникам этих комнат.
++   */
++  const broadcastTerminalRooms = (result, canonical) => {
++    const targets = Array.isArray(result?.terminalRooms) ? result.terminalRooms : [];
++    for (const target of targets) {
++      if (!target || target.code === canonical) continue;
++      broadcastKeyAccessState(target, null);
++    }
++  };
++
+   const handleUpgrade = (req, socket, head) => {
+     wss.handleUpgrade(req, socket, head, (ws) => {
+       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+@@ -734,6 +747,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
+           broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
+           broadcastKeyAccessState(result.room, clientId);
++          broadcastTerminalRooms(result, canonical);
+           break;
+         }
+ 
+@@ -771,6 +785,8 @@ const attachRoomWebSocketServer = (httpServer, {
+           // Патч 516: взлом привязанного терминала открывает точки с
+           // необязательным ключом.
+           broadcastKeyAccessState(result.room, clientId);
++          // Патч 532: прогресс замка уходит и в привязанные комнаты.
++          broadcastTerminalRooms(result, canonical);
+           // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
+           // Никакой правки room.lastSnapshots здесь больше нет.
+           if (result.pinsToSpend > 0) {

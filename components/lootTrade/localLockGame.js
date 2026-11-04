@@ -43,7 +43,37 @@ const finish = (game, spentPins, error = null) => ({
   error,
 });
 
-export const initialLocalLockState = () => finish(null, 0);
+/**
+ * Патч 532: локальный резерв тоже помнит угаданные позиции между открытиями
+ * окна. `useState` в модалке живёт только до размонтирования, поэтому доска
+ * хранится здесь, в памяти модуля, по containerId точки. После ACCESS GRANTED
+ * память очищается — следующий взлом начинает новую комбинацию.
+ */
+const localBoards = new Map();
+
+export const initialLocalLockState = (containerId = '') => {
+  const id = String(containerId || '').trim();
+  const saved = id ? localBoards.get(id) : null;
+  return saved ? finish(saved.game, saved.spentPins) : finish(null, 0);
+};
+
+export const saveLocalLockState = (containerId, state) => {
+  const id = String(containerId || '').trim();
+  if (!id || !state) return;
+  if (state.game?.status === 'won' || state.game?.status === 'closed') {
+    localBoards.delete(id);
+    return;
+  }
+  localBoards.set(id, {
+    game: state.game || null,
+    spentPins: Math.max(0, Math.floor(Number(state.spentPins) || 0)),
+  });
+};
+
+export const clearLocalLockState = (containerId) => {
+  const id = String(containerId || '').trim();
+  if (id) localBoards.delete(id);
+};
 
 const localConfig = (lock) => ({
   containerId: String(lock?.containerId || lock?.id || '').trim(),
@@ -73,7 +103,9 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
   if (decision) {
     if (!game || game.status !== 'awaitingRetry') return finish(game, carried, 'LOCK_NOT_ACTIVE');
     if (decision === 'no') return finish(engine.closeLockGame(game, { now }), carried);
-    const fresh = engine.createLockGame({
+    // Патч 532: «Да» Мастера в локальной партии продолжает ту же доску.
+    const fresh = engine.resumeLockGame({
+      game,
       config,
       operatorClientId: LOCAL_LOCK_OPERATOR,
       operatorCharacterId: characterId || 'local',
@@ -89,13 +121,14 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
     return finish(fresh, carried);
   }
 
-  // Патч 526: явный новый подход игрока. Локальный резерв повторяет закон
-  // сервера: свежая доска по текущему листу, сломанные заколки не
-  // возвращаются, блокировки пока нет (shouldBlockLock() — задел на будущее).
+  // Патч 526/532: явный новый подход игрока. Свежий лист обновляет заколки,
+  // навык и удачу, но угаданные позиции и комбинация остаются (закон 532).
+  // Сломанные заколки не возвращаются, блокировки пока нет.
   if (action === 'newAttempt') {
     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
     if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
-    const fresh = engine.createLockGame({
+    const fresh = engine.resumeLockGame({
+      game,
       config,
       operatorClientId: LOCAL_LOCK_OPERATOR,
       operatorCharacterId: characterId || 'local',

@@ -1,8 +1,12 @@
 {
-  "version": "531",
+  "version": "532",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Угаданные позиции замка теперь запоминаются: при поломке заколки курсор остаётся на первой неотгаданной ячейке, а уже найденные стрелки остаются серыми на доске — повторять всю последовательность не нужно.",
+      "Прогресс взлома не слетает при «Ещё подход», когда закончились заколки, при закрытии и повторном открытии окна: купите заколки и продолжайте ту же комбинацию с того же места.",
+      "Комбинация и угаданные позиции общие для всех игроков точки, включая привязанные комнаты: другой персонаж продолжает тот же взлом со своим листом.",
+      "Доступ по-прежнему выдаётся только после полного взлома. Память позиций сбрасывается победой ACCESS GRANTED или повторной выдачей точки Мастером; подсказки обновлены.",
       "По зацепке владельца нашли причину «полос через центр»: стиль flex: 0 (в браузере flex: 0 1 0%) схлопывал кнопку стрелки. Убрали его вместе с собственным фоном, рамками и жёсткими width/height кнопки; фоном служит затемнённая область стрелок.",
       "Вернули начертание стрелок до светлой темы: иконки arrow-*-bold размера 22 с явным центрированием по обеим осям. Цветовая гамма осталась светлой — тёмная стрелка на светлой области, а не зелёная на тёмной.",
       "Починили перенос длинной подсказки о правилах: левая колонка строки статуса теперь сжимается до ширины карточки, текст переносится внутри модалки и не уходит за её границы одной строкой.",
@@ -122,6 +126,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Solved positions on a lock are now remembered: when a bobby pin breaks, the cursor stays on the first unsolved cell and the known arrows remain grey on the board — no need to repeat the whole sequence.",
+      "Hack progress survives «Another attempt», running out of bobby pins, and closing or reopening the window: buy more pins and continue the same combination from the same spot.",
+      "The combination and solved positions are shared by everyone on the point, including bound rooms: another character continues the same lock with their own sheet.",
+      "Access is still granted only after the full hack. Solved positions reset on ACCESS GRANTED or when the Game Master reissues the point; hints were updated.",
       "The owner's clue found the cause of the stripes through the center: flex: 0 (rendered as flex: 0 1 0% in the browser) collapsed the arrow button. Removed it along with the button's own background, borders and fixed width/height; the darker arrow area is the background now.",
       "Restored the pre-light-theme arrow drawing: arrow-*-bold icons at size 22, explicitly centered on both axes. The palette stays light — a dark arrow on the light area instead of green on dark.",
       "Fixed wrapping of the long rules hint: the left column of the status row now shrinks to the card width, so the text wraps inside the modal instead of overflowing in a single line.",
