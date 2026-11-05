@@ -1,6 +1,35 @@
 # Changelog
 ---
 
+## Restored at the owner's request (patch 534)
+
+The owner pointed out that patch 533 rolled back more than asked: the progress
+counter, the saved-positions line and the hints, and it also broke the wrapping
+of the long rules description. Only these are restored, nothing else.
+
+**Restored:**
+
+- `statusLeft` and `flexShrink/maxWidth` on `arrowsHint` — the long rules
+  description wraps inside the modal again instead of running off in one line.
+- The «Solved N of M» counter counts green **and grey** cells again.
+- The «Solved positions (X of Y) are kept» line in the «Approach finished»
+  panel and the `progressSaved` key in RU/EN.
+- The `arrowsHint`, `greyHint` and `newAttemptHint` hints describe the new
+  mechanic again: solved positions are kept until the lock is finished.
+
+**Untouched:** the patch 533 style rollback (borders, radius, zero paddings,
+the `arrowPad` border, `modalStyles.btn/saveBtn`, the size 30 icon, 58×50
+spacers), the four style removals named by the owner, centering, the light
+palette and **all of the 532 mechanic** (`resumeLockGame`, `knownPositions`,
+the shared board, local board memory, the 529 snapshot law).
+
+The historical 527/531/532 tests were updated for the restored state.
+Checks: typecheck, build, full `npm test`, forward and reverse `git apply
+--check`, installer from the exact base and from 533 with byte comparison,
+live WS probe. The 533 notes describe an intermediate state; this entry is
+the current one.
+
+
 ## Rolling back the extra 531/532 edits (patch 533)
 
 The owner pointed out that patches 531 and 532 went beyond the request and

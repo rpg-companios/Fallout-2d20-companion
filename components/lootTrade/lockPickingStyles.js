@@ -58,6 +58,10 @@ export const lockLightStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
+  // Патч 531 / возвращено в 534: левая колонка строки статуса СЖИМАЕТСЯ
+  // до ширины карточки, иначе длинное описание правил задаёт собственную
+  // ширину, встаёт в одну строку и уходит за границы модалки.
+  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
@@ -104,6 +108,9 @@ export const lockLightStyles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 2,
     textAlign: 'left',
+    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
+    flexShrink: 1,
+    maxWidth: '100%',
   },
 
   // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть

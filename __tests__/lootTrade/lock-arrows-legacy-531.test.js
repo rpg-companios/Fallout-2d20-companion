@@ -1,11 +1,11 @@
 // Патч 531 удалил по слову владельца ровно четыре правила кнопки стрелки:
 // `flex: 0`, `backgroundColor: '#dadada'`, `width: 58`, `height: 50`.
 //
-// Патч 533 откатывает ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
-// нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30,
-// пустышки 58×50 и исходная вёрстка строки статуса (без statusLeft и
-// flexShrink/maxWidth). Оставлены только четыре названных removal'а и
-// центрирование по обеим осям.
+// Патч 533 откатил ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
+// нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30
+// и пустышки 58×50. Оставлены четыре названных removal'а и центрирование.
+// Патч 534 ВЕРНУЛ перенос длинного описания: statusLeft и flexShrink/
+// maxWidth снова на месте (владелец не просил их откатывать).
 import React, { act } from 'react';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -175,15 +175,17 @@ describe('531: начертание стрелок до светлой темы'
     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
   });
 
-  it('патч 533 откатил новые правила переноса: statusLeft и flexShrink/maxWidth убраны', async () => {
+  it('патч 534 вернул перенос описания: statusLeft и flexShrink/maxWidth на месте', async () => {
     const renderer = await render();
     const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
     const style = flat(hint.props.style);
-    expect(style.flexShrink).toBeUndefined();
-    expect(style.maxWidth).toBeUndefined();
-    expect(lockLightStyles.statusLeft).toBeUndefined();
+    expect(style.flexShrink).toBe(1);
+    expect(style.maxWidth).toBe('100%');
+    expect(lockLightStyles.statusLeft.flex).toBe(1);
+    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
+    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
     const source = read('components/lootTrade/LockPickingModal.js');
-    expect(source).not.toContain('styles.statusLeft');
+    expect(source).toContain('<View style={styles.statusLeft}>');
   });
 
   it('все четыре кнопки на месте и нажимаемы', async () => {

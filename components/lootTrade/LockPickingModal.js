@@ -387,7 +387,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.statusRow}>
-            <View>
+            <View style={styles.statusLeft}>
               <Text testID="lock-pins-count" style={styles.pinCount}>
                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
               </Text>
@@ -443,6 +443,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                   {tLootTrade('lock.noPinsHint')}
                 </Text>
               ) : null}
+              {Number(game?.knownPositions) > 0 ? (
+                <Text style={styles.hintText} testID="lock-progress-saved">
+                  {formatLootTrade(tLootTrade('lock.progressSaved'), {
+                    count: game.knownPositions, total: game.cellCount,
+                  })}
+                </Text>
+              ) : null}
               <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
@@ -489,7 +496,10 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               ) : null}
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('lock.progress'), {
-                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
+                  // Патч 532 / возвращено в 534: серые ячейки — уже угаданные
+                  // и запомненные позиции, они тоже входят в прогресс.
+                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN
+                    || c.state === CELL_STATE.GREY).length,
                   total: game.cellCount,
                 })}
               </Text>
