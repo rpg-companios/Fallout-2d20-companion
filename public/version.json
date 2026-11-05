@@ -1,8 +1,9 @@
 {
-  "version": "536",
+  "version": "537",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
       "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
       "Счётчик заколок остаётся сверху заметным, а длинное описание правил по-прежнему переносится внутри окна и не уходит за его границы.",
       "Мастер может заблокировать замок и открыть его сам: «Открыть» сразу даёт доступ к точке, без мини-игры.",
@@ -140,6 +141,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",
       "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",
       "The bobby pin counter stays prominent at the top, and the long rules description still wraps inside the window instead of running past its edge.",
       "The Game Master can block a lock and open it themselves: Open grants access to the point right away, without a mini-game.",

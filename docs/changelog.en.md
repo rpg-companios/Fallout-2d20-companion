@@ -1,6 +1,35 @@
 # Changelog
 ---
 
+## Multi-level locations and passages — design (patch 537)
+
+The owner shifted priorities: the one-off "OR" linking of the second check row
+and "lock everything" from the card are postponed as not topical. In their
+place — a thorough level-design model: multi-level locations (a "Village" with
+houses, locked doors, chests and merchants; a secret lab where, after a failed
+hack, the doors lock and there is no way back).
+
+Agreed and recorded in `docs/location-level-design.md`:
+
+- **Passages between locations** — a path from location to location; the Game
+  Master decides what happened and what to lock by hand.
+- **Blocking is universal:** a cave-in, a trap, an alarm — any narrative.
+  Mechanically there is no passage; the reason is free text.
+- **Two mechanisms:** a hackable lock (the existing mini-game) and a solid
+  obstruction (only the Game Master can clear it). Passage directionality:
+  "from B to A is blocked, from A to B is open" — one-way doors and "locked
+  behind you."
+- **Manual control + room for auto-rules** "event -> block passage."
+- **No new entities** — the same `hub/terminal/lock/loot/merchant` nodes and
+  the 523 graph edges.
+- **The map is not now.** The owner's vision: a companion app + Owlbear fed by
+  data from the admin part; we keep the model exportable, without map fields.
+
+This is **design only**: a design doc + roadmap reprioritization (thesis 28).
+No code changed — implementation comes in a separate patch after the model is
+approved. The foundation (the 523 graph, visibility boundary, addressed hack,
+shared resources, one session, the 529 snapshot law) is preserved as invariants.
+
 ## Lockpicking: "Rules" and "Details" as two stacked blocks (patch 536)
 
 Owner: "In the lockpicking modal… they take one row but two containers. Can we
