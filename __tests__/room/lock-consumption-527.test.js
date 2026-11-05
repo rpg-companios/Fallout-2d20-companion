@@ -21,9 +21,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 const json = (rel) => JSON.parse(read(rel));
 
-// Патч 532: подсказка больше не говорит «начать сначала» — угаданные
-// позиции сохраняются. Точная формулировка по-прежнему фиксируется тестом.
-const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки.';
+const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.';
 
 const snapshot = (pins) => ({
   characterName: 'Сталкер',
@@ -216,12 +214,12 @@ describe('527: терминология и стрелки', () => {
     const source = read('components/lootTrade/lockPickingStyles.js');
     expect(source).toContain('arrowPad');
     expect(source).toMatch(/arrowPad:\s*\{[^}]*backgroundColor:\s*ADMIN_MODAL_PALETTE\.surfaceMuted/);
-    // Патч 531: фон у области, а не у каждой кнопки; начертание стрелок
-    // вернулось к размеру 22 и явному центрированию (убраны flex/рамки).
+    // Слово владельца (531): убраны только flex, фон и жёсткие размеры.
+    // Патч 533 вернул рамки/радиус/паддинги и иконку 30; центрирование осталось.
     expect(source).toMatch(/arrowButton:\s*\{[^}]*justifyContent:\s*'center'/);
     expect(source).not.toMatch(/arrowButton:\s*\{[^}]*flex:/);
     expect(source).toMatch(/crossRow:\s*\{[^}]*gap:\s*16/);
-    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{22\}/);
+    expect(read('components/lootTrade/LockPickingModal.js')).toMatch(/size=\{30\}/);
     expect(read('components/lootTrade/LockPickingModal.js')).toContain('testID="lock-arrow-pad"');
     expect(read('components/lootTrade/LockPickingModal.js')).toContain('ScrollView');
   });

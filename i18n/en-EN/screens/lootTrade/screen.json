@@ -387,7 +387,7 @@
     "actionFailed": "Action failed",
     "newAttempt": "Another attempt",
     "approachFinished": "Attempt finished",
-    "newAttemptHint": "Another attempt continues the same lock: solved positions are kept. Start one whenever you buy bobby pins or improve your stats.",
+    "newAttemptHint": "Start a new attempt whenever you buy bobby pins or improve your stats.",
     "stateOutOfPins": "Out of bobby pins",
     "hackedTitle": "Lock picked",
     "hackedMessage": "{name}: access granted. Operator — {operator}. The player can start another attempt on their own.",
@@ -395,12 +395,11 @@
     "sessionNotPublished": "The character sheet has not reached the room yet. Open the character and try again.",
     "ready": "Lock is ready",
     "progress": "Solved {done} of {total}",
-    "greyHint": "Grey arrows are already solved and stay for the rest of the lock",
-    "progressSaved": "Solved positions ({count} of {total}) are kept: the next attempt continues this lock.",
+    "greyHint": "Repeat the grey arrows",
     "arrowLeft": "Left",
     "arrowUp": "Up",
     "arrowRight": "Right",
     "arrowDown": "Down",
-    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell."
+    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, you have to start the lockpicking over."
   }
 }

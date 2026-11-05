@@ -389,29 +389,28 @@ describe('532: локальный резерв помнит доску межд�
   });
 });
 
-describe('532: строки, документы и версия', () => {
-  it('подсказки больше не велят начинать сначала, RU/EN пары равны', () => {
+describe('532/533: строки, документы и версия', () => {
+  it('откат 533: подсказки вернулись к формулировкам 527/531, progressSaved удалён', () => {
     const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
     const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
     expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
-    expect(ru.arrowsHint).toContain('сохраняются');
-    expect(ru.arrowsHint).not.toContain('начать сначала');
-    expect(en.arrowsHint).toContain('bobby pin breaks');
-    expect(en.arrowsHint).toContain('solved positions are kept');
-    expect(ru.greyHint).toContain('сохраняются');
-    expect(en.greyHint).toContain('already solved');
-    expect(ru.progressSaved).toContain('{count}');
-    expect(en.progressSaved).toContain('{count}');
-    expect(ru.newAttemptHint).toContain('сохраняются');
-    expect(en.newAttemptHint).toContain('solved positions are kept');
+    expect(ru.arrowsHint).toContain('начать сначала');
+    expect(en.arrowsHint).toContain('start the lockpicking over');
+    expect(ru.greyHint).toBe('Серые стрелки нужно повторить');
+    expect(en.greyHint).toBe('Repeat the grey arrows');
+    expect(ru.newAttemptHint).toContain('купите заколки');
+    expect(en.newAttemptHint).toContain('buy bobby pins');
+    expect(ru.progressSaved).toBeUndefined();
+    expect(en.progressSaved).toBeUndefined();
     expect(JSON.stringify(ru)).not.toMatch(/отмычк|шпильк|булавк/i);
   });
 
-  it('клиент считает серые ячейки прогрессом и показывает сохранение при паузе', () => {
+  it('откат 533: счётчик считает только зелёные, дополнительной числовой строки нет', () => {
     const modal = read('components/lootTrade/LockPickingModal.js');
-    expect(modal).toContain('CELL_STATE.GREY');
-    expect(modal).toContain('lock-progress-saved');
-    expect(modal).toContain("tLootTrade('lock.progressSaved')");
+    expect(modal).not.toContain('lock-progress-saved');
+    expect(modal).not.toContain("tLootTrade('lock.progressSaved')");
+    expect(modal).toMatch(/done: displayCells\.filter\(\(c\) => c\.state === CELL_STATE\.GREEN\)\.length/);
+    // Механика 532 (память доски в локальном резерве) не откатывалась.
     expect(modal).toContain('saveLocalLockState');
     expect(modal).toContain('initialLocalLockState(containerId)');
   });
@@ -431,17 +430,18 @@ describe('532: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('532');
+    expect(version.version).toBe('533');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(121);
-    expect(version.notes['en-EN']).toHaveLength(121);
-    expect(json('patchs/baseline.json').baseline).toBe('532');
+    expect(version.notes['ru-RU']).toHaveLength(125);
+    expect(version.notes['en-EN']).toHaveLength(125);
+    expect(json('patchs/baseline.json').baseline).toBe('533');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+    expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **532**');
-    expect(roadmap).toContain('| 22 |');
-    expect(roadmap).toContain('Осталось после патча 532');
-    expect(read('docs/patch-532-install.md')).toContain('532');
-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 17.');
+    expect(roadmap).toContain('Текущая версия: **533**');
+    expect(roadmap).toContain('| 23 |');
+    expect(roadmap).toContain('Осталось после патча 533');
+    expect(read('docs/patch-533-install.md')).toContain('533');
+    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 18.');
   });
 });

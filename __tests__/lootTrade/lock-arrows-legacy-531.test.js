@@ -1,12 +1,11 @@
-// Патч 531: владелец проверил стрелки — «всё равно с какими полосами через
-// центр». Просьба: «вернём стрелки, которые были до внедрения светлой темы.
-// Только то начертание или иконки стрелок. Их форма была хороша, только
-// цветовая гамма была не та».
+// Патч 531 удалил по слову владельца ровно четыре правила кнопки стрелки:
+// `flex: 0`, `backgroundColor: '#dadada'`, `width: 58`, `height: 50`.
 //
-// Иконки `arrow-*-bold` не менялись с 520; «полосы» давала обвязка: базовые
-// стили формы 525 (рамка + paddingVertical без justifyContent), рамки 527 и
-// размер 30. Возвращаем до-светлое начертание, оставляя светлую палитру,
-// затемнённую область, увеличенный шаг и подсказку 527.
+// Патч 533 откатывает ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
+// нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30,
+// пустышки 58×50 и исходная вёрстка строки статуса (без statusLeft и
+// flexShrink/maxWidth). Оставлены только четыре названных removal'а и
+// центрирование по обеим осям.
 import React, { act } from 'react';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -112,38 +111,39 @@ describe('531: начертание стрелок до светлой темы'
       expect(source).toContain(`${dir}: 'arrow-${dir}-bold'`);
       expect(source).toContain(`${dir}: 'arrow-${dir}'`); // CELL_ICON не менялся
     }
-    expect(source).toContain('size={22}');
-    expect(source).not.toContain('size={30}');
+    // Патч 533: иконка нажимной стрелки снова 30 (в ячейках осталась 22).
+    expect(source).toContain('size={30}');
+    const arrowBlock = source
+      .slice(source.indexOf('const arrowButton'), source.indexOf('const hasBoard'));
+    expect(arrowBlock).toContain('size={30}');
   });
 
-  it('кнопка стрелки больше не наследует базовые стили формы 525', () => {
+  it('патч 533 вернул базовые стили формы 525 в массив стилей кнопки', () => {
     const source = read('components/lootTrade/LockPickingModal.js');
-    // В массиве стилей кнопки нет modalStyles.btn / saveBtn: именно они
-    // добавляли рамку и paddingVertical без вертикального центрирования.
-    expect(source).toContain('style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}');
     const arrowBlock = source
       .slice(source.indexOf('const arrowButton'), source.indexOf('const hasBoard'))
       .replace(/\/\/.*$/gm, ''); // комментарии не должны влиять на проверку кода
-    expect(arrowBlock).not.toContain('modalStyles.btn');
-    expect(arrowBlock).not.toContain('modalStyles.saveBtn');
+    expect(arrowBlock).toContain('modalStyles.btn');
+    expect(arrowBlock).toContain('modalStyles.saveBtn');
+    expect(arrowBlock).toContain('styles.arrowButton');
   });
 
-  it('никаких рамок/полос и никакой коробки у кнопки: только заливка области', () => {
+  it('патч 533 вернул рамки, радиус и нулевые паддинги; четыре removal 531 в силе', () => {
     const pad = lockLightStyles.arrowPad;
     const button = lockLightStyles.arrowButton;
-    expect(pad.borderWidth).toBeUndefined();
-    expect(pad.borderColor).toBeUndefined();
+    expect(pad.borderWidth).toBe(1);
+    expect(pad.borderColor).toBe(LOCK_PALETTE.borderMuted);
     expect(pad.backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
-    expect(button.borderWidth).toBeUndefined();
-    expect(button.borderColor).toBeUndefined();
-    // Зацепка владельца: flex: 0 → в браузере `flex: 0 1 0%` схлопывал
-    // кнопку и рисовал линию; фон/размеры кнопки тоже убраны.
+    expect(button.borderWidth).toBe(1.5);
+    expect(button.borderColor).toBe('#9a9a9a');
+    expect(button.borderRadius).toBe(6);
+    expect(button.paddingHorizontal).toBe(0);
+    expect(button.paddingVertical).toBe(0);
+    // Ровно то, что просил владелец в 531.
     expect(button.flex).toBeUndefined();
     expect(button.backgroundColor).toBeUndefined();
     expect(button.width).toBeUndefined();
     expect(button.height).toBeUndefined();
-    expect(button.paddingHorizontal).toBeGreaterThan(0); // осталась зона нажатия
-    expect(button.paddingVertical).toBeGreaterThan(0);
   });
 
   it('иконка центрирована по обеим осям, как до светлой темы', () => {
@@ -154,12 +154,13 @@ describe('531: начертание стрелок до светлой темы'
   it('цветовая гамма осталась СВЕТЛОЙ, а не зелёной 524', async () => {
     const renderer = await render();
     const button = renderer.root.findAllByProps({ testID: 'lock-arrow-up' })[0];
-    expect(flat(button.props.style).backgroundColor).toBeUndefined();
+    // Базовый saveBtn снова даёт светлую подложку кнопки (откат 533).
+    expect(flat(button.props.style).backgroundColor).toBe(modalStyles.saveBtn.backgroundColor);
     const pad = renderer.root.findAllByProps({ testID: 'lock-arrow-pad' })[0];
     expect(flat(pad.props.style).backgroundColor).toBe(LOCK_PALETTE.surfaceMuted);
     const icon = button.findAllByType('MaterialCommunityIcons')[0];
     expect(icon.props.name).toBe('arrow-up-bold');
-    expect(icon.props.size).toBe(22);
+    expect(icon.props.size).toBe(30);
     expect(icon.props.color).toBe(LOCK_PALETTE.text);
     expect(icon.props.color).not.toBe('#c8efb8');
   });
@@ -174,19 +175,15 @@ describe('531: начертание стрелок до светлой темы'
     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
   });
 
-  it('подсказка правил переносится внутри модалки, а не уходит одной строкой', async () => {
+  it('патч 533 откатил новые правила переноса: statusLeft и flexShrink/maxWidth убраны', async () => {
     const renderer = await render();
     const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
     const style = flat(hint.props.style);
-    expect(style.flexShrink).toBe(1);
-    expect(style.maxWidth).toBe('100%');
-    // Родитель-колонка сжимается до ширины карточки: иначе row-контейнер
-    // берёт ширину длиннейшей строки и вылезает за границы окна.
-    expect(lockLightStyles.statusLeft.flex).toBe(1);
-    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
-    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
+    expect(style.flexShrink).toBeUndefined();
+    expect(style.maxWidth).toBeUndefined();
+    expect(lockLightStyles.statusLeft).toBeUndefined();
     const source = read('components/lootTrade/LockPickingModal.js');
-    expect(source).toContain('<View style={styles.statusLeft}>');
+    expect(source).not.toContain('styles.statusLeft');
   });
 
   it('все четыре кнопки на месте и нажимаемы', async () => {
@@ -195,7 +192,7 @@ describe('531: начертание стрелок до светлой темы'
       const button = renderer.root.findAllByProps({ testID: `lock-arrow-${dir}` })[0];
       expect(button).toBeTruthy();
       expect(button.props.disabled).toBe(false);
-      expect(button.findAllByType('MaterialCommunityIcons')[0].props.size).toBe(22);
+      expect(button.findAllByType('MaterialCommunityIcons')[0].props.size).toBe(30);
     }
   });
 });

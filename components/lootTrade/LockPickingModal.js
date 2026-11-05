@@ -327,16 +327,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
       testID={`lock-arrow-${arrow}`}
       accessibilityRole="button"
       accessibilityLabel={tLootTrade(ARROW_KEY[arrow])}
-      // Патч 531: вернули начертание стрелок из версии ДО светлой темы.
-      // Базовые стили формы (modalStyles.btn/saveBtn) добавляли рамку и
-      // paddingVertical без justifyContent — иконка «прилипала» к верху, а
-      // линии рамки проходили прямо через стрелку. Теперь кнопка — отдельный
-      // самодостаточный стиль с явным центрированием, как в 520–524.
-      style={[styles.arrowButton, !canPress && styles.arrowButtonDisabled]}
+      // Патч 533: базовые стили формы и иконка 30 возвращены. Из стилей
+      // кнопки по слову владельца убраны только flex, #dadada, width, height;
+      // центрирование по обеим осям сохранено.
+      style={[
+        modalStyles.btn,
+        modalStyles.saveBtn,
+        styles.arrowButton,
+        !canPress && styles.arrowButtonDisabled,
+      ]}
       disabled={!canPress}
       onPress={() => void doAction('press', arrow)}
     >
-      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={22} color={LOCK_PALETTE.text} />
+      <MaterialCommunityIcons name={ARROW_ICON[arrow]} size={30} color={LOCK_PALETTE.text} />
     </TouchableOpacity>
   );
 
@@ -384,7 +387,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             showsVerticalScrollIndicator={false}
           >
           <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
+            <View>
               <Text testID="lock-pins-count" style={styles.pinCount}>
                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
               </Text>
@@ -440,13 +443,6 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                   {tLootTrade('lock.noPinsHint')}
                 </Text>
               ) : null}
-              {Number(game?.knownPositions) > 0 ? (
-                <Text style={styles.hintText} testID="lock-progress-saved">
-                  {formatLootTrade(tLootTrade('lock.progressSaved'), {
-                    count: game.knownPositions, total: game.cellCount,
-                  })}
-                </Text>
-              ) : null}
               <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
               {newAttemptButton}
             </View>
@@ -493,10 +489,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               ) : null}
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('lock.progress'), {
-                  // Патч 532: серые ячейки — уже угаданные и запомненные
-                  // позиции, они тоже входят в прогресс.
-                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN
-                    || c.state === CELL_STATE.GREY).length,
+                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
                   total: game.cellCount,
                 })}
               </Text>

@@ -1,6 +1,52 @@
 # Changelog
 ---
 
+## Rolling back the extra 531/532 edits (patch 533)
+
+The owner pointed out that patches 531 and 532 went beyond the request and
+asked to roll the extras back. The rollback is surgical: **the patch 532
+mechanic that remembers solved positions is untouched**, only the four style
+rules the owner named in 531 (`flex: 0`, `#dadada`, `width: 58`, `height: 50`)
+remain removed, and centering is preserved.
+
+### 1. Arrow styles (rolling back the extra 531 edits)
+
+- `arrowButton`: `borderRadius: 6`, `borderWidth: 1.5`,
+  `borderColor: '#9a9a9a'` and `paddingVertical/paddingHorizontal: 0` restored.
+- `arrowPad`: its `borderWidth: 1` + `borderColor` restored.
+- `LockPickingModal.js`: `modalStyles.btn` and `modalStyles.saveBtn` are back
+  in the button style array; the icon is **30** again; `arrowSpacer` is
+  `58×50` again.
+- The 531 additions `statusLeft` and `flexShrink/maxWidth` on `arrowsHint`
+  are removed; the status row is a plain `<View>` again. Consequence: the long
+  rules hint may stop wrapping, since the wrapping rule was rolled back on the
+  owner's explicit instruction.
+
+### 2. Counter and hints (rolling back the extra 532 edits)
+
+- «Solved N of M» counts green cells only again.
+- The «Solved positions (X of Y) are kept» line is gone from the
+  «Approach finished» panel.
+- `arrowsHint`, `greyHint` and `newAttemptHint` are back to their 527/531
+  wording; the `progressSaved` key is removed from RU and EN. Consequence:
+  the texts again say «start over» / «repeat the grey arrows», although the
+  engine does keep the progress.
+
+### What is preserved
+
+The four style removals named by the owner, arrow centering, the light
+palette, laws 524–530 and **all of the 532 mechanic**: `resumeLockGame()`,
+`knownPositions`, the shared board across bound rooms, local board memory,
+reset on a win or GM reissue, the 529 snapshot law and server protection.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test`, forward and reverse `git
+apply --check`, installer from the exact `a62ec71` base (493–533 chain) and
+from version 532 with byte comparison, live WS probe. The historical 527/531/
+532 tests were updated for the rollback.
+
+
 ## Remembering solved positions (patch 532)
 
 The owner: "And let's make solved positions remembered? A broken bobby pin does

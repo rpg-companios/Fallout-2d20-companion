@@ -1,8 +1,12 @@
 {
-  "version": "532",
+  "version": "533",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "У кнопок со стрелками и области вокруг них вернулись рамки, скругления и привычный вид; иконки снова крупные, а пустышки в верхнем ряду выровнены по ним. Убрано только то, что мешало: лишнее сжатие кнопки, серый фон и жёсткие ширина с высотой.",
+      "Вёрстка строки со счётчиком заколок и подсказкой вернулась к прежнему виду: новые правила ширины и переноса убраны. Длинная подсказка правил снова показывается как раньше.",
+      "Счётчик «Отгадано N из M» снова считает только зелёные ячейки, а дополнительная строка про сохранённые позиции убрана из окна завершённого подхода.",
+      "Подсказки о поломке заколки, серых стрелках и новом подходе снова звучат по-старому. Само запоминание угаданных позиций работает как прежде: прогресс не пропадает.",
       "Угаданные позиции замка теперь запоминаются: при поломке заколки курсор остаётся на первой неотгаданной ячейке, а уже найденные стрелки остаются серыми на доске — повторять всю последовательность не нужно.",
       "Прогресс взлома не слетает при «Ещё подход», когда закончились заколки, при закрытии и повторном открытии окна: купите заколки и продолжайте ту же комбинацию с того же места.",
       "Комбинация и угаданные позиции общие для всех игроков точки, включая привязанные комнаты: другой персонаж продолжает тот же взлом со своим листом.",
@@ -126,6 +130,10 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The arrow buttons and the area around them have their border, rounded corners and familiar look back; the icons are large again and the top-row spacers match them. Only the things that got in the way were removed: the squeezing rule, the grey background and the fixed width and height.",
+      "The row with the bobby pin counter and the hint is back to its old layout: the extra width and wrapping rules are gone. The long rules hint is displayed the way it was before.",
+      "The «Solved N of M» counter counts green cells only again, and the extra line about kept positions is gone from the finished-approach panel.",
+      "The hints about a broken bobby pin, grey arrows and another attempt read the way they used to. Remembering solved positions still works: progress is not lost.",
       "Solved positions on a lock are now remembered: when a bobby pin breaks, the cursor stays on the first unsolved cell and the known arrows remain grey on the board — no need to repeat the whole sequence.",
       "Hack progress survives «Another attempt», running out of bobby pins, and closing or reopening the window: buy more pins and continue the same combination from the same spot.",
       "The combination and solved positions are shared by everyone on the point, including bound rooms: another character continues the same lock with their own sheet.",
