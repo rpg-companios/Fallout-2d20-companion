@@ -4,8 +4,10 @@
 // Патч 533 откатил ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
 // нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30
 // и пустышки 58×50. Оставлены четыре названных removal'а и центрирование.
-// Патч 534 ВЕРНУЛ перенос длинного описания: statusLeft и flexShrink/
-// maxWidth снова на месте (владелец не просил их откатывать).
+// Патч 534 ВЕРНУЛ перенос длинного описания: flexShrink/maxWidth снова на
+// месте (владелец не просил их откатывать). Патч 536 разнёс строку статуса на
+// два вертикальных контейнера — «Правила» (rulesBlock) и «Сведения»
+// (infoBlock); перенос описания внутри rulesBlock сохранён.
 import React, { act } from 'react';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -175,17 +177,18 @@ describe('531: начертание стрелок до светлой темы'
     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
   });
 
-  it('патч 534 вернул перенос описания: statusLeft и flexShrink/maxWidth на месте', async () => {
+  it('патч 534 вернул перенос описания (536: блок правил): flexShrink/maxWidth на месте', async () => {
     const renderer = await render();
     const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
     const style = flat(hint.props.style);
     expect(style.flexShrink).toBe(1);
     expect(style.maxWidth).toBe('100%');
-    expect(lockLightStyles.statusLeft.flex).toBe(1);
-    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
-    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
+    // Патч 536: описание живёт в отдельном блоке «Правила», который сжимается
+    // до ширины карточки (закон переноса 531/534 сохранён).
+    expect(lockLightStyles.rulesBlock.flexShrink).toBe(1);
+    expect(lockLightStyles.rulesBlock.minWidth).toBe(0);
     const source = read('components/lootTrade/LockPickingModal.js');
-    expect(source).toContain('<View style={styles.statusLeft}>');
+    expect(source).toContain('testID="lock-rules-block"');
   });
 
   it('все четыре кнопки на месте и нажимаемы', async () => {

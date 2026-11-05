@@ -49,22 +49,50 @@ export const lockLightStyles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
 
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+  // Патч 536: правила и сведения — ДВА отдельных контейнера один под другим
+  // (слово владельца: «1-й Правила, 2-й сведения»), а не одна строка с двумя
+  // колонками. Счётчик заколок остаётся сверху заметным, под ним блок правил,
+  // затем блок сведений. Каркас блоков — как у board/pointCard (рамка +
+  // surfaceRaised), заголовки — как statusLabel.
+  statusColumn: {
+    flexDirection: 'column',
+    gap: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
-  // Патч 531 / возвращено в 534: левая колонка строки статуса СЖИМАЕТСЯ
-  // до ширины карточки, иначе длинное описание правил задаёт собственную
-  // ширину, встаёт в одну строку и уходит за границы модалки.
-  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
+  // Блок правил сжимается до ширины карточки, чтобы длинное описание
+  // переносилось внутри модалки (закон 531/534 сохранён).
+  rulesBlock: {
+    borderWidth: 1,
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  infoBlock: {
+    borderWidth: 1,
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  blockTitle: {
+    color: ADMIN_MODAL_PALETTE.mutedText,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
+  infoSkillLabel: { marginTop: 6 },
 
   board: {
     marginTop: 12,
@@ -105,10 +133,10 @@ export const lockLightStyles = StyleSheet.create({
     color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: 4,
     marginBottom: 2,
     textAlign: 'left',
-    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
+    // Явно разрешаем перенос: ограничение ширины приходит от rulesBlock.
     flexShrink: 1,
     maxWidth: '100%',
   },

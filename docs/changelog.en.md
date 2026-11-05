@@ -1,6 +1,38 @@
 # Changelog
 ---
 
+## Lockpicking: "Rules" and "Details" as two stacked blocks (patch 536)
+
+Owner: "In the lockpicking modal… they take one row but two containers. Can we
+redo them as 2 different containers one under the other. 1st Rules, 2nd
+details."
+
+The status row in the lockpicking window used to be a single horizontal row of
+two columns: bobby-pin counter, rules description and difficulty on the left,
+LOCKPICK and stats on the right. It is now a vertical column of two separate
+containers:
+
+- **On top** — the prominent bobby-pin counter (`Pins: N`), as before.
+- **Container 1 "Rules"** — a heading and the mini-game description (the hint
+  about arrows, green/red and solved positions being kept when a pin breaks).
+  The long text still wraps inside the window.
+- **Container 2 "Details"** — a heading, the difficulty (`Difficulty N · M
+  cells`), LOCKPICK and the "Skill · Perception · Luck" line.
+
+The hint text itself did not change — only the layout. The description-wrap
+law (531/534) is preserved: the rules block shrinks to the card width
+(`flexShrink: 1`, `minWidth: 0`) and the hint wraps (`flexShrink: 1`,
+`maxWidth: '100%'`). The block frame follows the nearest modal sample
+(`docs/ui-modals-rules.md`): light surface, border and radius from
+`ADMIN_MODAL_PALETTE`, no literals. The hacking mechanics, the 532 position
+memory, the 535 "Game Master decides" flow and the blocked-point panel are
+untouched.
+
+Paired strings `lock.rulesTitle` ("Правила"/Rules) and `lock.infoTitle`
+("Сведения"/Details) were added to the RU/EN dictionaries. Acceptance test
+`__tests__/lootTrade/lock-status-blocks-536.test.js`; the historical wrap
+checks (531/532) were updated for the rules block.
+
 ## "The Game Master decides" and a shared board for bound rooms (patch 535)
 
 The owner accepted the proposal for a standard escape hatch: "the same Yes/No

@@ -407,14 +407,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <Text testID="lock-pins-count" style={styles.pinCount}>
-                {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
-              </Text>
+          {/* Патч 536: два контейнера один под другим — «Правила» и «Сведения». */}
+          <View style={styles.statusColumn}>
+            <Text testID="lock-pins-count" style={styles.pinCount}>
+              {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+            </Text>
+            <View style={styles.rulesBlock} testID="lock-rules-block">
+              <Text style={styles.blockTitle}>{tLootTrade('lock.rulesTitle')}</Text>
               <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
                 {tLootTrade('lock.arrowsHint')}
               </Text>
+            </View>
+            <View style={styles.infoBlock} testID="lock-info-block">
+              <Text style={styles.blockTitle}>{tLootTrade('lock.infoTitle')}</Text>
               <Text style={styles.statText}>
                 {game?.cellCount
                   ? formatLootTrade(tLootTrade('lock.difficulty'), {
@@ -423,9 +428,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                     })
                   : tLootTrade('lock.ready')}
               </Text>
-            </View>
-            <View style={{ alignItems: 'flex-end', maxWidth: '48%' }}>
-              <Text style={styles.statusLabel}>LOCKPICK</Text>
+              <Text style={[styles.statusLabel, styles.infoSkillLabel]}>LOCKPICK</Text>
               {game ? (
                 <Text style={styles.statText}>
                   {formatLootTrade(tLootTrade('lock.skill'), {

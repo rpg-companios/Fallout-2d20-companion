@@ -255,17 +255,18 @@ describe('535: протокол, клиент, строки и документ�
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('535');
+    expect(version.version).toBe('536');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(133);
-    expect(version.notes['en-EN']).toHaveLength(133);
-    expect(json('patchs/baseline.json').baseline).toBe('535');
+    expect(version.notes['ru-RU']).toHaveLength(135);
+    expect(version.notes['en-EN']).toHaveLength(135);
+    expect(json('patchs/baseline.json').baseline).toBe('536');
     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+    expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **535**');
-    expect(roadmap).toContain('| 26 |');
-    expect(roadmap).toContain('Осталось после патча 535');
-    expect(read('docs/patch-535-install.md')).toContain('535');
-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
+    expect(roadmap).toContain('Текущая версия: **536**');
+    expect(roadmap).toContain('| 27 |');
+    expect(roadmap).toContain('Осталось после патча 536');
+    expect(read('docs/patch-536-install.md')).toContain('536');
+    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 21.');
   });
 });
