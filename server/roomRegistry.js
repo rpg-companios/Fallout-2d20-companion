@@ -30,6 +30,8 @@ const {
 } = require('./terminalHacking');
 const {
   createLockGame,
+  isResumableLockGame,
+  resumeLockGame,
   keyWonLockGame,
   syncLockGameConfig,
   publicLockGameState,
@@ -488,6 +490,72 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return out;
   };
 
+  /**
+   * Патч 532: угаданные позиции замка ОБЩИЕ для всех игроков точки, включая
+   * привязанные комнаты. `terminalStates` по-прежнему живут на комнате (общая
+   * доска мини-игры — отдельный пункт плана 13), но доска замка копируется в
+   * связанные комнаты: любой игрок продолжает ТУ ЖЕ комбинацию и тот же
+   * угаданный префикс.
+   */
+  const boundRoomsForTerminal = (room, containerId) => {
+    const id = String(containerId || '').trim();
+    if (!id) return [room];
+    const codes = new Set([room.code]);
+    const addSessionCodes = (session) => {
+      if (!Array.isArray(session?.roomCodes)) return;
+      for (const raw of session.roomCodes) {
+        const code = String(raw || '').trim().toUpperCase();
+        if (code) codes.add(code);
+      }
+    };
+    addSessionCodes(room.activeSession);
+    for (const other of rooms.values()) {
+      const session = other.activeSession;
+      if (!session) continue;
+      const mentions = session === room.activeSession
+        || (Array.isArray(session.roomCodes)
+          && session.roomCodes.some((raw) => String(raw || '').trim().toUpperCase() === room.code));
+      if (!mentions) continue;
+      addSessionCodes(session);
+      codes.add(other.code);
+    }
+    return [...codes]
+      .map((code) => rooms.get(code))
+      .filter((target) => target && target.terminalStates.has(id));
+  };
+
+  /**
+   * Патч 532: комната, которой точку выдали ПОЗЖЕ начала взлома, подхватывает
+   * уже идущую доску из привязанной комнаты, чтобы не начать другой секрет.
+   */
+  const adoptSharedLockGame = (room, containerId) => {
+    const id = String(containerId || '').trim();
+    for (const target of boundRoomsForTerminal(room, id)) {
+      if (target === room) continue;
+      const other = target.terminalStates.get(id);
+      if (other?.config?.kind === 'lock' && isResumableLockGame(other.game)) {
+        return { ...other.game };
+      }
+    }
+    return null;
+  };
+
+  /** Разослать доску замка в привязанные комнаты. game=null — сброс Мастера. */
+  const propagateLockGame = (room, containerId, game, closed = false) => {
+    const id = String(containerId || '').trim();
+    const targets = boundRoomsForTerminal(room, id);
+    for (const target of targets) {
+      if (target === room) continue;
+      const entry = target.terminalStates.get(id);
+      if (!entry || entry.config?.kind !== 'lock') continue;
+      entry.game = game ? { ...game } : null;
+      entry.closed = Boolean(closed);
+      entry.updatedAt = now();
+      refreshKeyAccess(target);
+    }
+    return targets;
+  };
+
   const propagateSharedSession = (session, fallbackCode = '') => {
     const bound = boundRoomsForSession(session, fallbackCode);
     for (const target of bound) target.activeSession = session;
@@ -589,7 +657,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           ? syncLockGameConfig(previous.game, config)
           : syncGameConfig(previous.game, config))
       : null;
-    if (reissue && game?.status === 'closed') game = null;
+    // Патч 532: повторная выдача Мастером сбрасывает память угаданных
+    // позиций замка (обычная правка карточки — нет).
+    if (reissue && (game?.status === 'closed' || config.kind === 'lock')) game = null;
     return {
       ...previous,
       config,
@@ -626,6 +696,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         config.containerId,
         mergeTerminalConfig(previous, config, options),
       );
+      // Патч 532: новая трансляция Мастера сбрасывает прогресс и в
+      // привязанных комнатах, иначе там осталась бы старая комбинация.
+      if (options.reissue && config.kind === 'lock') {
+        propagateLockGame(room, config.containerId, null, false);
+      }
     }
   };
 
@@ -642,7 +717,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
     room.terminalStates.set(config.containerId, entry);
     refreshKeyAccess(room);
-    return { room, terminal: terminalPublic(config.containerId, entry) };
+    // Патч 532: явная повторная выдача точки Мастером — сброс прогресса во
+    // всех привязанных комнатах. Живая правка карточки доску не трогает.
+    const terminalRooms = reissue && config.kind === 'lock'
+      ? propagateLockGame(room, config.containerId, null, false)
+      : null;
+    return {
+      room,
+      terminal: terminalPublic(config.containerId, entry),
+      ...(terminalRooms ? { terminalRooms } : {}),
+    };
   };
 
   /** Выполнить синхронизированное действие терминала. */
@@ -716,11 +800,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         return { room, terminal: terminalPublic(id, entry) };
       }
       // unlock/reset/reissue — повторная трансляция терминала.
+      // Патч 532: у замка это ещё и сброс запомненных позиций.
       entry.closed = false;
       entry.game = null;
       entry.accessId = newBroadcastId();
       entry.updatedAt = now();
-      return { room, terminal: terminalPublic(id, entry) };
+      const terminalRooms = entry.config?.kind === 'lock'
+        ? propagateLockGame(room, id, null, false)
+        : null;
+      return {
+        room,
+        terminal: terminalPublic(id, entry),
+        ...(terminalRooms ? { terminalRooms } : {}),
+      };
     }
     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
     // не запускается вообще — игрок получает понятный отказ.
@@ -747,7 +839,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       if (shouldBlockLock({ game: entry.game, config: entry.config })) {
         return { error: ERROR_CODE.LOCK_BLOCKED };
       }
-      const fresh = createLockGame({
+      // Патч 532: явный подход ПРОДОЛЖАЕТ взлом точки. Секрет и угаданные
+      // позиции общие для всех игроков, обновляется только лист оператора.
+      const fresh = resumeLockGame({
+        game: entry.game || adoptSharedLockGame(room, id),
         config: entry.config,
         operatorClientId: clientId,
         operatorCharacterId: charId,
@@ -762,7 +857,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       entry.operatorSnapshot = published.snapshot || {};
       entry.updatedAt = now();
       refreshKeyAccess(room);
-      return { room, terminal: terminalPublic(id, entry) };
+      const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
+      return { room, terminal: terminalPublic(id, entry), terminalRooms };
     }
     if (entry.closed || entry.game?.status === 'closed') return { error: ERROR_CODE.TERMINAL_CLOSED };
     if (entry.game?.status === 'awaitingRetry') return { error: ERROR_CODE.TERMINAL_AWAITING_RETRY };
@@ -783,9 +879,56 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
     }
     if (action === 'start' && switchingOperator) {
+      if (entry.config?.kind === 'lock' && isResumableLockGame(entry.game)) {
+        // Патч 532: другой игрок НЕ начинает новый взлом, а продолжает общий
+        // прогресс точки со своим листом. Секрет и угаданные позиции те же.
+        const resumed = resumeLockGame({
+          game: entry.game,
+          config: entry.config,
+          operatorClientId: clientId,
+          operatorCharacterId: charId,
+          characterSnapshot: snapshot,
+          now: now(),
+          rng: lockRandom,
+          spentPins: 0,
+        });
+        resumed.operatorName = String(published.fromName || snapshot?.name || '').trim();
+        entry.game = resumed;
+        entry.closed = false;
+        entry.operatorSnapshot = published.snapshot || {};
+        entry.updatedAt = now();
+        refreshKeyAccess(room);
+        const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
+        return { room, terminal: terminalPublic(id, entry), terminalRooms };
+      }
       // Доска пересобирается createGame() из конфигурации терминала, а не из
       // чужого состояния: число слов, скобки и удача берутся из нового листа.
       entry.game = null;
+    }
+    // Патч 532: точка выдана этой комнате позже, а взлом уже идёт в
+    // привязанной — продолжаем общую доску, а не начинаем новый секрет.
+    if (action === 'start' && !entry.game && entry.config?.kind === 'lock') {
+      const shared = adoptSharedLockGame(room, id);
+      if (shared) {
+        const resumed = resumeLockGame({
+          game: shared,
+          config: entry.config,
+          operatorClientId: clientId,
+          operatorCharacterId: charId,
+          characterSnapshot: snapshot,
+          now: now(),
+          rng: lockRandom,
+          spentPins: 0,
+        });
+        resumed.operatorName = String(published.fromName || snapshot?.name || '').trim();
+        entry.game = resumed;
+        entry.closed = false;
+        entry.operatorSnapshot = published.snapshot || {};
+        entry.updatedAt = now();
+        refreshKeyAccess(room);
+        const terminalRooms = propagateLockGame(room, id, entry.game, entry.closed);
+        return { room, terminal: terminalPublic(id, entry), terminalRooms };
+      }
     }
     const result = entry.config?.kind === 'lock'
       ? applyLockAction({
@@ -848,6 +991,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
     // для которых ключ был необязательным.
     refreshKeyAccess(room);
+    const terminalRooms = entry.config?.kind === 'lock'
+      ? propagateLockGame(room, id, entry.game, entry.closed)
+      : null;
     return {
       room,
       terminal: terminalPublic(id, entry),
@@ -856,6 +1002,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       digestCommand,
       characterId: charId,
       clientId,
+      ...(terminalRooms ? { terminalRooms } : {}),
     };
   };
 

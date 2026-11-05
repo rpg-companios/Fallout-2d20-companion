@@ -1,0 +1,551 @@
+diff --git a/__tests__/lootTrade/lock-arrows-legacy-531.test.js b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+index 6c14a00..b39685a 100644
+--- a/__tests__/lootTrade/lock-arrows-legacy-531.test.js
++++ b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+@@ -1,11 +1,11 @@
+ // Патч 531 удалил по слову владельца ровно четыре правила кнопки стрелки:
+ // `flex: 0`, `backgroundColor: '#dadada'`, `width: 58`, `height: 50`.
+ //
+-// Патч 533 откатывает ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
+-// нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30,
+-// пустышки 58×50 и исходная вёрстка строки статуса (без statusLeft и
+-// flexShrink/maxWidth). Оставлены только четыре названных removal'а и
+-// центрирование по обеим осям.
++// Патч 533 откатил ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
++// нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30
++// и пустышки 58×50. Оставлены четыре названных removal'а и центрирование.
++// Патч 534 ВЕРНУЛ перенос длинного описания: statusLeft и flexShrink/
++// maxWidth снова на месте (владелец не просил их откатывать).
+ import React, { act } from 'react';
+ import TestRenderer from 'react-test-renderer';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -175,15 +175,17 @@ describe('531: начертание стрелок до светлой темы'
+     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
+   });
+ 
+-  it('патч 533 откатил новые правила переноса: statusLeft и flexShrink/maxWidth убраны', async () => {
++  it('патч 534 вернул перенос описания: statusLeft и flexShrink/maxWidth на месте', async () => {
+     const renderer = await render();
+     const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
+     const style = flat(hint.props.style);
+-    expect(style.flexShrink).toBeUndefined();
+-    expect(style.maxWidth).toBeUndefined();
+-    expect(lockLightStyles.statusLeft).toBeUndefined();
++    expect(style.flexShrink).toBe(1);
++    expect(style.maxWidth).toBe('100%');
++    expect(lockLightStyles.statusLeft.flex).toBe(1);
++    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
++    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
+     const source = read('components/lootTrade/LockPickingModal.js');
+-    expect(source).not.toContain('styles.statusLeft');
++    expect(source).toContain('<View style={styles.statusLeft}>');
+   });
+ 
+   it('все четыре кнопки на месте и нажимаемы', async () => {
+diff --git a/__tests__/room/lock-consumption-527.test.js b/__tests__/room/lock-consumption-527.test.js
+index 6132d31..6c5c634 100644
+--- a/__tests__/room/lock-consumption-527.test.js
++++ b/__tests__/room/lock-consumption-527.test.js
+@@ -21,7 +21,8 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
+ const json = (rel) => JSON.parse(read(rel));
+ 
+-const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала.';
++// Патч 534 вернул подсказку под механику сохранения позиций (532).
++const HINT_RU = 'Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки.';
+ 
+ const snapshot = (pins) => ({
+   characterName: 'Сталкер',
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 2e6888e..e0398ab 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -389,30 +389,36 @@ describe('532: локальный резерв помнит доску межд
+   });
+ });
+ 
+-describe('532/533: строки, документы и версия', () => {
+-  it('откат 533: подсказки вернулись к формулировкам 527/531, progressSaved удалён', () => {
++describe('532/534: строки, документы и версия', () => {
++  it('534 вернул подсказки под механику сохранения позиций, RU/EN пары равны', () => {
+     const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
+     const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
+     expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
+-    expect(ru.arrowsHint).toContain('начать сначала');
+-    expect(en.arrowsHint).toContain('start the lockpicking over');
+-    expect(ru.greyHint).toBe('Серые стрелки нужно повторить');
+-    expect(en.greyHint).toBe('Repeat the grey arrows');
+-    expect(ru.newAttemptHint).toContain('купите заколки');
+-    expect(en.newAttemptHint).toContain('buy bobby pins');
+-    expect(ru.progressSaved).toBeUndefined();
+-    expect(en.progressSaved).toBeUndefined();
++    expect(ru.arrowsHint).toContain('сохраняются');
++    expect(ru.arrowsHint).not.toContain('начать сначала');
++    expect(en.arrowsHint).toContain('bobby pin breaks');
++    expect(en.arrowsHint).toContain('solved positions are kept');
++    expect(ru.greyHint).toContain('сохраняются');
++    expect(en.greyHint).toContain('already solved');
++    expect(ru.progressSaved).toContain('{count}');
++    expect(en.progressSaved).toContain('{count}');
++    expect(ru.newAttemptHint).toContain('сохраняются');
++    expect(en.newAttemptHint).toContain('solved positions are kept');
+     expect(JSON.stringify(ru)).not.toMatch(/отмычк|шпильк|булавк/i);
+   });
+ 
+-  it('откат 533: счётчик считает только зелёные, дополнительной числовой строки нет', () => {
++  it('534 вернул счётчик с серыми ячейками и строку о сохранённом прогрессе', () => {
+     const modal = read('components/lootTrade/LockPickingModal.js');
+-    expect(modal).not.toContain('lock-progress-saved');
+-    expect(modal).not.toContain("tLootTrade('lock.progressSaved')");
+-    expect(modal).toMatch(/done: displayCells\.filter\(\(c\) => c\.state === CELL_STATE\.GREEN\)\.length/);
+-    // Механика 532 (память доски в локальном резерве) не откатывалась.
++    expect(modal).toContain('CELL_STATE.GREY');
++    expect(modal).toContain('lock-progress-saved');
++    expect(modal).toContain("tLootTrade('lock.progressSaved')");
+     expect(modal).toContain('saveLocalLockState');
+     expect(modal).toContain('initialLocalLockState(containerId)');
++    // Перенос длинного описания тоже возвращён.
++    expect(modal).toContain('<View style={styles.statusLeft}>');
++    const styles = read('components/lootTrade/lockPickingStyles.js');
++    expect(styles).toContain('statusLeft:');
++    expect(styles).toContain('flexShrink: 1');
+   });
+ 
+   it('движок, реестр, локальный резерв и сетевой слой используют один закон', () => {
+@@ -430,18 +436,19 @@ describe('532/533: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('533');
++    expect(version.version).toBe('534');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(125);
+-    expect(version.notes['en-EN']).toHaveLength(125);
+-    expect(json('patchs/baseline.json').baseline).toBe('533');
++    expect(version.notes['ru-RU']).toHaveLength(129);
++    expect(version.notes['en-EN']).toHaveLength(129);
++    expect(json('patchs/baseline.json').baseline).toBe('534');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
++    expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **533**');
+-    expect(roadmap).toContain('| 23 |');
+-    expect(roadmap).toContain('Осталось после патча 533');
+-    expect(read('docs/patch-533-install.md')).toContain('533');
+-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 18.');
++    expect(roadmap).toContain('Текущая версия: **534**');
++    expect(roadmap).toContain('| 24 |');
++    expect(roadmap).toContain('Осталось после патча 534');
++    expect(read('docs/patch-534-install.md')).toContain('534');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 19.');
+   });
+ });
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 00bbaa3..7ebd9ab 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -387,7 +387,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+             showsVerticalScrollIndicator={false}
+           >
+           <View style={styles.statusRow}>
+-            <View>
++            <View style={styles.statusLeft}>
+               <Text testID="lock-pins-count" style={styles.pinCount}>
+                 {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+               </Text>
+@@ -443,6 +443,13 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+                   {tLootTrade('lock.noPinsHint')}
+                 </Text>
+               ) : null}
++              {Number(game?.knownPositions) > 0 ? (
++                <Text style={styles.hintText} testID="lock-progress-saved">
++                  {formatLootTrade(tLootTrade('lock.progressSaved'), {
++                    count: game.knownPositions, total: game.cellCount,
++                  })}
++                </Text>
++              ) : null}
+               <Text style={styles.hintText}>{tLootTrade('lock.newAttemptHint')}</Text>
+               {newAttemptButton}
+             </View>
+@@ -489,7 +496,10 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               ) : null}
+               <Text style={styles.statusHint}>
+                 {formatLootTrade(tLootTrade('lock.progress'), {
+-                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN).length,
++                  // Патч 532 / возвращено в 534: серые ячейки — уже угаданные
++                  // и запомненные позиции, они тоже входят в прогресс.
++                  done: displayCells.filter((c) => c.state === CELL_STATE.GREEN
++                    || c.state === CELL_STATE.GREY).length,
+                   total: game.cellCount,
+                 })}
+               </Text>
+diff --git a/components/lootTrade/lockPickingStyles.js b/components/lootTrade/lockPickingStyles.js
+index 1459352..c59489e 100644
+--- a/components/lootTrade/lockPickingStyles.js
++++ b/components/lootTrade/lockPickingStyles.js
+@@ -58,6 +58,10 @@ export const lockLightStyles = StyleSheet.create({
+     borderBottomWidth: 1,
+     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
++  // Патч 531 / возвращено в 534: левая колонка строки статуса СЖИМАЕТСЯ
++  // до ширины карточки, иначе длинное описание правил задаёт собственную
++  // ширину, встаёт в одну строку и уходит за границы модалки.
++  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
+   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
+   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
+   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
+@@ -104,6 +108,9 @@ export const lockLightStyles = StyleSheet.create({
+     marginTop: 8,
+     marginBottom: 2,
+     textAlign: 'left',
++    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
++    flexShrink: 1,
++    maxWidth: '100%',
+   },
+ 
+   // Область стрелок: заливка чуть темнее светлой карточки, кнопки — ещё чуть
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 34ca22d..ce6256e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,35 @@
+ # Changelog
+ ---
+ 
++## Restored at the owner's request (patch 534)
++
++The owner pointed out that patch 533 rolled back more than asked: the progress
++counter, the saved-positions line and the hints, and it also broke the wrapping
++of the long rules description. Only these are restored, nothing else.
++
++**Restored:**
++
++- `statusLeft` and `flexShrink/maxWidth` on `arrowsHint` — the long rules
++  description wraps inside the modal again instead of running off in one line.
++- The «Solved N of M» counter counts green **and grey** cells again.
++- The «Solved positions (X of Y) are kept» line in the «Approach finished»
++  panel and the `progressSaved` key in RU/EN.
++- The `arrowsHint`, `greyHint` and `newAttemptHint` hints describe the new
++  mechanic again: solved positions are kept until the lock is finished.
++
++**Untouched:** the patch 533 style rollback (borders, radius, zero paddings,
++the `arrowPad` border, `modalStyles.btn/saveBtn`, the size 30 icon, 58×50
++spacers), the four style removals named by the owner, centering, the light
++palette and **all of the 532 mechanic** (`resumeLockGame`, `knownPositions`,
++the shared board, local board memory, the 529 snapshot law).
++
++The historical 527/531/532 tests were updated for the restored state.
++Checks: typecheck, build, full `npm test`, forward and reverse `git apply
++--check`, installer from the exact base and from 533 with byte comparison,
++live WS probe. The 533 notes describe an intermediate state; this entry is
++the current one.
++
++
+ ## Rolling back the extra 531/532 edits (patch 533)
+ 
+ The owner pointed out that patches 531 and 532 went beyond the request and
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 91aa94f..ca45afe 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Возврат по слову владельца (патч 534)
++
++Владелец уточнил: в патче 533 я откатил сверх просьбы счётчик прогресса,
++строку о сохранённых позициях и подсказки, а также сломал перенос длинного
++описания правил. Возвращаю **только это**, без других изменений.
++
++**Вернулось:**
++
++- `statusLeft` и `flexShrink/maxWidth` у `arrowsHint` — длинное описание
++  правил снова переносится внутри модалки, а не уходит одной строкой.
++- Счётчик `«Отгадано N из M»` снова считает зелёные **и серые** ячейки.
++- Строка `«Угаданные позиции (X из Y) сохранены»` в панели «Подход завершён»
++  и ключ `progressSaved` в RU/EN.
++- Подсказки `arrowsHint`, `greyHint`, `newAttemptHint` снова описывают новую
++  механику: угаданные позиции сохраняются до конца взлома.
++
++**Не тронуто:** стилевой откат 533 (рамки, радиус, нулевые паддинги, рамка
++`arrowPad`, `modalStyles.btn/saveBtn`, иконка 30, пустышки 58×50), четыре
++удаления стилей по слову владельца, центрирование, светлая палитра и **вся
++механика 532** (`resumeLockGame`, `knownPositions`, общая доска, локальная
++память, закон снимка 529).
++
++Исторические тесты 527/531/532 обновлены под возвращённое состояние.
++Проверки: typecheck, build, полный `npm test`, `git apply --check` в обе
++стороны, установщик от точной базы и от 533 с побайтовым сравнением, живая
++WS-проба. Заметки 533 описывают промежуточное состояние; актуально то, что
++сказано здесь.
++
++
+ ## Откат избыточных правок 531/532 (патч 533)
+ 
+ Владелец указал, что patches 531 и 532 вышли за пределы просьбы, и попросил
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 9b8370d..15b5b65 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -404,8 +404,9 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ Регрессии: законы 527–530 (канон «Заколка», команды списания, закон снимка,
+ пауза красного «?», семантика взлома) и защита сервера не тронуты.
+ 
+-> **Патч 533:** всё описанное в этом разделе про стили стрелок и перенос
+-> подсказки, кроме четырёх удалений по слову владельца, откачено — см. §18.
++> **Патч 533:** описанные здесь стили стрелок, кроме четырёх удалений по
++> слову владельца, откачены — см. §18. **Патч 534:** перенос описания
++> (`statusLeft` / `flexShrink / maxWidth`) возвращён — см. §19.
+ 
+ ## 17. Уточнение 532: память угаданных позиций на весь взлом точки
+ 
+@@ -462,7 +463,8 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ после полного взлома — сама по себе память позиций точку не открывает.
+ 
+ > **Патч 533:** интерфейсная часть (счётчик, подсказки, `progressSaved`)
+-> откачена, механика этого раздела полностью сохранена — см. §18.
++> была откачена; **патч 534 вернул её по слову владельца**. Механика этого
++> раздела полностью сохранена — см. §18, §19.
+ 
+ ## 18. Уточнение 533: откат избыточных правок 531/532
+ 
+@@ -495,3 +497,41 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ Исторические приёмочные тесты 527/531/532 обновлены под восстановленное
+ состояние; `__tests__/room/lock-progress-532.test.js` по-прежнему проверяет
+ движок, реестр, привязанные комнаты и локальный резерв.
++
++> **Патч 534:** перенос описания, счётчик, строка о сохранённых позициях и
++> подсказки возвращены по слову владельца — см. §19. Откат стилей из §18
++> остаётся в силе.
++
++## 19. Уточнение 534: возврат по слову владельца
++
++Владелец: «А это я не просил откатывать: „Отгадано N из M" снова считает
++только зелёные ячейки. Убрана строка „Угаданные позиции (X из Y) сохранены"
++и ключ progressSaved (RU/EN)» и «перенос описания и подсказки под новую
++механику верни пожалуйста». Также: «Не надо делать сверх того, что я просил.
++Если считаешь мне пригодится функция — предложи».
++
++**Возвращено (ровно четыре позиции):**
++
++1. `statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 }`
++   и `flexShrink: 1` / `maxWidth: '100%'` у `arrowsHint`; строка статуса
++   снова `<View style={styles.statusLeft}>`. Длинное описание правил
++   переносится внутри модалки.
++2. Счётчик `Отгадано N из M` считает `CELL_STATE.GREEN` **и**
++   `CELL_STATE.GREY`: уже угаданные и запомненные позиции видны в прогрессе
++   после поломки заколки.
++3. Строка `«Угаданные позиции ({count} из {total}) сохранены»` с
++   `testID="lock-progress-saved"` в панели «Подход завершён» и ключ
++   `progressSaved` в RU/EN.
++4. `arrowsHint`, `greyHint`, `newAttemptHint` в формулировках 532: поломка
++   не отменяет прогресс, серые стрелки уже угаданы, новый подход продолжает
++   тот же взлом.
++
++**Оставлено без изменений:** весь стилевой откат §18 (рамки, радиус,
++нулевые паддинги, рамка `arrowPad`, `modalStyles.btn/saveBtn`, иконка 30,
++`arrowSpacer 58×50`), четыре удаления по слову владельца, центрирование,
++светлая палитра, законы 524–531 и вся механика §17.
++
++Текстовое несоответствие, отмеченное в §18, исчезло: подсказки снова
++описывают реальное поведение движка. Законы снимка 529 и защита сервера
++не тронуты. Исторические тесты 527/531/532 обновлены под возвращённое
++состояние.
+diff --git a/docs/patch-534-install.md b/docs/patch-534-install.md
+new file mode 100644
+index 0000000..e25a803
+--- /dev/null
++++ b/docs/patch-534-install.md
+@@ -0,0 +1,57 @@
++# Установка патча 534: возврат по слову владельца
++
++Патч подготовлен от состояния **версии 533** (коммит `4708b5c`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–534
++цепочкой. Файл установки: `patchs/534-restore-lock-ui.patch`.
++
++> Владелец: «А это я не просил откатывать: „Отгадано N из M" снова считает
++> только зелёные ячейки. Убрана строка „Угаданные позиции (X из Y)
++> сохранены" и ключ progressSaved (RU/EN)»; «перенос описания и подсказки
++> под новую механику верни пожалуйста»; «Не надо делать сверх того, что я
++> просил».
++
++## Что возвращено (ровно четыре позиции)
++
++| Файл | Возвращено |
++| --- | --- |
++| `components/lootTrade/lockPickingStyles.js` | `statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 }`; `flexShrink: 1` и `maxWidth: '100%'` у `arrowsHint` |
++| `components/lootTrade/LockPickingModal.js` | `<View style={styles.statusLeft}>`; строка с `testID="lock-progress-saved"`; счётчик `done` считает `GREEN` + `GREY` |
++| `i18n/ru-RU/screens/lootTrade/screen.json`, `i18n/en-EN/...` | весь блок `lock` байтово равен версии 532: `arrowsHint`, `greyHint`, `newAttemptHint` под механику сохранения прогресса и ключ `progressSaved` |
++
++Итог: длинное описание правил переносится внутри модалки; счётчик показывает
++угаданные и запомненные позиции; в панели «Подход завершён» видно, сколько
++позиций сохранено; подсказки снова соответствуют движку.
++
++## Что НЕ менялось
++
++- Стилевой откат 533: `borderRadius: 6`, `borderWidth: 1.5`,
++  `borderColor: '#9a9a9a'`, нулевые паддинги `arrowButton`; рамка
++  `arrowPad`; `modalStyles.btn/saveBtn` в массиве стилей; иконка `30`;
++  `arrowSpacer 58×50`.
++- Четыре удаления по слову владельца (`flex: 0`, `#dadada`, `width: 58`,
++  `height: 50`) и центрирование по обеим осям.
++- Светлая палитра, законы 524–531, **вся механика 532** (`resumeLockGame()`,
++  `knownPositions`, общая доска для привязанных комнат, локальная память,
++  условия сброса) и закон снимка 529.
++- `server/` — не менялся, перезапуск для логики не требуется.
++
++## Замечание о заметках
++
++Заметки `public/version.json` накапливаются (релиз 4). Четыре заметки 533
++описывают промежуточное состояние; актуальное поведение описано в четырёх
++новых заметках 534. Исторические записи changelog не переписывались.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`: успешно; `dist/version.json` =
++  534/4/129+129.
++- `npm test`: полный набор зелёный; тесты 527 (`lock-consumption-527`), 531
++  (`lock-arrows-legacy-531`) и 532 (`lock-progress-532`) обновлены под
++  возвращённое состояние.
++- `git apply --check` вперёд от дерева 533 и в обратную сторону от 534.
++- `./apply-patch.sh 534` от версии 533 и полная цепочка 493–534 от чистого
++  `main` `a62ec71`; побайтовое сравнение с итоговым деревом.
++- Живой сервер комнат: `/version.json` = 534/4/129+129 и WS-проба — перенос,
++  счётчик, строка и подсказки на месте, механика 532 и закон снимка 529
++  работают.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 6a65632..e425ab5 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **533**.
++Дата ревизии: 2026-11-04. Текущая версия: **534**.
+ 
+ ## Тезисы
+ 
+@@ -34,18 +34,20 @@
+ | 20 | **Семантика взлома в иерархии:** «взлом локации = вход» и «взлом контейнера = содержимое», подписи/подсказки, адресный исход ACCESS GRANTED с паузой, кнопка доступа после закрытия мини-игры | ✅ сделано | **530** |
+ | 21 | Артефакт «полосы через центр» у стрелок: убран `flex: 0 1 0%`, фон/рамки/жёсткие размеры кнопки, возвращено до-светлое начертание иконок с центрированием; длинная подсказка переносится внутри модалки | ✅ сделано | **531** |
+ | 22 | Память угаданных позиций замка на весь взлом точки: поломка заколки не откатывает курсор, «Ещё подход»/«кончились заколки»/смена оператора продолжают ту же комбинацию, прогресс общий для привязанных комнат; сброс — победа или повторная выдача Мастером | ✅ сделано | **532** |
+-| 23 | Откат избыточных правок 531/532: у стрелок возвращены рамки, радиус, базовые стили формы, иконка 30 и пустышки 58×50; убраны statusLeft/flexShrink/maxWidth; счётчик снова считает только зелёные, подсказки и строка progressSaved возвращены к 527/531. Механика памяти позиций не тронута | ✅ сделано | **533** |
++| 23 | Откат избыточных правок 531/532: у стрелок возвращены рамки, радиус, базовые стили формы, иконка 30 и пустышки 58×50; убраны statusLeft/flexShrink/maxWidth; счётчик снова считает только зелёные, подсказки и строка progressSaved возвращены к 527/531. Механика памяти позиций не тронута. Часть отката отменена в 534 | ✅ сделано | **533** |
++| 24 | Возврат по слову владельца: перенос длинного описания (statusLeft/flexShrink/maxWidth), счётчик «Отгадано N из M» с зелёными и серыми, строка о сохранённых позициях и progressSaved RU/EN, подсказки под механику сохранения прогресса. Стилевой откат 533 и механика 532 не тронуты | ✅ сделано | **534** |
+ 
+-## Осталось после патча 533
++## Осталось после патча 534
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+ красную ошибку, паузу перед её сбросом, закрепили закон снимка для всего
+ пространства Мастера, развели семантику взлома локации/контейнера, убрали
+ артефакт стрелок и добавили память угаданных позиций на весь взлом точки.
+-Патч 533 откатил избыточные интерфейсные правки 531/532 по слову владельца,
+-оставив саму механику памяти и только четыре названных им удаления стилей —
+-не меняя порядок тринадцатого тезиса: граф, граница видимости, адресный взлом,
++Патч 533 откатил избыточные стилевые правки 531 по слову владельца, оставив
++механику памяти и только четыре названных им удаления стилей; патч 534 вернул
++перенос описания, счётчик, строку о прогрессе и подсказки — владелец их не
++просил откатывать. Порядок тринадцатого тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 02b68b8..5235d17 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -387,7 +387,7 @@
+     "actionFailed": "Action failed",
+     "newAttempt": "Another attempt",
+     "approachFinished": "Attempt finished",
+-    "newAttemptHint": "Start a new attempt whenever you buy bobby pins or improve your stats.",
++    "newAttemptHint": "Another attempt continues the same lock: solved positions are kept. Start one whenever you buy bobby pins or improve your stats.",
+     "stateOutOfPins": "Out of bobby pins",
+     "hackedTitle": "Lock picked",
+     "hackedMessage": "{name}: access granted. Operator — {operator}. The player can start another attempt on their own.",
+@@ -395,11 +395,12 @@
+     "sessionNotPublished": "The character sheet has not reached the room yet. Open the character and try again.",
+     "ready": "Lock is ready",
+     "progress": "Solved {done} of {total}",
+-    "greyHint": "Repeat the grey arrows",
++    "greyHint": "Grey arrows are already solved and stay for the rest of the lock",
++    "progressSaved": "Solved positions ({count} of {total}) are kept: the next attempt continues this lock.",
+     "arrowLeft": "Left",
+     "arrowUp": "Up",
+     "arrowRight": "Right",
+     "arrowDown": "Down",
+-    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, you have to start the lockpicking over."
++    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell."
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index e2f071b..a950f6b 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -388,7 +388,7 @@
+     "actionFailed": "Действие не выполнено",
+     "newAttempt": "Ещё подход",
+     "approachFinished": "Подход завершён",
+-    "newAttemptHint": "Начните новый подход, когда купите заколки или улучшите характеристики.",
++    "newAttemptHint": "Новый подход продолжает тот же взлом: угаданные позиции сохраняются. Начните его, когда купите заколки или улучшите характеристики.",
+     "stateOutOfPins": "Нет заколок",
+     "hackedTitle": "Замок взломан",
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Игрок может начать новый подход сам.",
+@@ -396,11 +396,12 @@
+     "sessionNotPublished": "Лист персонажа ещё не передан в комнату. Откройте персонажа и повторите взлом.",
+     "ready": "Замок готов к взлому",
+     "progress": "Отгадано {done} из {total}",
+-    "greyHint": "Серые стрелки нужно повторить",
++    "greyHint": "Серые стрелки уже угаданы и сохраняются до конца взлома",
++    "progressSaved": "Угаданные позиции ({count} из {total}) сохранены: следующий подход продолжит взлом.",
+     "arrowLeft": "Влево",
+     "arrowUp": "Вверх",
+     "arrowRight": "Вправо",
+     "arrowDown": "Вниз",
+-    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка взлом необходимо начать сначала."
++    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки."
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 121bce7..03fc1e6 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "533"
++  "baseline": "534"
+ }
+diff --git a/public/version.json b/public/version.json
+index 94fb6c1..b8b1915 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "533",
++  "version": "534",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Длинное описание правил снова переносится внутри окна и не уходит одной строкой за его границы.",
++      "Счётчик «Отгадано N из M» снова учитывает и зелёные, и серые ячейки: уже угаданные позиции остаются в прогрессе после поломки заколки.",
++      "В окне завершённого подхода снова видно, сколько угаданных позиций сохранено; строки для русского и английского языков на месте.",
++      "Подсказки о поломке заколки, серых стрелках и новом подходе снова описывают сохранение прогресса: взлом продолжается с первой неотгаданной ячейки.",
+       "У кнопок со стрелками и области вокруг них вернулись рамки, скругления и привычный вид; иконки снова крупные, а пустышки в верхнем ряду выровнены по ним. Убрано только то, что мешало: лишнее сжатие кнопки, серый фон и жёсткие ширина с высотой.",
+       "Вёрстка строки со счётчиком заколок и подсказкой вернулась к прежнему виду: новые правила ширины и переноса убраны. Длинная подсказка правил снова показывается как раньше.",
+       "Счётчик «Отгадано N из M» снова считает только зелёные ячейки, а дополнительная строка про сохранённые позиции убрана из окна завершённого подхода.",
+@@ -130,6 +134,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The long rules description wraps inside the window again instead of running off the edge in a single line.",
++      "The «Solved N of M» counter counts green and grey cells again: positions already guessed stay in the progress after a bobby pin breaks.",
++      "The finished-approach panel shows how many solved positions are kept again, with both Russian and English strings in place.",
++      "The hints about a broken bobby pin, grey arrows and another attempt describe keeping progress again: the lock continues from the first unsolved cell.",
+       "The arrow buttons and the area around them have their border, rounded corners and familiar look back; the icons are large again and the top-row spacers match them. Only the things that got in the way were removed: the squeezing rule, the grey background and the fixed width and height.",
+       "The row with the bobby pin counter and the hint is back to its old layout: the extra width and wrapping rules are gone. The long rules hint is displayed the way it was before.",
+       "The «Solved N of M» counter counts green cells only again, and the extra line about kept positions is gone from the finished-approach panel.",

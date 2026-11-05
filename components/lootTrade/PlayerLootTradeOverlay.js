@@ -474,7 +474,8 @@ export default function PlayerLootTradeOverlay() {
         kind: directKind,
         autoStart,
         accessKey: directAccessKey,
-        // Замок: явное «Взломать» собирает новую доску по текущему листу.
+        // Замок: явное «Взломать» продолжает взлом (память позиций 532).
+        // Свежий лист обновляет заколки/навык/удачу, комбинация та же.
         freshAttempt: Boolean(autoStart && directIsLock),
       });
     };
@@ -1003,8 +1004,8 @@ export default function PlayerLootTradeOverlay() {
                                 testID="terminal-hack-button"
                                 style={[styles.terminalHackButton, !hackAllowed && styles.terminalButtonDisabled]}
                                 onPress={() => {
-                                  // Патч 526: явный подход игрока. У замка
-                                  // он собирает новую доску по текущему листу.
+                                  // Патч 526/532: явный подход игрока. У замка
+                                  // он продолжает ту же доску с угаданными позициями.
                                   setTerminalSelection({
                                     node: terminalForSelection,
                                     kind: nodeCheckKind,

@@ -14,8 +14,16 @@
  *   угадывание по позиции, четыре стрелки; провал остаётся в ячейке;
  *   одна заколка в руке выдерживает S провалов (S = ранг LOCKPICK 0…6);
  *   в момент поломки Удача 4…10 даёт 5…20% спасти заколку;
- *   при поломке комбинация та же, зелёные стрелки сереют и остаются видны;
+ *   при поломке комбинация та же, угаданные позиции ЗАПОМИНАЮТСЯ и серыми
+ *   стрелками остаются видны, курсор остаётся на первой неотгаданной ячейке;
  *   победа любого источника открывает точку через общее событие `hacked`.
+ *
+ * Патч 532: «Сломанная заколка не лишает прогресса ... Но прогресс не
+ * слетит». Память живёт весь взлом точки: поломка, «кончились заколки»,
+ * «Ещё подход», закрытие окна и смена оператора НЕ перегенерируют секрет и
+ * НЕ стирают угаданный префикс. Свежий лист при новом подходе обновляет
+ * только заколки/навык/удачу. Сброс — ACCESS GRANTED или повторная выдача
+ * Мастером. Прогресс общий для всех игроков точки (в т.ч. привязанных комнат).
  */
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -369,6 +377,8 @@ const createLockGame = ({
     secret,
     cells: Array.from({ length: cellCount }, () => ({ arrow: null, state: CELL_STATE.HIDDEN })),
     cursor: 0,
+    // Патч 532: сколько позиций уже угадано и запомнено на этой точке.
+    knownPositions: 0,
     per: stats.per,
     luck: stats.luck,
     skill: stats.skill,
@@ -391,6 +401,103 @@ const createLockGame = ({
   };
 };
 
+// ---------------------------------------------------------------------------
+// Патч 532: память угаданных позиций на весь взлом точки.
+// ---------------------------------------------------------------------------
+
+/** Непрерывный префикс уже угаданных ячеек (green/grey) слева направо. */
+const guessedLockPositions = (game) => {
+  const cells = Array.isArray(game?.cells) ? game.cells : [];
+  const guessed = [];
+  for (const cell of cells) {
+    if (!cell || !ARROWS.includes(cell.arrow)) break;
+    if (cell.state !== CELL_STATE.GREEN && cell.state !== CELL_STATE.GREY) break;
+    guessed.push(cell.arrow);
+  }
+  return guessed;
+};
+
+/** Ячейки для продолжения: угаданные -> grey, красные/пустые -> hidden. */
+const rememberedLockCells = (game) => {
+  const count = clamp(Math.floor(Number(game?.cellCount) || 0), 0, 18);
+  return Array.from({ length: count }, (_, idx) => {
+    const cell = Array.isArray(game?.cells) ? game.cells[idx] : null;
+    if (!cell || !ARROWS.includes(cell.arrow)) return { arrow: null, state: CELL_STATE.HIDDEN };
+    if (cell.state === CELL_STATE.GREEN || cell.state === CELL_STATE.GREY) {
+      return { arrow: cell.arrow, state: CELL_STATE.GREY };
+    }
+    return { arrow: null, state: CELL_STATE.HIDDEN };
+  });
+};
+
+/** Доска ещё не выиграна и не закрыта Мастером — её можно продолжить. */
+const isResumableLockGame = (game) => Boolean(
+  game
+  && game.kind === 'lock'
+  && Array.isArray(game.secret)
+  && game.secret.length > 0
+  && game.status !== 'won'
+  && game.status !== 'closed',
+);
+
+/**
+ * Продолжить взлом: ТОТ ЖЕ секрет и угаданный префикс, курсор на первой
+ * неотгаданной ячейке. Обновляются только заколки, навык, удача, оператор и
+ * служебные счётчики хода. PER/сложность/число ячеек зафиксированы на время
+ * взлома, иначе новая длина комбинации обесценила бы уже угаданные позиции.
+ *
+ * Если продолжать нечего (первый взлом, победа, повторная выдача Мастером) —
+ * собирается свежая доска с новым секретом.
+ */
+const resumeLockGame = ({
+  game = null,
+  config = {},
+  operatorClientId = null,
+  operatorCharacterId = null,
+  characterSnapshot = {},
+  now = Date.now(),
+  rng = Math.random,
+  spentPins = 0,
+} = {}) => {
+  if (!isResumableLockGame(game)) {
+    return createLockGame({
+      config, operatorClientId, operatorCharacterId,
+      characterSnapshot, now, rng, spentPins,
+    });
+  }
+  const stats = lockStats(characterSnapshot);
+  stats.luckSave = luckSaveChance(stats.luck);
+  const alreadySpent = clamp(Math.floor(Number(spentPins) || 0), 0, 100000);
+  const availablePins = Math.max(0, stats.pins - alreadySpent);
+  const hasPin = availablePins > 0;
+  const cells = rememberedLockCells(game);
+  const known = guessedLockPositions({ ...game, cells });
+  const next = {
+    ...game,
+    cells,
+    cursor: known.length,
+    knownPositions: known.length,
+    status: hasPin ? 'playing' : 'awaitingRetry',
+    result: hasPin ? '' : 'OUT OF PINS',
+    scrollUp: false,
+    pinsTotal: availablePins,
+    pinsRemaining: hasPin ? availablePins - 1 : 0,
+    spentPins: alreadySpent,
+    pinActive: hasPin,
+    pinFailures: 0,
+    skill: stats.skill,
+    luck: stats.luck,
+    luckSave: stats.luckSave,
+    pressedArrows: Array.isArray(game.pressedArrows) ? game.pressedArrows.slice(-24) : [],
+    breakHighlight: null,
+    operatorClientId,
+    operatorCharacterId,
+    revision: (Number(game.revision) || 0) + 1,
+    updatedAt: now,
+  };
+  return syncLockGameConfig(next, config);
+};
+
 const keyWonLockGame = (config, now = Date.now()) => ({
   status: 'won',
   kind: 'lock',
@@ -404,6 +511,7 @@ const keyWonLockGame = (config, now = Date.now()) => ({
   secret: [],
   cells: [],
   cursor: 0,
+  knownPositions: 0,
   per: 4,
   luck: 4,
   skill: 0,
@@ -485,9 +593,12 @@ const applyLockAction = ({
   // нажатию кнопки, а start запрещён при won/playing.
   if (action === 'newAttempt') {
     if (shouldBlockLock({ game, config })) return { error: 'LOCK_BLOCKED' };
+    // Патч 532: явный подход ПРОДОЛЖАЕТ тот же взлом, а не собирает новую
+    // комбинацию. Свежий лист меняет заколки/навык/удачу, угаданные позиции
+    // остаются. Победа и повторная выдача Мастера дают новый секрет.
     return {
-      game: createLockGame({
-        config, operatorClientId: clientId, operatorCharacterId: characterId,
+      game: resumeLockGame({
+        game, config, operatorClientId: clientId, operatorCharacterId: characterId,
         characterSnapshot, now, rng, spentPins,
       }),
     };
@@ -510,10 +621,14 @@ const applyLockAction = ({
       : { ...cell }
   ));
   const pressedArrows = [...(game.pressedArrows || []), arrow].slice(-24);
+  // Патч 532: сколько позиций уже угадано ДО этого нажатия. Именно столько
+  // останется в памяти, если нажатие сломает заколку.
+  const knownBefore = guessedLockPositions({ ...game, cells }).length;
   let next = {
     ...game,
     cells,
     pressedArrows,
+    knownPositions: knownBefore,
     breakHighlight: null,
     revision: game.revision + 1,
     updatedAt: now,
@@ -522,6 +637,7 @@ const applyLockAction = ({
   if (ARROWS.indexOf(arrow) === game.secret[idx]) {
     cells[idx] = { arrow, state: CELL_STATE.GREEN };
     next.cursor = idx + 1;
+    next.knownPositions = next.cursor;
     next.result = '';
     if (next.cursor >= game.cellCount) {
       next.status = 'won';
@@ -547,18 +663,24 @@ const applyLockAction = ({
 
   next.brokenPins = (game.brokenPins || 0) + 1;
   next.pinFailures = 0;
-  next.cursor = 0;
+  // Патч 532: курсор НЕ откатывается в начало. Угаданные позиции запомнены,
+  // игрок продолжает с той же ячейки, в которой ошибся. Повторять префикс
+  // больше не нужно — именно это отнимало время при маленькой ВОС.
+  next.cursor = idx;
+  next.knownPositions = knownBefore;
   // Пауза перед обновлением цветов: сервер сохраняет красный «?» в cells, а
   // клиент по истечении breakHighlight.durationMs рисует его скрытым.
   next.breakHighlight = { durationMs: BREAK_HIGHLIGHT_MS };
   // Угаданные стрелки остаются видимыми, но сереют; комбинация та же.
   // Патч 527: ошибочную ячейку НЕ стираем — игрок должен увидеть красный
   // «?» даже когда на этом же ходе сломалась заколка (раньше при навыке 0
-  // красный не показывался вообще).
+  // красный не показывался вообще). Патч 532: уже серые стрелки тоже остаются
+  // серыми, а не исчезают — это память позиций между заколками.
   next.cells = cells.map((cell, cellIdx) => (
     cellIdx === idx
       ? { arrow: null, state: CELL_STATE.RED }
-      : (cell.state === CELL_STATE.GREEN
+      : ((cell.state === CELL_STATE.GREEN || cell.state === CELL_STATE.GREY)
+        && ARROWS.includes(cell.arrow)
         ? { arrow: cell.arrow, state: CELL_STATE.GREY }
         : { arrow: null, state: CELL_STATE.HIDDEN })
   ));
@@ -591,6 +713,10 @@ module.exports = {
   consumeBobbyPins,
   effectiveDifficulty,
   createLockGame,
+  guessedLockPositions,
+  rememberedLockCells,
+  isResumableLockGame,
+  resumeLockGame,
   keyWonLockGame,
   publicLockGameState,
   syncLockGameConfig,

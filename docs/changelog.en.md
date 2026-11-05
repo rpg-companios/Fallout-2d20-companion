@@ -1,5 +1,147 @@
 # Changelog
 ---
+
+## Restored at the owner's request (patch 534)
+
+The owner pointed out that patch 533 rolled back more than asked: the progress
+counter, the saved-positions line and the hints, and it also broke the wrapping
+of the long rules description. Only these are restored, nothing else.
+
+**Restored:**
+
+- `statusLeft` and `flexShrink/maxWidth` on `arrowsHint` — the long rules
+  description wraps inside the modal again instead of running off in one line.
+- The «Solved N of M» counter counts green **and grey** cells again.
+- The «Solved positions (X of Y) are kept» line in the «Approach finished»
+  panel and the `progressSaved` key in RU/EN.
+- The `arrowsHint`, `greyHint` and `newAttemptHint` hints describe the new
+  mechanic again: solved positions are kept until the lock is finished.
+
+**Untouched:** the patch 533 style rollback (borders, radius, zero paddings,
+the `arrowPad` border, `modalStyles.btn/saveBtn`, the size 30 icon, 58×50
+spacers), the four style removals named by the owner, centering, the light
+palette and **all of the 532 mechanic** (`resumeLockGame`, `knownPositions`,
+the shared board, local board memory, the 529 snapshot law).
+
+The historical 527/531/532 tests were updated for the restored state.
+Checks: typecheck, build, full `npm test`, forward and reverse `git apply
+--check`, installer from the exact base and from 533 with byte comparison,
+live WS probe. The 533 notes describe an intermediate state; this entry is
+the current one.
+
+
+## Rolling back the extra 531/532 edits (patch 533)
+
+The owner pointed out that patches 531 and 532 went beyond the request and
+asked to roll the extras back. The rollback is surgical: **the patch 532
+mechanic that remembers solved positions is untouched**, only the four style
+rules the owner named in 531 (`flex: 0`, `#dadada`, `width: 58`, `height: 50`)
+remain removed, and centering is preserved.
+
+### 1. Arrow styles (rolling back the extra 531 edits)
+
+- `arrowButton`: `borderRadius: 6`, `borderWidth: 1.5`,
+  `borderColor: '#9a9a9a'` and `paddingVertical/paddingHorizontal: 0` restored.
+- `arrowPad`: its `borderWidth: 1` + `borderColor` restored.
+- `LockPickingModal.js`: `modalStyles.btn` and `modalStyles.saveBtn` are back
+  in the button style array; the icon is **30** again; `arrowSpacer` is
+  `58×50` again.
+- The 531 additions `statusLeft` and `flexShrink/maxWidth` on `arrowsHint`
+  are removed; the status row is a plain `<View>` again. Consequence: the long
+  rules hint may stop wrapping, since the wrapping rule was rolled back on the
+  owner's explicit instruction.
+
+### 2. Counter and hints (rolling back the extra 532 edits)
+
+- «Solved N of M» counts green cells only again.
+- The «Solved positions (X of Y) are kept» line is gone from the
+  «Approach finished» panel.
+- `arrowsHint`, `greyHint` and `newAttemptHint` are back to their 527/531
+  wording; the `progressSaved` key is removed from RU and EN. Consequence:
+  the texts again say «start over» / «repeat the grey arrows», although the
+  engine does keep the progress.
+
+### What is preserved
+
+The four style removals named by the owner, arrow centering, the light
+palette, laws 524–530 and **all of the 532 mechanic**: `resumeLockGame()`,
+`knownPositions`, the shared board across bound rooms, local board memory,
+reset on a win or GM reissue, the 529 snapshot law and server protection.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test`, forward and reverse `git
+apply --check`, installer from the exact `a62ec71` base (493–533 chain) and
+from version 532 with byte comparison, live WS probe. The historical 527/531/
+532 tests were updated for the rollback.
+
+
+## Remembering solved positions (patch 532)
+
+The owner: "And let's make solved positions remembered? A broken bobby pin does
+not take progress away, you still need to finish the hack to get access, or
+break off if you run out of pins. But progress must not be lost. It's just that
+with low PER it takes a long time to guess the sequence, and then a lot more
+time to repeat it."
+
+Clarifications from the owner: progress lives **for the whole hack on the point**
+(pin break, running out of pins, "Another attempt", reopening the window); it
+resets on **ACCESS GRANTED or a GM reissue**; it is **shared by everyone on the
+point**, including bound rooms.
+
+### 1. What was wrong
+
+After a pin broke, the combination stayed the same but the cursor went back to
+`0` and the solved arrows turned grey: the player had to press the whole known
+prefix again. With low PER the board is long (up to 18 cells), so "guess" and
+"repeat" became two equally slow jobs. An explicit "Another attempt" even
+regenerated the secret and lost progress entirely.
+
+### 2. Law 532
+
+- `server/lockPicking.js`: on a break, `cursor` stays on the first unsolved
+  cell and solved cells stay visible as `grey`; the red «?» and the 528 pause
+  are preserved. Added pure `guessedLockPositions()`, `rememberedLockCells()`,
+  `isResumableLockGame()`, `resumeLockGame()` and the `knownPositions` field.
+- `resumeLockGame()` continues the hack: **same secret**, same solved prefix,
+  cursor on the first unsolved cell. A fresh sheet only updates bobby pins, the
+  `LOCKPICK` skill and Luck; PER, difficulty and cell count are fixed for the
+  duration of the hack, otherwise a new sequence length would invalidate the
+  solved positions. A win (`won`), closing (`closed`) or a GM reissue resets
+  the memory and builds a board with a new secret.
+- `server/roomRegistry.js`: `newAttempt` and `start` from another character
+  continue the shared board instead of wiping it; `unlock/reset/reissue` and
+  `issueTerminal({ reissue: true })` clear the memory. The lock board is copied
+  to bound rooms (`boundRoomsForTerminal()` / `propagateLockGame()`), and
+  `server/roomServer.js` broadcasts fresh point states and access events to
+  them.
+- `components/lootTrade/localLockGame.js`: the legacy-server fallback keeps the
+  board in module memory by `containerId`, so closing the window no longer
+  loses progress; `saveLocalLockState()` clears it after a win.
+- `components/lootTrade/LockPickingModal.js`: the "Solved N of M" counter now
+  counts both green and grey cells; the "Approach finished" panel says solved
+  positions are kept. The `arrowsHint`, `greyHint` and `newAttemptHint` hints no
+  longer tell the player to start over, and a paired `progressSaved` string was
+  added (RU/EN).
+
+### What is preserved
+
+Laws 524–531: the «Заколка» canon, the light palette, the pre-light-theme arrow
+drawing, `char.command` → `char.refresh` → `char.publish`, the **529 snapshot
+law** (the server never edits the published sheet), the 650 ms pause before
+fading the red «?», unlimited explicit player attempts with no automatic
+restart after ACCESS GRANTED, the 530 location/container hack semantics,
+server protection and protocol limits. Access is still granted only after the
+full hack: remembered positions alone do not open the point.
+
+### Checks
+
+`npm run typecheck`, `npm run build`, `npm test`, forward and reverse `git
+apply --check`, installer from the exact `a62ec71` base (493–532 chain) and
+from version 531 with byte comparison, live WS probe. Acceptance tests:
+`__tests__/room/lock-progress-532.test.js` (engine, registry, OUT OF PINS,
+operator switch, bound rooms, GM reset, local fallback, strings).
+
 ## Arrows without stripes and a wrapping hint (patch 531)
 
 The owner inspected the arrows in the browser and found the clue: "If you

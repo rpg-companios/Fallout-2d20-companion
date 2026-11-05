@@ -397,6 +397,19 @@ const attachRoomWebSocketServer = (httpServer, {
     });
   };
 
+  /**
+   * Патч 532: угаданные позиции замка общие для привязанных комнат. Реестр
+   * уже скопировал доску в их `terminalStates`; здесь рассылаем свежие
+   * состояния точек и журнал доступа всем участникам этих комнат.
+   */
+  const broadcastTerminalRooms = (result, canonical) => {
+    const targets = Array.isArray(result?.terminalRooms) ? result.terminalRooms : [];
+    for (const target of targets) {
+      if (!target || target.code === canonical) continue;
+      broadcastKeyAccessState(target, null);
+    }
+  };
+
   const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
@@ -734,6 +747,7 @@ const attachRoomWebSocketServer = (httpServer, {
           sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
           broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
           broadcastKeyAccessState(result.room, clientId);
+          broadcastTerminalRooms(result, canonical);
           break;
         }
 
@@ -771,6 +785,8 @@ const attachRoomWebSocketServer = (httpServer, {
           // Патч 516: взлом привязанного терминала открывает точки с
           // необязательным ключом.
           broadcastKeyAccessState(result.room, clientId);
+          // Патч 532: прогресс замка уходит и в привязанные комнаты.
+          broadcastTerminalRooms(result, canonical);
           // Патч 528: сломанную заколку списывает САМ КЛИЕНТ по команде.
           // Никакой правки room.lastSnapshots здесь больше нет.
           if (result.pinsToSpend > 0) {
