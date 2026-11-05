@@ -1,0 +1,545 @@
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 84cfa9a..41366a4 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,23 +255,25 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('539');
++    expect(version.version).toBe('540');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(138);
+-    expect(version.notes['en-EN']).toHaveLength(138);
+-    expect(json('patchs/baseline.json').baseline).toBe('539');
++    expect(version.notes['ru-RU']).toHaveLength(139);
++    expect(version.notes['en-EN']).toHaveLength(139);
++    expect(json('patchs/baseline.json').baseline).toBe('540');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
++    expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **539**');
++    expect(roadmap).toContain('Текущая версия: **540**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+-    expect(roadmap).toContain('Осталось после патча 539');
+-    expect(read('docs/patch-539-install.md')).toContain('539');
++    expect(roadmap).toContain('| 31 |');
++    expect(roadmap).toContain('Осталось после патча 540');
++    expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 98030ec..629a262 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('539');
++    expect(version.version).toBe('540');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(138);
+-    expect(version.notes['en-EN']).toHaveLength(138);
+-    expect(json('patchs/baseline.json').baseline).toBe('539');
++    expect(version.notes['ru-RU']).toHaveLength(139);
++    expect(version.notes['en-EN']).toHaveLength(139);
++    expect(json('patchs/baseline.json').baseline).toBe('540');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -449,13 +449,15 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
++    expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **539**');
++    expect(roadmap).toContain('Текущая версия: **540**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+-    expect(roadmap).toContain('Осталось после патча 539');
+-    expect(read('docs/patch-539-install.md')).toContain('539');
++    expect(roadmap).toContain('| 31 |');
++    expect(roadmap).toContain('Осталось после патча 540');
++    expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/nested-location-540.test.js b/__tests__/room/nested-location-540.test.js
+new file mode 100644
+index 0000000..c9b478e
+--- /dev/null
++++ b/__tests__/room/nested-location-540.test.js
+@@ -0,0 +1,119 @@
++// Приёмочный тест 540: вложенная локация живёт только внутри родителя и
++// показывает свои параметры в дереве, как другие записи в хабе.
++// 1) Папка, вложенная в папку, исчезает с корневого экрана (не дублируется).
++// 2) У вложенной локации в дереве видны параметры: комнаты, объекты, заперто,
++//    ключ, замок/терминал, выход; её можно открыть (перейти внутрь).
++// 3) При удалении родителя вложенные локации возвращаются на корень, не теряются.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  CONTAINER_KIND,
++  isContainerVisibleOnRoot,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.HUB, name: id, roomCodes: ['GM-AAA111'], ...extra,
++});
++
++describe('540: вложенная локация не показывается на корневом экране', () => {
++  it('локация без родителя — на корне', () => {
++    const nipton = hub('nipton');
++    expect(isContainerVisibleOnRoot(nipton, [nipton])).toBe(true);
++  });
++
++  it('локация с родителем живёт только внутри родителя (как папка в папке)', () => {
++    const nipton = hub('nipton');
++    const mayor = hub('mayor', { parentLocationId: 'nipton' });
++    const all = [nipton, mayor];
++    expect(isContainerVisibleOnRoot(nipton, all)).toBe(true);
++    expect(isContainerVisibleOnRoot(mayor, all)).toBe(false);
++  });
++
++  it('перенос в хаб скрывает с корня, вынос обратно — возвращает', () => {
++    const nipton = hub('nipton');
++    const moved = hub('mayor', { parentLocationId: 'nipton', inRoot: false });
++    expect(isContainerVisibleOnRoot(moved, [nipton, moved])).toBe(false);
++    const out = { ...moved, parentLocationId: '', inRoot: true };
++    expect(isContainerVisibleOnRoot(out, [nipton, out])).toBe(true);
++  });
++
++  it('если родитель удалён, вложенная локация не теряется и возвращается на корень', () => {
++    const orphan = hub('mayor', { parentLocationId: 'gone' });
++    expect(isContainerVisibleOnRoot(orphan, [orphan])).toBe(true);
++  });
++
++  it('сундук/торговец по-прежнему скрыт в локации, если не вынесен на экран', () => {
++    const nipton = hub('nipton', { links: [{ containerId: 'chest', locked: false }] });
++    const chest = normalizeContainerEntity({ id: 'chest', kind: CONTAINER_KIND.LOOT, name: 'chest' });
++    expect(isContainerVisibleOnRoot(chest, [nipton, chest])).toBe(false);
++    expect(isContainerVisibleOnRoot({ ...chest, inRoot: true }, [nipton, chest])).toBe(true);
++  });
++});
++
++describe('540: у вложенной локации в дереве есть параметры', () => {
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++
++  it('мета-строка локации: комнаты, объекты, заперто', () => {
++    expect(tree).toContain('const renderHubMeta');
++    expect(tree).toContain('testID={`hub-tree-meta-${container.id}`}');
++    expect(tree).toContain("tLootTrade('detail.roomsLabel')");
++    expect(tree).toContain("tLootTrade('card.hubNodesCount')");
++    expect(tree).toContain("tLootTrade('card.hubLockedCount')");
++    expect(tree).toContain('{isHub && renderHubMeta(container)}');
++  });
++
++  it('комнаты приходят из экрана (formatHubCardRoomLabel)', () => {
++    expect(tree).toContain('roomLabelOf');
++    expect(screen).toContain('roomLabelOf={formatHubCardRoomLabel}');
++  });
++
++  it('ключ, замок/терминал и выход по-прежнему видны пунктиром', () => {
++    expect(tree).toContain('const renderDependencies');
++    expect(tree).toContain("tLootTrade('form.locationTreeBlockedBy')");
++    expect(tree).toContain("tLootTrade('form.locationTreeKey')");
++    expect(tree).toContain("tLootTrade('form.locationTreeExitTo')");
++    expect(tree).toContain("borderStyle: 'dashed'");
++  });
++});
++
++describe('540: вложенную локацию можно открыть и она не теряется при удалении', () => {
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++
++  it('кнопка «Содержимое» открывает вложенную локацию (переход внутрь)', () => {
++    expect(tree).toContain('testID={`hub-tree-open-nested-${container.id}`}');
++    expect(tree).toContain('onOpenChild?.(container)');
++    expect(tree).toContain("tLootTrade('detail.hubOpenChildCard')");
++    // Переход внутрь ставит активного контейнера и запоминает возврат.
++    expect(screen).toContain('setReturnHubId(activeContainer.id);');
++    expect(screen).toContain('setActiveContainerId(child.id);');
++  });
++
++  it('при удалении хаба вложенные локации выносятся на корень', () => {
++    expect(screen).toContain('const nestedLocations = containers.filter(');
++    expect(screen).toContain("String(c.parentLocationId || '').trim() === container.id");
++    expect(screen).toContain("{ ...nested, parentLocationId: '', inRoot: true }");
++  });
++});
++
++describe('540: парные строки параметров на обоих языках', () => {
++  const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++  const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++  it('ключи параметров есть в обоих языках', () => {
++    expect(ru.detail.roomsLabel).toBeTruthy();
++    expect(en.detail.roomsLabel).toBeTruthy();
++    expect(ru.card.hubNodesCount).toBeTruthy();
++    expect(en.card.hubNodesCount).toBeTruthy();
++    expect(ru.card.hubLockedCount).toBeTruthy();
++    expect(en.card.hubLockedCount).toBeTruthy();
++    expect(ru.detail.hubOpenChildCard).toBeTruthy();
++    expect(en.detail.hubOpenChildCard).toBeTruthy();
++  });
++});
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 26110e7..51b6e3b 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -1158,6 +1158,17 @@ export default function LootTradeScreen() {
+         }
+       }
+ 
++      // Патч 540: вложенные локации удаляемого хаба не теряются — выносим их
++      // на корень (очищаем parentLocationId), как содержимое удалённой папки.
++      const nestedLocations = containers.filter(
++        (c) => c && c.kind === CONTAINER_KIND.HUB
++          && String(c.parentLocationId || '').trim() === container.id,
++      );
++      for (const nested of nestedLocations) {
++        await db.saveGmContainer({ ...nested, parentLocationId: '', inRoot: true });
++        void syncGmContainerToCloudIfEnabled(nested.id);
++      }
++
+       await deleteGmContainerFromCloudIfEnabled(container.id);
+       await db.deleteGmContainer(container.id);
+       if (activeContainerId === container.id) setActiveContainerId(null);
+@@ -2486,6 +2497,7 @@ export default function LootTradeScreen() {
+                 hub={activeContainer}
+                 containers={containers}
+                 keyItemNames={keyItemNames}
++                roomLabelOf={formatHubCardRoomLabel}
+                 onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
+                 onOpenChild={(child) => {
+                   setReturnHubId(activeContainer.id);
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index b46575a..155f15e 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -29,6 +29,7 @@ const HubTreeView = ({
+   hub,
+   containers = [],
+   keyItemNames = {},
++  roomLabelOf,
+   onOpenSettings,
+   onOpenChild,
+   onToggleLock,
+@@ -148,6 +149,27 @@ const HubTreeView = ({
+     );
+   };
+ 
++  // Патч 540: параметры вложенной локации — как у других записей в хабе.
++  // Комнаты, число объектов и запертых точек; ключ/замок/выход — ниже пунктиром.
++  const renderHubMeta = (container) => {
++    const links = Array.isArray(container.links) ? container.links : [];
++    const lockedCount = links.filter((l) => l?.locked).length;
++    const roomLabel = typeof roomLabelOf === 'function' ? (roomLabelOf(container) || '') : '';
++    const parts = [];
++    if (roomLabel) {
++      parts.push(formatLootTrade(tLootTrade('detail.roomsLabel'), { rooms: roomLabel }));
++    }
++    parts.push(formatLootTrade(tLootTrade('card.hubNodesCount'), { count: links.length }));
++    if (lockedCount > 0) {
++      parts.push(formatLootTrade(tLootTrade('card.hubLockedCount'), { count: lockedCount }));
++    }
++    return (
++      <Text testID={`hub-tree-meta-${container.id}`} style={styles.hubMeta} numberOfLines={2}>
++        {parts.join(' · ')}
++      </Text>
++    );
++  };
++
+   // Рекурсивный узел. visited защищает от циклов матрёшки.
+   const renderNode = (entry, depth, visited, isDirectChild) => {
+     const { container, link } = entry;
+@@ -204,9 +226,17 @@ const HubTreeView = ({
+             )}
+           </TouchableOpacity>
+ 
+-          {/* Патч 539: вложенную локацию можно вынуть обратно на корень. */}
++          {/* Патч 539/540: вложенную локацию можно открыть (перейти внутрь) и
++              вынуть обратно на корень. */}
+           {isHub && isDirectChild && (
+             <View style={styles.nodeControls}>
++              <TouchableOpacity
++                testID={`hub-tree-open-nested-${container.id}`}
++                style={styles.smallBtn}
++                onPress={() => onOpenChild?.(container)}
++              >
++                <Text style={styles.smallBtnText}>{tLootTrade('detail.hubOpenChildCard')}</Text>
++              </TouchableOpacity>
+               <TouchableOpacity
+                 testID={`hub-tree-move-nested-out-${container.id}`}
+                 style={styles.smallBtn}
+@@ -243,6 +273,8 @@ const HubTreeView = ({
+           )}
+         </View>
+ 
++        {isHub && renderHubMeta(container)}
++
+         {renderDependencies(container)}
+ 
+         {!isHub && isDirectChild && link && link.locked && (
+@@ -298,6 +330,7 @@ const styles = StyleSheet.create({
+   nodeNameBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+   nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 13, fontWeight: '700' },
+   nodeMeta: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
++  hubMeta: { marginLeft: 30, marginTop: 2, color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
+   catalogBadge: {
+     paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
+     backgroundColor: ADMIN_MODAL_PALETTE.accent,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index cc60435..19f0aaa 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,27 @@
+ # Changelog
+ ---
+ 
++## A nested location lives only inside its parent + parameters in the tree (patch 540)
++
++A refinement of nesting at the owner's word (thesis 31). Still admin-only; the
++player window is the next step.
++
++- **A folder in a folder leaves the root.** If a location is created as a child
++  from the start (a parent is set) or moved into a hub with the arrows, it is no
++  longer shown as a card on the root screen alongside everything else — it lives
++  only inside its parent and opens from the parent's tree. Hubs used to always
++  be visible on the root, so a child location was duplicated as both a card and
++  a tree entry.
++- **A nested location shows its parameters in the tree** — like other entries in
++  the hub: the rooms it is available for, the number of objects and locked
++  points, while the key, lock/terminal and exit are shown as dashed dependency
++  lines.
++- **A nested location can be opened.** The "Contents" button goes inside the
++  location to manage its contents, with a way back to the parent.
++- **Nothing is lost.** If the parent is deleted, nested locations return to the
++  root screen instead of disappearing; if the parent is ever missing from the
++  data, the location is shown on the root too.
++
+ ## The hub is itself a folder-tree (patch 539)
+ 
+ A rework of the 538 location structure at the owner's word (thesis 30). There
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 919141e..48e3176 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,25 @@
+ 
+ ---
+ 
++## Вложенная локация — только внутри родителя + параметры в дереве (патч 540)
++
++Доработка вложенности по слову владельца (тезис 31). По-прежнему только
++админская часть; окно игрока — следующим шагом.
++
++- **Папка в папке исчезает с корня.** Если локацию создали сразу дочерней
++  (указали родителя) или перенесли в хаб стрелками, она больше не показывается
++  карточкой на корневом экране рядом со всеми элементами — она живёт только
++  внутри родителя и открывается из его дерева. Раньше хабы всегда были видны
++  на корне, поэтому дочерняя локация дублировалась и карточкой, и записью.
++- **У вложенной локации в дереве есть параметры** — как у других записей в
++  хабе: комнаты, для которых она доступна, число объектов и запертых точек,
++  а ключ, замок/терминал и выход видны пунктирными линиями зависимости.
++- **Вложенную локацию можно открыть.** Кнопка «Содержимое» переходит внутрь
++  локации, чтобы управлять её содержимым, с возвратом к родителю.
++- **Ничего не теряется.** Если родитель удалён, вложенные локации возвращаются
++  на корневой экран, а не пропадают; если родитель вдруг исчез из данных,
++  локация тоже показывается на корне.
++
+ ## Хаб — сам папка-дерево (патч 539)
+ 
+ Переработка структуры локаций из 538 по слову владельца (тезис 30). Отдельной
+diff --git a/docs/patch-540-install.md b/docs/patch-540-install.md
+new file mode 100644
+index 0000000..7726f6e
+--- /dev/null
++++ b/docs/patch-540-install.md
+@@ -0,0 +1,51 @@
++# Установка патча 540: вложенная локация — только внутри родителя + параметры в дереве
++
++Патч подготовлен от состояния **версии 539** (коммит `600f0c2`, ветка
++`arena/0fa5e3ce-fallout-2d20-companion`). Файл установки:
++`patchs/540-nested-location-params.patch`.
++
++> Владелец: «Если я папку кладу внутрь папки, то старая папка остаётся на месте
++> или она вкладывается в ту, куда переносят? Я создал Хаб Ниптон. Потом создал
++> Мэрию, родителем указал Ниптон. Мэрия оказалась и карточкой и записью в хабе,
++> но в хабе я не вижу её параметров. И зачем мне её карточка на экране, если я
++> специально указал, что она дочь Ниптона? 1. У локаций, как и у других записей
++> в хабе, должны быть параметры. 2. Если я создаю изначально дочернюю локацию
++> или переношу локацию в хаб, она не должна отображаться на экране со всеми
++> элементами». Скрипт установки владелец правит вручную сам.
++
++## Что меняется
++
++Это **реальный код**, но только админская часть. Окно просмотра локаций для
++игрока не входит в 540.
++
++| Файл | Что сделано |
++| --- | --- |
++| `domain/lootTrade.js` | `isContainerVisibleOnRoot`: локация с родителем (`parentLocationId`) скрыта с корня и живёт только внутри родителя; если родитель исчез — возвращается на корень (не теряется) |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | параметры вложенной локации (`renderHubMeta`): комнаты, число объектов и запертых точек; кнопка «Содержимое» открывает вложенную локацию (переход внутрь); ключ/замок/выход по-прежнему пунктиром |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | в дерево передаётся `roomLabelOf`; при удалении хаба вложенные локации выносятся на корень (`parentLocationId: ''`) |
++| `__tests__/room/nested-location-540.test.js` | новый приёмочный тест (11 проверок, включая поведение видимости на корне) |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 540, тезис 31, «Осталось после патча 540» |
++
++## Согласованные рабочие допущения
++
++- Вложенность локации задаёт `parentLocationId` (матрёшка из 538–539). На корень
++  выходит только локация без родителя; дочерняя видна лишь в дереве родителя.
++- Если родитель удалён или отсутствует в данных, дочерняя локация возвращается
++  на корень — защита от «потерянных» локаций, как для сундуков/торговцев.
++- Параметры в дереве читают уже сохранённые поля локации: `roomCodes`, `links`,
++  `requiredKeyItemId`, `accessExpression`, `exitLocationId`. Ничего не меняется
++  в игровом пути — дерево только показывает.
++- Кнопка «Содержимое» ставит вложенную локацию активным контейнером и запоминает
++  родителя для возврата (`returnHubId`).
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: полный набор зелёный (версионные защёлки переведены на 540).
++- `git apply --check` вперёд от дерева 539 и в обратную сторону от 540.
++- Заметки «Что нового» парные (139/139), на языке игрока, релиз остаётся 4.
++
++## Откат
++
++`git apply -R patchs/540-nested-location-params.patch` вернёт код, словари и
++версию к состоянию 539.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 68a2401..9beec80 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **539**.
++Дата ревизии: 2026-11-05. Текущая версия: **540**.
+ 
+ ## Тезисы
+ 
+@@ -42,8 +42,9 @@
+ | 28 | **Многоуровневые локации / левел-дизайн:** переходы между локациями, которые Мастер перекрывает вручную (обвал, ловушка, сигнализация — любой нарратив); взламываемый замок и глухая преграда, направленность проходов, «выхода назад нет». Без новых сущностей, карта и автоправила — задел на будущее. Проект готов, реализация после утверждения модели | 📐 проект | **537** |
+ | 29 | **Структура локаций в админке:** строки «Родительская локация» и «Выход из локации», чекбокс «Хаб» после названия (2 ячейки: чекбокс + пояснение), дерево структуры с переходом в настройки секции, матрёшка «локация в локацию». Требование доступа — конструктор И/ИЛИ (`+` = И, `/` = ИЛИ), нельзя начать/закончить оператором; `+` связывает сильнее `/`. Только админка; окно игрока — следующим шагом | ✅ сделано (админка) | **538** |
+ | 30 | **Хаб — сам папка-дерево (переработка 538 по слову владельца):** отдельной карточки «Структура локаций» больше нет — открыл хаб и видишь дерево вложенного. Локации — спойлерами (нажал — видно, что входит), пунктирные линии показывают, что от чего зависит (что чем заблокировано, какой ключ нужен, что во что выходит); узел открывает настройки. У хаба-папки нет родителя/выхода (он сам родитель), остаются серверные комнаты; хабы вкладываются друг в друга. Родитель/выход обычной локации — выпадающие списки с поиском, не кнопки. Локацию таскают за стрелки и кладут в локацию — она становится дочерней, как папки в Windows; вложенную можно вынуть обратно. Ключ и замок/терминал — отдельные поля с понятными подписями; И/ИЛИ = войти, только пройдя обе преграды или одну из них. Только админка | ✅ сделано (админка) | **539** |
++| 31 | **Вложенная локация — только внутри родителя + параметры в дереве:** папка, вложенная в папку, исчезает с корневого экрана (не дублируется карточкой), живёт в дереве родителя и открывается из него. У вложенной локации в дереве видны параметры, как у других записей в хабе: комнаты, число объектов и запертых точек, ключ, замок/терминал, выход. Кнопка «Содержимое» открывает вложенную локацию (переход внутрь). При удалении родителя вложенные локации возвращаются на корень и не теряются | ✅ сделано (админка) | **540** |
+ 
+-## Осталось после патча 539
++## Осталось после патча 540
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -88,6 +89,16 @@
+ («Ключевой предмет для доступа в локацию», «Замок или терминал, не дающий
+ без проверки войти в локацию»); И/ИЛИ означает, что войти можно, только
+ пройдя обе преграды или одну из них. Окно игрока по-прежнему отложено.
++Патч 540 довёл вложенность до ума по слову владельца (тезис 31): папка,
++вложенная в папку, больше не дублируется карточкой на корневом экране —
++вложенная локация живёт только внутри родителя и открывается из его дерева.
++Раньше хабы всегда были видны на корне, поэтому дочерняя локация оставалась
++карточкой, хотя родитель был указан. Теперь вложенная локация исчезает с корня.
++В дереве у локации появились параметры, как у других записей в хабе: комнаты,
++число объектов и запертых точек, а ключ, замок/терминал и выход по-прежнему
++видны пунктиром. Вложенную локацию можно открыть кнопкой «Содержимое»
++(переход внутрь), а при удалении родителя вложенные локации возвращаются на
++корень и не теряются. Окно игрока по-прежнему отложено.
+ Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+@@ -131,11 +142,11 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+-### Что осталось после 539 (структура локаций)
++### Что осталось после 540 (структура локаций)
+ 
+-- **Окно просмотра локаций для игрока** — админская часть готова в 538–539
+-  (хаб — папка-дерево), игрок пока не видит дерево/переходы; это следующий
+-  отдельный шаг.
++- **Окно просмотра локаций для игрока** — админская часть готова в 538–540
++  (хаб — папка-дерево, вложенность без дублей), игрок пока не видит
++  дерево/переходы; это следующий отдельный шаг.
+ - **Переходы между локациями в игре** — модель `parentLocationId` /
+   `exitLocationId` хранится и редактируется, но сам переход (вход через
+   родителя, особый выход/телепорт) ещё не исполняется в сессии; ручная
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index a7b9bc5..f4b9f9a 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -538,13 +538,23 @@ export const getHubIdsContainingChild = (childId, allContainers = []) => {
+ 
+ /**
+  * Определяет, показывается ли карточка на корневом экране «Добыча/Торговля»:
+- * - все локации ('hub') всегда на корневом экране;
++ * - локация ('hub') без родителя — на корневом экране;
++ * - патч 540: вложенная локация (есть parentLocationId) живёт ТОЛЬКО внутри
++ *   родителя и на корне не показывается — как папка, вложенная в папку. Если
++ *   родитель исчез (удалён), локация не теряется и возвращается на корень;
+  * - сундук/торговец показывается на корне, если он не привязан ни к одной локации
+  *   (защита от «потерянных» карточек) ИЛИ если Мастер явно вынес его на экран (inRoot === true).
+  */
+ export const isContainerVisibleOnRoot = (container, allContainers = []) => {
+   if (!container) return false;
+-  if (container.kind === CONTAINER_KIND.HUB) return true;
++  if (container.kind === CONTAINER_KIND.HUB) {
++    const parentId = String(container.parentLocationId || '').trim();
++    if (!parentId) return true;
++    const parentExists = (Array.isArray(allContainers) ? allContainers : []).some(
++      (c) => c && c.kind === CONTAINER_KIND.HUB && c.id === parentId,
++    );
++    return !parentExists;
++  }
+   const parentHubIds = getHubIdsContainingChild(container.id, allContainers);
+   if (parentHubIds.length === 0) return true;
+   return container.inRoot === true;
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index c499bf9..de8cdcc 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "539"
++  "baseline": "540"
+ }
+diff --git a/public/version.json b/public/version.json
+index 5abc288..bd86c95 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "539",
++  "version": "540",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
+       "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
+       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+       "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
+@@ -143,6 +144,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
+       "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
+       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
+       "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",

@@ -1158,6 +1158,17 @@ export default function LootTradeScreen() {
         }
       }
 
+      // Патч 540: вложенные локации удаляемого хаба не теряются — выносим их
+      // на корень (очищаем parentLocationId), как содержимое удалённой папки.
+      const nestedLocations = containers.filter(
+        (c) => c && c.kind === CONTAINER_KIND.HUB
+          && String(c.parentLocationId || '').trim() === container.id,
+      );
+      for (const nested of nestedLocations) {
+        await db.saveGmContainer({ ...nested, parentLocationId: '', inRoot: true });
+        void syncGmContainerToCloudIfEnabled(nested.id);
+      }
+
       await deleteGmContainerFromCloudIfEnabled(container.id);
       await db.deleteGmContainer(container.id);
       if (activeContainerId === container.id) setActiveContainerId(null);
@@ -2486,6 +2497,7 @@ export default function LootTradeScreen() {
                 hub={activeContainer}
                 containers={containers}
                 keyItemNames={keyItemNames}
+                roomLabelOf={formatHubCardRoomLabel}
                 onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
                 onOpenChild={(child) => {
                   setReturnHubId(activeContainer.id);

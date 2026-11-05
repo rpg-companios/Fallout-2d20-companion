@@ -1,8 +1,9 @@
 {
-  "version": "539",
+  "version": "540",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
       "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
       "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
@@ -143,6 +144,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
       "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
       "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",

@@ -538,13 +538,23 @@ export const getHubIdsContainingChild = (childId, allContainers = []) => {
 
 /**
  * Определяет, показывается ли карточка на корневом экране «Добыча/Торговля»:
- * - все локации ('hub') всегда на корневом экране;
+ * - локация ('hub') без родителя — на корневом экране;
+ * - патч 540: вложенная локация (есть parentLocationId) живёт ТОЛЬКО внутри
+ *   родителя и на корне не показывается — как папка, вложенная в папку. Если
+ *   родитель исчез (удалён), локация не теряется и возвращается на корень;
  * - сундук/торговец показывается на корне, если он не привязан ни к одной локации
  *   (защита от «потерянных» карточек) ИЛИ если Мастер явно вынес его на экран (inRoot === true).
  */
 export const isContainerVisibleOnRoot = (container, allContainers = []) => {
   if (!container) return false;
-  if (container.kind === CONTAINER_KIND.HUB) return true;
+  if (container.kind === CONTAINER_KIND.HUB) {
+    const parentId = String(container.parentLocationId || '').trim();
+    if (!parentId) return true;
+    const parentExists = (Array.isArray(allContainers) ? allContainers : []).some(
+      (c) => c && c.kind === CONTAINER_KIND.HUB && c.id === parentId,
+    );
+    return !parentExists;
+  }
   const parentHubIds = getHubIdsContainingChild(container.id, allContainers);
   if (parentHubIds.length === 0) return true;
   return container.inRoot === true;

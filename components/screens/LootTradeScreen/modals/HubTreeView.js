@@ -29,6 +29,7 @@ const HubTreeView = ({
   hub,
   containers = [],
   keyItemNames = {},
+  roomLabelOf,
   onOpenSettings,
   onOpenChild,
   onToggleLock,
@@ -148,6 +149,27 @@ const HubTreeView = ({
     );
   };
 
+  // Патч 540: параметры вложенной локации — как у других записей в хабе.
+  // Комнаты, число объектов и запертых точек; ключ/замок/выход — ниже пунктиром.
+  const renderHubMeta = (container) => {
+    const links = Array.isArray(container.links) ? container.links : [];
+    const lockedCount = links.filter((l) => l?.locked).length;
+    const roomLabel = typeof roomLabelOf === 'function' ? (roomLabelOf(container) || '') : '';
+    const parts = [];
+    if (roomLabel) {
+      parts.push(formatLootTrade(tLootTrade('detail.roomsLabel'), { rooms: roomLabel }));
+    }
+    parts.push(formatLootTrade(tLootTrade('card.hubNodesCount'), { count: links.length }));
+    if (lockedCount > 0) {
+      parts.push(formatLootTrade(tLootTrade('card.hubLockedCount'), { count: lockedCount }));
+    }
+    return (
+      <Text testID={`hub-tree-meta-${container.id}`} style={styles.hubMeta} numberOfLines={2}>
+        {parts.join(' · ')}
+      </Text>
+    );
+  };
+
   // Рекурсивный узел. visited защищает от циклов матрёшки.
   const renderNode = (entry, depth, visited, isDirectChild) => {
     const { container, link } = entry;
@@ -204,9 +226,17 @@ const HubTreeView = ({
             )}
           </TouchableOpacity>
 
-          {/* Патч 539: вложенную локацию можно вынуть обратно на корень. */}
+          {/* Патч 539/540: вложенную локацию можно открыть (перейти внутрь) и
+              вынуть обратно на корень. */}
           {isHub && isDirectChild && (
             <View style={styles.nodeControls}>
+              <TouchableOpacity
+                testID={`hub-tree-open-nested-${container.id}`}
+                style={styles.smallBtn}
+                onPress={() => onOpenChild?.(container)}
+              >
+                <Text style={styles.smallBtnText}>{tLootTrade('detail.hubOpenChildCard')}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 testID={`hub-tree-move-nested-out-${container.id}`}
                 style={styles.smallBtn}
@@ -242,6 +272,8 @@ const HubTreeView = ({
             </View>
           )}
         </View>
+
+        {isHub && renderHubMeta(container)}
 
         {renderDependencies(container)}
 
@@ -298,6 +330,7 @@ const styles = StyleSheet.create({
   nodeNameBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
   nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 13, fontWeight: '700' },
   nodeMeta: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
+  hubMeta: { marginLeft: 30, marginTop: 2, color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
   catalogBadge: {
     paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
     backgroundColor: ADMIN_MODAL_PALETTE.accent,

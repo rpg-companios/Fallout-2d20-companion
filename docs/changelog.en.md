@@ -1,6 +1,27 @@
 # Changelog
 ---
 
+## A nested location lives only inside its parent + parameters in the tree (patch 540)
+
+A refinement of nesting at the owner's word (thesis 31). Still admin-only; the
+player window is the next step.
+
+- **A folder in a folder leaves the root.** If a location is created as a child
+  from the start (a parent is set) or moved into a hub with the arrows, it is no
+  longer shown as a card on the root screen alongside everything else — it lives
+  only inside its parent and opens from the parent's tree. Hubs used to always
+  be visible on the root, so a child location was duplicated as both a card and
+  a tree entry.
+- **A nested location shows its parameters in the tree** — like other entries in
+  the hub: the rooms it is available for, the number of objects and locked
+  points, while the key, lock/terminal and exit are shown as dashed dependency
+  lines.
+- **A nested location can be opened.** The "Contents" button goes inside the
+  location to manage its contents, with a way back to the parent.
+- **Nothing is lost.** If the parent is deleted, nested locations return to the
+  root screen instead of disappearing; if the parent is ever missing from the
+  data, the location is shown on the root too.
+
 ## The hub is itself a folder-tree (patch 539)
 
 A rework of the 538 location structure at the owner's word (thesis 30). There
