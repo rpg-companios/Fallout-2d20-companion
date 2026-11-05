@@ -90,6 +90,7 @@ import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
 import IssueContainerModal from './modals/IssueContainerModal';
 import HubChildPickerModal from './modals/HubChildPickerModal';
+import LocationTreeModal from './modals/LocationTreeModal';
 
 const NUM_COLS = 3;
 const MENU_WIDTH = 220;
@@ -414,6 +415,7 @@ export default function LootTradeScreen() {
   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
   const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [locationTreeOpen, setLocationTreeOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [hubPickerOpen, setHubPickerOpen] = useState(false);
@@ -915,11 +917,46 @@ export default function LootTradeScreen() {
     });
   };
 
+  // Патч 538: не даём родителю уйти в собственного потомка (цикл матрёшки).
+  const wouldCreateParentCycle = (cardId, newParentId) => {
+    if (!cardId || !newParentId || cardId === newParentId) return true;
+    const byId = new Map(containers.map((c) => [c.id, c]));
+    let cursor = byId.get(newParentId);
+    const seen = new Set([cardId]);
+    while (cursor) {
+      if (seen.has(cursor.id)) return true;
+      seen.add(cursor.id);
+      const parentId = String(cursor.parentLocationId || '').trim();
+      if (!parentId) return false;
+      if (parentId === cardId) return true;
+      cursor = byId.get(parentId);
+    }
+    return false;
+  };
+
   const handleMoveCardIntoHub = async (cardId, hubId) => {
-    if (!cardId || !hubId) return;
+    if (!cardId || !hubId || cardId === hubId) return;
     const card = containers.find((c) => c.id === cardId);
     const hub = containers.find((c) => c.id === hubId && c.kind === CONTAINER_KIND.HUB);
-    if (!card || !hub || card.kind === CONTAINER_KIND.HUB) return;
+    if (!card || !hub) return;
+
+    // Патч 538: матрёшка «локация в локацию» — вложенная локация становится
+    // дочерней целевой (parentLocationId), а не ссылкой в links.
+    if (card.kind === CONTAINER_KIND.HUB) {
+      if (wouldCreateParentCycle(cardId, hubId)) {
+        showRawAlert({ title: tLootTrade('form.locationCycle') });
+        return;
+      }
+      if (card.parentLocationId !== hubId) {
+        await persistAndSyncContainer({ ...card, parentLocationId: hubId, inRoot: false });
+      } else {
+        await loadData();
+      }
+      setMovingContainerId(null);
+      setDrag(null);
+      hubDropBounds.current = {};
+      return;
+    }
 
     if (card.inRoot) {
       await db.saveGmContainer({ ...card, inRoot: false });
@@ -1680,6 +1717,7 @@ export default function LootTradeScreen() {
 
   const gridItems = [
     { type: 'createHub', id: '__create_hub__' },
+    { type: 'locationTree', id: '__location_tree__' },
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
@@ -1814,6 +1852,16 @@ export default function LootTradeScreen() {
                         />
                       );
                     }
+                    if (cell.type === 'locationTree') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="file-tree"
+                          label={tLootTrade('actions.locationTree')}
+                          onPress={() => setLocationTreeOpen(true)}
+                        />
+                      );
+                    }
                     if (cell.type === 'createLoot') {
                       return (
                         <ActionCell
@@ -1910,13 +1958,13 @@ export default function LootTradeScreen() {
                         gateSourceNames={gateSourceNames}
                         gateEvents={gateEvents}
                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
-                        isDropTarget={Boolean(isHubCell && movingContainerId)}
-                        canMoveToHub={!isHubCell && availableHubs.length > 0}
+                        isDropTarget={Boolean(isHubCell && movingContainerId && movingContainerId !== cell.id)}
+                        canMoveToHub={availableHubs.length > 0}
                         cardRefCallback={isHubCell
                           ? (node) => { hubRefs.current[cell.id] = node; }
                           : undefined}
                         onOpen={() => {
-                          if (isHubCell && movingContainerId) {
+                          if (isHubCell && movingContainerId && movingContainerId !== cell.id) {
                             void handleMoveCardIntoHub(movingContainerId, cell.id);
                             return;
                           }
@@ -1924,15 +1972,15 @@ export default function LootTradeScreen() {
                           setActiveContainerId(cell.id);
                         }}
                         onIssueOrClose={() => handleIssueOrClosePress(cell)}
-                        onMoveToHub={!isHubCell && availableHubs.length > 0
+                        onMoveToHub={availableHubs.length > 0
                           ? () => setMoveToHubTarget(cell)
                           : undefined}
                         onDuplicate={() => handleDuplicateCard(cell)}
                         onEdit={() => setFormModal({ kind: cell.kind, initialContainer: cell })}
                         onDelete={() => handleDeleteCard(cell)}
-                        onDragStart={!isHubCell && availableHubs.length > 0 ? handleDragStart : undefined}
-                        onDragMove={!isHubCell && availableHubs.length > 0 ? handleDragMove : undefined}
-                        onDragEnd={!isHubCell && availableHubs.length > 0 ? handleDragEnd : undefined}
+                        onDragStart={availableHubs.length > 0 ? handleDragStart : undefined}
+                        onDragMove={availableHubs.length > 0 ? handleDragMove : undefined}
+                        onDragEnd={availableHubs.length > 0 ? handleDragEnd : undefined}
                       />
                     );
                   })}
@@ -2679,6 +2727,17 @@ export default function LootTradeScreen() {
         onClose={() => setFormModal(null)}
       />
 
+      {/* Патч 538: дерево структуры локаций; узел открывает настройки секции. */}
+      <LocationTreeModal
+        visible={locationTreeOpen}
+        containers={containers}
+        onOpenSettings={(container) => {
+          setLocationTreeOpen(false);
+          setFormModal({ kind: container.kind, initialContainer: container });
+        }}
+        onClose={() => setLocationTreeOpen(false)}
+      />
+
       <HubChildPickerModal
         visible={hubPickerOpen}
         hub={activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer : null}
@@ -2736,7 +2795,7 @@ export default function LootTradeScreen() {
               {tLootTrade('detail.moveToHubPickerTitle')}
             </Text>
             <ScrollView style={{ maxHeight: 280 }}>
-              {availableHubs.map((hub) => (
+              {availableHubs.filter((hub) => hub.id !== moveToHubTarget?.id).map((hub) => (
                 <TouchableOpacity
                   key={hub.id}
                   style={styles.movePickerRow}

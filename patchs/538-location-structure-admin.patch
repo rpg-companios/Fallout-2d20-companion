@@ -1,0 +1,2138 @@
+diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
+index 23a1e2a..ec953fe 100644
+--- a/__tests__/room/container-gates-517.test.js
++++ b/__tests__/room/container-gates-517.test.js
+@@ -116,7 +116,10 @@ describe('517: связи видны Мастеру и план обновлён
+   it('вторая строка формы выбирает любые точки, а не только терминалы', () => {
+     expect(screen).toContain('availableCheckContainers={gateSources}');
+     expect(screen).toContain('gateSources');
++    // Патч 538: выбор точек-проверок переехал в конструктор И/ИЛИ.
+     expect(read('components/screens/LootTradeScreen/modals/ContainerFormModal.js'))
++      .toContain('<AccessExpressionBuilder');
++    expect(read('components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js'))
+       .toContain('check.kindLabel');
+   });
+ 
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index df3d31b..d5e874c 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,19 +255,21 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('537');
++    expect(version.version).toBe('538');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(136);
+-    expect(version.notes['en-EN']).toHaveLength(136);
+-    expect(json('patchs/baseline.json').baseline).toBe('537');
++    expect(version.notes['ru-RU']).toHaveLength(137);
++    expect(version.notes['en-EN']).toHaveLength(137);
++    expect(json('patchs/baseline.json').baseline).toBe('538');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
++    expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **537**');
++    expect(roadmap).toContain('Текущая версия: **538**');
+     expect(roadmap).toContain('| 28 |');
+-    expect(roadmap).toContain('Осталось после патча 537');
+-    expect(read('docs/patch-537-install.md')).toContain('537');
++    expect(roadmap).toContain('| 29 |');
++    expect(roadmap).toContain('Осталось после патча 538');
++    expect(read('docs/patch-538-install.md')).toContain('538');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 7d39deb..6e48331 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -84,18 +84,20 @@ describe('514: две строки настройки в форме точки',
+   it('описание — последнее поле формы (патч 515)', () => {
+     expect(form).toContain('testID="container-form-description"');
+     const descAt = form.indexOf('container-form-description');
+-    const checkAt = form.indexOf('container-form-check-search');
+-    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
++    // Патч 538: конструктор И/ИЛИ вместо строки проверок.
++    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
++    const hintAt = form.indexOf('<AccessExpressionBuilder');
+     expect(checkAt).toBeGreaterThan(-1);
+     expect(descAt).toBeGreaterThan(checkAt);
+     expect(descAt).toBeGreaterThan(hintAt);
+     expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
+   });
+ 
+-  it('вторая строка — поиск и список терминалов / замков', () => {
++  it('вторая строка — конструктор И/ИЛИ со списком терминалов / замков', () => {
+     expect(form).toContain('availableCheckContainers');
+-    expect(form).toContain('testID="container-form-check-search"');
+-    expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
++    // Патч 538: конструктор выражения с поиском и выбором точек-проверок.
++    expect(form).toContain('<AccessExpressionBuilder');
++    expect(form).toContain("tLootTrade('form.accessExprLabel')");
+     // Патч 517: ворота ссылаются на любую точку, а не только терминал.
+     expect(screen).toContain('availableCheckContainers={gateSources}');
+   });
+@@ -103,9 +105,10 @@ describe('514: две строки настройки в форме точки',
+   it('поля уезжают в сохранение и показываются на карточке', () => {
+     expect(form).toContain('requiredKeyItemId: canRequireKey ? requiredKeyItemId');
+     expect(form).toContain('keyRequirement: canRequireKey && requiredKeyItemId');
+-    // Патч 520: вторая строка стала списком до двух источников через «ИЛИ».
+-    expect(form).toContain('linkedCheckIds: canRequireKey ? linkedCheckIds');
+-    expect(form).toContain("linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '')");
++    // Патч 538: выражение И/ИЛИ — источник истины, linkedCheckIds выводится из него.
++    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
++    expect(form).toContain('linkedCheckIds: canRequireKey ? expressionCheckIds(accessTokens)');
++    expect(form).toContain("linkedCheckId: canRequireKey ? (expressionCheckIds(accessTokens)[0] || '')");
+     expect(screen).toContain('card-requires-key-');
+     expect(screen).toContain("'card.keyRequiredBadge'");
+   });
+diff --git a/__tests__/room/location-structure-538.test.js b/__tests__/room/location-structure-538.test.js
+new file mode 100644
+index 0000000..35ee60b
+--- /dev/null
++++ b/__tests__/room/location-structure-538.test.js
+@@ -0,0 +1,231 @@
++// Приёмочный тест 538: структура локаций в админке — конструктор требования
++// И/ИЛИ (+ = И, / = ИЛИ), строки «родительская локация» / «выход из локации»,
++// чекбокс «Хаб», дерево структуры с переходом в настройки и матрёшка
++// «локация в локацию». Игровая часть (окно игрока) остаётся на потом.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import {
++  ACCESS_OP,
++  makeCheckToken,
++  makeOpToken,
++  appendCheck,
++  appendOp,
++  canAppendCheck,
++  canAppendOp,
++  removeLastToken,
++  isCompleteAccessExpression,
++  expressionCheckIds,
++  evaluateAccessExpression,
++  formatAccessExpression,
++  resolveAccessExpression,
++} from '../../server/accessExpression.js';
++import { resolveKeyAccess, KEY_ACCESS } from '../../server/keyAccess.js';
++import { CONTAINER_KIND, normalizeContainerEntity } from '../../domain/lootTrade.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const C = (id) => makeCheckToken(id);
++const AND = makeOpToken(ACCESS_OP.AND);
++const OR = makeOpToken(ACCESS_OP.OR);
++
++describe('538: модель выражения И/ИЛИ', () => {
++  it('+ — это И, / — это ИЛИ', () => {
++    expect(ACCESS_OP.AND).toBe('+');
++    expect(ACCESS_OP.OR).toBe('/');
++  });
++
++  it('нельзя начать с оператора и нельзя закончить оператором', () => {
++    // «+ Замок» — нельзя: оператор в пустую строку не добавляется.
++    expect(appendOp([], ACCESS_OP.AND)).toEqual([]);
++    expect(canAppendOp([])).toBe(false);
++    // «Замок +» — незавершено.
++    const trailing = appendOp([C('lock1')], ACCESS_OP.AND);
++    expect(trailing).toHaveLength(2);
++    expect(isCompleteAccessExpression(trailing)).toBe(false);
++    // После оператора нельзя добавить второй оператор подряд.
++    expect(canAppendOp(trailing)).toBe(false);
++    expect(appendOp(trailing, ACCESS_OP.OR)).toEqual(trailing);
++    // «Замок + Терминал» и «Замок / Терминал» — завершены.
++    expect(isCompleteAccessExpression([C('lock1'), AND, C('term1')])).toBe(true);
++    expect(isCompleteAccessExpression([C('lock1'), OR, C('term1')])).toBe(true);
++  });
++
++  it('операнды и операторы строго чередуются', () => {
++    let tokens = [];
++    expect(canAppendCheck(tokens)).toBe(true);
++    tokens = appendCheck(tokens, 'lock1');
++    expect(canAppendCheck(tokens)).toBe(false); // подряд две точки нельзя
++    expect(appendCheck(tokens, 'term1')).toEqual(tokens);
++    tokens = appendOp(tokens, ACCESS_OP.AND);
++    expect(canAppendCheck(tokens)).toBe(true);
++    tokens = appendCheck(tokens, 'term1');
++    expect(isCompleteAccessExpression(tokens)).toBe(true);
++    expect(expressionCheckIds(tokens)).toEqual(['lock1', 'term1']);
++  });
++
++  it('removeLastToken откатывает по одному шагу', () => {
++    const tokens = [C('a'), AND, C('b')];
++    expect(removeLastToken(tokens)).toEqual([C('a'), AND]);
++    expect(removeLastToken([C('a')])).toEqual([]);
++    expect(removeLastToken([])).toEqual([]);
++  });
++
++  it('И связывает сильнее ИЛИ: A + B / C = (A И B) ИЛИ C', () => {
++    const expr = [C('a'), AND, C('b'), OR, C('c')];
++    // Только c пройдено → ИЛИ-ветка срабатывает.
++    expect(evaluateAccessExpression(expr, (id) => id === 'c')).toBe(true);
++    // Только a пройдено → (a И b) ложно, c ложно → не открыто.
++    expect(evaluateAccessExpression(expr, (id) => id === 'a')).toBe(false);
++    // a и b пройдены → первая ветка истинна.
++    expect(evaluateAccessExpression(expr, (id) => id === 'a' || id === 'b')).toBe(true);
++  });
++
++  it('чистое И требует все точки, чистое ИЛИ — любую', () => {
++    const andExpr = [C('a'), AND, C('b')];
++    expect(evaluateAccessExpression(andExpr, (id) => id === 'a')).toBe(false);
++    expect(evaluateAccessExpression(andExpr, () => true)).toBe(true);
++    const orExpr = [C('a'), OR, C('b')];
++    expect(evaluateAccessExpression(orExpr, (id) => id === 'b')).toBe(true);
++    expect(evaluateAccessExpression(orExpr, () => false)).toBe(false);
++  });
++
++  it('legacy linkedCheckIds читается как ИЛИ, явное выражение приоритетнее', () => {
++    const legacy = resolveAccessExpression({ linkedCheckIds: ['a', 'b'] });
++    expect(legacy).toEqual([C('a'), OR, C('b')]);
++    const explicit = resolveAccessExpression({
++      accessExpression: [C('a'), AND, C('b')],
++      linkedCheckIds: ['a', 'b'],
++    });
++    expect(explicit).toEqual([C('a'), AND, C('b')]);
++    expect(resolveAccessExpression({ linkedCheckId: 'solo' })).toEqual([C('solo')]);
++  });
++
++  it('форматирование даёт «Замок 1 + Терминал 1»', () => {
++    const names = { lock1: 'Замок 1', term1: 'Терминал 1' };
++    expect(formatAccessExpression([C('lock1'), AND, C('term1')], (id) => names[id]))
++      .toBe('Замок 1 + Терминал 1');
++    expect(formatAccessExpression([C('lock1'), OR, C('term1')], (id) => names[id]))
++      .toBe('Замок 1 / Терминал 1');
++  });
++});
++
++describe('538: сервер оценивает И/ИЛИ, а не принудительное ИЛИ', () => {
++  const requirement = { accessExpression: [C('lock1'), AND, C('term1')] };
++  it('И: одной точки мало, нужны обе', () => {
++    const onlyLock = resolveKeyAccess(requirement, { accessEvents: { lock1: true } });
++    expect(onlyLock.state).toBe(KEY_ACCESS.NEEDS_CHECK);
++    const both = resolveKeyAccess(requirement, {
++      accessEvents: { lock1: true },
++      terminalStates: { term1: { game: { status: 'won' } } },
++    });
++    expect(both.state).toBe(KEY_ACCESS.OPEN);
++  });
++  it('ИЛИ: достаточно любой точки', () => {
++    const orReq = { accessExpression: [C('lock1'), OR, C('term1')] };
++    const onlyTerm = resolveKeyAccess(orReq, {
++      terminalStates: { term1: { game: { status: 'won' } } },
++    });
++    expect(onlyTerm.state).toBe(KEY_ACCESS.OPEN);
++  });
++  it('без требования — none, обратная совместимость с legacy ИЛИ', () => {
++    expect(resolveKeyAccess({}, {}).state).toBe(KEY_ACCESS.NONE);
++    const legacy = resolveKeyAccess({ linkedCheckIds: ['a', 'b'] }, { accessEvents: { b: true } });
++    expect(legacy.state).toBe(KEY_ACCESS.OPEN);
++  });
++});
++
++describe('538: поля локации в доменной модели', () => {
++  it('normalizeContainerEntity хранит родителя, выход и флаг «Хаб»', () => {
++    const hub = normalizeContainerEntity({
++      id: 'h1', kind: CONTAINER_KIND.HUB, name: 'Бункер',
++      parentLocationId: 'h0', exitLocationId: 'h2', isCatalogHub: true,
++    });
++    expect(hub.parentLocationId).toBe('h0');
++    expect(hub.exitLocationId).toBe('h2');
++    expect(hub.isCatalogHub).toBe(true);
++  });
++  it('не-локация не получает полей локации', () => {
++    const loot = normalizeContainerEntity({ id: 'c1', kind: CONTAINER_KIND.LOOT, name: 'Ящик' });
++    expect(loot.parentLocationId).toBe('');
++    expect(loot.exitLocationId).toBe('');
++    expect(loot.isCatalogHub).toBe(false);
++  });
++  it('выражение доходит до сущности и выводит linkedCheckIds', () => {
++    const lock = normalizeContainerEntity({
++      id: 'l1', kind: CONTAINER_KIND.LOCK, name: 'Замок',
++      accessExpression: [C('a'), AND, C('b'), OR, C('c')],
++    });
++    expect(lock.accessExpression).toHaveLength(5);
++    expect(lock.linkedCheckIds).toEqual(['a', 'b', 'c']);
++    expect(lock.linkedCheckId).toBe('a');
++  });
++});
++
++describe('538: форма и конструктор в админке', () => {
++  const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++  const builder = read('components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js');
++  it('форма использует конструктор И/ИЛИ и сохраняет выражение', () => {
++    expect(form).toContain('<AccessExpressionBuilder');
++    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
++    expect(form).toContain('isCompleteAccessExpression(accessTokens)');
++  });
++  it('конструктор даёт кнопки + и / и блокирует некорректный порядок', () => {
++    expect(builder).toContain('testID="access-op-and"');
++    expect(builder).toContain('testID="access-op-or"');
++    expect(builder).toContain('canAppendOp');
++    expect(builder).toContain('canAppendCheck');
++    expect(builder).toContain('disabled={!allowOp}');
++    expect(builder).toContain('disabled={!allowCheck}');
++  });
++  it('чекбокс «Хаб» и две строки локации присутствуют', () => {
++    expect(form).toContain('testID="container-form-hub-catalog"');
++    expect(form).toContain("tLootTrade('form.parentLocationLabel')");
++    expect(form).toContain("tLootTrade('form.exitLocationLabel')");
++    expect(form).toContain('parentLocationId: isHub ? parentLocationId');
++    expect(form).toContain('exitLocationId: isHub ? exitLocationId');
++    expect(form).toContain('isCatalogHub: isHub ? isCatalogHub');
++  });
++});
++
++describe('538: дерево структуры и матрёшка локация-в-локацию', () => {
++  const tree = read('components/screens/LootTradeScreen/modals/LocationTreeModal.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  it('дерево кликабельно и открывает настройки секции', () => {
++    expect(tree).toContain('onOpenSettings');
++    expect(tree).toContain('testID={`location-tree-node-${hub.id}`}');
++    expect(tree).toContain('parentLocationId');
++    expect(tree).toContain('exitLocationId');
++    expect(screen).toContain('<LocationTreeModal');
++    expect(screen).toContain('setFormModal({ kind: container.kind, initialContainer: container })');
++  });
++  it('локацию можно вложить в другую локацию, цикл запрещён', () => {
++    expect(screen).toContain('wouldCreateParentCycle');
++    expect(screen).toContain('parentLocationId: hubId');
++    expect(screen).toContain("tLootTrade('form.locationCycle')");
++    // Плитка дерева на сетке.
++    expect(screen).toContain("type: 'locationTree'");
++    expect(screen).toContain("tLootTrade('actions.locationTree')");
++  });
++});
++
++describe('538: парные RU/EN строки', () => {
++  const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++  const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++  it('новые ключи формы и действий есть в обоих языках', () => {
++    const keys = [
++      'accessExprLabel', 'accessOpAnd', 'accessOpOr', 'accessExprHint',
++      'accessExprIncomplete', 'hubCatalogLabel', 'parentLocationLabel',
++      'exitLocationLabel', 'locationNone', 'locationSelfReference',
++      'locationCycle', 'locationTreeTitle',
++    ];
++    for (const key of keys) {
++      expect(ru.form[key], `ru.form.${key}`).toBeTruthy();
++      expect(en.form[key], `en.form.${key}`).toBeTruthy();
++    }
++    expect(ru.actions.locationTree).toBeTruthy();
++    expect(en.actions.locationTree).toBeTruthy();
++  });
++});
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index 444c9b6..edd5edb 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -322,7 +322,8 @@ describe('520: пятая карточка и документы', () => {
+     });
+     expect(standalone.kind).toBe('lock');
+     expect(standalone.difficulty).toBe(5);
+-    expect(standalone.linkedCheckIds).toEqual(['t1', 'x1']); // максимум две строки
++    // Патч 538: лимит «две строки» снят — выражение хранит все операнды.
++    expect(standalone.linkedCheckIds).toEqual(['t1', 'x1', 'x2']);
+     expect(standalone.linkedCheckId).toBe('t1');
+     const node = buildStandaloneLockSessionNode(standalone);
+     expect(node.kind).toBe(CONTAINER_KIND.LOCK);
+@@ -338,12 +339,12 @@ describe('520: пятая карточка и документы', () => {
+     expect(nodes[0].linkedCheckIds).toEqual(['t1', 'x1']);
+   });
+ 
+-  it('форма и экран Мастера показывают две строки и плитку создания', () => {
++  it('форма и экран Мастера показывают конструктор И/ИЛИ и плитку создания', () => {
+     const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+-    expect(form).toContain('container-form-linked-check-rows');
+-    expect(form).toContain('linked-check-row-');
+-    expect(form).toContain("tLootTrade('form.linkedCheckOr')");
+-    expect(form).toContain('normalizeLinkedCheckIds');
++    // Патч 538: две строки ИЛИ заменены конструктором выражения (+ = И, / = ИЛИ).
++    expect(form).toContain('<AccessExpressionBuilder');
++    expect(form).toContain("tLootTrade('form.accessExprLabel')");
++    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
+     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+     expect(screen).toContain('createLock');
+     expect(screen).toContain("iconName=\"lock\"");
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index af4577e..eb1ef30 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,22 +436,24 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('537');
++    expect(version.version).toBe('538');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(136);
+-    expect(version.notes['en-EN']).toHaveLength(136);
+-    expect(json('patchs/baseline.json').baseline).toBe('537');
++    expect(version.notes['ru-RU']).toHaveLength(137);
++    expect(version.notes['en-EN']).toHaveLength(137);
++    expect(json('patchs/baseline.json').baseline).toBe('538');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
++    expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **537**');
++    expect(roadmap).toContain('Текущая версия: **538**');
+     expect(roadmap).toContain('| 28 |');
+-    expect(roadmap).toContain('Осталось после патча 537');
+-    expect(read('docs/patch-537-install.md')).toContain('537');
++    expect(roadmap).toContain('| 29 |');
++    expect(roadmap).toContain('Осталось после патча 538');
++    expect(read('docs/patch-538-install.md')).toContain('538');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/terminal-gm-retry-504.test.js b/__tests__/room/terminal-gm-retry-504.test.js
+index 671e7fa..2ddee48 100644
+--- a/__tests__/room/terminal-gm-retry-504.test.js
++++ b/__tests__/room/terminal-gm-retry-504.test.js
+@@ -335,9 +335,10 @@ describe('504: lockOnFailure удалён полностью', () => {
+     // Патч 516: конфигурация терминала несёт ещё и требование ключа.
+     // Патч 520: общий реестр проверок различает терминал и замок и хранит
+     // до двух источников ворот через «ИЛИ».
++    // Патч 538: добавлено выражение И/ИЛИ (accessExpression).
+     expect(Object.keys(config).sort()).toEqual([
+-      'containerId', 'description', 'difficulty', 'keyRequirement', 'kind',
+-      'linkedCheckId', 'linkedCheckIds', 'name', 'requiredKeyItemId',
++      'accessExpression', 'containerId', 'description', 'difficulty', 'keyRequirement',
++      'kind', 'linkedCheckId', 'linkedCheckIds', 'name', 'requiredKeyItemId',
+     ]);
+     const game = createGame({
+       config, operatorClientId: 'p', operatorCharacterId: 'c',
+diff --git a/__tests__/ui/form-checkbox-515.test.js b/__tests__/ui/form-checkbox-515.test.js
+index d2b1450..8c03779 100644
+--- a/__tests__/ui/form-checkbox-515.test.js
++++ b/__tests__/ui/form-checkbox-515.test.js
+@@ -41,8 +41,9 @@ describe('515: чекбокс обязательности', () => {
+ describe('515: описание в конце формы', () => {
+   it('в форме контейнера описание после всех настроек', () => {
+     const descAt = form.indexOf('testID="container-form-description"');
+-    const checkAt = form.indexOf('container-form-check-search');
+-    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
++    // Патч 538: строку проверок заменил конструктор И/ИЛИ (AccessExpressionBuilder).
++    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
++    const hintAt = form.indexOf('<AccessExpressionBuilder');
+     expect(descAt).toBeGreaterThan(-1);
+     expect(descAt).toBeGreaterThan(checkAt);
+     expect(descAt).toBeGreaterThan(hintAt);
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 80f2838..7eb3fd9 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -2,7 +2,7 @@
+ 
+ set -euo pipefail
+ 
+-ARENA_BRANCH="arena/054e6676-fallout-2d20-companion"
++ARENA_BRANCH="arena/0fa5e3ce-fallout-2d20-companion"
+ REMOTE="origin"
+ 
+ ROOT_DIR="$(
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index d59ecf6..710eb18 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -90,6 +90,7 @@ import ContainerCatalogModal from './modals/ContainerCatalogModal';
+ import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
+ import IssueContainerModal from './modals/IssueContainerModal';
+ import HubChildPickerModal from './modals/HubChildPickerModal';
++import LocationTreeModal from './modals/LocationTreeModal';
+ 
+ const NUM_COLS = 3;
+ const MENU_WIDTH = 220;
+@@ -414,6 +415,7 @@ export default function LootTradeScreen() {
+   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
+   const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
+   const [catalogOpen, setCatalogOpen] = useState(false);
++  const [locationTreeOpen, setLocationTreeOpen] = useState(false);
+   const [catalogFeedback, setCatalogFeedback] = useState('');
+   const [editingEntry, setEditingEntry] = useState(null);
+   const [hubPickerOpen, setHubPickerOpen] = useState(false);
+@@ -915,11 +917,46 @@ export default function LootTradeScreen() {
+     });
+   };
+ 
++  // Патч 538: не даём родителю уйти в собственного потомка (цикл матрёшки).
++  const wouldCreateParentCycle = (cardId, newParentId) => {
++    if (!cardId || !newParentId || cardId === newParentId) return true;
++    const byId = new Map(containers.map((c) => [c.id, c]));
++    let cursor = byId.get(newParentId);
++    const seen = new Set([cardId]);
++    while (cursor) {
++      if (seen.has(cursor.id)) return true;
++      seen.add(cursor.id);
++      const parentId = String(cursor.parentLocationId || '').trim();
++      if (!parentId) return false;
++      if (parentId === cardId) return true;
++      cursor = byId.get(parentId);
++    }
++    return false;
++  };
++
+   const handleMoveCardIntoHub = async (cardId, hubId) => {
+-    if (!cardId || !hubId) return;
++    if (!cardId || !hubId || cardId === hubId) return;
+     const card = containers.find((c) => c.id === cardId);
+     const hub = containers.find((c) => c.id === hubId && c.kind === CONTAINER_KIND.HUB);
+-    if (!card || !hub || card.kind === CONTAINER_KIND.HUB) return;
++    if (!card || !hub) return;
++
++    // Патч 538: матрёшка «локация в локацию» — вложенная локация становится
++    // дочерней целевой (parentLocationId), а не ссылкой в links.
++    if (card.kind === CONTAINER_KIND.HUB) {
++      if (wouldCreateParentCycle(cardId, hubId)) {
++        showRawAlert({ title: tLootTrade('form.locationCycle') });
++        return;
++      }
++      if (card.parentLocationId !== hubId) {
++        await persistAndSyncContainer({ ...card, parentLocationId: hubId, inRoot: false });
++      } else {
++        await loadData();
++      }
++      setMovingContainerId(null);
++      setDrag(null);
++      hubDropBounds.current = {};
++      return;
++    }
+ 
+     if (card.inRoot) {
+       await db.saveGmContainer({ ...card, inRoot: false });
+@@ -1680,6 +1717,7 @@ export default function LootTradeScreen() {
+ 
+   const gridItems = [
+     { type: 'createHub', id: '__create_hub__' },
++    { type: 'locationTree', id: '__location_tree__' },
+     { type: 'createLoot', id: '__create_loot__' },
+     { type: 'createMerchant', id: '__create_merchant__' },
+     { type: 'createTerminal', id: '__create_terminal__' },
+@@ -1814,6 +1852,16 @@ export default function LootTradeScreen() {
+                         />
+                       );
+                     }
++                    if (cell.type === 'locationTree') {
++                      return (
++                        <ActionCell
++                          key={cell.id}
++                          iconName="file-tree"
++                          label={tLootTrade('actions.locationTree')}
++                          onPress={() => setLocationTreeOpen(true)}
++                        />
++                      );
++                    }
+                     if (cell.type === 'createLoot') {
+                       return (
+                         <ActionCell
+@@ -1910,13 +1958,13 @@ export default function LootTradeScreen() {
+                         gateSourceNames={gateSourceNames}
+                         gateEvents={gateEvents}
+                         isLive={getActiveLiveEntriesForContainer(cell).length > 0}
+-                        isDropTarget={Boolean(isHubCell && movingContainerId)}
+-                        canMoveToHub={!isHubCell && availableHubs.length > 0}
++                        isDropTarget={Boolean(isHubCell && movingContainerId && movingContainerId !== cell.id)}
++                        canMoveToHub={availableHubs.length > 0}
+                         cardRefCallback={isHubCell
+                           ? (node) => { hubRefs.current[cell.id] = node; }
+                           : undefined}
+                         onOpen={() => {
+-                          if (isHubCell && movingContainerId) {
++                          if (isHubCell && movingContainerId && movingContainerId !== cell.id) {
+                             void handleMoveCardIntoHub(movingContainerId, cell.id);
+                             return;
+                           }
+@@ -1924,15 +1972,15 @@ export default function LootTradeScreen() {
+                           setActiveContainerId(cell.id);
+                         }}
+                         onIssueOrClose={() => handleIssueOrClosePress(cell)}
+-                        onMoveToHub={!isHubCell && availableHubs.length > 0
++                        onMoveToHub={availableHubs.length > 0
+                           ? () => setMoveToHubTarget(cell)
+                           : undefined}
+                         onDuplicate={() => handleDuplicateCard(cell)}
+                         onEdit={() => setFormModal({ kind: cell.kind, initialContainer: cell })}
+                         onDelete={() => handleDeleteCard(cell)}
+-                        onDragStart={!isHubCell && availableHubs.length > 0 ? handleDragStart : undefined}
+-                        onDragMove={!isHubCell && availableHubs.length > 0 ? handleDragMove : undefined}
+-                        onDragEnd={!isHubCell && availableHubs.length > 0 ? handleDragEnd : undefined}
++                        onDragStart={availableHubs.length > 0 ? handleDragStart : undefined}
++                        onDragMove={availableHubs.length > 0 ? handleDragMove : undefined}
++                        onDragEnd={availableHubs.length > 0 ? handleDragEnd : undefined}
+                       />
+                     );
+                   })}
+@@ -2679,6 +2727,17 @@ export default function LootTradeScreen() {
+         onClose={() => setFormModal(null)}
+       />
+ 
++      {/* Патч 538: дерево структуры локаций; узел открывает настройки секции. */}
++      <LocationTreeModal
++        visible={locationTreeOpen}
++        containers={containers}
++        onOpenSettings={(container) => {
++          setLocationTreeOpen(false);
++          setFormModal({ kind: container.kind, initialContainer: container });
++        }}
++        onClose={() => setLocationTreeOpen(false)}
++      />
++
+       <HubChildPickerModal
+         visible={hubPickerOpen}
+         hub={activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer : null}
+@@ -2736,7 +2795,7 @@ export default function LootTradeScreen() {
+               {tLootTrade('detail.moveToHubPickerTitle')}
+             </Text>
+             <ScrollView style={{ maxHeight: 280 }}>
+-              {availableHubs.map((hub) => (
++              {availableHubs.filter((hub) => hub.id !== moveToHubTarget?.id).map((hub) => (
+                 <TouchableOpacity
+                   key={hub.id}
+                   style={styles.movePickerRow}
+diff --git a/components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js b/components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js
+new file mode 100644
+index 0000000..7852e50
+--- /dev/null
++++ b/components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js
+@@ -0,0 +1,239 @@
++import React, { useMemo, useState } from 'react';
++import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
++import { tLootTrade } from '../logic/lootTradeI18n';
++import {
++  ACCESS_OP,
++  appendCheck,
++  appendOp,
++  canAppendCheck,
++  canAppendOp,
++  removeLastToken,
++  isCompleteAccessExpression,
++} from '../../../../domain/accessExpression';
++
++/**
++ * Патч 538: конструктор требования доступа «И/ИЛИ».
++ * Владелец: «кнопки "+" и "/"… + — и, / — или… Замок 1 + = нельзя,
++ * + Замок = нельзя, Замок + Терминал = можно, Замок / Терминал = можно».
++ * Строка собирается чередованием операндов (точек-проверок) и операторов;
++ * начать или закончить оператором нельзя — кнопки блокируются.
++ */
++const AccessExpressionBuilder = ({
++  tokens = [],
++  onChange,
++  availableChecks = [],
++}) => {
++  const [query, setQuery] = useState('');
++  const list = Array.isArray(tokens) ? tokens : [];
++  const emit = (next) => { if (typeof onChange === 'function') onChange(next); };
++
++  const nameOf = useMemo(() => {
++    const map = new Map();
++    for (const check of Array.isArray(availableChecks) ? availableChecks : []) {
++      if (check?.id) map.set(check.id, check);
++    }
++    return (id) => map.get(id) || null;
++  }, [availableChecks]);
++
++  const filteredChecks = useMemo(() => {
++    const q = query.trim().toLowerCase();
++    return (Array.isArray(availableChecks) ? availableChecks : [])
++      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
++  }, [availableChecks, query]);
++
++  const allowCheck = canAppendCheck(list);
++  const allowOp = canAppendOp(list);
++  const complete = isCompleteAccessExpression(list);
++  const endsWithOp = list.length > 0 && list[list.length - 1].type === 'op';
++
++  return (
++    <View>
++      {/* Строка выражения: операнды и операторы по порядку. */}
++      <View testID="access-expression-row" style={styles.expressionRow}>
++        {list.length === 0 ? (
++          <Text style={styles.emptyText}>{tLootTrade('form.accessExprEmpty')}</Text>
++        ) : list.map((token, idx) => (
++          token.type === 'check' ? (
++            <View key={`c-${idx}-${token.id}`} style={styles.operandChip}>
++              <Text style={styles.operandName} numberOfLines={1}>
++                {nameOf(token.id)?.name || token.id}
++              </Text>
++              {nameOf(token.id)?.kindLabel ? (
++                <Text style={styles.operandKind}>{nameOf(token.id).kindLabel}</Text>
++              ) : null}
++            </View>
++          ) : (
++            <Text key={`o-${idx}`} style={styles.opSymbol}>{token.op}</Text>
++          )
++        ))}
++      </View>
++
++      {/* Кнопки операторов и шага назад. */}
++      <View style={styles.controlsRow}>
++        <TouchableOpacity
++          testID="access-op-and"
++          style={[styles.opButton, !allowOp && styles.opButtonDisabled]}
++          disabled={!allowOp}
++          onPress={() => emit(appendOp(list, ACCESS_OP.AND))}
++        >
++          <Text style={[styles.opButtonText, !allowOp && styles.opButtonTextDisabled]}>
++            {tLootTrade('form.accessOpAnd')}
++          </Text>
++        </TouchableOpacity>
++        <TouchableOpacity
++          testID="access-op-or"
++          style={[styles.opButton, !allowOp && styles.opButtonDisabled]}
++          disabled={!allowOp}
++          onPress={() => emit(appendOp(list, ACCESS_OP.OR))}
++        >
++          <Text style={[styles.opButtonText, !allowOp && styles.opButtonTextDisabled]}>
++            {tLootTrade('form.accessOpOr')}
++          </Text>
++        </TouchableOpacity>
++        <TouchableOpacity
++          testID="access-remove-last"
++          style={[styles.opButton, list.length === 0 && styles.opButtonDisabled]}
++          disabled={list.length === 0}
++          onPress={() => emit(removeLastToken(list))}
++        >
++          <MaterialCommunityIcons
++            name="backspace-outline"
++            size={18}
++            color={list.length === 0 ? ADMIN_MODAL_PALETTE.borderMuted : ADMIN_MODAL_PALETTE.text}
++          />
++        </TouchableOpacity>
++        <TouchableOpacity
++          testID="access-clear"
++          style={[styles.opButton, list.length === 0 && styles.opButtonDisabled]}
++          disabled={list.length === 0}
++          onPress={() => emit([])}
++        >
++          <MaterialCommunityIcons
++            name="close"
++            size={18}
++            color={list.length === 0 ? ADMIN_MODAL_PALETTE.borderMuted : ADMIN_MODAL_PALETTE.danger}
++          />
++        </TouchableOpacity>
++      </View>
++
++      {/* Выбор операнда: поиск и список точек-проверок. */}
++      <TextInput
++        testID="access-check-search"
++        style={[styles.input, !allowCheck && styles.inputDisabled]}
++        value={query}
++        onChangeText={setQuery}
++        editable={allowCheck}
++        placeholder={tLootTrade('form.accessCheckSearchPlaceholder')}
++        placeholderTextColor="#8c8c8c"
++      />
++      <View style={styles.checkChips}>
++        {filteredChecks.length === 0 ? (
++          <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
++        ) : filteredChecks.map((check) => (
++          <TouchableOpacity
++            key={check.id}
++            testID={`access-check-${check.id}`}
++            style={[styles.checkChip, !allowCheck && styles.checkChipDisabled]}
++            disabled={!allowCheck}
++            onPress={() => emit(appendCheck(list, check.id))}
++          >
++            <Text style={styles.checkChipName} numberOfLines={1}>{check.name}</Text>
++            <Text style={styles.checkChipKind}>
++              {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
++            </Text>
++          </TouchableOpacity>
++        ))}
++      </View>
++
++      <Text style={styles.hintText}>{tLootTrade('form.accessExprHint')}</Text>
++      {endsWithOp && (
++        <Text testID="access-expr-incomplete" style={styles.warnText}>
++          {tLootTrade('form.accessExprIncomplete')}
++        </Text>
++      )}
++      {list.length > 0 && complete && (
++        <Text testID="access-expr-complete" style={styles.hintText}>
++          {tLootTrade('form.accessExprReady')}
++        </Text>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  expressionRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    alignItems: 'center',
++    gap: 6,
++    minHeight: 40,
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  emptyText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12 },
++  operandChip: {
++    paddingHorizontal: 9,
++    paddingVertical: 5,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.selectedBorder,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++  },
++  operandName: { color: ADMIN_MODAL_PALETTE.text, fontSize: 12, fontWeight: '700' },
++  operandKind: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10 },
++  opSymbol: {
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 18,
++    fontWeight: '700',
++    paddingHorizontal: 2,
++  },
++  controlsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
++  opButton: {
++    minWidth: 44,
++    minHeight: 38,
++    alignItems: 'center',
++    justifyContent: 'center',
++    paddingHorizontal: 12,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  opButtonDisabled: { opacity: 0.4 },
++  opButtonText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 15, fontWeight: '700' },
++  opButtonTextDisabled: { color: ADMIN_MODAL_PALETTE.mutedText },
++  input: {
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 14,
++    marginTop: 8,
++  },
++  inputDisabled: { opacity: 0.5 },
++  checkChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
++  checkChip: {
++    paddingHorizontal: 11,
++    paddingVertical: 8,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  checkChipDisabled: { opacity: 0.4 },
++  checkChipName: { color: ADMIN_MODAL_PALETTE.text, fontSize: 13, fontWeight: '700' },
++  checkChipKind: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
++  hintText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 6, lineHeight: 16 },
++  warnText: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 11, marginTop: 4, lineHeight: 16 },
++});
++
++export default AccessExpressionBuilder;
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 8397cce..0fbf075 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -30,9 +30,14 @@ import {
+   KEY_REQUIREMENT,
+   normalizeKeyRequirement,
+   containerCanRequireKey,
+-  normalizeLinkedCheckIds,
+ } from '../../../../domain/lootTrade';
+ import { showRawAlert } from '../../../alerts/alertService';
++import AccessExpressionBuilder from './AccessExpressionBuilder';
++import {
++  resolveAccessExpression,
++  expressionCheckIds,
++  isCompleteAccessExpression,
++} from '../../../../domain/accessExpression';
+ 
+ const EMPTY_ARRAY = Object.freeze([]);
+ 
+@@ -79,10 +84,14 @@ const ContainerFormModal = ({
+   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
+   // Патч 514: две строки требования доступа (ключ + проверка).
+   const [keyQuery, setKeyQuery] = useState('');
+-  const [checkQuery, setCheckQuery] = useState('');
+   const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
+   const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
+-  const [linkedCheckIds, setLinkedCheckIds] = useState([]);
++  // Патч 538: требование доступа — выражение И/ИЛИ (токены), а не список ИЛИ.
++  const [accessTokens, setAccessTokens] = useState([]);
++  // Патч 538: строки локации — родитель, особый выход и флаг «Хаб»-каталога.
++  const [parentLocationId, setParentLocationId] = useState('');
++  const [exitLocationId, setExitLocationId] = useState('');
++  const [isCatalogHub, setIsCatalogHub] = useState(false);
+ 
+   useEffect(() => {
+     if (!initSessionKey) return;
+@@ -122,10 +131,12 @@ const ContainerFormModal = ({
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     ));
+     setKeyQuery('');
+-    setCheckQuery('');
+     setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
+     setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
+-    setLinkedCheckIds(normalizeLinkedCheckIds(initialContainer || {}));
++    setAccessTokens(resolveAccessExpression(initialContainer || {}));
++    setParentLocationId(String(initialContainer?.parentLocationId || '').trim());
++    setExitLocationId(String(initialContainer?.exitLocationId || '').trim());
++    setIsCatalogHub(Boolean(initialContainer?.isCatalogHub));
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [initSessionKey]);
+ 
+@@ -135,28 +146,12 @@ const ContainerFormModal = ({
+       .filter((k) => !q || String(k?.name || '').toLowerCase().includes(q));
+   }, [availableKeyItems, keyQuery]);
+ 
+-  const filteredChecks = useMemo(() => {
+-    const q = checkQuery.trim().toLowerCase();
+-    return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
+-      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
+-  }, [availableCheckContainers, checkQuery]);
+-
+-  // Патч 520: вторая строка требования — до двух точек через «ИЛИ».
+-  // Терминал и замок вместе точку не блокируют: хватает любой проверки.
+-  const selectedChecks = useMemo(
+-    () => linkedCheckIds
+-      .map((id) => (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
+-        .find((c) => c?.id === id))
+-      .filter(Boolean),
+-    [linkedCheckIds, availableCheckContainers],
+-  );
+-  const toggleLinkedCheck = (id) => {
+-    setLinkedCheckIds((prev) => {
+-      if (prev.includes(id)) return prev.filter((item) => item !== id);
+-      if (prev.length >= 2) return [prev[1], id];
+-      return [...prev, id];
+-    });
+-  };
++  // Патч 538: локации-кандидаты на роль родителя/выхода (кроме самой себя).
++  const locationOptions = useMemo(() => {
++    const selfId = String(initialContainer?.id || '');
++    return (Array.isArray(availableHubs) ? availableHubs : [])
++      .filter((h) => h?.id && h.id !== selfId);
++  }, [availableHubs, initialContainer?.id]);
+ 
+   const combinedHubs = useMemo(() => {
+     const map = new Map();
+@@ -266,6 +261,18 @@ const ContainerFormModal = ({
+       showRawAlert({ title: tLootTrade('form.validationRoom') });
+       return;
+     }
++    // Патч 538: выражение И/ИЛИ нельзя сохранить незавершённым («Замок 1 +»).
++    if (canRequireKey && accessTokens.length > 0 && !isCompleteAccessExpression(accessTokens)) {
++      showRawAlert({ title: tLootTrade('form.accessExprIncomplete') });
++      return;
++    }
++    // Патч 538: родитель и выход локации не могут указывать на саму себя.
++    if (isHub && initialContainer?.id) {
++      if (parentLocationId === initialContainer.id || exitLocationId === initialContainer.id) {
++        showRawAlert({ title: tLootTrade('form.locationSelfReference') });
++        return;
++      }
++    }
+ 
+     let finalSelectedHubIds = selectedHubIds;
+     if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
+@@ -310,8 +317,15 @@ const ContainerFormModal = ({
+         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+         requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
+         keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
+-        linkedCheckIds: canRequireKey ? linkedCheckIds : [],
+-        linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '') : '',
++        // Патч 538: выражение И/ИЛИ — источник истины; linkedCheckIds остаётся
++        // списком операндов для старых читателей.
++        accessExpression: canRequireKey ? accessTokens : [],
++        linkedCheckIds: canRequireKey ? expressionCheckIds(accessTokens) : [],
++        linkedCheckId: canRequireKey ? (expressionCheckIds(accessTokens)[0] || '') : '',
++        // Патч 538: строки локации (родитель / особый выход / «Хаб»-каталог).
++        parentLocationId: isHub ? parentLocationId : '',
++        exitLocationId: isHub ? exitLocationId : '',
++        isCatalogHub: isHub ? isCatalogHub : false,
+       },
+       capsRollInfo,
+       isHub ? null : finalSelectedHubIds,
+@@ -370,6 +384,77 @@ const ContainerFormModal = ({
+ 
+             {isHub ? (
+               <>
++                {/* Патч 538: чекбокс «Хаб» — локация-каталог для просмотра деревом. */}
++                <TouchableOpacity
++                  testID="container-form-hub-catalog"
++                  style={styles.checkboxRow}
++                  onPress={() => setIsCatalogHub((v) => !v)}
++                  accessibilityRole="checkbox"
++                  accessibilityState={{ checked: isCatalogHub }}
++                >
++                  <MaterialCommunityIcons
++                    name={isCatalogHub ? 'checkbox-marked' : 'checkbox-blank-outline'}
++                    size={22}
++                    color={isCatalogHub ? ADMIN_MODAL_PALETTE.text : ADMIN_MODAL_PALETTE.mutedText}
++                  />
++                  <Text style={styles.checkboxLabel}>{tLootTrade('form.hubCatalogLabel')}</Text>
++                </TouchableOpacity>
++                <Text style={styles.hintText}>{tLootTrade('form.hubCatalogHint')}</Text>
++
++                {/* Патч 538: строка 1 — родительская локация (вложенность/ветвление). */}
++                <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
++                <View style={styles.roomChips}>
++                  <TouchableOpacity
++                    testID="container-form-parent-none"
++                    style={[styles.roomChip, !parentLocationId && styles.roomChipActive]}
++                    onPress={() => setParentLocationId('')}
++                  >
++                    <Text style={[styles.roomChipName, !parentLocationId && styles.roomChipTextActive]}>
++                      {tLootTrade('form.locationNone')}
++                    </Text>
++                  </TouchableOpacity>
++                  {locationOptions.map((hub) => (
++                    <TouchableOpacity
++                      key={hub.id}
++                      testID={`container-form-parent-${hub.id}`}
++                      style={[styles.roomChip, parentLocationId === hub.id && styles.roomChipActive]}
++                      onPress={() => setParentLocationId(hub.id)}
++                    >
++                      <Text style={[styles.roomChipName, parentLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
++                        {hub.name}
++                      </Text>
++                    </TouchableOpacity>
++                  ))}
++                </View>
++                <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
++
++                {/* Патч 538: строка 2 — выход из локации (особый переход/телепорт). */}
++                <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
++                <View style={styles.roomChips}>
++                  <TouchableOpacity
++                    testID="container-form-exit-none"
++                    style={[styles.roomChip, !exitLocationId && styles.roomChipActive]}
++                    onPress={() => setExitLocationId('')}
++                  >
++                    <Text style={[styles.roomChipName, !exitLocationId && styles.roomChipTextActive]}>
++                      {tLootTrade('form.locationNone')}
++                    </Text>
++                  </TouchableOpacity>
++                  {locationOptions.map((hub) => (
++                    <TouchableOpacity
++                      key={hub.id}
++                      testID={`container-form-exit-${hub.id}`}
++                      style={[styles.roomChip, exitLocationId === hub.id && styles.roomChipActive]}
++                      onPress={() => setExitLocationId(hub.id)}
++                    >
++                      <Text style={[styles.roomChipName, exitLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
++                        {hub.name}
++                      </Text>
++                    </TouchableOpacity>
++                  ))}
++                </View>
++                <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
++
+                 <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
+                 {availableRooms.length === 0 ? (
+                   <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
+@@ -697,52 +782,13 @@ const ContainerFormModal = ({
+                   </TouchableOpacity>
+                 )}
+ 
+-                <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
+-                <TextInput
+-                  testID="container-form-check-search"
+-                  style={styles.input}
+-                  value={checkQuery}
+-                  onChangeText={setCheckQuery}
+-                  placeholder={tLootTrade('form.linkedCheckSearchPlaceholder')}
+-                  placeholderTextColor="#8c8c8c"
++                {/* Патч 538: требование доступа — конструктор И/ИЛИ (+ = И, / = ИЛИ). */}
++                <Text style={styles.label}>{tLootTrade('form.accessExprLabel')}</Text>
++                <AccessExpressionBuilder
++                  tokens={accessTokens}
++                  onChange={setAccessTokens}
++                  availableChecks={availableCheckContainers}
+                 />
+-                <View style={styles.roomChips}>
+-                  {filteredChecks.length === 0 ? (
+-                    <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
+-                  ) : filteredChecks.map((check) => {
+-                    const selected = linkedCheckIds.includes(check.id);
+-                    return (
+-                      <TouchableOpacity
+-                        key={check.id}
+-                        testID={`container-form-check-${check.id}`}
+-                        style={[styles.roomChip, selected && styles.roomChipActive]}
+-                        onPress={() => toggleLinkedCheck(check.id)}
+-                      >
+-                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
+-                          {check.name}
+-                        </Text>
+-                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+-                          {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
+-                        </Text>
+-                      </TouchableOpacity>
+-                    );
+-                  })}
+-                </View>
+-                {selectedChecks.length > 0 && (
+-                  <View testID="container-form-linked-check-rows" style={styles.roomChips}>
+-                    {selectedChecks.map((check, idx) => (
+-                      <View key={check.id} style={styles.roomChips}>
+-                        {idx > 0 && (
+-                          <Text style={styles.hintText}>{tLootTrade('form.linkedCheckOr')}</Text>
+-                        )}
+-                        <Text testID={`linked-check-row-${idx + 1}`} style={styles.roomChipName}>
+-                          {`${idx + 1}. ${check.name}`}
+-                          {check.kindLabel ? ` · ${check.kindLabel}` : ''}
+-                        </Text>
+-                      </View>
+-                    ))}
+-                  </View>
+-                )}
+                 {(isTerminal || isLock) && (
+                   <Text testID="container-form-lock-pin-estimate" style={styles.hintText}>
+                     {formatLootTrade(tLootTrade('form.lockPinEstimate'), {
+@@ -750,10 +796,6 @@ const ContainerFormModal = ({
+                     })}
+                   </Text>
+                 )}
+-                <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
+-                <Text style={styles.hintText}>
+-                  {formatLootTrade(tLootTrade('form.linkedCheckSelected'), { count: linkedCheckIds.length })}
+-                </Text>
+               </>
+             )}
+ 
+diff --git a/components/screens/LootTradeScreen/modals/LocationTreeModal.js b/components/screens/LootTradeScreen/modals/LocationTreeModal.js
+new file mode 100644
+index 0000000..2196bdf
+--- /dev/null
++++ b/components/screens/LootTradeScreen/modals/LocationTreeModal.js
+@@ -0,0 +1,243 @@
++import React, { useMemo } from 'react';
++import {
++  Modal,
++  View,
++  Text,
++  TouchableOpacity,
++  ScrollView,
++  StyleSheet,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
++import { useLocale } from '../../../../i18n/locale';
++import { tLootTrade } from '../logic/lootTradeI18n';
++import { CONTAINER_KIND } from '../../../../domain/lootTrade';
++import {
++  resolveAccessExpression,
++  formatAccessExpression,
++} from '../../../../domain/accessExpression';
++
++/**
++ * Патч 538: дерево структуры локаций («Хаб»-каталог).
++ * Показывает, что за чем идёт (вложенность), что чем заблокировано
++ * (условие И/ИЛИ) и что во что выходит (особый выход/телепорт).
++ * Нажатие на любой узел открывает настройки этой секции.
++ */
++const LocationTreeModal = ({ visible, containers = [], onOpenSettings, onClose }) => {
++  useLocale();
++
++  const list = Array.isArray(containers) ? containers : [];
++  const byId = useMemo(() => {
++    const map = new Map();
++    for (const c of list) if (c?.id) map.set(c.id, c);
++    return map;
++  }, [list]);
++
++  const hubs = useMemo(
++    () => list.filter((c) => c?.kind === CONTAINER_KIND.HUB),
++    [list],
++  );
++
++  // Вложенные локации: parentLocationId -> список дочерних хабов.
++  const childrenByParent = useMemo(() => {
++    const map = new Map();
++    for (const hub of hubs) {
++      const parentId = String(hub.parentLocationId || '').trim();
++      if (!parentId) continue;
++      if (!map.has(parentId)) map.set(parentId, []);
++      map.get(parentId).push(hub);
++    }
++    return map;
++  }, [hubs]);
++
++  const roots = useMemo(
++    () => hubs.filter((hub) => {
++      const parentId = String(hub.parentLocationId || '').trim();
++      return !parentId || !byId.has(parentId);
++    }),
++    [hubs, byId],
++  );
++
++  const nameOf = (id) => byId.get(id)?.name || id;
++
++  const blockedLabel = (container) => {
++    const tokens = resolveAccessExpression(container || {});
++    if (!tokens.length) return '';
++    return formatAccessExpression(tokens, nameOf);
++  };
++
++  const open = (container) => {
++    if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
++  };
++
++  const kindIcon = (kind) => {
++    if (kind === CONTAINER_KIND.HUB) return 'map-marker-multiple';
++    if (kind === CONTAINER_KIND.LOCK) return 'lock';
++    if (kind === CONTAINER_KIND.TERMINAL) return 'desktop-classic';
++    if (kind === CONTAINER_KIND.MERCHANT) return 'account-cash';
++    return 'treasure-chest';
++  };
++
++  // Рекурсивный узел локации; visited защищает от циклов матрёшки.
++  const renderHub = (hub, depth, visited) => {
++    if (!hub || visited.has(hub.id)) return null;
++    const nextVisited = new Set(visited);
++    nextVisited.add(hub.id);
++
++    const nestedHubs = childrenByParent.get(hub.id) || [];
++    const linkedChildren = (hub.links || [])
++      .map((l) => byId.get(l.containerId))
++      .filter((c) => c && c.kind !== CONTAINER_KIND.HUB);
++    const exitId = String(hub.exitLocationId || '').trim();
++    const exitTarget = exitId ? byId.get(exitId) : null;
++    const blocked = blockedLabel(hub);
++
++    return (
++      <View key={hub.id} style={[styles.node, { marginLeft: depth * 18 }]}>
++        <TouchableOpacity
++          testID={`location-tree-node-${hub.id}`}
++          style={styles.nodeHeader}
++          onPress={() => open(hub)}
++        >
++          <MaterialCommunityIcons name={kindIcon(hub.kind)} size={18} color={ADMIN_MODAL_PALETTE.text} />
++          <Text style={styles.nodeName} numberOfLines={1}>{hub.name}</Text>
++          {hub.isCatalogHub && (
++            <View style={styles.catalogBadge}>
++              <Text style={styles.catalogBadgeText}>{tLootTrade('form.locationTreeCatalogBadge')}</Text>
++            </View>
++          )}
++          <MaterialCommunityIcons name="chevron-right" size={18} color={ADMIN_MODAL_PALETTE.mutedText} />
++        </TouchableOpacity>
++
++        {blocked ? (
++          <Text style={styles.metaRow} numberOfLines={2}>
++            {tLootTrade('form.locationTreeBlockedBy')} {blocked}
++          </Text>
++        ) : null}
++
++        {exitTarget ? (
++          <TouchableOpacity
++            testID={`location-tree-exit-${hub.id}`}
++            style={styles.exitRow}
++            onPress={() => open(exitTarget)}
++          >
++            <MaterialCommunityIcons name="exit-run" size={14} color={ADMIN_MODAL_PALETTE.mutedText} />
++            <Text style={styles.metaRow} numberOfLines={1}>
++              {tLootTrade('form.locationTreeExitTo')} {exitTarget.name}
++            </Text>
++          </TouchableOpacity>
++        ) : null}
++
++        {linkedChildren.map((child) => (
++          <TouchableOpacity
++            key={child.id}
++            testID={`location-tree-child-${child.id}`}
++            style={[styles.childRow, { marginLeft: 18 }]}
++            onPress={() => open(child)}
++          >
++            <MaterialCommunityIcons name={kindIcon(child.kind)} size={15} color={ADMIN_MODAL_PALETTE.mutedText} />
++            <Text style={styles.childName} numberOfLines={1}>{child.name}</Text>
++            {blockedLabel(child) ? (
++              <Text style={styles.childMeta} numberOfLines={1}>{blockedLabel(child)}</Text>
++            ) : null}
++          </TouchableOpacity>
++        ))}
++
++        {nestedHubs.map((childHub) => renderHub(childHub, depth + 1, nextVisited))}
++      </View>
++    );
++  };
++
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={styles.overlay}>
++        <View style={styles.card}>
++          <View style={styles.header}>
++            <Text style={styles.title}>{tLootTrade('form.locationTreeTitle')}</Text>
++            <TouchableOpacity testID="location-tree-close" onPress={onClose} style={styles.closeBtn}>
++              <MaterialCommunityIcons name="close" size={22} color={ADMIN_MODAL_PALETTE.text} />
++            </TouchableOpacity>
++          </View>
++          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
++            {hubs.length === 0 ? (
++              <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmpty')}</Text>
++            ) : (
++              roots.map((hub) => renderHub(hub, 0, new Set()))
++            )}
++          </ScrollView>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.56)',
++    alignItems: 'center',
++    justifyContent: 'center',
++    padding: 16,
++  },
++  card: {
++    width: '100%',
++    maxWidth: 560,
++    maxHeight: '84%',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
++    borderRadius: 10,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.border,
++    overflow: 'hidden',
++  },
++  header: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 16,
++    paddingVertical: 12,
++    borderBottomWidth: 1,
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  title: { color: ADMIN_MODAL_PALETTE.text, fontSize: 16, fontWeight: '700' },
++  closeBtn: { padding: 4 },
++  scroll: { flexGrow: 0 },
++  scrollContent: { padding: 14 },
++  emptyText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 13, lineHeight: 19 },
++  node: { marginBottom: 10 },
++  nodeHeader: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    paddingHorizontal: 10,
++    paddingVertical: 9,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 14, fontWeight: '700' },
++  catalogBadge: {
++    paddingHorizontal: 7,
++    paddingVertical: 2,
++    borderRadius: 4,
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
++  },
++  catalogBadgeText: { color: ADMIN_MODAL_PALETTE.accentText, fontSize: 10, fontWeight: '700' },
++  metaRow: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 3, marginLeft: 26 },
++  exitRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
++  childRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 6,
++    paddingVertical: 6,
++    paddingHorizontal: 8,
++    marginTop: 4,
++    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++  },
++  childName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 12, fontWeight: '600' },
++  childMeta: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, maxWidth: 160 },
++});
++
++export default LocationTreeModal;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index cec6448..fc2364e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,36 @@
+ # Changelog
+ ---
+ 
++## Location structure in the admin side (patch 538)
++
++The admin part of the location structure is implemented (thesis 29). The
++player's location-view window is deliberately deferred to the next step.
++
++- **Two new rows in the location form.** "Parent location" — this location is
++  contained inside another: you can enter it through the parent and return.
++  "Exit from location" — where the exit leads if it does not lead to the
++  previous location: a special passage or a teleport. This is how branching
++  is built.
++- **Access requirement is an AND/OR builder.** Under the check-point picker
++  there are now `+` (AND) and `/` (OR) buttons: the row reads like "Lock 1 +
++  Terminal 1" or "Lock 1 / Terminal 1". You cannot start or end with an
++  operator ("Lock 1 +" and "+ Lock" are invalid). AND binds tighter than OR:
++  `A + B / C` = `(A AND B) OR C`. There can be more than two operands.
++- **A "Hub" checkbox after the name** — two cells (checkbox + explanation).
++  A catalog location is for conveniently viewing the structure as a tree.
++- **Location structure tree** — a separate "Location Structure" tile on the
++  grid: what follows what, what is blocked by what, what exits where. Tapping
++  any node opens that section's settings.
++- **Matryoshka "location into location".** Moving a location into another
++  makes it a child (`parentLocationId`); a lock/terminal inside a location
++  stays its child element. Cycles are forbidden.
++- **Compatibility.** The expression is stored in `accessExpression` and
++  reaches the server (`keyAccess`, `terminalHacking`, `lootTradeSession`,
++  `roomRegistry`); the legacy `linkedCheckIds`/`linkedCheckId` fields are
++  derived from it, and old saves with forced OR still read as before.
++
++---
++
+ ## Multi-level locations and passages — design (patch 537)
+ 
+ The owner shifted priorities: the one-off "OR" linking of the second check row
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ab5414c..ef3514b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Структура локаций в админке (патч 538)
++
++Реализована админская часть структуры локаций (тезис 29). Окно просмотра
++локаций для игрока сознательно отложено на следующий шаг.
++
++- **Две новые строки в форме локации.** «Родительская локация» — эта локация
++  содержится внутри другой: в неё можно перейти через родителя и обратно.
++  «Выход из локации» — куда ведёт выход, если он ведёт не в предыдущую
++  локацию: особый переход или телепорт. Так строится ветвление.
++- **Требование доступа — конструктор И/ИЛИ.** Под выбором точек-проверок
++  появились кнопки `+` (И) и `/` (ИЛИ): строка читается как «Замок 1 +
++  Терминал 1» или «Замок 1 / Терминал 1». Начать или закончить оператором
++  нельзя («Замок 1 +» и «+ Замок» недопустимы). «И» связывает сильнее «ИЛИ»:
++  `A + B / C` = `(A И B) ИЛИ C`. Операндов может быть больше двух.
++- **Чекбокс «Хаб» после названия** — две ячейки (чекбокс + пояснение).
++  Локация-каталог нужна для удобного просмотра структуры деревом.
++- **Дерево структуры локаций** — отдельная плитка «Структура локаций» на
++  сетке: что за чем идёт, что чем заблокировано, что во что выходит. Нажатие
++  на любой узел открывает настройки этой секции.
++- **Матрёшка «локация в локацию».** Перенос локации в другую делает её
++  дочерней (`parentLocationId`); замок/терминал внутри локации остаётся её
++  дочерним элементом. Циклы запрещены.
++- **Совместимость.** Выражение хранится в `accessExpression` и доходит до
++  сервера (`keyAccess`, `terminalHacking`, `lootTradeSession`, `roomRegistry`);
++  legacy-поля `linkedCheckIds`/`linkedCheckId` выводятся из него, старые
++  сохранения с принудительным «ИЛИ» читаются как прежде.
++
++---
++
+ ## Многоуровневые локации и переходы — проект (патч 537)
+ 
+ Владелец сместил приоритет: точечные «ИЛИ»-связывание второй строки проверки и
+diff --git a/docs/patch-538-install.md b/docs/patch-538-install.md
+new file mode 100644
+index 0000000..b2a3501
+--- /dev/null
++++ b/docs/patch-538-install.md
+@@ -0,0 +1,58 @@
++# Установка патча 538: структура локаций в админке
++
++Патч подготовлен от состояния **версии 537** (коммит `ed2b084`, ветка
++`arena/0fa5e3ce-fallout-2d20-companion`). Файл установки:
++`patchs/538-location-structure-admin.patch`.
++
++> Владелец: «При создании локации после названия можно сделать чекбокс
++> „Хаб"… две ячейки: чекбокс и пояснение… строки „Родительская локация" и
++> „Выход из локации"… под конструктором, где выбираются замки, кнопки "+" и
++> "/"… "+" — и, "/" — или… строка не может заканчиваться оператором… дерево
++> структуры: что за чем идёт, что чем заблокировано, что во что выходит;
++> нажатие на секцию открывает её настройки… локацию можно вложить в другую
++> локацию… пока только админская часть, окно игрока потом». Скрипт установки
++> владелец правит вручную сам.
++
++## Что меняется
++
++Это **реальный код**, но только админская часть. Окно просмотра локаций для
++игрока не входит в 538.
++
++| Файл | Что сделано |
++| --- | --- |
++| `server/accessExpression.js` | новый канонический модуль выражения И/ИЛИ (токены, чередование, приоритет `+` над `/`, оценка, форматирование, legacy-совместимость) |
++| `domain/accessExpression.js` | клиентская точка входа (реэкспорт канона) |
++| `domain/lootTrade.js` | `normalizeContainerEntity` хранит `accessExpression`, выводит `linkedCheckIds`/`linkedCheckId`; у локаций — `parentLocationId`, `exitLocationId`, `isCatalogHub` |
++| `server/keyAccess.js` | оценка выражения И/ИЛИ вместо принудительного ИЛИ (`gateExpressionPassed`, `hasGateChecks`) |
++| `server/terminalHacking.js`, `server/lootTradeSession.js`, `server/roomRegistry.js` | `accessExpression` доходит до сервера во всех нормализаторах и вызовах resolve |
++| `components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js` | новый конструктор: кнопки `+`/`/`, строка токенов, выбор операнда, блокировка некорректного порядка |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | конструктор вместо строки «ИЛИ»; чекбокс «Хаб» и строки родитель/выход; валидация завершённости и самоссылки |
++| `components/screens/LootTradeScreen/modals/LocationTreeModal.js` | новое дерево структуры с переходом в настройки секции |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | плитка «Структура локаций», матрёшка «локация в локацию» (`handleMoveCardIntoHub` для хабов, защита от циклов) |
++| `i18n/{ru-RU,en-EN}/screens/lootTrade/screen.json` | новые парные строки формы, действий и дерева |
++| `__tests__/room/location-structure-538.test.js` | новый приёмочный тест (20 проверок) |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 538, тезис 29, «Осталось после патча 538» |
++
++## Согласованные рабочие допущения
++
++- Выражение — массив токенов: операнд `{type:'check', id}` и оператор
++  `{type:'op', op}`; `+` = И, `/` = ИЛИ. Полное выражение нечётной длины,
++  строгое чередование, начинается и заканчивается операндом.
++- `+` связывает сильнее `/`, скобок нет: `A + B / C` = `(A И B) ИЛИ C`.
++- «Хаб» — булев флаг `isCatalogHub` на локации (`kind:'hub'`); поля
++  `parentLocationId`/`exitLocationId` хранятся только у локаций.
++- Лимит «две проверки» снят для выражения; legacy-поле `linkedCheckIds` в
++  сессионных нормализаторах по-прежнему ограничено двумя для старых читателей.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: полный набор зелёный (обновлены версионные защёлки под 538 и
++  исторические тесты, чей UI заменил конструктор).
++- `git apply --check` вперёд от дерева 537 и в обратную сторону от 538.
++- Заметки «Что нового» парные (137/137), на языке игрока, релиз остаётся 4.
++
++## Откат
++
++`git apply -R patchs/538-location-structure-admin.patch` вернёт код,
++словари и версию к состоянию 537.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index b0a8f94..3b8ffd3 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **537**.
++Дата ревизии: 2026-11-05. Текущая версия: **538**.
+ 
+ ## Тезисы
+ 
+@@ -40,8 +40,9 @@
+ | 26 | **Общая доска и общий журнал для привязанных комнат:** `terminalStates` и `accessEvents` объединены по контуру `roomCodes`, точки видны во всех комнатах контура, доска терминала (а не только замка) и события доступа расходятся вместе; автоблокировка 526 не возвращалась | ✅ сделано | **535** |
+ | 27 | **Взлом замка: два блока один под другим:** строка статуса разнесена на вертикальную колонку — сверху счётчик заколок, контейнер 1 «Правила» (описание мини-игры), контейнер 2 «Сведения» (сложность, LOCKPICK, навык/восприятие/удача). Текст подсказки не менялся, перенос описания сохранён; рамка блоков по образцу модалок | ✅ сделано | **536** |
+ | 28 | **Многоуровневые локации / левел-дизайн:** переходы между локациями, которые Мастер перекрывает вручную (обвал, ловушка, сигнализация — любой нарратив); взламываемый замок и глухая преграда, направленность проходов, «выхода назад нет». Без новых сущностей, карта и автоправила — задел на будущее. Проект готов, реализация после утверждения модели | 📐 проект | **537** |
++| 29 | **Структура локаций в админке:** строки «Родительская локация» и «Выход из локации», чекбокс «Хаб» после названия (2 ячейки: чекбокс + пояснение), дерево структуры с переходом в настройки секции, матрёшка «локация в локацию». Требование доступа — конструктор И/ИЛИ (`+` = И, `/` = ИЛИ), нельзя начать/закончить оператором; `+` связывает сильнее `/`. Только админка; окно игрока — следующим шагом | ✅ сделано (админка) | **538** |
+ 
+-## Осталось после патча 537
++## Осталось после патча 538
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -62,6 +63,15 @@
+ переприоритизация; код не менялся. Два оставшихся пункта тезиса 13 («ИЛИ»-
+ связывание второй строки проверки и «заблокировать всё» из карточки) владелец
+ отложил как неактуальные — приоритет у левел-дизайна (тезис 28).
++Патч 538 реализовал админскую часть структуры локаций (тезис 29): у локации
++появились «Родительская локация» и «Выход из локации», чекбокс «Хаб» сразу
++после названия и дерево структуры с переходом в настройки секции; локацию
++можно вложить в другую локацию (матрёшка). Требование доступа теперь
++собирается конструктором И/ИЛИ (`+` = И, `/` = ИЛИ) вместо принудительного
++«ИЛИ» — тем самым возобновлён и расширен отложенный пункт тезиса 13 про
++связывание проверки. Оператором нельзя начать или закончить выражение; «И»
++связывает сильнее «ИЛИ». Окно просмотра локаций для игрока сознательно не
++входило в 538 и остаётся следующим шагом.
+ Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+@@ -83,8 +93,9 @@
+    - ~~общая доска мини-игры и общий журнал событий для всех привязанных
+      комнат (`terminalStates` / `accessEvents`)~~ ✅ **535**;
+    - ~~ручное связывание второй строки «проверка» с уже созданными точками через
+-     «ИЛИ» и запрет повторного выбора источника взлома~~ ⏸ **отложено** (537,
+-     слово владельца: «не то чтобы прям актуальненько»);
++     «ИЛИ» и запрет повторного выбора источника взлома~~ ✅ **538** — возобновлено
++     владельцем и расширено до конструктора И/ИЛИ (`+` = И, `/` = ИЛИ), операндов
++     может быть больше двух;
+    - ~~«Заблокировать всё» с сохранением в карточке Мастера и выбор конкретного
+      узла из карточки, а не только из живой панели~~ ⏸ **отложено** (537);
+      вместо этого приоритет — переходы между локациями и ручная блокировка
+@@ -104,6 +115,19 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
++### Что осталось после 538 (структура локаций)
++
++- **Окно просмотра локаций для игрока** — админская часть готова в 538,
++  игрок пока не видит дерево/переходы; это следующий отдельный шаг.
++- **Переходы между локациями в игре** — модель `parentLocationId` /
++  `exitLocationId` хранится и редактируется, но сам переход (вход через
++  родителя, особый выход/телепорт) ещё не исполняется в сессии; ручная
++  блокировка прохода Мастером под любой нарратив — по модели тезиса 28
++  (`docs/location-level-design.md`), без автоправил.
++- **«Заблокировать всё» из карточки** — по-прежнему ⏸ отложено владельцем.
++- **Экспорт структуры в Owlbear** — задел на будущее: приложение-кампаньон
++  отдаёт данные из админки, карта внутри приложения не строится.
++
+ ## Граф пространств (реализовано в 523)
+ 
+ - Канон `server/locationGraph.js`, точка входа `domain/locationGraph.js`:
+diff --git a/domain/accessExpression.js b/domain/accessExpression.js
+new file mode 100644
+index 0000000..e318bd5
+--- /dev/null
++++ b/domain/accessExpression.js
+@@ -0,0 +1,8 @@
++'use strict';
++
++/**
++ * Патч 538: клиентская точка входа к требованиям доступа «И/ИЛИ».
++ * Канон живёт в `server/accessExpression.js` — лёгкий деплой NetAngels
++ * раскладывает в app/ только `server/` + `ws`, дубля правил нет.
++ */
++module.exports = require('../server/accessExpression.js');
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 5582517..a7b9bc5 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -9,6 +9,11 @@
+ 
+ import itemStacking from './itemStacking.js';
+ import locationGraph from './locationGraph.js';
++import {
++  normalizeAccessExpression,
++  expressionCheckIds,
++  resolveAccessExpression,
++} from './accessExpression.js';
+ import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
+ import {
+   AMMO_FOUND_BY_ID,
+@@ -771,11 +776,27 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+     keyRequirement: containerCanRequireKey(kind)
+       ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
+       : KEY_REQUIREMENT.NONE,
+-    linkedCheckIds: containerCanRequireKey(kind) ? normalizeLinkedCheckIds(raw) : [],
++    // Патч 538: требование доступа — выражение И/ИЛИ (+ = И, / = ИЛИ).
++    // Источник истины — accessExpression; linkedCheckIds остаётся списком
++    // операндов для старых читателей, linkedCheckId — первый операнд.
++    accessExpression: containerCanRequireKey(kind) ? resolveAccessExpression(raw) : [],
++    linkedCheckIds: containerCanRequireKey(kind)
++      ? expressionCheckIds(resolveAccessExpression(raw))
++      : [],
+     // Legacy-поле: первый источник. Старые карточки и сервер 516–519 читают его.
+     linkedCheckId: containerCanRequireKey(kind)
+-      ? normalizeLinkedCheckIds(raw)[0] || ''
++      ? (expressionCheckIds(resolveAccessExpression(raw))[0] || '')
++      : '',
++    // Патч 538: строки локации — родительская локация (вложенность/ветвление)
++    // и выход из локации (особый переход/телепорт, если ведёт не к родителю).
++    // Флаг «Хаб» помечает локацию-каталог для просмотра структуры деревом.
++    parentLocationId: kind === CONTAINER_KIND.HUB
++      ? String(raw.parentLocationId || '').trim()
++      : '',
++    exitLocationId: kind === CONTAINER_KIND.HUB
++      ? String(raw.exitLocationId || '').trim()
+       : '',
++    isCatalogHub: kind === CONTAINER_KIND.HUB ? Boolean(raw.isCatalogHub) : false,
+     createdAt: Number(raw.createdAt) || now,
+     updatedAt: Number(raw.updatedAt) || now,
+   };
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index a2b6947..65664f4 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -5,6 +5,7 @@
+     "createLoot": "Create\nContainer",
+     "createMerchant": "Create\nMerchant",
+     "createHub": "Create\nLocation",
++    "locationTree": "Location\nStructure",
+     "syncCloud": "Cloud sync",
+     "createTerminal": "Hacking terminal",
+     "createKeyItem": "Create key / note",
+@@ -97,6 +98,30 @@
+     "linkedCheckLock": "Lock",
+     "linkedCheckLevel": "lvl {difficulty}",
+     "linkedCheckSelected": "Selected: {count} of 2",
++    "accessExprLabel": "Gate: AND/OR condition",
++    "accessExprEmpty": "No condition set — the point is not locked by checks",
++    "accessOpAnd": "+  (AND)",
++    "accessOpOr": "/  (OR)",
++    "accessCheckSearchPlaceholder": "Search a check point (terminal or lock)",
++    "accessExprHint": "Build the condition: check points alternate with operators. '+' means AND (both required), '/' means OR (any one is enough). You cannot start or end with an operator. AND binds tighter than OR.",
++    "accessExprIncomplete": "The condition is unfinished: add a check point after the operator (you cannot end with '+' or '/').",
++    "accessExprReady": "The condition is ready to save.",
++    "locationSelfReference": "A location cannot be its own parent or exit.",
++    "locationCycle": "You cannot nest a location inside its own descendant — that would create a cycle.",
++    "locationTreeTitle": "Location structure",
++    "locationTreeEmpty": "No locations yet. Create a location and mark it as a Hub to see the tree.",
++    "locationTreeExitTo": "exit →",
++    "locationTreeBlockedBy": "blocked by:",
++    "locationTreeOpenSettings": "Open settings",
++    "locationTreeCatalogBadge": "hub",
++    "locationTreeChildren": "nested:",
++    "hubCatalogLabel": "Hub",
++    "hubCatalogHint": "A catalog location: a convenient tree of the structure — what follows what, what is blocked by what, what exits where. Tap a section to open its settings.",
++    "parentLocationLabel": "Parent location",
++    "parentLocationHint": "This location is contained inside another: you can enter it through the parent and return to the parent. This is how branching is built.",
++    "exitLocationLabel": "Exit from location",
++    "exitLocationHint": "Where the exit leads if it does not lead to the previous (parent) location: a special passage or a teleport.",
++    "locationNone": "— none —",
+     "lockPinEstimate": "Roughly {count} bobby pins at skill 0"
+   },
+   "detail": {
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index eae1022..cd8e28f 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -5,6 +5,7 @@
+     "createLoot": "Создать\nконтейнер",
+     "createMerchant": "Создать\nторговца",
+     "createHub": "Создать\nлокацию",
++    "locationTree": "Структура\nлокаций",
+     "syncCloud": "Синхронизация с облаком",
+     "createTerminal": "Терминал взлома",
+     "createKeyItem": "Создать ключ / записку",
+@@ -98,6 +99,30 @@
+     "linkedCheckLock": "Замок",
+     "linkedCheckLevel": "ур. {difficulty}",
+     "linkedCheckSelected": "Выбрано: {count} из 2",
++    "accessExprLabel": "Ворота: условие И/ИЛИ",
++    "accessExprEmpty": "Условие не задано — точка не заперта проверками",
++    "accessOpAnd": "+  (И)",
++    "accessOpOr": "/  (ИЛИ)",
++    "accessCheckSearchPlaceholder": "Поиск точки-проверки (терминал или замок)",
++    "accessExprHint": "Соберите условие: точки-проверки чередуются с операторами. «+» — И (нужны обе), «/» — ИЛИ (достаточно любой). Начать или закончить оператором нельзя. «И» связывает сильнее «ИЛИ».",
++    "accessExprIncomplete": "Условие не завершено: добавьте точку-проверку после оператора (нельзя закончить на «+» или «/»).",
++    "accessExprReady": "Условие готово к сохранению.",
++    "locationSelfReference": "Локация не может быть родителем или выходом самой себе.",
++    "locationCycle": "Нельзя вложить локацию в её собственного потомка — получится цикл.",
++    "locationTreeTitle": "Структура локаций",
++    "locationTreeEmpty": "Пока нет локаций. Создайте локацию и отметьте её как «Хаб», чтобы увидеть дерево.",
++    "locationTreeExitTo": "выход →",
++    "locationTreeBlockedBy": "заблокировано:",
++    "locationTreeOpenSettings": "Открыть настройки",
++    "locationTreeCatalogBadge": "хаб",
++    "locationTreeChildren": "вложено:",
++    "hubCatalogLabel": "Хаб",
++    "hubCatalogHint": "Локация-каталог: удобное дерево структуры — что за чем идёт, что чем заблокировано, что во что выходит. Нажмите на секцию, чтобы открыть её настройки.",
++    "parentLocationLabel": "Родительская локация",
++    "parentLocationHint": "Эта локация содержится внутри другой: в неё можно перейти через родителя и из неё в родителя. Так строится ветвление.",
++    "exitLocationLabel": "Выход из локации",
++    "exitLocationHint": "Куда ведёт выход, если он ведёт не в предыдущую (родительскую) локацию: особый переход или телепорт.",
++    "locationNone": "— нет —",
+     "lockPinEstimate": "Ориентировочно {count} отмычек при навыке 0"
+   },
+   "detail": {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 809044a..617c385 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "537"
++  "baseline": "538"
+ }
+diff --git a/public/version.json b/public/version.json
+index 2a08109..8b0983a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "537",
++  "version": "538",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+       "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
+       "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
+       "Счётчик заколок остаётся сверху заметным, а длинное описание правил по-прежнему переносится внутри окна и не уходит за его границы.",
+@@ -141,6 +142,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
+       "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",
+       "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",
+       "The bobby pin counter stays prominent at the top, and the long rules description still wraps inside the window instead of running past its edge.",
+diff --git a/server/accessExpression.js b/server/accessExpression.js
+new file mode 100644
+index 0000000..8849d7a
+--- /dev/null
++++ b/server/accessExpression.js
+@@ -0,0 +1,217 @@
++'use strict';
++
++// server/accessExpression.js
++// Патч 538: требования доступа «И/ИЛИ» вместо принудительного «ИЛИ».
++//
++// Слово владельца: «Запирание локации не принудительное "или", а возможность
++// выбора и/или… кнопки "+" и "/"… + — и, / — или… Замок 1 + = нельзя,
++// + Замок = нельзя, Замок + Терминал = можно, Замок / Терминал = можно».
++//
++// Выражение — чередующаяся последовательность токенов:
++//   { type: 'check', id }  — операнд (точка-проверка: терминал или замок);
++//   { type: 'op', op }     — оператор: '+' = И (AND), '/' = ИЛИ (OR).
++// Корректное выражение начинается и заканчивается операндом, операторы не
++// идут подряд и не стоят в начале/конце. Приоритет: «И» (+) связывает сильнее
++// «ИЛИ» (/), т.е. «A + B / C» = (A И B) ИЛИ C. Скобок нет (слово владельца).
++//
++// Обратная совместимость: старые карточки хранят linkedCheckIds (до двух,
++// ИЛИ). Из них собирается выражение со всеми операторами '/'. Новое поле
++// accessExpression имеет приоритет; linkedCheckIds остаётся списком операндов
++// для старых читателей.
++
++const ACCESS_OP = Object.freeze({ AND: '+', OR: '/' });
++
++const isNonEmptyId = (value) => String(value || '').trim().length > 0;
++
++const makeCheckToken = (id) => ({ type: 'check', id: String(id || '').trim() });
++const makeOpToken = (op) => ({ type: 'op', op: op === ACCESS_OP.AND ? ACCESS_OP.AND : ACCESS_OP.OR });
++
++/** Нормализация токена; возвращает null для мусора. */
++const normalizeAccessToken = (raw) => {
++  if (!raw || typeof raw !== 'object') return null;
++  if (raw.type === 'check' && isNonEmptyId(raw.id)) return makeCheckToken(raw.id);
++  if (raw.type === 'op' && (raw.op === ACCESS_OP.AND || raw.op === ACCESS_OP.OR)) {
++    return makeOpToken(raw.op);
++  }
++  return null;
++};
++
++/**
++ * Привести сырое выражение к массиву токенов. Принимает массив токенов,
++ * объект { tokens } или legacy-список linkedCheckIds (ИЛИ). Подряд идущие
++ * операнды или операторы отбрасываем как мусор (чередование обязательно);
++ * осознанный повтор операнда через оператор сохраняется.
++ */
++const normalizeAccessExpression = (raw) => {
++  let list = [];
++  if (Array.isArray(raw)) list = raw;
++  else if (raw && Array.isArray(raw.tokens)) list = raw.tokens;
++  else if (raw && Array.isArray(raw.linkedCheckIds)) {
++    // Legacy: список источников через ИЛИ.
++    const ids = raw.linkedCheckIds.filter(isNonEmptyId);
++    const tokens = [];
++    ids.forEach((id, idx) => {
++      if (idx > 0) tokens.push(makeOpToken(ACCESS_OP.OR));
++      tokens.push(makeCheckToken(id));
++    });
++    return tokens;
++  }
++  const out = [];
++  for (const item of list) {
++    const token = normalizeAccessToken(item);
++    if (!token) continue;
++    const prev = out[out.length - 1];
++    // Не допускаем два операнда или два оператора подряд.
++    if (prev && prev.type === token.type) continue;
++    out.push(token);
++  }
++  return out;
++};
++
++/** Выражение завершено: непустое, начинается и заканчивается операндом. */
++const isCompleteAccessExpression = (tokens) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (list.length === 0) return false;
++  if (list.length % 2 === 0) return false; // операндов на 1 больше, чем операторов
++  for (let i = 0; i < list.length; i += 1) {
++    const expected = i % 2 === 0 ? 'check' : 'op';
++    if (!list[i] || list[i].type !== expected) return false;
++    if (expected === 'check' && !isNonEmptyId(list[i].id)) return false;
++    if (expected === 'op' && list[i].op !== ACCESS_OP.AND && list[i].op !== ACCESS_OP.OR) return false;
++  }
++  return true;
++};
++
++/** Можно ли добавить операнд: пусто или последний токен — оператор. */
++const canAppendCheck = (tokens) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (list.length === 0) return true;
++  return list[list.length - 1].type === 'op';
++};
++
++/** Можно ли добавить оператор: последний токен — операнд. */
++const canAppendOp = (tokens) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (list.length === 0) return false;
++  return list[list.length - 1].type === 'check';
++};
++
++/** Добавить операнд (если можно). Возвращает новый массив. */
++const appendCheck = (tokens, id) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (!canAppendCheck(list) || !isNonEmptyId(id)) return list;
++  return [...list, makeCheckToken(id)];
++};
++
++/** Добавить оператор (если можно). Возвращает новый массив. */
++const appendOp = (tokens, op) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (!canAppendOp(list)) return list;
++  return [...list, makeOpToken(op)];
++};
++
++/** Убрать последний токен (шаг назад при сборке). */
++const removeLastToken = (tokens) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  return list.slice(0, -1);
++};
++
++/** Список id операндов (для legacy-поля linkedCheckIds и отображения). */
++const expressionCheckIds = (tokens) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  const seen = new Set();
++  const out = [];
++  for (const token of list) {
++    if (token?.type === 'check' && isNonEmptyId(token.id) && !seen.has(token.id)) {
++      seen.add(token.id);
++      out.push(token.id);
++    }
++  }
++  return out;
++};
++
++/**
++ * Вычислить выражение. `isPassed(id)` сообщает, пройдена ли проверка.
++ * Пустое/незавершённое выражение трактуем как «требования нет» → true.
++ * Приоритет: И (+) сильнее ИЛИ (/): дизъюнкция конъюнкций.
++ */
++const evaluateAccessExpression = (tokens, isPassed) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  if (list.length === 0) return true;
++  const passed = typeof isPassed === 'function' ? isPassed : () => false;
++  // Разбиваем на ИЛИ-группы; внутри группы — И.
++  let groupResult = true;
++  let anyGroupPassed = false;
++  let expectCheck = true;
++  for (const token of list) {
++    if (token?.type === 'check') {
++      if (!expectCheck) continue;
++      groupResult = groupResult && Boolean(passed(token.id));
++      expectCheck = false;
++    } else if (token?.type === 'op') {
++      if (expectCheck) continue;
++      if (token.op === ACCESS_OP.OR) {
++        anyGroupPassed = anyGroupPassed || groupResult;
++        groupResult = true;
++      }
++      // AND: продолжаем накапливать groupResult.
++      expectCheck = true;
++    }
++  }
++  anyGroupPassed = anyGroupPassed || groupResult;
++  return anyGroupPassed;
++};
++
++/** Человекочитаемая строка: «Замок 1 + Терминал 1». getName(id) → имя. */
++const formatAccessExpression = (tokens, getName) => {
++  const list = Array.isArray(tokens) ? tokens : [];
++  const name = typeof getName === 'function' ? getName : (id) => id;
++  return list.map((token) => (
++    token?.type === 'check' ? String(name(token.id) ?? token.id) : ` ${token.op} `
++  )).join('');
++};
++
++/** Legacy linkedCheckIds (ИЛИ) → выражение. */
++const linkedCheckIdsToExpression = (ids) => {
++  const list = (Array.isArray(ids) ? ids : []).filter(isNonEmptyId);
++  const tokens = [];
++  list.forEach((id, idx) => {
++    if (idx > 0) tokens.push(makeOpToken(ACCESS_OP.OR));
++    tokens.push(makeCheckToken(id));
++  });
++  return tokens;
++};
++
++/**
++ * Выбрать актуальное выражение точки: если есть валидное accessExpression —
++ * оно; иначе legacy linkedCheckIds/linkedCheckId (ИЛИ). Пустой массив = нет
++ * требования.
++ */
++const resolveAccessExpression = (raw = {}) => {
++  const explicit = normalizeAccessExpression(raw?.accessExpression);
++  if (explicit.length > 0) return explicit;
++  const legacyIds = [
++    ...(Array.isArray(raw?.linkedCheckIds) ? raw.linkedCheckIds : []),
++    raw?.linkedCheckId,
++  ].filter(isNonEmptyId);
++  return linkedCheckIdsToExpression(legacyIds);
++};
++
++module.exports = {
++  ACCESS_OP,
++  makeCheckToken,
++  makeOpToken,
++  normalizeAccessToken,
++  normalizeAccessExpression,
++  isCompleteAccessExpression,
++  canAppendCheck,
++  canAppendOp,
++  appendCheck,
++  appendOp,
++  removeLastToken,
++  expressionCheckIds,
++  evaluateAccessExpression,
++  formatAccessExpression,
++  linkedCheckIdsToExpression,
++  resolveAccessExpression,
++};
+diff --git a/server/keyAccess.js b/server/keyAccess.js
+index 62ca6f9..fc5edc0 100644
+--- a/server/keyAccess.js
++++ b/server/keyAccess.js
+@@ -10,6 +10,11 @@
+  * 3.3–3.4 и 7.3–7.4 `docs/key-items-and-gates-design.md`.
+  */
+ 
++const {
++  resolveAccessExpression,
++  evaluateAccessExpression,
++} = require('./accessExpression.js');
++
+ const KEY_ACCESS = Object.freeze({
+   NONE: 'none',                 // требования нет
+   OPEN_BY_KEY: 'open-by-key',   // ключ добыт: мини-игра не запускается
+@@ -50,10 +55,26 @@ const linkedCheckIdsOf = (requirement = {}) => {
+ /**
+  * Патч 520: если в требованиях указаны и терминал, и замок, они НЕ блокируют
+  * точку одновременно. Достаточно любого пройденного источника — «ИЛИ».
++ * Патч 538: legacy-ИЛИ сохранён как частный случай выражения из одних '/'.
+  */
+ const anyCheckPassed = (options, requirement) => linkedCheckIdsOf(requirement)
+   .some((id) => isCheckPassed(options, id));
+ 
++/**
++ * Патч 538: ворота-выражение И/ИЛИ. Источник истины — accessExpression
++ * (+ = И, / = ИЛИ); у старых карточек без него собирается legacy-ИЛИ из
++ * linkedCheckIds. Пустое выражение = требования нет (возвращаем false, а
++ * решение «требования нет» принимает resolveKeyAccess по длине списка).
++ */
++const gateExpressionPassed = (options, requirement) => {
++  const expression = resolveAccessExpression(requirement);
++  if (expression.length === 0) return false;
++  return evaluateAccessExpression(expression, (id) => isCheckPassed(options, id));
++};
++
++/** Есть ли у точки хоть одна проверка-операнд в требовании. */
++const hasGateChecks = (requirement) => resolveAccessExpression(requirement).length > 0;
++
+ const isCheckPassed = (sources, linkedCheckId) => {
+   const id = String(linkedCheckId || '').trim();
+   if (!id) return false;
+@@ -76,11 +97,11 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
+   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
+   if (!keyItemId) {
+     // Патч 517: ворота работают и без требования ключа.
+-    const linkedCheckIds = linkedCheckIdsOf(requirement);
+-    if (linkedCheckIds.length === 0) {
++    // Патч 538: выражение И/ИЛИ вместо принудительного ИЛИ.
++    if (!hasGateChecks(requirement)) {
+       return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
+     }
+-    return anyCheckPassed(options, requirement)
++    return gateExpressionPassed(options, requirement)
+       ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
+       : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
+   }
+@@ -90,7 +111,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
+   if (requirement.keyRequirement === 'required') {
+     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
+   }
+-  if (linkedCheckIdsOf(requirement).length > 0 && anyCheckPassed(options, requirement)) {
++  if (hasGateChecks(requirement) && gateExpressionPassed(options, requirement)) {
+     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
+   }
+   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
+@@ -112,6 +133,8 @@ module.exports = {
+   isCheckPassed,
+   linkedCheckIdsOf,
+   anyCheckPassed,
++  gateExpressionPassed,
++  hasGateChecks,
+   resolveKeyAccess,
+   isKeyAccessOpen,
+   isUnlockedByKey,
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index b4871ab..679a8fe 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -12,6 +12,7 @@ const {
+   effectiveItemWeight,
+ } = require('./itemStacking.js');
+ const locationGraph = require('./locationGraph.js');
++const { normalizeAccessExpression } = require('./accessExpression.js');
+ const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+ 
+@@ -194,6 +195,7 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+     keyRequirement: String(raw.keyRequirement || 'none'),
+     linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
++    accessExpression: normalizeAccessExpression(raw.accessExpression),
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
+     // Патч 519: терминал, привязанный к другой точке как замок, не должен
+@@ -286,6 +288,7 @@ const applyKeyAccessToSession = (session, resolve) => {
+       keyRequirement: target.keyRequirement,
+       linkedCheckIds: target.linkedCheckIds,
+       linkedCheckId: target.linkedCheckId,
++      accessExpression: target.accessExpression,
+     });
+     const state = decision?.state || 'none';
+     const restricted = state === 'denied' || state === 'needs-check';
+@@ -354,6 +357,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+     keyRequirement: String(raw.keyRequirement || 'none'),
+     linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
++    accessExpression: normalizeAccessExpression(raw.accessExpression),
+     // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
+     roomCodes: Array.isArray(raw.roomCodes)
+       ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 8f42dc0..44a055d 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -187,6 +187,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           keyRequirement: entry.config?.keyRequirement,
+           linkedCheckId: entry.config?.linkedCheckId,
+           linkedCheckIds: entry.config?.linkedCheckIds,
++          accessExpression: entry.config?.accessExpression,
+         });
+         entry.keyAccessState = decision.state;
+         entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
+@@ -900,6 +901,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         keyRequirement: node.keyRequirement,
+         linkedCheckId: node.linkedCheckId,
+         linkedCheckIds: node.linkedCheckIds,
++        accessExpression: node.accessExpression,
+       });
+       if (!config.containerId || !config.name) continue;
+       const previous = room.terminalStates.get(config.containerId);
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index afc09a4..2a5a23f 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -7,6 +7,7 @@
+ // словаря нужной длины СЛУЧАЙНО выбирается СЕКРЕТНОЕ СЛОВО, затем из того же
+ // словаря подбираются пустышки с разной степенью сходства (likeness).
+ const { getWordsByLength } = require('./terminalWords');
++const { normalizeAccessExpression } = require('./accessExpression.js');
+ 
+ // Ленивые геттеры сохраняют старый экспорт WORDS_BY_LENGTH для тестов и
+ // вызывающих, но не разворачивают все шесть файлов при импорте модуля.
+@@ -74,6 +75,8 @@ const normalizeTerminalConfig = (raw = {}) => ({
+   linkedCheckIds: Array.isArray(raw.linkedCheckIds)
+     ? raw.linkedCheckIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 2)
+     : [],
++  // Патч 538: выражение И/ИЛИ доходит до сервера вместе с конфигурацией.
++  accessExpression: normalizeAccessExpression(raw.accessExpression),
+ });
+ 
+ // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.

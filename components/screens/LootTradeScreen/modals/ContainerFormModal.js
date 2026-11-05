@@ -30,9 +30,14 @@ import {
   KEY_REQUIREMENT,
   normalizeKeyRequirement,
   containerCanRequireKey,
-  normalizeLinkedCheckIds,
 } from '../../../../domain/lootTrade';
 import { showRawAlert } from '../../../alerts/alertService';
+import AccessExpressionBuilder from './AccessExpressionBuilder';
+import {
+  resolveAccessExpression,
+  expressionCheckIds,
+  isCompleteAccessExpression,
+} from '../../../../domain/accessExpression';
 
 const EMPTY_ARRAY = Object.freeze([]);
 
@@ -79,10 +84,14 @@ const ContainerFormModal = ({
   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
   // Патч 514: две строки требования доступа (ключ + проверка).
   const [keyQuery, setKeyQuery] = useState('');
-  const [checkQuery, setCheckQuery] = useState('');
   const [requiredKeyItemId, setRequiredKeyItemId] = useState('');
   const [keyRequirement, setKeyRequirement] = useState(KEY_REQUIREMENT.NONE);
-  const [linkedCheckIds, setLinkedCheckIds] = useState([]);
+  // Патч 538: требование доступа — выражение И/ИЛИ (токены), а не список ИЛИ.
+  const [accessTokens, setAccessTokens] = useState([]);
+  // Патч 538: строки локации — родитель, особый выход и флаг «Хаб»-каталога.
+  const [parentLocationId, setParentLocationId] = useState('');
+  const [exitLocationId, setExitLocationId] = useState('');
+  const [isCatalogHub, setIsCatalogHub] = useState(false);
 
   useEffect(() => {
     if (!initSessionKey) return;
@@ -122,10 +131,12 @@ const ContainerFormModal = ({
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
     ));
     setKeyQuery('');
-    setCheckQuery('');
     setRequiredKeyItemId(String(initialContainer?.requiredKeyItemId || '').trim());
     setKeyRequirement(normalizeKeyRequirement(initialContainer?.keyRequirement));
-    setLinkedCheckIds(normalizeLinkedCheckIds(initialContainer || {}));
+    setAccessTokens(resolveAccessExpression(initialContainer || {}));
+    setParentLocationId(String(initialContainer?.parentLocationId || '').trim());
+    setExitLocationId(String(initialContainer?.exitLocationId || '').trim());
+    setIsCatalogHub(Boolean(initialContainer?.isCatalogHub));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initSessionKey]);
 
@@ -135,28 +146,12 @@ const ContainerFormModal = ({
       .filter((k) => !q || String(k?.name || '').toLowerCase().includes(q));
   }, [availableKeyItems, keyQuery]);
 
-  const filteredChecks = useMemo(() => {
-    const q = checkQuery.trim().toLowerCase();
-    return (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
-      .filter((c) => c?.id && (!q || String(c?.name || '').toLowerCase().includes(q)));
-  }, [availableCheckContainers, checkQuery]);
-
-  // Патч 520: вторая строка требования — до двух точек через «ИЛИ».
-  // Терминал и замок вместе точку не блокируют: хватает любой проверки.
-  const selectedChecks = useMemo(
-    () => linkedCheckIds
-      .map((id) => (Array.isArray(availableCheckContainers) ? availableCheckContainers : [])
-        .find((c) => c?.id === id))
-      .filter(Boolean),
-    [linkedCheckIds, availableCheckContainers],
-  );
-  const toggleLinkedCheck = (id) => {
-    setLinkedCheckIds((prev) => {
-      if (prev.includes(id)) return prev.filter((item) => item !== id);
-      if (prev.length >= 2) return [prev[1], id];
-      return [...prev, id];
-    });
-  };
+  // Патч 538: локации-кандидаты на роль родителя/выхода (кроме самой себя).
+  const locationOptions = useMemo(() => {
+    const selfId = String(initialContainer?.id || '');
+    return (Array.isArray(availableHubs) ? availableHubs : [])
+      .filter((h) => h?.id && h.id !== selfId);
+  }, [availableHubs, initialContainer?.id]);
 
   const combinedHubs = useMemo(() => {
     const map = new Map();
@@ -266,6 +261,18 @@ const ContainerFormModal = ({
       showRawAlert({ title: tLootTrade('form.validationRoom') });
       return;
     }
+    // Патч 538: выражение И/ИЛИ нельзя сохранить незавершённым («Замок 1 +»).
+    if (canRequireKey && accessTokens.length > 0 && !isCompleteAccessExpression(accessTokens)) {
+      showRawAlert({ title: tLootTrade('form.accessExprIncomplete') });
+      return;
+    }
+    // Патч 538: родитель и выход локации не могут указывать на саму себя.
+    if (isHub && initialContainer?.id) {
+      if (parentLocationId === initialContainer.id || exitLocationId === initialContainer.id) {
+        showRawAlert({ title: tLootTrade('form.locationSelfReference') });
+        return;
+      }
+    }
 
     let finalSelectedHubIds = selectedHubIds;
     if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
@@ -310,8 +317,15 @@ const ContainerFormModal = ({
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
         requiredKeyItemId: canRequireKey ? requiredKeyItemId : '',
         keyRequirement: canRequireKey && requiredKeyItemId ? keyRequirement : KEY_REQUIREMENT.NONE,
-        linkedCheckIds: canRequireKey ? linkedCheckIds : [],
-        linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '') : '',
+        // Патч 538: выражение И/ИЛИ — источник истины; linkedCheckIds остаётся
+        // списком операндов для старых читателей.
+        accessExpression: canRequireKey ? accessTokens : [],
+        linkedCheckIds: canRequireKey ? expressionCheckIds(accessTokens) : [],
+        linkedCheckId: canRequireKey ? (expressionCheckIds(accessTokens)[0] || '') : '',
+        // Патч 538: строки локации (родитель / особый выход / «Хаб»-каталог).
+        parentLocationId: isHub ? parentLocationId : '',
+        exitLocationId: isHub ? exitLocationId : '',
+        isCatalogHub: isHub ? isCatalogHub : false,
       },
       capsRollInfo,
       isHub ? null : finalSelectedHubIds,
@@ -370,6 +384,77 @@ const ContainerFormModal = ({
 
             {isHub ? (
               <>
+                {/* Патч 538: чекбокс «Хаб» — локация-каталог для просмотра деревом. */}
+                <TouchableOpacity
+                  testID="container-form-hub-catalog"
+                  style={styles.checkboxRow}
+                  onPress={() => setIsCatalogHub((v) => !v)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isCatalogHub }}
+                >
+                  <MaterialCommunityIcons
+                    name={isCatalogHub ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={22}
+                    color={isCatalogHub ? ADMIN_MODAL_PALETTE.text : ADMIN_MODAL_PALETTE.mutedText}
+                  />
+                  <Text style={styles.checkboxLabel}>{tLootTrade('form.hubCatalogLabel')}</Text>
+                </TouchableOpacity>
+                <Text style={styles.hintText}>{tLootTrade('form.hubCatalogHint')}</Text>
+
+                {/* Патч 538: строка 1 — родительская локация (вложенность/ветвление). */}
+                <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
+                <View style={styles.roomChips}>
+                  <TouchableOpacity
+                    testID="container-form-parent-none"
+                    style={[styles.roomChip, !parentLocationId && styles.roomChipActive]}
+                    onPress={() => setParentLocationId('')}
+                  >
+                    <Text style={[styles.roomChipName, !parentLocationId && styles.roomChipTextActive]}>
+                      {tLootTrade('form.locationNone')}
+                    </Text>
+                  </TouchableOpacity>
+                  {locationOptions.map((hub) => (
+                    <TouchableOpacity
+                      key={hub.id}
+                      testID={`container-form-parent-${hub.id}`}
+                      style={[styles.roomChip, parentLocationId === hub.id && styles.roomChipActive]}
+                      onPress={() => setParentLocationId(hub.id)}
+                    >
+                      <Text style={[styles.roomChipName, parentLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
+                        {hub.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
+
+                {/* Патч 538: строка 2 — выход из локации (особый переход/телепорт). */}
+                <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
+                <View style={styles.roomChips}>
+                  <TouchableOpacity
+                    testID="container-form-exit-none"
+                    style={[styles.roomChip, !exitLocationId && styles.roomChipActive]}
+                    onPress={() => setExitLocationId('')}
+                  >
+                    <Text style={[styles.roomChipName, !exitLocationId && styles.roomChipTextActive]}>
+                      {tLootTrade('form.locationNone')}
+                    </Text>
+                  </TouchableOpacity>
+                  {locationOptions.map((hub) => (
+                    <TouchableOpacity
+                      key={hub.id}
+                      testID={`container-form-exit-${hub.id}`}
+                      style={[styles.roomChip, exitLocationId === hub.id && styles.roomChipActive]}
+                      onPress={() => setExitLocationId(hub.id)}
+                    >
+                      <Text style={[styles.roomChipName, exitLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
+                        {hub.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
+
                 <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
                 {availableRooms.length === 0 ? (
                   <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
@@ -697,52 +782,13 @@ const ContainerFormModal = ({
                   </TouchableOpacity>
                 )}
 
-                <Text style={styles.label}>{tLootTrade('form.linkedCheckLabel')}</Text>
-                <TextInput
-                  testID="container-form-check-search"
-                  style={styles.input}
-                  value={checkQuery}
-                  onChangeText={setCheckQuery}
-                  placeholder={tLootTrade('form.linkedCheckSearchPlaceholder')}
-                  placeholderTextColor="#8c8c8c"
+                {/* Патч 538: требование доступа — конструктор И/ИЛИ (+ = И, / = ИЛИ). */}
+                <Text style={styles.label}>{tLootTrade('form.accessExprLabel')}</Text>
+                <AccessExpressionBuilder
+                  tokens={accessTokens}
+                  onChange={setAccessTokens}
+                  availableChecks={availableCheckContainers}
                 />
-                <View style={styles.roomChips}>
-                  {filteredChecks.length === 0 ? (
-                    <Text style={styles.hintText}>{tLootTrade('form.linkedCheckEmpty')}</Text>
-                  ) : filteredChecks.map((check) => {
-                    const selected = linkedCheckIds.includes(check.id);
-                    return (
-                      <TouchableOpacity
-                        key={check.id}
-                        testID={`container-form-check-${check.id}`}
-                        style={[styles.roomChip, selected && styles.roomChipActive]}
-                        onPress={() => toggleLinkedCheck(check.id)}
-                      >
-                        <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]} numberOfLines={1}>
-                          {check.name}
-                        </Text>
-                        <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
-                          {check.kindLabel || tLootTrade('form.linkedCheckTerminal')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                {selectedChecks.length > 0 && (
-                  <View testID="container-form-linked-check-rows" style={styles.roomChips}>
-                    {selectedChecks.map((check, idx) => (
-                      <View key={check.id} style={styles.roomChips}>
-                        {idx > 0 && (
-                          <Text style={styles.hintText}>{tLootTrade('form.linkedCheckOr')}</Text>
-                        )}
-                        <Text testID={`linked-check-row-${idx + 1}`} style={styles.roomChipName}>
-                          {`${idx + 1}. ${check.name}`}
-                          {check.kindLabel ? ` · ${check.kindLabel}` : ''}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
                 {(isTerminal || isLock) && (
                   <Text testID="container-form-lock-pin-estimate" style={styles.hintText}>
                     {formatLootTrade(tLootTrade('form.lockPinEstimate'), {
@@ -750,10 +796,6 @@ const ContainerFormModal = ({
                     })}
                   </Text>
                 )}
-                <Text style={styles.hintText}>{tLootTrade('form.linkedCheckHint')}</Text>
-                <Text style={styles.hintText}>
-                  {formatLootTrade(tLootTrade('form.linkedCheckSelected'), { count: linkedCheckIds.length })}
-                </Text>
               </>
             )}
 

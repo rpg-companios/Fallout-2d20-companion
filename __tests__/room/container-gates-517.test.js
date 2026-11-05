@@ -116,7 +116,10 @@ describe('517: связи видны Мастеру и план обновлён
   it('вторая строка формы выбирает любые точки, а не только терминалы', () => {
     expect(screen).toContain('availableCheckContainers={gateSources}');
     expect(screen).toContain('gateSources');
+    // Патч 538: выбор точек-проверок переехал в конструктор И/ИЛИ.
     expect(read('components/screens/LootTradeScreen/modals/ContainerFormModal.js'))
+      .toContain('<AccessExpressionBuilder');
+    expect(read('components/screens/LootTradeScreen/modals/AccessExpressionBuilder.js'))
       .toContain('check.kindLabel');
   });
 

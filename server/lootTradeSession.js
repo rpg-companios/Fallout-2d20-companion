@@ -12,6 +12,7 @@ const {
   effectiveItemWeight,
 } = require('./itemStacking.js');
 const locationGraph = require('./locationGraph.js');
+const { normalizeAccessExpression } = require('./accessExpression.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
 
@@ -194,6 +195,7 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
     keyRequirement: String(raw.keyRequirement || 'none'),
     linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+    accessExpression: normalizeAccessExpression(raw.accessExpression),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
     // Патч 519: терминал, привязанный к другой точке как замок, не должен
@@ -286,6 +288,7 @@ const applyKeyAccessToSession = (session, resolve) => {
       keyRequirement: target.keyRequirement,
       linkedCheckIds: target.linkedCheckIds,
       linkedCheckId: target.linkedCheckId,
+      accessExpression: target.accessExpression,
     });
     const state = decision?.state || 'none';
     const restricted = state === 'denied' || state === 'needs-check';
@@ -354,6 +357,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
     keyRequirement: String(raw.keyRequirement || 'none'),
     linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+    accessExpression: normalizeAccessExpression(raw.accessExpression),
     // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
     roomCodes: Array.isArray(raw.roomCodes)
       ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]

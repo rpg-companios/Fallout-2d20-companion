@@ -187,6 +187,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           keyRequirement: entry.config?.keyRequirement,
           linkedCheckId: entry.config?.linkedCheckId,
           linkedCheckIds: entry.config?.linkedCheckIds,
+          accessExpression: entry.config?.accessExpression,
         });
         entry.keyAccessState = decision.state;
         entry.keyUnlocked = decision.state === KEY_ACCESS.OPEN_BY_KEY;
@@ -900,6 +901,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         keyRequirement: node.keyRequirement,
         linkedCheckId: node.linkedCheckId,
         linkedCheckIds: node.linkedCheckIds,
+        accessExpression: node.accessExpression,
       });
       if (!config.containerId || !config.name) continue;
       const previous = room.terminalStates.get(config.containerId);

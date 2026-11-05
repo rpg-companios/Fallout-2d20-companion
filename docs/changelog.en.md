@@ -1,6 +1,36 @@
 # Changelog
 ---
 
+## Location structure in the admin side (patch 538)
+
+The admin part of the location structure is implemented (thesis 29). The
+player's location-view window is deliberately deferred to the next step.
+
+- **Two new rows in the location form.** "Parent location" — this location is
+  contained inside another: you can enter it through the parent and return.
+  "Exit from location" — where the exit leads if it does not lead to the
+  previous location: a special passage or a teleport. This is how branching
+  is built.
+- **Access requirement is an AND/OR builder.** Under the check-point picker
+  there are now `+` (AND) and `/` (OR) buttons: the row reads like "Lock 1 +
+  Terminal 1" or "Lock 1 / Terminal 1". You cannot start or end with an
+  operator ("Lock 1 +" and "+ Lock" are invalid). AND binds tighter than OR:
+  `A + B / C` = `(A AND B) OR C`. There can be more than two operands.
+- **A "Hub" checkbox after the name** — two cells (checkbox + explanation).
+  A catalog location is for conveniently viewing the structure as a tree.
+- **Location structure tree** — a separate "Location Structure" tile on the
+  grid: what follows what, what is blocked by what, what exits where. Tapping
+  any node opens that section's settings.
+- **Matryoshka "location into location".** Moving a location into another
+  makes it a child (`parentLocationId`); a lock/terminal inside a location
+  stays its child element. Cycles are forbidden.
+- **Compatibility.** The expression is stored in `accessExpression` and
+  reaches the server (`keyAccess`, `terminalHacking`, `lootTradeSession`,
+  `roomRegistry`); the legacy `linkedCheckIds`/`linkedCheckId` fields are
+  derived from it, and old saves with forced OR still read as before.
+
+---
+
 ## Multi-level locations and passages — design (patch 537)
 
 The owner shifted priorities: the one-off "OR" linking of the second check row

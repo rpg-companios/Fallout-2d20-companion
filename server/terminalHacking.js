@@ -7,6 +7,7 @@
 // словаря нужной длины СЛУЧАЙНО выбирается СЕКРЕТНОЕ СЛОВО, затем из того же
 // словаря подбираются пустышки с разной степенью сходства (likeness).
 const { getWordsByLength } = require('./terminalWords');
+const { normalizeAccessExpression } = require('./accessExpression.js');
 
 // Ленивые геттеры сохраняют старый экспорт WORDS_BY_LENGTH для тестов и
 // вызывающих, но не разворачивают все шесть файлов при импорте модуля.
@@ -74,6 +75,8 @@ const normalizeTerminalConfig = (raw = {}) => ({
   linkedCheckIds: Array.isArray(raw.linkedCheckIds)
     ? raw.linkedCheckIds.map((id) => String(id || '').trim()).filter(Boolean).slice(0, 2)
     : [],
+  // Патч 538: выражение И/ИЛИ доходит до сервера вместе с конфигурацией.
+  accessExpression: normalizeAccessExpression(raw.accessExpression),
 });
 
 // CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.

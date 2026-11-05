@@ -322,7 +322,8 @@ describe('520: пятая карточка и документы', () => {
     });
     expect(standalone.kind).toBe('lock');
     expect(standalone.difficulty).toBe(5);
-    expect(standalone.linkedCheckIds).toEqual(['t1', 'x1']); // максимум две строки
+    // Патч 538: лимит «две строки» снят — выражение хранит все операнды.
+    expect(standalone.linkedCheckIds).toEqual(['t1', 'x1', 'x2']);
     expect(standalone.linkedCheckId).toBe('t1');
     const node = buildStandaloneLockSessionNode(standalone);
     expect(node.kind).toBe(CONTAINER_KIND.LOCK);
@@ -338,12 +339,12 @@ describe('520: пятая карточка и документы', () => {
     expect(nodes[0].linkedCheckIds).toEqual(['t1', 'x1']);
   });
 
-  it('форма и экран Мастера показывают две строки и плитку создания', () => {
+  it('форма и экран Мастера показывают конструктор И/ИЛИ и плитку создания', () => {
     const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
-    expect(form).toContain('container-form-linked-check-rows');
-    expect(form).toContain('linked-check-row-');
-    expect(form).toContain("tLootTrade('form.linkedCheckOr')");
-    expect(form).toContain('normalizeLinkedCheckIds');
+    // Патч 538: две строки ИЛИ заменены конструктором выражения (+ = И, / = ИЛИ).
+    expect(form).toContain('<AccessExpressionBuilder');
+    expect(form).toContain("tLootTrade('form.accessExprLabel')");
+    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
     expect(screen).toContain('createLock');
     expect(screen).toContain("iconName=\"lock\"");

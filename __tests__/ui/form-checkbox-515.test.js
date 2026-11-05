@@ -41,8 +41,9 @@ describe('515: чекбокс обязательности', () => {
 describe('515: описание в конце формы', () => {
   it('в форме контейнера описание после всех настроек', () => {
     const descAt = form.indexOf('testID="container-form-description"');
-    const checkAt = form.indexOf('container-form-check-search');
-    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
+    // Патч 538: строку проверок заменил конструктор И/ИЛИ (AccessExpressionBuilder).
+    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
+    const hintAt = form.indexOf('<AccessExpressionBuilder');
     expect(descAt).toBeGreaterThan(-1);
     expect(descAt).toBeGreaterThan(checkAt);
     expect(descAt).toBeGreaterThan(hintAt);
