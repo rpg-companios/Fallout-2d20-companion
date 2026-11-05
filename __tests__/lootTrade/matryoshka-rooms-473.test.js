@@ -327,8 +327,9 @@ describe('Patch 473 — Matryoshka organization, sorting, multi-room Locations &
     expect(idxHub).toBeLessThan(idxLoot);
     expect(idxLoot).toBeLessThan(idxMerch);
 
-    // 2. Внутри локации сохранён текстовый список hubChildRow + вынос на экран, а на корне есть PanResponder перетаскивания
-    expect(lootScreenSrc).toContain('styles.hubChildRow');
+    // 2. Внутри локации содержимое — дерево (патч 539 заменил плоский список
+    //    hubChildRow на HubTreeView) + вынос на экран, а на корне есть PanResponder перетаскивания
+    expect(lootScreenSrc).toContain('<HubTreeView');
     expect(lootScreenSrc).toContain('handleMoveChildOutToRoot');
     expect(lootScreenSrc).toContain('handleMoveCardIntoHub');
     expect(lootScreenSrc).toContain('analyzeHubDeletion');

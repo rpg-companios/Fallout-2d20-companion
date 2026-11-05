@@ -1,0 +1,1897 @@
+diff --git a/__tests__/installer/baseline-sync-patchs-493.test.js b/__tests__/installer/baseline-sync-patchs-493.test.js
+index 47afb54..b151af9 100644
+--- a/__tests__/installer/baseline-sync-patchs-493.test.js
++++ b/__tests__/installer/baseline-sync-patchs-493.test.js
+@@ -10,7 +10,7 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
+-const BRANCH = 'arena/054e6676-fallout-2d20-companion';
++const BRANCH = 'arena/0fa5e3ce-fallout-2d20-companion';
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+diff --git a/__tests__/installer/cleanup-gitlinks-460.test.js b/__tests__/installer/cleanup-gitlinks-460.test.js
+index b795639..865418f 100644
+--- a/__tests__/installer/cleanup-gitlinks-460.test.js
++++ b/__tests__/installer/cleanup-gitlinks-460.test.js
+@@ -73,7 +73,7 @@ describe('Патч 460: уборка неиспользуемых папок/ф
+       const subSha = git(subRepo, ['rev-parse', 'HEAD']).trim();
+ 
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/054e6676-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, '.kiro/specs/old'), { recursive: true });
+diff --git a/__tests__/installer/concise-installer-output-455.test.js b/__tests__/installer/concise-installer-output-455.test.js
+index 56bf454..36308a7 100644
+--- a/__tests__/installer/concise-installer-output-455.test.js
++++ b/__tests__/installer/concise-installer-output-455.test.js
+@@ -36,7 +36,7 @@ describe('Патч 455: лаконичный отчёт apply-patch.sh и явн
+ 
+     try {
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/054e6676-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+diff --git a/__tests__/installer/preserve-owner-commits-464.test.js b/__tests__/installer/preserve-owner-commits-464.test.js
+index 77b97a7..79623a8 100644
+--- a/__tests__/installer/preserve-owner-commits-464.test.js
++++ b/__tests__/installer/preserve-owner-commits-464.test.js
+@@ -52,7 +52,7 @@ describe('Патч 464: восстановление ghoul.png из 39bb559 и 
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'modules/fallout/assets/origins'), { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/054e6676-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
+ 
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+       fs.writeFileSync(path.join(upstream, 'modules/fallout/assets/origins/survivor.png'), 'arena-survivor-v1');
+diff --git a/__tests__/lootTrade/matryoshka-rooms-473.test.js b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+index a8b8e17..344c663 100644
+--- a/__tests__/lootTrade/matryoshka-rooms-473.test.js
++++ b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+@@ -327,8 +327,9 @@ describe('Patch 473 — Matryoshka organization, sorting, multi-room Locations &
+     expect(idxHub).toBeLessThan(idxLoot);
+     expect(idxLoot).toBeLessThan(idxMerch);
+ 
+-    // 2. Внутри локации сохранён текстовый список hubChildRow + вынос на экран, а на корне есть PanResponder перетаскивания
+-    expect(lootScreenSrc).toContain('styles.hubChildRow');
++    // 2. Внутри локации содержимое — дерево (патч 539 заменил плоский список
++    //    hubChildRow на HubTreeView) + вынос на экран, а на корне есть PanResponder перетаскивания
++    expect(lootScreenSrc).toContain('<HubTreeView');
+     expect(lootScreenSrc).toContain('handleMoveChildOutToRoot');
+     expect(lootScreenSrc).toContain('handleMoveCardIntoHub');
+     expect(lootScreenSrc).toContain('analyzeHubDeletion');
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index d5e874c..84cfa9a 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,21 +255,23 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('538');
++    expect(version.version).toBe('539');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(137);
+-    expect(version.notes['en-EN']).toHaveLength(137);
+-    expect(json('patchs/baseline.json').baseline).toBe('538');
++    expect(version.notes['ru-RU']).toHaveLength(138);
++    expect(version.notes['en-EN']).toHaveLength(138);
++    expect(json('patchs/baseline.json').baseline).toBe('539');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
++    expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **538**');
++    expect(roadmap).toContain('Текущая версия: **539**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+-    expect(roadmap).toContain('Осталось после патча 538');
+-    expect(read('docs/patch-538-install.md')).toContain('538');
++    expect(roadmap).toContain('| 30 |');
++    expect(roadmap).toContain('Осталось после патча 539');
++    expect(read('docs/patch-539-install.md')).toContain('539');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hub-folder-tree-539.test.js b/__tests__/room/hub-folder-tree-539.test.js
+new file mode 100644
+index 0000000..62c3b66
+--- /dev/null
++++ b/__tests__/room/hub-folder-tree-539.test.js
+@@ -0,0 +1,152 @@
++// Приёмочный тест 539: хаб — сам папка-дерево (без отдельной карточки
++// «Структура локаций»). Внутри хаба — дерево вложенного: локации-спойлеры,
++// пунктирные линии зависимостей; узел открывает настройки. Родитель/выход —
++// выпадающие списки; у хаба-папки их нет. Локации таскаются стрелками и
++// вкладываются друг в друга, как папки в Windows. Ключ и замок/терминал —
++// отдельные поля с понятными подписями; И/ИЛИ = обе преграды или одна из них.
++import { describe, expect, it } from 'vitest';
++import { readFileSync, existsSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const exists = (rel) => existsSync(path.join(ROOT, rel));
++
++describe('539: отдельной карточки «Структура локаций» больше нет', () => {
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  it('плитка, состояние и модальное окно дерева убраны', () => {
++    expect(screen).not.toContain("type: 'locationTree'");
++    expect(screen).not.toContain('locationTreeOpen');
++    expect(screen).not.toContain('LocationTreeModal');
++    expect(exists('components/screens/LootTradeScreen/modals/LocationTreeModal.js')).toBe(false);
++  });
++  it('дерево живёт внутри самого хаба', () => {
++    expect(screen).toContain('<HubTreeView');
++    expect(screen).toContain('hub={activeContainer}');
++    expect(screen).toContain("tLootTrade('detail.locationsInside')");
++    expect(screen).toContain('setFormModal({ kind: container.kind, initialContainer: container })');
++  });
++});
++
++describe('539: дерево вложенного — спойлеры и пунктирные зависимости', () => {
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++  it('локации раскрываются спойлерами, узел открывает настройки', () => {
++    expect(tree).toContain('testID={`hub-tree-toggle-${container.id}`}');
++    expect(tree).toContain('testID={`hub-tree-node-${container.id}`}');
++    expect(tree).toContain('chevron-down');
++    expect(tree).toContain('chevron-right');
++    expect(tree).toContain('onOpenSettings');
++  });
++  it('пунктирные линии показывают, что от чего зависит', () => {
++    expect(tree).toContain("borderStyle: 'dashed'");
++    expect(tree).toContain("tLootTrade('form.locationTreeBlockedBy')");
++    expect(tree).toContain("tLootTrade('form.locationTreeKey')");
++    expect(tree).toContain("tLootTrade('form.locationTreeExitTo')");
++  });
++  it('дети = вложенные локации (parentLocationId) + узлы из links, без дублей', () => {
++    expect(tree).toContain('const childrenOf');
++    expect(tree).toContain('parentLocationId');
++    expect(tree).toContain('node.links');
++    expect(tree).toContain('seen.has(c.id)');
++    // Игровой путь не ломается: ссылки links остаются нетронутыми.
++    expect(tree).not.toContain('saveGmContainer');
++    expect(tree).not.toContain('links:');
++  });
++  it('вложенную локацию можно вынуть обратно на корень', () => {
++    expect(tree).toContain('onMoveNestedOut');
++    expect(tree).toContain('testID={`hub-tree-move-nested-out-${container.id}`}');
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(screen).toContain('const handleMoveNestedLocationOut');
++    expect(screen).toContain("parentLocationId: '', inRoot: true");
++    expect(screen).toContain('onMoveNestedOut={handleMoveNestedLocationOut}');
++  });
++});
++
++describe('539: родитель и выход — выпадающие списки, не кнопки', () => {
++  const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++  const select = read('components/screens/LootTradeScreen/modals/LocationSelect.js');
++  it('форма использует LocationSelect для родителя и выхода', () => {
++    expect(form).toContain("import LocationSelect from './LocationSelect'");
++    expect(form).toContain('testID="container-form-parent"');
++    expect(form).toContain('testID="container-form-exit"');
++    // Старые стены чипов убраны.
++    expect(form).not.toContain('testID={`container-form-parent-${hub.id}`}');
++    expect(form).not.toContain('testID={`container-form-exit-${hub.id}`}');
++  });
++  it('список прокручивается, ищется и содержит вариант «нет»', () => {
++    expect(select).toContain('ScrollView');
++    expect(select).toContain('nestedScrollEnabled');
++    expect(select).toContain("tLootTrade('form.locationSearchPlaceholder')");
++    expect(select).toContain("tLootTrade('form.locationNone')");
++    expect(select).toContain('allowNone');
++  });
++  it('у хаба-папки родителя и выхода нет — он сам родитель', () => {
++    expect(form).toContain('{!isCatalogHub && (');
++    expect(form).toContain("tLootTrade(isCatalogHub ? 'form.hubFolderHint' : 'form.hubCatalogHint')");
++    // Комнаты остаются: хабы определяют серверные комнаты.
++    expect(form).toContain("tLootTrade('form.roomsMultiLabel')");
++  });
++});
++
++describe('539: локации таскаются стрелками и вкладываются друг в друга', () => {
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  it('стрелки переноса есть и у локаций-хабов', () => {
++    expect(screen).toContain('{onDragStart && (');
++    expect(screen).not.toContain('{!isHub && onDragStart && (');
++  });
++  it('handleDragStart больше не отбрасывает хабы', () => {
++    expect(screen).toContain('if (!card) return;');
++    expect(screen).not.toContain('if (!card || card.kind === CONTAINER_KIND.HUB) return;');
++  });
++  it('бросок на самого себя исключён, цикл матрёшки запрещён и снимает призрак', () => {
++    expect(screen).toContain('id !== movingContainerId');
++    expect(screen).toContain('wouldCreateParentCycle');
++    expect(screen).toContain("tLootTrade('form.locationCycle')");
++  });
++});
++
++describe('539: ключ и замок/терминал — отдельные понятные поля', () => {
++  const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++  it('у локации ключ и замок/терминал подписаны по-человечески', () => {
++    expect(form).toContain("tLootTrade(isHub ? 'form.locationKeyLabel' : 'form.keyRequirementLabel')");
++    expect(form).toContain("tLootTrade(isHub ? 'form.locationGateLabel' : 'form.accessExprLabel')");
++    expect(form).toContain("tLootTrade('form.locationGateHint')");
++  });
++  it('конструктор И/ИЛИ сохранён и выражение уходит в сохранение', () => {
++    expect(form).toContain('<AccessExpressionBuilder');
++    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
++    expect(form).toContain('isCompleteAccessExpression(accessTokens)');
++  });
++});
++
++describe('539: парные RU/EN строки', () => {
++  const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++  const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++  it('новые ключи есть в обоих языках', () => {
++    const formKeys = [
++      'locationSearchPlaceholder', 'locationNoMatch', 'hubFolderHint',
++      'locationKeyLabel', 'locationGateLabel', 'locationGateHint',
++      'locationTreeKey', 'locationTreeEmptyNode',
++    ];
++    for (const key of formKeys) {
++      expect(ru.form[key], `ru.form.${key}`).toBeTruthy();
++      expect(en.form[key], `en.form.${key}`).toBeTruthy();
++    }
++    expect(ru.detail.locationsInside).toBeTruthy();
++    expect(en.detail.locationsInside).toBeTruthy();
++  });
++  it('ключи отдельной карточки дерева убраны из обоих языков', () => {
++    expect(ru.actions.locationTree).toBeUndefined();
++    expect(en.actions.locationTree).toBeUndefined();
++    expect(ru.form.locationTreeTitle).toBeUndefined();
++    expect(en.form.locationTreeTitle).toBeUndefined();
++  });
++  it('подписи передают смысл: папка, ключ, замок, обе преграды или одна', () => {
++    expect(ru.form.locationKeyLabel).toContain('Ключевой предмет');
++    expect(ru.form.locationGateLabel).toContain('Замок или терминал');
++    expect(ru.form.locationGateHint).toContain('обе преграды');
++    expect(ru.form.locationGateHint).toContain('одну из них');
++    expect(ru.detail.locationsInside).toBe('Локации внутри');
++  });
++});
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 6e48331..dfd08d0 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -85,7 +85,8 @@ describe('514: две строки настройки в форме точки',
+     expect(form).toContain('testID="container-form-description"');
+     const descAt = form.indexOf('container-form-description');
+     // Патч 538: конструктор И/ИЛИ вместо строки проверок.
+-    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
++    // Патч 539: подпись стала тернарной (isHub ? locationGateLabel : accessExprLabel).
++    const checkAt = form.indexOf("'form.accessExprLabel'");
+     const hintAt = form.indexOf('<AccessExpressionBuilder');
+     expect(checkAt).toBeGreaterThan(-1);
+     expect(descAt).toBeGreaterThan(checkAt);
+@@ -97,7 +98,8 @@ describe('514: две строки настройки в форме точки',
+     expect(form).toContain('availableCheckContainers');
+     // Патч 538: конструктор выражения с поиском и выбором точек-проверок.
+     expect(form).toContain('<AccessExpressionBuilder');
+-    expect(form).toContain("tLootTrade('form.accessExprLabel')");
++    // Патч 539: подпись тернарная, но ключ accessExprLabel остаётся для не-хабов.
++    expect(form).toContain("'form.accessExprLabel'");
+     // Патч 517: ворота ссылаются на любую точку, а не только терминал.
+     expect(screen).toContain('availableCheckContainers={gateSources}');
+   });
+diff --git a/__tests__/room/location-structure-538.test.js b/__tests__/room/location-structure-538.test.js
+index 35ee60b..3e51d93 100644
+--- a/__tests__/room/location-structure-538.test.js
++++ b/__tests__/room/location-structure-538.test.js
+@@ -190,24 +190,21 @@ describe('538: форма и конструктор в админке', () => {
+   });
+ });
+ 
+-describe('538: дерево структуры и матрёшка локация-в-локацию', () => {
+-  const tree = read('components/screens/LootTradeScreen/modals/LocationTreeModal.js');
++describe('538: матрёшка локация-в-локацию (дерево переехало внутрь хаба в 539)', () => {
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
+   const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+   it('дерево кликабельно и открывает настройки секции', () => {
+     expect(tree).toContain('onOpenSettings');
+-    expect(tree).toContain('testID={`location-tree-node-${hub.id}`}');
++    expect(tree).toContain('testID={`hub-tree-node-${container.id}`}');
+     expect(tree).toContain('parentLocationId');
+     expect(tree).toContain('exitLocationId');
+-    expect(screen).toContain('<LocationTreeModal');
++    expect(screen).toContain('<HubTreeView');
+     expect(screen).toContain('setFormModal({ kind: container.kind, initialContainer: container })');
+   });
+   it('локацию можно вложить в другую локацию, цикл запрещён', () => {
+     expect(screen).toContain('wouldCreateParentCycle');
+     expect(screen).toContain('parentLocationId: hubId');
+     expect(screen).toContain("tLootTrade('form.locationCycle')");
+-    // Плитка дерева на сетке.
+-    expect(screen).toContain("type: 'locationTree'");
+-    expect(screen).toContain("tLootTrade('actions.locationTree')");
+   });
+ });
+ 
+@@ -219,13 +216,12 @@ describe('538: парные RU/EN строки', () => {
+       'accessExprLabel', 'accessOpAnd', 'accessOpOr', 'accessExprHint',
+       'accessExprIncomplete', 'hubCatalogLabel', 'parentLocationLabel',
+       'exitLocationLabel', 'locationNone', 'locationSelfReference',
+-      'locationCycle', 'locationTreeTitle',
++      'locationCycle', 'locationTreeBlockedBy', 'locationTreeExitTo',
++      'locationTreeCatalogBadge',
+     ];
+     for (const key of keys) {
+       expect(ru.form[key], `ru.form.${key}`).toBeTruthy();
+       expect(en.form[key], `en.form.${key}`).toBeTruthy();
+     }
+-    expect(ru.actions.locationTree).toBeTruthy();
+-    expect(en.actions.locationTree).toBeTruthy();
+   });
+ });
+diff --git a/__tests__/room/lock-picking-520.test.js b/__tests__/room/lock-picking-520.test.js
+index edd5edb..aae74c5 100644
+--- a/__tests__/room/lock-picking-520.test.js
++++ b/__tests__/room/lock-picking-520.test.js
+@@ -343,7 +343,8 @@ describe('520: пятая карточка и документы', () => {
+     const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
+     // Патч 538: две строки ИЛИ заменены конструктором выражения (+ = И, / = ИЛИ).
+     expect(form).toContain('<AccessExpressionBuilder');
+-    expect(form).toContain("tLootTrade('form.accessExprLabel')");
++    // Патч 539: подпись тернарная (isHub ? locationGateLabel : accessExprLabel).
++    expect(form).toContain("'form.accessExprLabel'");
+     expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
+     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+     expect(screen).toContain('createLock');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index eb1ef30..98030ec 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('538');
++    expect(version.version).toBe('539');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(137);
+-    expect(version.notes['en-EN']).toHaveLength(137);
+-    expect(json('patchs/baseline.json').baseline).toBe('538');
++    expect(version.notes['ru-RU']).toHaveLength(138);
++    expect(version.notes['en-EN']).toHaveLength(138);
++    expect(json('patchs/baseline.json').baseline).toBe('539');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -448,12 +448,14 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
++    expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **538**');
++    expect(roadmap).toContain('Текущая версия: **539**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+-    expect(roadmap).toContain('Осталось после патча 538');
+-    expect(read('docs/patch-538-install.md')).toContain('538');
++    expect(roadmap).toContain('| 30 |');
++    expect(roadmap).toContain('Осталось после патча 539');
++    expect(read('docs/patch-539-install.md')).toContain('539');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/screens/character-screen-boot-451.test.js b/__tests__/screens/character-screen-boot-451.test.js
+index b9cae4a..cef025f 100644
+--- a/__tests__/screens/character-screen-boot-451.test.js
++++ b/__tests__/screens/character-screen-boot-451.test.js
+@@ -154,7 +154,7 @@ describe('патч 451: целостность запуска приложени
+ 
+   it('apply-patch.sh указывает на рабочую ветку и проверяет целостность node_modules', () => {
+     const script = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
+-    expect(script).toContain('ARENA_BRANCH="arena/054e6676-fallout-2d20-companion"');
++    expect(script).toContain('ARENA_BRANCH="arena/0fa5e3ce-fallout-2d20-companion"');
+     expect(script).toContain('deps_check()');
+     expect(script).toContain('deps_check || exit 1');
+   });
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 710eb18..26110e7 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -90,7 +90,7 @@ import ContainerCatalogModal from './modals/ContainerCatalogModal';
+ import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
+ import IssueContainerModal from './modals/IssueContainerModal';
+ import HubChildPickerModal from './modals/HubChildPickerModal';
+-import LocationTreeModal from './modals/LocationTreeModal';
++import HubTreeView from './modals/HubTreeView';
+ 
+ const NUM_COLS = 3;
+ const MENU_WIDTH = 220;
+@@ -217,7 +217,9 @@ const ContainerCardCell = ({
+       }}
+       activeOpacity={0.82}
+     >
+-      {!isHub && onDragStart && (
++      {/* Патч 539: стрелки переноса есть и у локаций-хабов — их вкладывают
++          друг в друга, как папки в Windows. */}
++      {onDragStart && (
+         <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
+           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+         </View>
+@@ -415,7 +417,6 @@ export default function LootTradeScreen() {
+   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
+   const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
+   const [catalogOpen, setCatalogOpen] = useState(false);
+-  const [locationTreeOpen, setLocationTreeOpen] = useState(false);
+   const [catalogFeedback, setCatalogFeedback] = useState('');
+   const [editingEntry, setEditingEntry] = useState(null);
+   const [hubPickerOpen, setHubPickerOpen] = useState(false);
+@@ -945,6 +946,10 @@ export default function LootTradeScreen() {
+     if (card.kind === CONTAINER_KIND.HUB) {
+       if (wouldCreateParentCycle(cardId, hubId)) {
+         showRawAlert({ title: tLootTrade('form.locationCycle') });
++        // Патч 539: отказ цикла не должен оставлять призрак переноса на экране.
++        setMovingContainerId(null);
++        setDrag(null);
++        hubDropBounds.current = {};
+         return;
+       }
+       if (card.parentLocationId !== hubId) {
+@@ -994,6 +999,16 @@ export default function LootTradeScreen() {
+     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+   };
+ 
++  // Патч 539: вынуть вложенную локацию (parentLocationId) обратно на корень.
++  // У хаба-папки поле родителя скрыто, поэтому разворачиваем матрёшку кнопкой.
++  const handleMoveNestedLocationOut = async (childId) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    const child = containers.find((c) => c.id === childId);
++    if (!child || child.kind !== CONTAINER_KIND.HUB) return;
++    if (String(child.parentLocationId || '') !== activeContainer.id) return;
++    await persistAndSyncContainer({ ...child, parentLocationId: '', inRoot: true });
++  };
++
+   const measureHubDropTargets = useCallback(() => {
+     const entries = Object.entries(hubRefs.current).map(([id, ref]) => new Promise((resolve) => {
+       if (!ref?.measureInWindow) {
+@@ -1009,7 +1024,9 @@ export default function LootTradeScreen() {
+   }, []);
+ 
+   const handleDragStart = async (point, card) => {
+-    if (!card || card.kind === CONTAINER_KIND.HUB) return;
++    // Патч 539: локации-хабы тоже можно таскать стрелками и вкладывать друг в
++    // друга (как папки в Windows). Цикл матрёшки ловит wouldCreateParentCycle.
++    if (!card) return;
+     hubDropBounds.current = {};
+     const isKeyItem = card.type === 'keyItem';
+     setMovingKeyItemId(isKeyItem ? card.id : null);
+@@ -1024,8 +1041,10 @@ export default function LootTradeScreen() {
+ 
+   const handleDragEnd = async (point) => {
+     await measureHubDropTargets();
+-    const hit = Object.entries(hubDropBounds.current).find(([, b]) => (
++    // Патч 539: локацию нельзя бросить на саму себя — исключаем её из целей.
++    const hit = Object.entries(hubDropBounds.current).find(([id, b]) => (
+       b
++      && id !== movingContainerId
+       && point.pageX >= b.x
+       && point.pageX <= b.x + b.width
+       && point.pageY >= b.y
+@@ -1717,7 +1736,6 @@ export default function LootTradeScreen() {
+ 
+   const gridItems = [
+     { type: 'createHub', id: '__create_hub__' },
+-    { type: 'locationTree', id: '__location_tree__' },
+     { type: 'createLoot', id: '__create_loot__' },
+     { type: 'createMerchant', id: '__create_merchant__' },
+     { type: 'createTerminal', id: '__create_terminal__' },
+@@ -1852,16 +1870,6 @@ export default function LootTradeScreen() {
+                         />
+                       );
+                     }
+-                    if (cell.type === 'locationTree') {
+-                      return (
+-                        <ActionCell
+-                          key={cell.id}
+-                          iconName="file-tree"
+-                          label={tLootTrade('actions.locationTree')}
+-                          onPress={() => setLocationTreeOpen(true)}
+-                        />
+-                      );
+-                    }
+                     if (cell.type === 'createLoot') {
+                       return (
+                         <ActionCell
+@@ -2471,126 +2479,24 @@ export default function LootTradeScreen() {
+                 })()}
+               </View>
+ 
+-              <ScrollView style={styles.itemsListContainer}>
+-                {(activeContainer.links || []).length === 0 ? (
+-                  <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+-                ) : (
+-                  [...(activeContainer.links || [])]
+-                    .sort((linkA, linkB) => {
+-                      const childA = containers.find((c) => c.id === linkA.containerId);
+-                      const childB = containers.find((c) => c.id === linkB.containerId);
+-                      const orderA = CONTAINER_KIND_SORT_ORDER[childA?.kind] ?? 99;
+-                      const orderB = CONTAINER_KIND_SORT_ORDER[childB?.kind] ?? 99;
+-                      if (orderA !== orderB) return orderA - orderB;
+-                      return String(childA?.name || '').localeCompare(String(childB?.name || ''), 'ru');
+-                    })
+-                    .map((link) => {
+-                      const child = containers.find((c) => c.id === link.containerId);
+-                      if (!child) return null;
+-                      const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
+-                      const childPieces = (child.items || []).reduce(
+-                        (sum, it) => sum + (Number(it.quantity) || 0),
+-                        0,
+-                      );
+-                      const parentHubIds = getHubIdsContainingChild(child.id, containers);
+-                      const sharedHubCount = parentHubIds.length;
+-                      return (
+-                        <View key={link.containerId} style={styles.hubChildRow}>
+-                          <View style={styles.hubChildTopLine}>
+-                            <View style={styles.itemRowMain}>
+-                              <View style={styles.itemRowTitleLine}>
+-                                <MaterialCommunityIcons
+-                                  name={child.kind === CONTAINER_KIND.LOCK ? 'lock'
+-                                    : (child.kind === CONTAINER_KIND.TERMINAL ? 'console'
+-                                      : (childIsMerch ? 'sack' : 'treasure-chest'))}
+-                                  size={18}
+-                                  color="#2b2b2b"
+-                                />
+-                                <Text style={styles.itemRowName}>{child.name}</Text>
+-                                {sharedHubCount > 1 && (
+-                                  <Text style={styles.hubSharedBadgeText}>
+-                                    {formatLootTrade(tLootTrade('detail.hubSharedBadge'), {
+-                                      count: sharedHubCount,
+-                                    })}
+-                                  </Text>
+-                                )}
+-                              </View>
+-                              <View style={styles.itemRowSub}>
+-                                <Text style={styles.itemRowSubText}>
+-                                  {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
+-                                </Text>
+-                                {childIsMerch && (
+-                                  <IconText style={styles.itemRowSubText}>
+-                                    {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
+-                                  </IconText>
+-                                )}
+-                              </View>
+-                            </View>
+-
+-                            <View style={styles.itemRowControls}>
+-                              <TouchableOpacity
+-                                style={[
+-                                  styles.hubLockChip,
+-                                  link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
+-                                ]}
+-                                onPress={() => handleToggleHubChildLock(child.id)}
+-                              >
+-                                <Text
+-                                  style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
+-                                >
+-                                  {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
+-                                </Text>
+-                              </TouchableOpacity>
+-
+-                              <TouchableOpacity
+-                                style={styles.itemRowSmallBtn}
+-                                onPress={() => {
+-                                  setReturnHubId(activeContainer.id);
+-                                  setActiveContainerId(child.id);
+-                                }}
+-                              >
+-                                <Text style={styles.itemRowSmallBtnText}>
+-                                  {tLootTrade('detail.hubOpenChildCard')}
+-                                </Text>
+-                              </TouchableOpacity>
+-
+-                              <TouchableOpacity
+-                                style={styles.itemRowSmallBtn}
+-                                onPress={() => handleMoveChildOutToRoot(child.id)}
+-                              >
+-                                <Text style={styles.itemRowSmallBtnText}>
+-                                  {tLootTrade('detail.hubMoveOutToRoot')}
+-                                </Text>
+-                              </TouchableOpacity>
+-
+-                              {(sharedHubCount > 1 || child.inRoot === true) && (
+-                                <TouchableOpacity
+-                                  style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
+-                                  onPress={() => handleRemoveHubChild(child.id)}
+-                                >
+-                                  <Text style={styles.itemRowDeleteBtnText}>
+-                                    {tLootTrade('detail.hubUnlinkChild')}
+-                                  </Text>
+-                                </TouchableOpacity>
+-                              )}
+-                            </View>
+-                          </View>
+-
+-                          {link.locked && (
+-                            <TextInput
+-                              style={styles.hubLockNoteInput}
+-                              defaultValue={link.lockLabel || ''}
+-                              placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
+-                              placeholderTextColor="#888888"
+-                              onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+-                              onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+-                            />
+-                          )}
+-                        </View>
+-                      );
+-                    })
+-                )}
+-              </ScrollView>
++              {/* Патч 539: хаб — сам папка-дерево. Локации-спойлеры, пунктирные
++                  линии зависимостей; узел открывает настройки секции. */}
++              <Text style={styles.hubKeysTitle}>{tLootTrade('detail.locationsInside')}</Text>
++              <HubTreeView
++                hub={activeContainer}
++                containers={containers}
++                keyItemNames={keyItemNames}
++                onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
++                onOpenChild={(child) => {
++                  setReturnHubId(activeContainer.id);
++                  setActiveContainerId(child.id);
++                }}
++                onToggleLock={handleToggleHubChildLock}
++                onMoveOut={handleMoveChildOutToRoot}
++                onUnlink={handleRemoveHubChild}
++                onUpdateLockLabel={handleUpdateHubChildLockLabel}
++                onMoveNestedOut={handleMoveNestedLocationOut}
++              />
+             </>
+           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
+             || activeContainer.kind === CONTAINER_KIND.LOCK) ? null : (
+@@ -2727,17 +2633,6 @@ export default function LootTradeScreen() {
+         onClose={() => setFormModal(null)}
+       />
+ 
+-      {/* Патч 538: дерево структуры локаций; узел открывает настройки секции. */}
+-      <LocationTreeModal
+-        visible={locationTreeOpen}
+-        containers={containers}
+-        onOpenSettings={(container) => {
+-          setLocationTreeOpen(false);
+-          setFormModal({ kind: container.kind, initialContainer: container });
+-        }}
+-        onClose={() => setLocationTreeOpen(false)}
+-      />
+-
+       <HubChildPickerModal
+         visible={hubPickerOpen}
+         hub={activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer : null}
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 0fbf075..c44067c 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -33,6 +33,7 @@ import {
+ } from '../../../../domain/lootTrade';
+ import { showRawAlert } from '../../../alerts/alertService';
+ import AccessExpressionBuilder from './AccessExpressionBuilder';
++import LocationSelect from './LocationSelect';
+ import {
+   resolveAccessExpression,
+   expressionCheckIds,
+@@ -399,61 +400,39 @@ const ContainerFormModal = ({
+                   />
+                   <Text style={styles.checkboxLabel}>{tLootTrade('form.hubCatalogLabel')}</Text>
+                 </TouchableOpacity>
+-                <Text style={styles.hintText}>{tLootTrade('form.hubCatalogHint')}</Text>
++                {/* Патч 539: чекбокс «Хаб» + одна подсказка. Отмечен — хаб-папка
++                    (сам родитель, родитель/выход не нужны); не отмечен — обычная
++                    локация с родителем и выходом. */}
++                <Text style={styles.hintText}>
++                  {tLootTrade(isCatalogHub ? 'form.hubFolderHint' : 'form.hubCatalogHint')}
++                </Text>
+ 
+-                {/* Патч 538: строка 1 — родительская локация (вложенность/ветвление). */}
+-                <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
+-                <View style={styles.roomChips}>
+-                  <TouchableOpacity
+-                    testID="container-form-parent-none"
+-                    style={[styles.roomChip, !parentLocationId && styles.roomChipActive]}
+-                    onPress={() => setParentLocationId('')}
+-                  >
+-                    <Text style={[styles.roomChipName, !parentLocationId && styles.roomChipTextActive]}>
+-                      {tLootTrade('form.locationNone')}
+-                    </Text>
+-                  </TouchableOpacity>
+-                  {locationOptions.map((hub) => (
+-                    <TouchableOpacity
+-                      key={hub.id}
+-                      testID={`container-form-parent-${hub.id}`}
+-                      style={[styles.roomChip, parentLocationId === hub.id && styles.roomChipActive]}
+-                      onPress={() => setParentLocationId(hub.id)}
+-                    >
+-                      <Text style={[styles.roomChipName, parentLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
+-                        {hub.name}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  ))}
+-                </View>
+-                <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
++                {/* Патч 539: обычной локации родитель и выход задаются выпадающими
++                    списками (не кнопками). У хаба-папки их нет — вложенность
++                    делается переносом стрелками, как папки в Windows. */}
++                {!isCatalogHub && (
++                  <>
++                    <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
++                    <LocationSelect
++                      testID="container-form-parent"
++                      value={parentLocationId}
++                      onChange={setParentLocationId}
++                      options={locationOptions}
++                      placeholder={tLootTrade('form.locationNone')}
++                    />
++                    <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
+ 
+-                {/* Патч 538: строка 2 — выход из локации (особый переход/телепорт). */}
+-                <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
+-                <View style={styles.roomChips}>
+-                  <TouchableOpacity
+-                    testID="container-form-exit-none"
+-                    style={[styles.roomChip, !exitLocationId && styles.roomChipActive]}
+-                    onPress={() => setExitLocationId('')}
+-                  >
+-                    <Text style={[styles.roomChipName, !exitLocationId && styles.roomChipTextActive]}>
+-                      {tLootTrade('form.locationNone')}
+-                    </Text>
+-                  </TouchableOpacity>
+-                  {locationOptions.map((hub) => (
+-                    <TouchableOpacity
+-                      key={hub.id}
+-                      testID={`container-form-exit-${hub.id}`}
+-                      style={[styles.roomChip, exitLocationId === hub.id && styles.roomChipActive]}
+-                      onPress={() => setExitLocationId(hub.id)}
+-                    >
+-                      <Text style={[styles.roomChipName, exitLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
+-                        {hub.name}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  ))}
+-                </View>
+-                <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
++                    <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
++                    <LocationSelect
++                      testID="container-form-exit"
++                      value={exitLocationId}
++                      onChange={setExitLocationId}
++                      options={locationOptions}
++                      placeholder={tLootTrade('form.locationNone')}
++                    />
++                    <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
++                  </>
++                )}
+ 
+                 <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
+                 {availableRooms.length === 0 ? (
+@@ -725,7 +704,11 @@ const ContainerFormModal = ({
+ 
+             {canRequireKey && (
+               <>
+-                <Text style={styles.label}>{tLootTrade('form.keyRequirementLabel')}</Text>
++                {/* Патч 539: ключи — ключи, замки — замки. У локации поле ключа
++                    названо по-человечески, отдельным блоком от замка/терминала. */}
++                <Text style={styles.label}>
++                  {tLootTrade(isHub ? 'form.locationKeyLabel' : 'form.keyRequirementLabel')}
++                </Text>
+                 <TextInput
+                   testID="container-form-key-search"
+                   style={styles.input}
+@@ -782,13 +765,20 @@ const ContainerFormModal = ({
+                   </TouchableOpacity>
+                 )}
+ 
+-                {/* Патч 538: требование доступа — конструктор И/ИЛИ (+ = И, / = ИЛИ). */}
+-                <Text style={styles.label}>{tLootTrade('form.accessExprLabel')}</Text>
++                {/* Патч 539: замок/терминал — отдельный блок с понятной подписью.
++                    И/ИЛИ означает: войти можно, только пройдя обе преграды (И)
++                    или одну из них (ИЛИ). Конструктор тот же (+ = И, / = ИЛИ). */}
++                <Text style={styles.label}>
++                  {tLootTrade(isHub ? 'form.locationGateLabel' : 'form.accessExprLabel')}
++                </Text>
+                 <AccessExpressionBuilder
+                   tokens={accessTokens}
+                   onChange={setAccessTokens}
+                   availableChecks={availableCheckContainers}
+                 />
++                {isHub && (
++                  <Text style={styles.hintText}>{tLootTrade('form.locationGateHint')}</Text>
++                )}
+                 {(isTerminal || isLock) && (
+                   <Text testID="container-form-lock-pin-estimate" style={styles.hintText}>
+                     {formatLootTrade(tLootTrade('form.lockPinEstimate'), {
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+new file mode 100644
+index 0000000..b46575a
+--- /dev/null
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -0,0 +1,339 @@
++import React, { useMemo, useState } from 'react';
++import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
++import { useLocale } from '../../../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
++import {
++  CONTAINER_KIND,
++  CONTAINER_KIND_SORT_ORDER,
++  getHubIdsContainingChild,
++} from '../../../../domain/lootTrade';
++import {
++  resolveAccessExpression,
++  formatAccessExpression,
++} from '../../../../domain/accessExpression';
++
++/**
++ * Патч 539: хаб сам по себе — древовидная папка. Открыв локацию-хаб, Мастер
++ * видит дерево вложенного: локации — спойлерами (нажал — видно, что входит),
++ * а пунктирные линии показывают, что от чего зависит (что чем заблокировано,
++ * что во что выходит, какой ключ нужен). Нажатие на узел открывает настройки.
++ *
++ * Дети узла = объединение (без дублей):
++ *   - вложенные локации: containers с parentLocationId === node.id (матрёшка);
++ *   - не-локационные узлы из node.links (контейнеры/торговцы/замки/терминалы).
++ * Игровой путь (links) не трогаем — дерево только читает и то, и другое.
++ */
++const HubTreeView = ({
++  hub,
++  containers = [],
++  keyItemNames = {},
++  onOpenSettings,
++  onOpenChild,
++  onToggleLock,
++  onMoveOut,
++  onUnlink,
++  onUpdateLockLabel,
++  onMoveNestedOut,
++}) => {
++  useLocale();
++  const [expanded, setExpanded] = useState(() => new Set());
++
++  const list = Array.isArray(containers) ? containers : [];
++  const byId = useMemo(() => {
++    const map = new Map();
++    for (const c of list) if (c?.id) map.set(c.id, c);
++    return map;
++  }, [list]);
++
++  const nameOf = (id) => byId.get(id)?.name || keyItemNames[id] || id;
++
++  const blockedLabel = (container) => {
++    const tokens = resolveAccessExpression(container || {});
++    if (!tokens.length) return '';
++    return formatAccessExpression(tokens, nameOf);
++  };
++
++  const kindIcon = (kind) => {
++    if (kind === CONTAINER_KIND.HUB) return 'map-marker-multiple';
++    if (kind === CONTAINER_KIND.LOCK) return 'lock';
++    if (kind === CONTAINER_KIND.TERMINAL) return 'desktop-classic';
++    if (kind === CONTAINER_KIND.MERCHANT) return 'account-cash';
++    return 'treasure-chest';
++  };
++
++  // Дети узла: вложенные локации (parentLocationId) + не-хабы из links.
++  const childrenOf = (node) => {
++    const seen = new Set();
++    const result = [];
++    for (const c of list) {
++      if (c?.kind === CONTAINER_KIND.HUB
++        && String(c.parentLocationId || '').trim() === node.id
++        && !seen.has(c.id)) {
++        seen.add(c.id);
++        result.push({ container: c, link: null });
++      }
++    }
++    for (const link of node.links || []) {
++      const c = byId.get(link.containerId);
++      if (c && c.kind !== CONTAINER_KIND.HUB && !seen.has(c.id)) {
++        seen.add(c.id);
++        result.push({ container: c, link });
++      }
++    }
++    result.sort((a, b) => {
++      const ra = CONTAINER_KIND_SORT_ORDER[a.container?.kind] ?? 99;
++      const rb = CONTAINER_KIND_SORT_ORDER[b.container?.kind] ?? 99;
++      if (ra !== rb) return ra - rb;
++      return String(a.container?.name || '').localeCompare(String(b.container?.name || ''), 'ru');
++    });
++    return result;
++  };
++
++  const toggleExpanded = (id) => {
++    setExpanded((prev) => {
++      const next = new Set(prev);
++      if (next.has(id)) next.delete(id); else next.add(id);
++      return next;
++    });
++  };
++
++  const open = (container) => {
++    if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
++  };
++
++  // Пунктирные строки зависимости: что блокирует, куда выход, какой ключ.
++  const renderDependencies = (container) => {
++    const blocked = blockedLabel(container);
++    const exitId = String(container.exitLocationId || '').trim();
++    const exitTarget = exitId ? byId.get(exitId) : null;
++    const keyId = String(container.requiredKeyItemId || '').trim();
++    const keyName = keyId ? (keyItemNames[keyId] || nameOf(keyId)) : '';
++    if (!blocked && !exitTarget && !keyName) return null;
++    return (
++      <View style={styles.depBlock}>
++        {blocked ? (
++          <View style={styles.depRow}>
++            <View style={styles.depDash} />
++            <MaterialCommunityIcons name="lock" size={13} color={ADMIN_MODAL_PALETTE.mutedText} />
++            <Text style={styles.depText} numberOfLines={2}>
++              {tLootTrade('form.locationTreeBlockedBy')} {blocked}
++            </Text>
++          </View>
++        ) : null}
++        {keyName ? (
++          <View style={styles.depRow}>
++            <View style={styles.depDash} />
++            <MaterialCommunityIcons name="key-variant" size={13} color={ADMIN_MODAL_PALETTE.gold} />
++            <Text style={styles.depText} numberOfLines={1}>
++              {tLootTrade('form.locationTreeKey')} {keyName}
++            </Text>
++          </View>
++        ) : null}
++        {exitTarget ? (
++          <TouchableOpacity
++            testID={`hub-tree-exit-${container.id}`}
++            style={styles.depRow}
++            onPress={() => open(exitTarget)}
++          >
++            <View style={styles.depDash} />
++            <MaterialCommunityIcons name="exit-run" size={13} color={ADMIN_MODAL_PALETTE.mutedText} />
++            <Text style={styles.depText} numberOfLines={1}>
++              {tLootTrade('form.locationTreeExitTo')} {exitTarget.name}
++            </Text>
++          </TouchableOpacity>
++        ) : null}
++      </View>
++    );
++  };
++
++  // Рекурсивный узел. visited защищает от циклов матрёшки.
++  const renderNode = (entry, depth, visited, isDirectChild) => {
++    const { container, link } = entry;
++    if (!container || visited.has(container.id)) return null;
++    const nextVisited = new Set(visited);
++    nextVisited.add(container.id);
++
++    const isHub = container.kind === CONTAINER_KIND.HUB;
++    const isOpen = expanded.has(container.id);
++    const kids = isHub ? childrenOf(container) : [];
++    const sharedHubCount = getHubIdsContainingChild(container.id, list).length;
++    const pieces = (container.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
++
++    return (
++      <View key={container.id} style={[styles.node, { marginLeft: depth * 16 }]}>
++        <View style={styles.nodeHeader}>
++          {isHub ? (
++            <TouchableOpacity
++              testID={`hub-tree-toggle-${container.id}`}
++              style={styles.chevronBtn}
++              onPress={() => toggleExpanded(container.id)}
++              accessibilityRole="button"
++            >
++              <MaterialCommunityIcons
++                name={isOpen ? 'chevron-down' : 'chevron-right'}
++                size={20}
++                color={ADMIN_MODAL_PALETTE.text}
++              />
++            </TouchableOpacity>
++          ) : (
++            <View style={styles.chevronBtn}>
++              <MaterialCommunityIcons name={kindIcon(container.kind)} size={16} color={ADMIN_MODAL_PALETTE.mutedText} />
++            </View>
++          )}
++
++          <TouchableOpacity
++            testID={`hub-tree-node-${container.id}`}
++            style={styles.nodeNameBtn}
++            onPress={() => open(container)}
++          >
++            {isHub && (
++              <MaterialCommunityIcons name={kindIcon(container.kind)} size={16} color={ADMIN_MODAL_PALETTE.text} />
++            )}
++            <Text style={styles.nodeName} numberOfLines={1}>{container.name}</Text>
++            {isHub && container.isCatalogHub && (
++              <View style={styles.catalogBadge}>
++                <Text style={styles.catalogBadgeText}>{tLootTrade('form.locationTreeCatalogBadge')}</Text>
++              </View>
++            )}
++            {!isHub && (
++              <Text style={styles.nodeMeta} numberOfLines={1}>
++                {formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}
++              </Text>
++            )}
++          </TouchableOpacity>
++
++          {/* Патч 539: вложенную локацию можно вынуть обратно на корень. */}
++          {isHub && isDirectChild && (
++            <View style={styles.nodeControls}>
++              <TouchableOpacity
++                testID={`hub-tree-move-nested-out-${container.id}`}
++                style={styles.smallBtn}
++                onPress={() => onMoveNestedOut?.(container.id)}
++              >
++                <Text style={styles.smallBtnText}>{tLootTrade('detail.hubMoveOutToRoot')}</Text>
++              </TouchableOpacity>
++            </View>
++          )}
++
++          {/* Управление прямыми детьми активного хаба (ссылки links). */}
++          {!isHub && isDirectChild && link && (
++            <View style={styles.nodeControls}>
++              <TouchableOpacity
++                style={[styles.lockChip, link.locked ? styles.lockChipLocked : styles.lockChipUnlocked]}
++                onPress={() => onToggleLock?.(container.id)}
++              >
++                <Text style={link.locked ? styles.lockChipTextLocked : styles.lockChipTextUnlocked}>
++                  {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
++                </Text>
++              </TouchableOpacity>
++              <TouchableOpacity style={styles.smallBtn} onPress={() => onOpenChild?.(container)}>
++                <Text style={styles.smallBtnText}>{tLootTrade('detail.hubOpenChildCard')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity style={styles.smallBtn} onPress={() => onMoveOut?.(container.id)}>
++                <Text style={styles.smallBtnText}>{tLootTrade('detail.hubMoveOutToRoot')}</Text>
++              </TouchableOpacity>
++              {(sharedHubCount > 1 || container.inRoot === true) && (
++                <TouchableOpacity style={[styles.smallBtn, styles.unlinkBtn]} onPress={() => onUnlink?.(container.id)}>
++                  <Text style={styles.unlinkBtnText}>{tLootTrade('detail.hubUnlinkChild')}</Text>
++                </TouchableOpacity>
++              )}
++            </View>
++          )}
++        </View>
++
++        {renderDependencies(container)}
++
++        {!isHub && isDirectChild && link && link.locked && (
++          <TextInput
++            style={styles.lockNoteInput}
++            defaultValue={link.lockLabel || ''}
++            placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
++            placeholderTextColor="#888888"
++            onEndEditing={(e) => onUpdateLockLabel?.(container.id, e.nativeEvent.text)}
++            onSubmitEditing={(e) => onUpdateLockLabel?.(container.id, e.nativeEvent.text)}
++          />
++        )}
++
++        {isHub && isOpen && (
++          <View style={styles.childrenBlock}>
++            {kids.length === 0 ? (
++              <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmptyNode')}</Text>
++            ) : kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
++          </View>
++        )}
++      </View>
++    );
++  };
++
++  if (!hub) return null;
++  const directKids = childrenOf(hub);
++
++  return (
++    <ScrollView style={styles.scroll} nestedScrollEnabled>
++      {directKids.length === 0 ? (
++        <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
++      ) : (
++        directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))
++      )}
++    </ScrollView>
++  );
++};
++
++const styles = StyleSheet.create({
++  scroll: { flexGrow: 0 },
++  node: { marginBottom: 6 },
++  nodeHeader: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    paddingHorizontal: 6,
++    paddingVertical: 6,
++  },
++  chevronBtn: { width: 26, alignItems: 'center', justifyContent: 'center' },
++  nodeNameBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
++  nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 13, fontWeight: '700' },
++  nodeMeta: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
++  catalogBadge: {
++    paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
++  },
++  catalogBadgeText: { color: ADMIN_MODAL_PALETTE.accentText, fontSize: 9, fontWeight: '700' },
++  nodeControls: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
++  lockChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, borderWidth: 1 },
++  lockChipLocked: { backgroundColor: '#fdecea', borderColor: ADMIN_MODAL_PALETTE.danger },
++  lockChipUnlocked: { backgroundColor: '#eef7ee', borderColor: '#3a7d3a' },
++  lockChipTextLocked: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 10, fontWeight: '700' },
++  lockChipTextUnlocked: { color: '#3a7d3a', fontSize: 10, fontWeight: '700' },
++  smallBtn: {
++    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
++    borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++  },
++  smallBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 10 },
++  unlinkBtn: { borderColor: ADMIN_MODAL_PALETTE.danger },
++  unlinkBtnText: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 10 },
++  depBlock: { marginLeft: 30, marginTop: 3 },
++  depRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 1 },
++  depDash: {
++    width: 16, height: 0, borderTopWidth: 1, borderStyle: 'dashed',
++    borderTopColor: ADMIN_MODAL_PALETTE.borderMuted,
++  },
++  depText: { flex: 1, color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11 },
++  childrenBlock: {
++    marginTop: 4, marginLeft: 12, paddingLeft: 10,
++    borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: ADMIN_MODAL_PALETTE.borderMuted,
++  },
++  lockNoteInput: {
++    marginLeft: 30, marginTop: 4, borderWidth: 1, borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    borderRadius: 4, paddingHorizontal: 8, paddingVertical: 5, fontSize: 12,
++    color: ADMIN_MODAL_PALETTE.text, backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++  },
++  emptyText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, lineHeight: 18, paddingVertical: 6 },
++});
++
++export default HubTreeView;
+diff --git a/components/screens/LootTradeScreen/modals/LocationSelect.js b/components/screens/LootTradeScreen/modals/LocationSelect.js
+new file mode 100644
+index 0000000..2069a4d
+--- /dev/null
++++ b/components/screens/LootTradeScreen/modals/LocationSelect.js
+@@ -0,0 +1,153 @@
++import React, { useMemo, useState } from 'react';
++import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
++import { tLootTrade } from '../logic/lootTradeI18n';
++
++/**
++ * Патч 539: выпадающий список локаций (родитель / выход).
++ * Владелец: «Родительские и локации выхода — не кнопки, а выпадающие списки.
++ * Если будет 100 локаций, тогда на экране станет 200 кнопок». Один селект
++ * с поиском вместо россыпи чипов.
++ */
++const LocationSelect = ({
++  value = '',
++  onChange,
++  options = [],
++  placeholder,
++  testID = 'location-select',
++  allowNone = true,
++}) => {
++  const [open, setOpen] = useState(false);
++  const [query, setQuery] = useState('');
++
++  const selected = useMemo(
++    () => (options || []).find((o) => o?.id === value) || null,
++    [options, value],
++  );
++
++  const filtered = useMemo(() => {
++    const q = query.trim().toLowerCase();
++    return (options || []).filter((o) => o?.id && (!q || String(o?.name || '').toLowerCase().includes(q)));
++  }, [options, query]);
++
++  const pick = (id) => {
++    if (typeof onChange === 'function') onChange(id);
++    setOpen(false);
++    setQuery('');
++  };
++
++  return (
++    <View>
++      <TouchableOpacity
++        testID={`${testID}-toggle`}
++        style={[styles.trigger, open && styles.triggerOpen]}
++        onPress={() => setOpen((v) => !v)}
++        accessibilityRole="button"
++      >
++        <Text style={[styles.triggerText, !selected && styles.triggerPlaceholder]} numberOfLines={1}>
++          {selected ? selected.name : (placeholder || tLootTrade('form.locationNone'))}
++        </Text>
++        <MaterialCommunityIcons
++          name={open ? 'chevron-up' : 'chevron-down'}
++          size={20}
++          color={ADMIN_MODAL_PALETTE.mutedText}
++        />
++      </TouchableOpacity>
++
++      {open && (
++        <View style={styles.menu}>
++          <TextInput
++            testID={`${testID}-search`}
++            style={styles.search}
++            value={query}
++            onChangeText={setQuery}
++            placeholder={tLootTrade('form.locationSearchPlaceholder')}
++            placeholderTextColor="#8c8c8c"
++          />
++          <ScrollView style={styles.list} nestedScrollEnabled keyboardShouldPersistTaps="handled">
++            {allowNone && (
++              <TouchableOpacity
++                testID={`${testID}-none`}
++                style={[styles.item, !value && styles.itemSelected]}
++                onPress={() => pick('')}
++              >
++                <Text style={[styles.itemText, !value && styles.itemTextSelected]}>
++                  {tLootTrade('form.locationNone')}
++                </Text>
++                {!value && <MaterialCommunityIcons name="check" size={16} color={ADMIN_MODAL_PALETTE.text} />}
++              </TouchableOpacity>
++            )}
++            {filtered.length === 0 ? (
++              <Text style={styles.empty}>{tLootTrade('form.locationNoMatch')}</Text>
++            ) : filtered.map((o) => {
++              const isSel = o.id === value;
++              return (
++                <TouchableOpacity
++                  key={o.id}
++                  testID={`${testID}-opt-${o.id}`}
++                  style={[styles.item, isSel && styles.itemSelected]}
++                  onPress={() => pick(o.id)}
++                >
++                  <Text style={[styles.itemText, isSel && styles.itemTextSelected]} numberOfLines={1}>
++                    {o.name}
++                  </Text>
++                  {isSel && <MaterialCommunityIcons name="check" size={16} color={ADMIN_MODAL_PALETTE.text} />}
++                </TouchableOpacity>
++              );
++            })}
++          </ScrollView>
++        </View>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  trigger: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++  },
++  triggerOpen: { borderColor: ADMIN_MODAL_PALETTE.gold },
++  triggerText: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 14 },
++  triggerPlaceholder: { color: ADMIN_MODAL_PALETTE.mutedText },
++  menu: {
++    marginTop: 4,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    overflow: 'hidden',
++  },
++  search: {
++    borderBottomWidth: 1,
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
++    paddingHorizontal: 12,
++    paddingVertical: 8,
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 13,
++  },
++  list: { maxHeight: 200 },
++  item: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 12,
++    paddingVertical: 9,
++    borderBottomWidth: 1,
++    borderBottomColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++  },
++  itemSelected: { backgroundColor: ADMIN_MODAL_PALETTE.selected },
++  itemText: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 13 },
++  itemTextSelected: { fontWeight: '700' },
++  empty: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 12, paddingHorizontal: 12, paddingVertical: 10 },
++});
++
++export default LocationSelect;
+diff --git a/components/screens/LootTradeScreen/modals/LocationTreeModal.js b/components/screens/LootTradeScreen/modals/LocationTreeModal.js
+deleted file mode 100644
+index 2196bdf..0000000
+--- a/components/screens/LootTradeScreen/modals/LocationTreeModal.js
++++ /dev/null
+@@ -1,243 +0,0 @@
+-import React, { useMemo } from 'react';
+-import {
+-  Modal,
+-  View,
+-  Text,
+-  TouchableOpacity,
+-  ScrollView,
+-  StyleSheet,
+-} from 'react-native';
+-import { MaterialCommunityIcons } from '@expo/vector-icons';
+-import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+-import { useLocale } from '../../../../i18n/locale';
+-import { tLootTrade } from '../logic/lootTradeI18n';
+-import { CONTAINER_KIND } from '../../../../domain/lootTrade';
+-import {
+-  resolveAccessExpression,
+-  formatAccessExpression,
+-} from '../../../../domain/accessExpression';
+-
+-/**
+- * Патч 538: дерево структуры локаций («Хаб»-каталог).
+- * Показывает, что за чем идёт (вложенность), что чем заблокировано
+- * (условие И/ИЛИ) и что во что выходит (особый выход/телепорт).
+- * Нажатие на любой узел открывает настройки этой секции.
+- */
+-const LocationTreeModal = ({ visible, containers = [], onOpenSettings, onClose }) => {
+-  useLocale();
+-
+-  const list = Array.isArray(containers) ? containers : [];
+-  const byId = useMemo(() => {
+-    const map = new Map();
+-    for (const c of list) if (c?.id) map.set(c.id, c);
+-    return map;
+-  }, [list]);
+-
+-  const hubs = useMemo(
+-    () => list.filter((c) => c?.kind === CONTAINER_KIND.HUB),
+-    [list],
+-  );
+-
+-  // Вложенные локации: parentLocationId -> список дочерних хабов.
+-  const childrenByParent = useMemo(() => {
+-    const map = new Map();
+-    for (const hub of hubs) {
+-      const parentId = String(hub.parentLocationId || '').trim();
+-      if (!parentId) continue;
+-      if (!map.has(parentId)) map.set(parentId, []);
+-      map.get(parentId).push(hub);
+-    }
+-    return map;
+-  }, [hubs]);
+-
+-  const roots = useMemo(
+-    () => hubs.filter((hub) => {
+-      const parentId = String(hub.parentLocationId || '').trim();
+-      return !parentId || !byId.has(parentId);
+-    }),
+-    [hubs, byId],
+-  );
+-
+-  const nameOf = (id) => byId.get(id)?.name || id;
+-
+-  const blockedLabel = (container) => {
+-    const tokens = resolveAccessExpression(container || {});
+-    if (!tokens.length) return '';
+-    return formatAccessExpression(tokens, nameOf);
+-  };
+-
+-  const open = (container) => {
+-    if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
+-  };
+-
+-  const kindIcon = (kind) => {
+-    if (kind === CONTAINER_KIND.HUB) return 'map-marker-multiple';
+-    if (kind === CONTAINER_KIND.LOCK) return 'lock';
+-    if (kind === CONTAINER_KIND.TERMINAL) return 'desktop-classic';
+-    if (kind === CONTAINER_KIND.MERCHANT) return 'account-cash';
+-    return 'treasure-chest';
+-  };
+-
+-  // Рекурсивный узел локации; visited защищает от циклов матрёшки.
+-  const renderHub = (hub, depth, visited) => {
+-    if (!hub || visited.has(hub.id)) return null;
+-    const nextVisited = new Set(visited);
+-    nextVisited.add(hub.id);
+-
+-    const nestedHubs = childrenByParent.get(hub.id) || [];
+-    const linkedChildren = (hub.links || [])
+-      .map((l) => byId.get(l.containerId))
+-      .filter((c) => c && c.kind !== CONTAINER_KIND.HUB);
+-    const exitId = String(hub.exitLocationId || '').trim();
+-    const exitTarget = exitId ? byId.get(exitId) : null;
+-    const blocked = blockedLabel(hub);
+-
+-    return (
+-      <View key={hub.id} style={[styles.node, { marginLeft: depth * 18 }]}>
+-        <TouchableOpacity
+-          testID={`location-tree-node-${hub.id}`}
+-          style={styles.nodeHeader}
+-          onPress={() => open(hub)}
+-        >
+-          <MaterialCommunityIcons name={kindIcon(hub.kind)} size={18} color={ADMIN_MODAL_PALETTE.text} />
+-          <Text style={styles.nodeName} numberOfLines={1}>{hub.name}</Text>
+-          {hub.isCatalogHub && (
+-            <View style={styles.catalogBadge}>
+-              <Text style={styles.catalogBadgeText}>{tLootTrade('form.locationTreeCatalogBadge')}</Text>
+-            </View>
+-          )}
+-          <MaterialCommunityIcons name="chevron-right" size={18} color={ADMIN_MODAL_PALETTE.mutedText} />
+-        </TouchableOpacity>
+-
+-        {blocked ? (
+-          <Text style={styles.metaRow} numberOfLines={2}>
+-            {tLootTrade('form.locationTreeBlockedBy')} {blocked}
+-          </Text>
+-        ) : null}
+-
+-        {exitTarget ? (
+-          <TouchableOpacity
+-            testID={`location-tree-exit-${hub.id}`}
+-            style={styles.exitRow}
+-            onPress={() => open(exitTarget)}
+-          >
+-            <MaterialCommunityIcons name="exit-run" size={14} color={ADMIN_MODAL_PALETTE.mutedText} />
+-            <Text style={styles.metaRow} numberOfLines={1}>
+-              {tLootTrade('form.locationTreeExitTo')} {exitTarget.name}
+-            </Text>
+-          </TouchableOpacity>
+-        ) : null}
+-
+-        {linkedChildren.map((child) => (
+-          <TouchableOpacity
+-            key={child.id}
+-            testID={`location-tree-child-${child.id}`}
+-            style={[styles.childRow, { marginLeft: 18 }]}
+-            onPress={() => open(child)}
+-          >
+-            <MaterialCommunityIcons name={kindIcon(child.kind)} size={15} color={ADMIN_MODAL_PALETTE.mutedText} />
+-            <Text style={styles.childName} numberOfLines={1}>{child.name}</Text>
+-            {blockedLabel(child) ? (
+-              <Text style={styles.childMeta} numberOfLines={1}>{blockedLabel(child)}</Text>
+-            ) : null}
+-          </TouchableOpacity>
+-        ))}
+-
+-        {nestedHubs.map((childHub) => renderHub(childHub, depth + 1, nextVisited))}
+-      </View>
+-    );
+-  };
+-
+-  return (
+-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+-      <View style={styles.overlay}>
+-        <View style={styles.card}>
+-          <View style={styles.header}>
+-            <Text style={styles.title}>{tLootTrade('form.locationTreeTitle')}</Text>
+-            <TouchableOpacity testID="location-tree-close" onPress={onClose} style={styles.closeBtn}>
+-              <MaterialCommunityIcons name="close" size={22} color={ADMIN_MODAL_PALETTE.text} />
+-            </TouchableOpacity>
+-          </View>
+-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+-            {hubs.length === 0 ? (
+-              <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmpty')}</Text>
+-            ) : (
+-              roots.map((hub) => renderHub(hub, 0, new Set()))
+-            )}
+-          </ScrollView>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-  overlay: {
+-    flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.56)',
+-    alignItems: 'center',
+-    justifyContent: 'center',
+-    padding: 16,
+-  },
+-  card: {
+-    width: '100%',
+-    maxWidth: 560,
+-    maxHeight: '84%',
+-    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+-    borderRadius: 10,
+-    borderWidth: 1,
+-    borderColor: ADMIN_MODAL_PALETTE.border,
+-    overflow: 'hidden',
+-  },
+-  header: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    justifyContent: 'space-between',
+-    paddingHorizontal: 16,
+-    paddingVertical: 12,
+-    borderBottomWidth: 1,
+-    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
+-    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+-  },
+-  title: { color: ADMIN_MODAL_PALETTE.text, fontSize: 16, fontWeight: '700' },
+-  closeBtn: { padding: 4 },
+-  scroll: { flexGrow: 0 },
+-  scrollContent: { padding: 14 },
+-  emptyText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 13, lineHeight: 19 },
+-  node: { marginBottom: 10 },
+-  nodeHeader: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    gap: 8,
+-    paddingHorizontal: 10,
+-    paddingVertical: 9,
+-    borderRadius: 6,
+-    borderWidth: 1,
+-    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+-    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+-  },
+-  nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 14, fontWeight: '700' },
+-  catalogBadge: {
+-    paddingHorizontal: 7,
+-    paddingVertical: 2,
+-    borderRadius: 4,
+-    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+-  },
+-  catalogBadgeText: { color: ADMIN_MODAL_PALETTE.accentText, fontSize: 10, fontWeight: '700' },
+-  metaRow: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 3, marginLeft: 26 },
+-  exitRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+-  childRow: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    gap: 6,
+-    paddingVertical: 6,
+-    paddingHorizontal: 8,
+-    marginTop: 4,
+-    borderRadius: 5,
+-    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+-  },
+-  childName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 12, fontWeight: '600' },
+-  childMeta: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, maxWidth: 160 },
+-});
+-
+-export default LocationTreeModal;
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fc2364e..cc60435 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,33 @@
+ # Changelog
+ ---
+ 
++## The hub is itself a folder-tree (patch 539)
++
++A rework of the 538 location structure at the owner's word (thesis 30). There
++is no longer a separate "Location Structure" card: the hub is itself a
++tree-folder. Still admin-only; the player window is the next step.
++
++- **A hub opens a tree of its contents.** Open a hub location and see what was
++  put inside it: locations, locks, terminals, containers, merchants. Locations
++  are spoilers: tap the arrow to reveal what is inside. Dashed lines show what
++  depends on what: what is blocked by what, which key is needed, what exits
++  where. Tapping a node opens that section's settings.
++- **The hub form is simplified.** Check "Hub" and the location becomes a folder
++  and is its own parent: the "Parent location" and "Exit from location" rows
++  disappear, leaving the server rooms the hub is available for. There can be
++  many hubs, and they can be nested into one another.
++- **Parent and exit are dropdowns.** For an ordinary location, parent and exit
++  are now picked from a searchable list with a "— none —" option, not a wall of
++  buttons: even 100 locations do not turn the screen into 200 buttons.
++- **The matryoshka works again.** A location can be grabbed by the move arrows
++  and dropped into another location — it becomes a child, like folders in
++  Windows. A nested location can be moved back out to the root. You cannot drop
++  a location onto itself or nest it into its own descendant (a cycle).
++- **Key and lock/terminal are separate fields.** "Key item for access to the
++  location" and "Lock or terminal that blocks entry to the location without a
++  check" are split apart and labelled in plain language. AND/OR means: you can
++  enter the location only by passing both obstacles (AND) or one of them (OR).
++
+ ## Location structure in the admin side (patch 538)
+ 
+ The admin part of the location structure is implemented (thesis 29). The
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ef3514b..919141e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,33 @@
+ 
+ ---
+ 
++## Хаб — сам папка-дерево (патч 539)
++
++Переработка структуры локаций из 538 по слову владельца (тезис 30). Отдельной
++карточки «Структура локаций» больше нет: хаб сам по себе — древовидная папка.
++По-прежнему только админская часть; окно игрока — следующим шагом.
++
++- **Хаб открывает дерево вложенного.** Открываешь локацию-хаб и видишь, что в
++  неё накидали: локации, замки, терминалы, контейнеры, торговцы. Локации —
++  спойлерами: нажал на стрелку — раскрылось, что входит. Пунктирные линии
++  показывают, что от чего зависит: что чем заблокировано, какой ключ нужен,
++  что во что выходит. Нажатие на узел открывает настройки этой секции.
++- **Форма хаба упрощена.** Отметил «Хаб» — локация становится папкой и сама
++  себе родитель: строки «Родительская локация» и «Выход из локации» исчезают,
++  остаются серверные комнаты, для которых хаб доступен. Таких хабов может
++  быть много, и их можно вкладывать друг в друга.
++- **Родитель и выход — выпадающие списки.** У обычной локации родитель и
++  выход теперь выбираются списком с поиском и вариантом «— нет —», а не
++  стеной кнопок: хоть 100 локаций, экран не превращается в 200 кнопок.
++- **Матрёшка снова работает.** Локацию можно ухватить за стрелки переноса и
++  положить в другую локацию — она станет дочерней, как папки в Windows.
++  Вложенную локацию можно вынуть обратно на корень. Бросить локацию на саму
++  себя или вложить в собственного потомка (цикл) нельзя.
++- **Ключ и замок/терминал — отдельные поля.** «Ключевой предмет для доступа в
++  локацию» и «Замок или терминал, не дающий без проверки войти в локацию»
++  разнесены и подписаны по-человечески. И/ИЛИ означает: войти в локацию
++  можно, только пройдя обе преграды (И) или одну из них (ИЛИ).
++
+ ## Структура локаций в админке (патч 538)
+ 
+ Реализована админская часть структуры локаций (тезис 29). Окно просмотра
+diff --git a/docs/patch-539-install.md b/docs/patch-539-install.md
+new file mode 100644
+index 0000000..789b61c
+--- /dev/null
++++ b/docs/patch-539-install.md
+@@ -0,0 +1,60 @@
++# Установка патча 539: хаб — сам папка-дерево
++
++Патч подготовлен от состояния **версии 538** (коммит `9ed886f`, ветка
++`arena/0fa5e3ce-fallout-2d20-companion`). Файл установки:
++`patchs/539-hub-folder-tree.patch`.
++
++> Владелец: «Я не просил КАРТОЧКУ структура локации… локация типа „ХАБ" была
++> как бы папкой локаций… открыл хаб — увидел дерево… если выбрал хаб —
++> большинство функций отпадает, ей не нужен родитель, она сама родитель…
++> хабы определяют серверные комнаты… ключи это ключи, замки это замки,
++> локации это локации… родительские и локации выхода — не кнопки, а выпадающие
++> списки… локацию можно ухватить за стрелки перемещения и перенести — она
++> станет дочерней, как в Windows папки внутрь папок… И/или нужно, чтобы понять,
++> в локацию можно войти только пройдя обе преграды замок/терминал или одну из
++> них… локации — спойлерами… очень нужны линии-точки, которые показывают, что
++> от чего зависит». Скрипт установки владелец правит вручную сам.
++
++## Что меняется
++
++Это **реальный код**, но только админская часть. Окно просмотра локаций для
++игрока не входит в 539.
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | новое дерево внутри хаба: локации-спойлеры, пунктирные линии зависимостей (блок/ключ/выход), узел открывает настройки; дети = вложенные локации + узлы из `links` без дублей |
++| `components/screens/LootTradeScreen/modals/LocationSelect.js` | новый выпадающий список локаций с поиском и вариантом «— нет —» (родитель/выход) |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | родитель/выход — списки вместо чипов; у хаба-папки они скрыты; ключ и замок/терминал — отдельные понятные поля; подсказка «Хаб» переключается |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | плитка/модалка «Структура локаций» убраны, дерево живёт в самом хабе; стрелки переноса есть у локаций, `handleDragStart` не отбрасывает хабы; вынуть вложенную локацию на корень; бросок на себя исключён |
++| `components/screens/LootTradeScreen/modals/LocationTreeModal.js` | удалён (отдельная карточка дерева больше не нужна) |
++| `i18n/{ru-RU,en-EN}/screens/lootTrade/screen.json` | новые парные строки (папка, ключ, замок, «Локации внутри»); ключи отдельной карточки дерева убраны |
++| `__tests__/room/hub-folder-tree-539.test.js` | новый приёмочный тест (17 проверок) |
++| `__tests__/room/location-structure-538.test.js` | дерево-блок перенацелен на `HubTreeView`, убраны отсылки к удалённой карточке |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 539, тезис 30, «Осталось после патча 539» |
++
++## Согласованные рабочие допущения
++
++- Все локации — `kind:'hub'`; чекбокс «Хаб» (`isCatalogHub`) включает режим
++  папки. У папки нет родителя/выхода в форме (она сама родитель), остаются
++  серверные комнаты; вложенность делается переносом стрелками.
++- Дети узла в дереве — объединение без дублей: локации с
++  `parentLocationId === node.id` (матрёшка) и не-локационные узлы из
++  `node.links`. Игровой путь (`links`) не меняется — дерево только читает.
++- Перенос локации в локацию ставит `parentLocationId` (как в 538); бросок на
++  саму себя исключён, цикл матрёшки запрещён (`wouldCreateParentCycle`).
++- И/ИЛИ сохранён из 538 и означает: войти в локацию можно, только пройдя обе
++  преграды (И) или одну из них (ИЛИ). Ключ — отдельное поле, не в одной строке
++  с замком/терминалом.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: полный набор зелёный (версионные защёлки переведены на 539,
++  исторический тест 538 перенацелен на дерево внутри хаба).
++- `git apply --check` вперёд от дерева 538 и в обратную сторону от 539.
++- Заметки «Что нового» парные (138/138), на языке игрока, релиз остаётся 4.
++
++## Откат
++
++`git apply -R patchs/539-hub-folder-tree.patch` вернёт код, словари и версию
++к состоянию 538.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 3b8ffd3..68a2401 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **538**.
++Дата ревизии: 2026-11-05. Текущая версия: **539**.
+ 
+ ## Тезисы
+ 
+@@ -41,8 +41,9 @@
+ | 27 | **Взлом замка: два блока один под другим:** строка статуса разнесена на вертикальную колонку — сверху счётчик заколок, контейнер 1 «Правила» (описание мини-игры), контейнер 2 «Сведения» (сложность, LOCKPICK, навык/восприятие/удача). Текст подсказки не менялся, перенос описания сохранён; рамка блоков по образцу модалок | ✅ сделано | **536** |
+ | 28 | **Многоуровневые локации / левел-дизайн:** переходы между локациями, которые Мастер перекрывает вручную (обвал, ловушка, сигнализация — любой нарратив); взламываемый замок и глухая преграда, направленность проходов, «выхода назад нет». Без новых сущностей, карта и автоправила — задел на будущее. Проект готов, реализация после утверждения модели | 📐 проект | **537** |
+ | 29 | **Структура локаций в админке:** строки «Родительская локация» и «Выход из локации», чекбокс «Хаб» после названия (2 ячейки: чекбокс + пояснение), дерево структуры с переходом в настройки секции, матрёшка «локация в локацию». Требование доступа — конструктор И/ИЛИ (`+` = И, `/` = ИЛИ), нельзя начать/закончить оператором; `+` связывает сильнее `/`. Только админка; окно игрока — следующим шагом | ✅ сделано (админка) | **538** |
++| 30 | **Хаб — сам папка-дерево (переработка 538 по слову владельца):** отдельной карточки «Структура локаций» больше нет — открыл хаб и видишь дерево вложенного. Локации — спойлерами (нажал — видно, что входит), пунктирные линии показывают, что от чего зависит (что чем заблокировано, какой ключ нужен, что во что выходит); узел открывает настройки. У хаба-папки нет родителя/выхода (он сам родитель), остаются серверные комнаты; хабы вкладываются друг в друга. Родитель/выход обычной локации — выпадающие списки с поиском, не кнопки. Локацию таскают за стрелки и кладут в локацию — она становится дочерней, как папки в Windows; вложенную можно вынуть обратно. Ключ и замок/терминал — отдельные поля с понятными подписями; И/ИЛИ = войти, только пройдя обе преграды или одну из них. Только админка | ✅ сделано (админка) | **539** |
+ 
+-## Осталось после патча 538
++## Осталось после патча 539
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -72,6 +73,21 @@
+ связывание проверки. Оператором нельзя начать или закончить выражение; «И»
+ связывает сильнее «ИЛИ». Окно просмотра локаций для игрока сознательно не
+ входило в 538 и остаётся следующим шагом.
++Патч 539 переработал структуру 538 по слову владельца (тезис 30): отдельная
++карточка «Структура локаций» убрана — хаб сам по себе стал папкой-деревом.
++Открыл хаб — видишь дерево вложенного: локации-спойлеры, пунктирные линии
++зависимостей (что чем заблокировано, какой ключ нужен, что во что выходит),
++нажатие на узел открывает настройки секции. У хаба-папки убраны родитель и
++выход (он сам родитель), остались серверные комнаты; хабы можно вкладывать
++друг в друга. Родитель и выход обычной локации теперь выбираются
++выпадающими списками с поиском, а не стенами кнопок. Починена матрёшка:
++локацию снова можно ухватить за стрелки переноса и положить в другую
++локацию (она станет дочерней, как папки в Windows), вложенную локацию можно
++вынуть обратно на корень; бросок на самого себя и цикл запрещены. Ключ и
++замок/терминал разведены по отдельным полям с человеческими подписями
++(«Ключевой предмет для доступа в локацию», «Замок или терминал, не дающий
++без проверки войти в локацию»); И/ИЛИ означает, что войти можно, только
++пройдя обе преграды или одну из них. Окно игрока по-прежнему отложено.
+ Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+@@ -115,10 +131,11 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+-### Что осталось после 538 (структура локаций)
++### Что осталось после 539 (структура локаций)
+ 
+-- **Окно просмотра локаций для игрока** — админская часть готова в 538,
+-  игрок пока не видит дерево/переходы; это следующий отдельный шаг.
++- **Окно просмотра локаций для игрока** — админская часть готова в 538–539
++  (хаб — папка-дерево), игрок пока не видит дерево/переходы; это следующий
++  отдельный шаг.
+ - **Переходы между локациями в игре** — модель `parentLocationId` /
+   `exitLocationId` хранится и редактируется, но сам переход (вход через
+   родителя, особый выход/телепорт) ещё не исполняется в сессии; ручная
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 65664f4..32c7d23 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -5,7 +5,6 @@
+     "createLoot": "Create\nContainer",
+     "createMerchant": "Create\nMerchant",
+     "createHub": "Create\nLocation",
+-    "locationTree": "Location\nStructure",
+     "syncCloud": "Cloud sync",
+     "createTerminal": "Hacking terminal",
+     "createKeyItem": "Create key / note",
+@@ -108,13 +107,9 @@
+     "accessExprReady": "The condition is ready to save.",
+     "locationSelfReference": "A location cannot be its own parent or exit.",
+     "locationCycle": "You cannot nest a location inside its own descendant — that would create a cycle.",
+-    "locationTreeTitle": "Location structure",
+-    "locationTreeEmpty": "No locations yet. Create a location and mark it as a Hub to see the tree.",
+     "locationTreeExitTo": "exit →",
+     "locationTreeBlockedBy": "blocked by:",
+-    "locationTreeOpenSettings": "Open settings",
+     "locationTreeCatalogBadge": "hub",
+-    "locationTreeChildren": "nested:",
+     "hubCatalogLabel": "Hub",
+     "hubCatalogHint": "A catalog location: a convenient tree of the structure — what follows what, what is blocked by what, what exits where. Tap a section to open its settings.",
+     "parentLocationLabel": "Parent location",
+@@ -122,6 +117,14 @@
+     "exitLocationLabel": "Exit from location",
+     "exitLocationHint": "Where the exit leads if it does not lead to the previous (parent) location: a special passage or a teleport.",
+     "locationNone": "— none —",
++    "locationSearchPlaceholder": "Search location…",
++    "locationNoMatch": "Nothing found",
++    "hubFolderHint": "A hub is a folder of locations and is itself the parent. Nest locations, locks, terminals and keys inside it — a tree of the contents opens within. No parent or exit is needed: move locations with the arrows, like folders in Windows.",
++    "locationKeyLabel": "Key item for access to the location",
++    "locationGateLabel": "Lock or terminal that blocks entry to the location without a check",
++    "locationGateHint": "You can enter the location only by passing both obstacles (AND) or one of them (OR).",
++    "locationTreeKey": "key:",
++    "locationTreeEmptyNode": "Empty for now. Drag a location here with the arrows or add objects.",
+     "lockPinEstimate": "Roughly {count} bobby pins at skill 0"
+   },
+   "detail": {
+@@ -173,6 +176,7 @@
+     "emptyLootPromptTitle": "Container is empty. Delete it?",
+     "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
+     "emptyLootKeep": "Keep",
++    "locationsInside": "Locations inside",
+     "hubKeysTitle": "Keys and notes in this location",
+     "hubKeysEmpty": "Drag a key card onto the location",
+     "hubKeyDetach": "Move back to grid",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index cd8e28f..ffedf6a 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -5,7 +5,6 @@
+     "createLoot": "Создать\nконтейнер",
+     "createMerchant": "Создать\nторговца",
+     "createHub": "Создать\nлокацию",
+-    "locationTree": "Структура\nлокаций",
+     "syncCloud": "Синхронизация с облаком",
+     "createTerminal": "Терминал взлома",
+     "createKeyItem": "Создать ключ / записку",
+@@ -109,13 +108,9 @@
+     "accessExprReady": "Условие готово к сохранению.",
+     "locationSelfReference": "Локация не может быть родителем или выходом самой себе.",
+     "locationCycle": "Нельзя вложить локацию в её собственного потомка — получится цикл.",
+-    "locationTreeTitle": "Структура локаций",
+-    "locationTreeEmpty": "Пока нет локаций. Создайте локацию и отметьте её как «Хаб», чтобы увидеть дерево.",
+     "locationTreeExitTo": "выход →",
+     "locationTreeBlockedBy": "заблокировано:",
+-    "locationTreeOpenSettings": "Открыть настройки",
+     "locationTreeCatalogBadge": "хаб",
+-    "locationTreeChildren": "вложено:",
+     "hubCatalogLabel": "Хаб",
+     "hubCatalogHint": "Локация-каталог: удобное дерево структуры — что за чем идёт, что чем заблокировано, что во что выходит. Нажмите на секцию, чтобы открыть её настройки.",
+     "parentLocationLabel": "Родительская локация",
+@@ -123,6 +118,14 @@
+     "exitLocationLabel": "Выход из локации",
+     "exitLocationHint": "Куда ведёт выход, если он ведёт не в предыдущую (родительскую) локацию: особый переход или телепорт.",
+     "locationNone": "— нет —",
++    "locationSearchPlaceholder": "Поиск локации…",
++    "locationNoMatch": "Ничего не найдено",
++    "hubFolderHint": "Хаб — это папка локаций и сам родитель. Вкладывайте в него локации, замки, терминалы и ключи — внутри откроется дерево вложенного. Родитель и выход не нужны: переносите локации стрелками, как папки в Windows.",
++    "locationKeyLabel": "Ключевой предмет для доступа в локацию",
++    "locationGateLabel": "Замок или терминал, не дающий без проверки войти в локацию",
++    "locationGateHint": "Войти в локацию можно, только пройдя обе преграды (И) или одну из них (ИЛИ).",
++    "locationTreeKey": "ключ:",
++    "locationTreeEmptyNode": "Пока пусто. Перетащите сюда локацию стрелками или добавьте объекты.",
+     "lockPinEstimate": "Ориентировочно {count} отмычек при навыке 0"
+   },
+   "detail": {
+@@ -174,6 +177,7 @@
+     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
+     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
+     "emptyLootKeep": "Оставить",
++    "locationsInside": "Локации внутри",
+     "hubKeysTitle": "Ключи и записки в локации",
+     "hubKeysEmpty": "Перетащите карточку ключа на локацию",
+     "hubKeyDetach": "Вернуть на сетку",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 617c385..c499bf9 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "538"
++  "baseline": "539"
+ }
+diff --git a/public/version.json b/public/version.json
+index 8b0983a..5abc288 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "538",
++  "version": "539",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
+       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+       "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
+       "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
+@@ -142,6 +143,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
+       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
+       "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",
+       "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",

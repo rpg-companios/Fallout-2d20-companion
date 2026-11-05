@@ -1,6 +1,54 @@
 # Changelog
 ---
 
+## A nested location lives only inside its parent + parameters in the tree (patch 540)
+
+A refinement of nesting at the owner's word (thesis 31). Still admin-only; the
+player window is the next step.
+
+- **A folder in a folder leaves the root.** If a location is created as a child
+  from the start (a parent is set) or moved into a hub with the arrows, it is no
+  longer shown as a card on the root screen alongside everything else — it lives
+  only inside its parent and opens from the parent's tree. Hubs used to always
+  be visible on the root, so a child location was duplicated as both a card and
+  a tree entry.
+- **A nested location shows its parameters in the tree** — like other entries in
+  the hub: the rooms it is available for, the number of objects and locked
+  points, while the key, lock/terminal and exit are shown as dashed dependency
+  lines.
+- **A nested location can be opened.** The "Contents" button goes inside the
+  location to manage its contents, with a way back to the parent.
+- **Nothing is lost.** If the parent is deleted, nested locations return to the
+  root screen instead of disappearing; if the parent is ever missing from the
+  data, the location is shown on the root too.
+
+## The hub is itself a folder-tree (patch 539)
+
+A rework of the 538 location structure at the owner's word (thesis 30). There
+is no longer a separate "Location Structure" card: the hub is itself a
+tree-folder. Still admin-only; the player window is the next step.
+
+- **A hub opens a tree of its contents.** Open a hub location and see what was
+  put inside it: locations, locks, terminals, containers, merchants. Locations
+  are spoilers: tap the arrow to reveal what is inside. Dashed lines show what
+  depends on what: what is blocked by what, which key is needed, what exits
+  where. Tapping a node opens that section's settings.
+- **The hub form is simplified.** Check "Hub" and the location becomes a folder
+  and is its own parent: the "Parent location" and "Exit from location" rows
+  disappear, leaving the server rooms the hub is available for. There can be
+  many hubs, and they can be nested into one another.
+- **Parent and exit are dropdowns.** For an ordinary location, parent and exit
+  are now picked from a searchable list with a "— none —" option, not a wall of
+  buttons: even 100 locations do not turn the screen into 200 buttons.
+- **The matryoshka works again.** A location can be grabbed by the move arrows
+  and dropped into another location — it becomes a child, like folders in
+  Windows. A nested location can be moved back out to the root. You cannot drop
+  a location onto itself or nest it into its own descendant (a cycle).
+- **Key and lock/terminal are separate fields.** "Key item for access to the
+  location" and "Lock or terminal that blocks entry to the location without a
+  check" are split apart and labelled in plain language. AND/OR means: you can
+  enter the location only by passing both obstacles (AND) or one of them (OR).
+
 ## Location structure in the admin side (patch 538)
 
 The admin part of the location structure is implemented (thesis 29). The

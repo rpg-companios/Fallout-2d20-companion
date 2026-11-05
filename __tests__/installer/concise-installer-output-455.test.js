@@ -36,7 +36,7 @@ describe('Патч 455: лаконичный отчёт apply-patch.sh и явн
 
     try {
       fs.mkdirSync(upstream, { recursive: true });
-      git(upstream, ['init', '-b', 'arena/054e6676-fallout-2d20-companion']);
+      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
