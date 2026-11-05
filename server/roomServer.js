@@ -402,6 +402,14 @@ const attachRoomWebSocketServer = (httpServer, {
    * уже скопировал доску в их `terminalStates`; здесь рассылаем свежие
    * состояния точек и журнал доступа всем участникам этих комнат.
    */
+  /** Патч 535: запросы «Мастер решает» видны во всех вкладках комнаты. */
+  const broadcastGmDecisions = (room) => {
+    if (!room) return;
+    broadcastToRoom(room, null, MESSAGE.GM_DECISION_STATE, {
+      decisions: registry.getGmDecisions(room.code),
+    });
+  };
+
   const broadcastTerminalRooms = (result, canonical) => {
     const targets = Array.isArray(result?.terminalRooms) ? result.terminalRooms : [];
     for (const target of targets) {
@@ -724,6 +732,65 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        // Патч 535: «Мастер решает». Игрок просит решения, Мастер отвечает
+        // «Да/Нет»; состояние запросов — канон сервера (закон 529).
+        case MESSAGE.GM_DECISION_REQUEST: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.requestGmDecision({
+            code: canonical,
+            clientId,
+            containerId: payload.containerId,
+            kind: payload.kind,
+            characterId: payload.characterId,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.GM_DECISION_STATE, {
+            decisions: registry.getGmDecisions(canonical),
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastGmDecisions(result.room);
+          break;
+        }
+
+        case MESSAGE.GM_DECISION_RESOLVE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.resolveGmDecision({
+            code: canonical,
+            clientId,
+            decisionId: payload.decisionId,
+            value: payload.value,
+            ownerToken: payload.ownerToken || null,
+            ws,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.GM_DECISION_STATE, {
+            decisions: registry.getGmDecisions(canonical),
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastGmDecisions(result.room);
+          if (result.terminal) {
+            sendEnvelope(ws, MESSAGE.TERMINAL_STATE, { terminal: result.terminal }, canonical, clientId);
+            broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
+            broadcastKeyAccessState(result.room, clientId);
+          }
+          broadcastTerminalRooms(result, canonical);
+          break;
+        }
+
         case MESSAGE.TERMINAL_ISSUE: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) {
@@ -948,6 +1015,8 @@ const attachRoomWebSocketServer = (httpServer, {
           broadcastKeyAccessState(result.room, clientId);
           // Патч 523: остальные привязанные комнаты сразу видят ту же локацию.
           broadcastSessionStateForResult(result, clientId, { session: result.session });
+          // Патч 535: и общий реестр точек/журнал доступа тоже.
+          broadcastTerminalRooms(result, canonical);
           break;
         }
 
@@ -983,6 +1052,7 @@ const attachRoomWebSocketServer = (httpServer, {
             session: result.session,
           });
           broadcastTerminalStates(result.room);
+          broadcastTerminalRooms(result, canonical);
           break;
         }
 

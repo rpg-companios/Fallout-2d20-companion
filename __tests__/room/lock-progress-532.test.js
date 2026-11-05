@@ -436,19 +436,20 @@ describe('532/534: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('534');
+    expect(version.version).toBe('535');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(129);
-    expect(version.notes['en-EN']).toHaveLength(129);
-    expect(json('patchs/baseline.json').baseline).toBe('534');
+    expect(version.notes['ru-RU']).toHaveLength(133);
+    expect(version.notes['en-EN']).toHaveLength(133);
+    expect(json('patchs/baseline.json').baseline).toBe('535');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+    expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **534**');
-    expect(roadmap).toContain('| 24 |');
-    expect(roadmap).toContain('Осталось после патча 534');
-    expect(read('docs/patch-534-install.md')).toContain('534');
-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 19.');
+    expect(roadmap).toContain('Текущая версия: **535**');
+    expect(roadmap).toContain('| 26 |');
+    expect(roadmap).toContain('Осталось после патча 535');
+    expect(read('docs/patch-535-install.md')).toContain('535');
+    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
   });
 });

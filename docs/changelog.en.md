@@ -1,6 +1,55 @@
 # Changelog
 ---
 
+## "The Game Master decides" and a shared board for bound rooms (patch 535)
+
+The owner accepted the proposal for a standard escape hatch: "the same Yes/No
+pattern the terminal already has, but available for any disputed situation, so
+we do not have to enumerate every exception in the rules. So the admin can
+block or open locks at their discretion". Clarifications: one step together
+with roadmap item 1; **both paths** — a player request and a manual GM switch;
+"open" = immediate ACCESS GRANTED without a hack; "locks for now, but leave
+room to manoeuvre", without guessing at future rulebooks.
+
+### 1. "The Game Master decides"
+
+- New protocol frames `gm.decisionRequest` / `gm.decisionState` /
+  `gm.decisionResolve` and error codes; the client mirror was updated.
+- Requests live in `room.gmDecisions` — Game Master state, server canon.
+  The 529 snapshot law holds: published sheets are never edited by the server.
+- A player whose point is blocked sees a hint and an "Ask the Game Master"
+  button; pressing twice does not create duplicate prompts.
+- `GmDecisionPromptHost` is mounted in `App.js` next to `TerminalRetryPromptHost`:
+  the Yes/No prompt appears above any screen and names both the point and the
+  requesting player.
+- "Yes" and the manual "Open" button grant `ACCESS GRANTED` immediately: a won
+  board (`hackedByGm`, not a key), a shared access event, the block lifted and
+  the 532 progress reset by the win. "No" leaves the point closed.
+- Manual `gmBlock` / `gmOpen` are available to the GM on the point card. The
+  block check was inserted **only** into `shouldBlockLock()`; automatic
+  blocking after failures (law 526) remains disabled.
+- The skeleton is extensible: `GM_DECISION_KINDS` on the server and
+  `gmDecisionTextKeys()` on the client. One kind exists now, `lock.open`;
+  unknown kinds get a generic string pair and an explicit server refusal. No
+  new screens or guesses about future situations.
+
+### 2. Roadmap item 1: shared board and shared access log
+
+- `boundScopeRooms()` walks location `roomCodes` to a fixed point;
+  `syncSharedTerminalScope()` merges **all** `terminalStates` and
+  `accessEvents` of the contour, not just the lock board (532).
+- A point issued in one room is visible in every bound room; the **terminal**
+  board (words, attempts, operator) and access events travel together.
+- A room that joins later adopts the hack already in progress instead of
+  starting a new secret; a fresh GM broadcast still resets the board.
+- Broadcasts use the existing `broadcastTerminalRooms()`; role/membership
+  checks, payload caps and JSON validation were not weakened.
+
+Checks: typecheck, build, full `npm test`, forward and reverse `git apply
+--check`, installer from the exact base and from 534 with byte comparison, live
+WS probe. The remaining items of thesis 13 are in `docs/roadmap.md`.
+
+
 ## Restored at the owner's request (patch 534)
 
 The owner pointed out that patch 533 rolled back more than asked: the progress

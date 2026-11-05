@@ -1,0 +1,2018 @@
+diff --git a/App.js b/App.js
+index 599d154..dfdeac0 100644
+--- a/App.js
++++ b/App.js
+@@ -16,6 +16,7 @@ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
+ import TerminalRetryPromptHost from './components/lootTrade/TerminalRetryPromptHost';
++import GmDecisionPromptHost from './components/lootTrade/GmDecisionPromptHost';
+ import CharSpendCommandHost from './components/lootTrade/CharSpendCommandHost';
+ // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
+ // /version.json + описание релиза (логика — src/utils/appVersion.js).
+@@ -372,6 +373,8 @@ function App() {
+           <AlertHost />
+           {/* Патч 504: вопрос Мастеру о повторном взломе поверх любого экрана. */}
+           <TerminalRetryPromptHost />
++          {/* Патч 535: штатный выход «Мастер решает» для спорных ситуаций. */}
++          <GmDecisionPromptHost />
+           {/* Патч 528: списание заколки и обновление листа по командам сервера. */}
+           <CharSpendCommandHost />
+           <SurvivalClock />
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+new file mode 100644
+index 0000000..9fc9583
+--- /dev/null
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -0,0 +1,271 @@
++// Приёмочный тест патча 535. Владелец принял предложение: «пригодится единый
++// штатный выход „Мастер решает" — тот же паттерн „Да/Нет", что уже есть у
++// терминала, но доступный для любой спорной ситуации, чтобы не перечислять
++// все исключения в правилах. Чтобы админ мог блокировать/открывать замки по
++// своему усмотрению» + «Сейчас замки, но оставить место для манёвра».
++//
++// Ответы на уточняющие вопросы: одним патчем с пунктом 1 плана; оба пути
++// (запрос игрока И ручной переключатель Мастера); «открыть» = сразу выдать
++// доступ без взлома; общий каркас без гадания о будущих видах решений.
++
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import { ERROR_CODE, MESSAGE } from '../../server/protocol.js';
++import {
++  LOCK_BLOCK_POLICY,
++  shouldBlockLock,
++  gmWonLockGame,
++} from '../../server/lockPicking.js';
++import {
++  findPendingGmDecisions,
++  gmDecisionTextKeys,
++} from '../../components/lootTrade/gmDecisionPrompt.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const LOCK = {
++  containerId: 'l1', name: 'Замок', description: '', difficulty: 0, kind: 'lock',
++  requiredKeyItemId: '', keyRequirement: 'none', linkedCheckId: '', linkedCheckIds: [],
++};
++const TERMINAL = {
++  containerId: 't1', name: 'Терминал', description: '', difficulty: 0, kind: 'terminal',
++  requiredKeyItemId: '', keyRequirement: 'none', linkedCheckId: '', linkedCheckIds: [],
++};
++
++const snapshot = (pins = 5) => ({
++  characterName: 'Сталкер',
++  data: {
++    attributes: [{ name: 'PER', value: 4 }, { name: 'LCK', value: 4 }, { name: 'INT', value: 5 }],
++    skills: [{ name: 'LOCKPICK', value: 0 }, { name: 'SCIENCE', value: 0 }],
++    equipment: { items: [{ id: 'pin', weaponId: 'item_bobby_pin', quantity: pins }] },
++  },
++});
++
++const setupOne = () => {
++  const registry = createRoomRegistry({ now: () => 1000, rng: () => 990 });
++  const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++  const code = room.code;
++  registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++  registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++  registry.putSnapshot({
++    code, characterId: 'ch1', revision: 1, snapshot: snapshot(),
++    fromClientId: 'p1', fromName: 'Игрок',
++  });
++  registry.issueTerminal({ code, clientId: 'gm', config: LOCK });
++  const act = (action, value, clientId = 'p1') => registry.terminalAction({
++    code, clientId, characterId: 'ch1', containerId: 'l1', action, value,
++  });
++  const entry = () => registry._rooms.get(code).terminalStates.get('l1');
++  return { registry, code, act, entry };
++};
++
++describe('535: «Мастер решает» — блокировка и открытие замка', () => {
++  it('автоблокировка 526 не вернулась: только явный флаг Мастера', () => {
++    expect(LOCK_BLOCK_POLICY.enabled).toBe(false);
++    expect(shouldBlockLock({ game: { status: 'won' }, config: LOCK })).toBe(false);
++    expect(shouldBlockLock({ game: null, config: LOCK, gmBlocked: true })).toBe(true);
++    const won = gmWonLockGame(LOCK);
++    expect(won.result).toBe('ACCESS GRANTED');
++    expect(won.hackedByGm).toBe(true);
++    expect(won.hackedByKey).toBe(false);
++  });
++
++  it('gmBlock / gmOpen — только Мастер; игрок не начинает взлом при блокировке', () => {
++    const { registry, code, act, entry } = setupOne();
++    expect(act('gmBlock', undefined, 'p1').error).toBe(ERROR_CODE.TERMINAL_GM_ONLY);
++    expect(registry.terminalAction({
++      code, clientId: 'gm', containerId: 'l1', action: 'gmBlock',
++    }).error).toBeUndefined();
++    expect(entry().gmBlocked).toBe(true);
++    expect(act('start').error).toBe(ERROR_CODE.LOCK_BLOCKED);
++    expect(act('newAttempt').error).toBe(ERROR_CODE.LOCK_BLOCKED);
++    const opened = registry.terminalAction({
++      code, clientId: 'gm', containerId: 'l1', action: 'gmOpen',
++    });
++    expect(opened.error).toBeUndefined();
++    expect(opened.terminal.gmBlocked).toBe(false);
++    expect(opened.terminal.game.status).toBe('won');
++    expect(opened.terminal.game.hackedByGm).toBe(true);
++    expect(registry.getAccessEvents(code).l1).toMatchObject({ kind: 'hacked', by: 'gm' });
++  });
++
++  it('запрос игрока → «Да/Нет» Мастера; «Да» открывает точку сразу', () => {
++    const { registry, code, act, entry } = setupOne();
++    registry.terminalAction({ code, clientId: 'gm', containerId: 'l1', action: 'gmBlock' });
++    const request = { code, clientId: 'p1', containerId: 'l1', kind: 'lock.open', characterId: 'ch1' };
++    const first = registry.requestGmDecision(request);
++    expect(first.error).toBeUndefined();
++    expect(first.decision.status).toBe('pending');
++    expect(first.decision.requestedBy.characterId).toBe('ch1');
++    // Повторное нажатие не плодит диалоги.
++    expect(registry.requestGmDecision(request).decision.id).toBe(first.decision.id);
++    expect(registry.getGmDecisions(code)).toHaveLength(1);
++    // Решать может только владелец комнаты.
++    expect(registry.resolveGmDecision({
++      code, clientId: 'p1', decisionId: first.decision.id, value: 'yes',
++    }).error).toBe(ERROR_CODE.GM_DECISION_GM_ONLY);
++
++    const declined = registry.resolveGmDecision({
++      code, clientId: 'gm', decisionId: first.decision.id, value: 'no',
++    });
++    expect(declined.error).toBeUndefined();
++    expect(declined.decision.status).toBe('declined');
++    expect(declined.granted).toBe(false);
++    expect(entry().gmBlocked).toBe(true);
++    expect(entry().game).toBeNull();
++    expect(act('start').error).toBe(ERROR_CODE.LOCK_BLOCKED);
++
++    const second = registry.requestGmDecision(request);
++    expect(second.decision.id).not.toBe(first.decision.id);
++    const approved = registry.resolveGmDecision({
++      code, clientId: 'gm', decisionId: second.decision.id, value: 'yes',
++    });
++    expect(approved.error).toBeUndefined();
++    expect(approved.granted).toBe(true);
++    expect(approved.terminal.game.status).toBe('won');
++    expect(approved.terminal.game.hackedByGm).toBe(true);
++    expect(entry().gmBlocked).toBe(false);
++    expect(registry.getAccessEvents(code).l1).toMatchObject({ kind: 'hacked', by: 'gm' });
++    expect(registry.getGmDecisions(code).every((d) => d.status !== 'pending')).toBe(true);
++    expect(registry.resolveGmDecision({
++      code, clientId: 'gm', decisionId: second.decision.id, value: 'yes',
++    }).error).toBe(ERROR_CODE.GM_DECISION_CLOSED);
++  });
++
++  it('виды решений расширяемы, но неизвестный вид не проходит на сервере', () => {
++    const { registry, code } = setupOne();
++    expect(registry.GM_DECISION_KINDS).toContain('lock.open');
++    expect(registry.requestGmDecision({
++      code, clientId: 'p1', containerId: 'l1', kind: 'invented.kind',
++    }).error).toBe(ERROR_CODE.GM_DECISION_KIND);
++    expect(gmDecisionTextKeys('lock.open').titleKey).toBe('gmDecision.lockOpenTitle');
++    expect(gmDecisionTextKeys('future.kind').titleKey).toBe('gmDecision.genericTitle');
++  });
++
++  it('глобальный хост показывает вопрос только Мастеру и только нерешённый', () => {
++    const rooms = {
++      R1: { role: 'gm', gmDecisions: [
++        { id: 'd1', status: 'pending', kind: 'lock.open', containerId: 'l1', name: 'Замок', requestedBy: { name: 'Игрок' } },
++        { id: 'd2', status: 'approved', kind: 'lock.open', containerId: 'l1', name: 'Замок', requestedBy: { name: 'Игрок' } },
++      ] },
++      R2: { role: 'player', gmDecisions: [
++        { id: 'd3', status: 'pending', kind: 'lock.open', containerId: 'l1', name: 'Замок', requestedBy: { name: 'Игрок' } },
++      ] },
++    };
++    expect(findPendingGmDecisions(rooms, 'gm').map((d) => d.id)).toEqual(['d1']);
++  });
++});
++
++describe('535: пункт 1 плана — общая доска и общий журнал доступа', () => {
++  it('точки, доска терминала и события доступа видны во всех привязанных комнатах', () => {
++    const registry = createRoomRegistry({ now: () => 1000, rng: () => 990 });
++    const a = registry.createRoom({ clientId: 'gm-R1', name: 'A', requestedCode: 'R1' }).room;
++    const b = registry.createRoom({ clientId: 'gm-R2', name: 'B', requestedCode: 'R2' }).room;
++    for (const room of [a, b]) {
++      registry.joinRoom({ code: room.code, clientId: `gm-${room.code}`, name: 'GM', role: 'gm' });
++      registry.joinRoom({ code: room.code, clientId: `p-${room.code}`, name: 'Игрок', role: 'player' });
++      registry.putSnapshot({
++        code: room.code, characterId: `ch-${room.code}`, revision: 1, snapshot: snapshot(),
++        fromClientId: `p-${room.code}`, fromName: 'Игрок',
++      });
++    }
++    registry.issueTerminal({ code: a.code, clientId: 'gm-R1', config: LOCK });
++    registry.openSession({
++      code: a.code, clientId: 'gm-R1',
++      session: {
++        sessionId: 'bound-535', containerId: 'hub', kind: 'hub', name: 'Бункер',
++        targetType: 'room', roomCodes: [a.code, b.code],
++        nodes: [
++          { containerId: 'l1', kind: 'lock', name: 'Замок', difficulty: 0 },
++          { containerId: 't1', kind: 'terminal', name: 'Терминал', difficulty: 0 },
++        ],
++      },
++    });
++    // Обе точки зарегистрированы в ОБЕИХ комнатах, а не только доска замка.
++    expect(registry.getState(b.code).terminalStates.l1).toBeTruthy();
++    expect(registry.getState(b.code).terminalStates.t1).toBeTruthy();
++
++    const started = registry.terminalAction({
++      code: a.code, clientId: 'p-R1', characterId: 'ch-R1', containerId: 't1', action: 'start',
++    });
++    expect(started.error).toBeUndefined();
++    const boardA = registry.getState(a.code).terminalStates.t1.game;
++    const boardB = registry.getState(b.code).terminalStates.t1.game;
++    expect(boardB).toBeTruthy();
++    expect(boardB.wordRanges).toEqual(boardA.wordRanges);
++
++    const opened = registry.terminalAction({
++      code: a.code, clientId: 'gm-R1', containerId: 'l1', action: 'gmOpen',
++    });
++    expect(opened.error).toBeUndefined();
++    expect(registry.getState(b.code).terminalStates.l1.game.status).toBe('won');
++    expect(registry.getAccessEvents(a.code).l1).toMatchObject({ kind: 'hacked', by: 'gm-R1' });
++    expect(registry.getAccessEvents(b.code).l1).toMatchObject({ kind: 'hacked', by: 'gm-R1' });
++  });
++});
++
++describe('535: протокол, клиент, строки и документы', () => {
++  it('сервер и клиентское зеркало знают три новых кадра и коды ошибок', () => {
++    expect(MESSAGE.GM_DECISION_REQUEST).toBe('gm.decisionRequest');
++    expect(MESSAGE.GM_DECISION_STATE).toBe('gm.decisionState');
++    expect(MESSAGE.GM_DECISION_RESOLVE).toBe('gm.decisionResolve');
++    const mirror = read('src/room/roomProtocol.ts');
++    for (const needle of [
++      'GM_DECISION_REQUEST', 'GM_DECISION_STATE', 'GM_DECISION_RESOLVE',
++      'GM_DECISION_GM_ONLY', 'GM_DECISION_NOT_FOUND', 'GM_DECISION_KIND', 'GM_DECISION_CLOSED',
++    ]) expect(mirror).toContain(needle);
++    for (const key of [
++      'GM_DECISION_GM_ONLY', 'GM_DECISION_NOT_FOUND', 'GM_DECISION_KIND', 'GM_DECISION_CLOSED',
++    ]) expect(ERROR_CODE[key]).toBe(key);
++  });
++
++  it('хост смонтирован, игрок видит блокировку и кнопку запроса, Мастер — переключатель', () => {
++    expect(read('App.js')).toContain('<GmDecisionPromptHost />');
++    const modal = read('components/lootTrade/LockPickingModal.js');
++    expect(modal).toContain('lock-gm-blocked');
++    expect(modal).toContain('lock-ask-gm');
++    expect(modal).toContain('requestGmDecision');
++    expect(modal).toContain('terminalState?.gmBlocked');
++    const admin = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(admin).toContain('setGmLockState');
++    expect(admin).toContain('gm-block-');
++    expect(admin).toContain('gm-open-');
++    expect(read('src/room/roomStore.ts')).toContain('GM_DECISION_STATE');
++    expect(read('server/roomServer.js')).toContain('MESSAGE.GM_DECISION_REQUEST');
++    expect(read('server/roomRegistry.js')).toContain('syncSharedTerminalScope');
++  });
++
++  it('RU/EN строки парные, закон снимка 529 не нарушен', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json');
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json');
++    for (const section of ['gmDecision', 'lock', 'livePanel']) {
++      expect(Object.keys(ru[section]).sort()).toEqual(Object.keys(en[section]).sort());
++    }
++    expect(ru.gmDecision.lockOpenMessage).toContain('{requester}');
++    expect(en.gmDecision.lockOpenMessage).toContain('{requester}');
++    expect(JSON.stringify(ru.lock)).not.toMatch(/отмычк|шпильк|булавк/i);
++    // Единственный писатель снимка — putSnapshot (529).
++    expect(read('server/roomRegistry.js').match(/room\.lastSnapshots\.set\(/g)).toHaveLength(1);
++  });
++
++  it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
++    const version = json('public/version.json');
++    expect(version.version).toBe('535');
++    expect(version.release).toBe(4);
++    expect(version.notes['ru-RU']).toHaveLength(133);
++    expect(version.notes['en-EN']).toHaveLength(133);
++    expect(json('patchs/baseline.json').baseline).toBe('535');
++    expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
++    const roadmap = read('docs/roadmap.md');
++    expect(roadmap).toContain('Текущая версия: **535**');
++    expect(roadmap).toContain('| 26 |');
++    expect(roadmap).toContain('Осталось после патча 535');
++    expect(read('docs/patch-535-install.md')).toContain('535');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
++  });
++});
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index e0398ab..d963f45 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,19 +436,20 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('534');
++    expect(version.version).toBe('535');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(129);
+-    expect(version.notes['en-EN']).toHaveLength(129);
+-    expect(json('patchs/baseline.json').baseline).toBe('534');
++    expect(version.notes['ru-RU']).toHaveLength(133);
++    expect(version.notes['en-EN']).toHaveLength(133);
++    expect(json('patchs/baseline.json').baseline).toBe('535');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
++    expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **534**');
+-    expect(roadmap).toContain('| 24 |');
+-    expect(roadmap).toContain('Осталось после патча 534');
+-    expect(read('docs/patch-534-install.md')).toContain('534');
+-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 19.');
++    expect(roadmap).toContain('Текущая версия: **535**');
++    expect(roadmap).toContain('| 26 |');
++    expect(roadmap).toContain('Осталось после патча 535');
++    expect(read('docs/patch-535-install.md')).toContain('535');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
+   });
+ });
+diff --git a/components/lootTrade/GmDecisionPromptHost.js b/components/lootTrade/GmDecisionPromptHost.js
+new file mode 100644
+index 0000000..2c0a671
+--- /dev/null
++++ b/components/lootTrade/GmDecisionPromptHost.js
+@@ -0,0 +1,125 @@
++/**
++ * Патч 535 — штатный выход «Мастер решает»: «Да/Нет» поверх ЛЮБОГО экрана.
++ *
++ * Тот же паттерн, что и TerminalRetryPromptHost (504), но источник правды —
++ * не доска терминала, а реестр запросов `gmDecisions` в roomStore. Состояние
++ * запросов принадлежит Мастеру и приходит с сервера (закон снимка 529), так
++ * что вопрос всплывет во всех вкладках Мастера, а игрок видит ожидание.
++ *
++ * Компонент ничего не рендерит: диалоги рисует AlertHost через showRawAlert.
++ * Несколько запросов обрабатываются последовательной очередью.
++ */
++
++import React, { useEffect, useRef } from 'react';
++import * as db from '../../db';
++import useRoomStore from '../../src/room/roomStore';
++import { showRawAlert } from '../alerts/alertService';
++import { useLocale } from '../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
++import { debugLog } from '../../src/debug/falloutDebug';
++import { findPendingGmDecisions, gmDecisionTextKeys } from './gmDecisionPrompt';
++
++const GmDecisionPromptHost = () => {
++  useLocale();
++  const handledRef = useRef(new Set());
++  const queueRef = useRef([]);
++  const busyRef = useRef(false);
++  const timerRef = useRef(null);
++
++  useEffect(() => {
++    const drain = async () => {
++      if (busyRef.current) return;
++      busyRef.current = true;
++      try {
++        let ownerTokens = {};
++        try {
++          const rows = await Promise.race([
++            db.getFolderRooms(),
++            new Promise((resolve) => setTimeout(() => resolve([]), 1000)),
++          ]);
++          ownerTokens = Object.fromEntries(
++            (rows || [])
++              .filter((row) => row?.code && row?.owner_token)
++              .map((row) => [String(row.code), String(row.owner_token)]),
++          );
++        } catch {
++          ownerTokens = {};
++        }
++        while (queueRef.current.length > 0) {
++          const item = queueRef.current.shift();
++          const keys = gmDecisionTextKeys(item.kind);
++          const message = [
++            formatLootTrade(tLootTrade(keys.messageKey), {
++              name: item.name,
++              requester: item.requester || '—',
++            }),
++          ].join('\n');
++          // eslint-disable-next-line no-await-in-loop
++          const index = await showRawAlert({
++            title: tLootTrade(keys.titleKey),
++            message,
++            kind: 'info',
++            buttons: [
++              { text: tLootTrade('gmDecision.yes') },
++              { text: tLootTrade('gmDecision.no'), style: 'cancel' },
++            ],
++          });
++          if (index !== 0 && index !== 1) {
++            const requeue = () => {
++              queueRef.current.push(item);
++              busyRef.current = false;
++              void drain();
++            };
++            handledRef.current.delete(item.key);
++            timerRef.current = setTimeout(requeue, 1500);
++            return;
++          }
++          const value = index === 0 ? 'yes' : 'no';
++          try {
++            // eslint-disable-next-line no-await-in-loop
++            await useRoomStore.getState().resolveGmDecision({
++              code: item.code,
++              decisionId: item.id,
++              value,
++              ownerToken: ownerTokens[item.code],
++            });
++          } catch (error) {
++            debugLog('gm.decision:failed', { message: error?.message });
++            handledRef.current.delete(item.key);
++            // eslint-disable-next-line no-await-in-loop
++            await showRawAlert({ title: tLootTrade('gmDecision.failed') });
++            timerRef.current = setTimeout(() => {
++              queueRef.current.push(item);
++              busyRef.current = false;
++              void drain();
++            }, 1500);
++            return;
++          }
++        }
++      } finally {
++        busyRef.current = false;
++      }
++    };
++
++    const collect = (state) => {
++      const clientId = state?.clientId || useRoomStore.getState().clientId;
++      for (const item of findPendingGmDecisions(state?.rooms, clientId)) {
++        if (handledRef.current.has(item.key)) continue;
++        handledRef.current.add(item.key);
++        queueRef.current.push(item);
++      }
++      if (queueRef.current.length > 0) void drain();
++    };
++
++    const unsubscribe = useRoomStore.subscribe(collect);
++    collect(useRoomStore.getState());
++    return () => {
++      unsubscribe();
++      if (timerRef.current) clearTimeout(timerRef.current);
++    };
++  }, []);
++
++  return null;
++};
++
++export default GmDecisionPromptHost;
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 7ebd9ab..6ec8182 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -101,9 +101,15 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+     && (game.operatorClientId !== myClientId || game.operatorCharacterId !== characterId),
+   );
+   const viewOnly = !localMode && Boolean(game && game.status === 'playing' && !isOperator);
++  // Патч 535: Мастер мог заблокировать точку по своему усмотрению. В локальном
++  // резерве (нет протокола комнаты) серверного решения нет — блокировки нет.
++  const gmBlocked = !localMode && Boolean(terminalState?.gmBlocked);
++  const gmDecision = (rooms?.[roomCode]?.gmDecisions || [])
++    .filter((entry) => entry?.containerId === containerId)
++    .slice(-1)[0] || null;
+   const canPress = Boolean(
+     characterId && (roomCode || localMode) && containerId
+-    && game?.status === 'playing' && isOperator && !busy,
++    && game?.status === 'playing' && isOperator && !busy && !gmBlocked,
+   );
+   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+ 
+@@ -344,6 +350,21 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   );
+ 
+   const hasBoard = Boolean(game && rows.length > 0);
++  // Патч 535: игрок просит Мастера решить спорную ситуацию. Пока единственный
++  // вид запроса — lock.open; каркас на сервере расширяемый.
++  const askGm = async () => {
++    if (!roomCode || !containerId) return;
++    try {
++      await useRoomStore.getState().requestGmDecision({
++        code: roomCode,
++        containerId,
++        kind: 'lock.open',
++        characterId,
++      });
++    } catch (error) {
++      showRawAlert({ title: tLootTrade('lock.actionFailed') });
++    }
++  };
+   const newAttemptButton = (
+     <TouchableOpacity
+       testID="lock-new-attempt-button"
+@@ -415,7 +436,30 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+             </View>
+           </View>
+ 
+-          {won ? (
++          {gmBlocked && !holdBoard ? (
++            <View style={styles.accessPanel} testID="lock-gm-blocked">
++              <Text style={styles.awaitingText}>{tLootTrade('lock.gmBlocked')}</Text>
++              <Text style={styles.hintText}>{tLootTrade('lock.gmBlockedHint')}</Text>
++              {gmDecision?.status === 'pending' ? (
++                <Text style={styles.hintText} testID="lock-gm-pending">
++                  {tLootTrade('lock.gmPending')}
++                </Text>
++              ) : null}
++              {gmDecision?.status === 'declined' ? (
++                <Text style={styles.hintText}>{tLootTrade('lock.gmDeclined')}</Text>
++              ) : null}
++              {!localMode && gmDecision?.status !== 'pending' ? (
++                <TouchableOpacity
++                  testID="lock-ask-gm"
++                  accessibilityRole="button"
++                  style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
++                  onPress={() => void askGm()}
++                >
++                  <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.askGm')}</Text>
++                </TouchableOpacity>
++              ) : null}
++            </View>
++          ) : won ? (
+             <View style={styles.accessPanel}>
+               <Text accessibilityRole="alert" style={styles.wonText}>
+                 {tLootTrade('lock.won')}
+diff --git a/components/lootTrade/gmDecisionPrompt.js b/components/lootTrade/gmDecisionPrompt.js
+new file mode 100644
+index 0000000..117463f
+--- /dev/null
++++ b/components/lootTrade/gmDecisionPrompt.js
+@@ -0,0 +1,35 @@
++/**
++ * Патч 535: чистый отбор запросов «Мастер решает» (без React Native).
++ *
++ * Один каркас на все будущие спорные ситуации: сервер присылает решения с
++ * полем `kind`, здесь мы только отбираем нерешённые и НЕ гадаем, какие ещё
++ * виды появятся. Тексты для известных видов лежат в словаре, для неизвестных
++ * есть общая пара строк — добавить новый вид = добавить строки и kind в
++ * `GM_DECISION_KINDS` на сервере.
++ */
++import { isGmRoom } from './terminalRetryPrompt';
++
++export const findPendingGmDecisions = (rooms, clientId = null) => {
++  const out = [];
++  for (const [code, room] of Object.entries(rooms || {})) {
++    if (!isGmRoom(room, clientId)) continue;
++    for (const decision of room?.gmDecisions || []) {
++      if (!decision?.id || decision.status !== 'pending') continue;
++      out.push({
++        code,
++        id: decision.id,
++        kind: decision.kind,
++        containerId: decision.containerId,
++        name: decision.name || decision.containerId,
++        requester: decision.requestedBy?.name || '',
++        key: `${code}|${decision.id}`,
++      });
++    }
++  }
++  return out;
++};
++
++/** Какой парой строк подписать диалог. Расширяется вместе с видами решений. */
++export const gmDecisionTextKeys = (kind) => (kind === 'lock.open'
++  ? { titleKey: 'gmDecision.lockOpenTitle', messageKey: 'gmDecision.lockOpenMessage' }
++  : { titleKey: 'gmDecision.genericTitle', messageKey: 'gmDecision.genericMessage' });
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 01beb75..d59ecf6 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -2069,12 +2069,15 @@ export default function LootTradeScreen() {
+                   // трансляция — единственный способ начать новую партию
+                   // терминала после ACCESS GRANTED (доска сама не пересобирается).
+                   const won = !closed && !awaiting && terminal.game?.status === 'won';
+-                  const stateLabel = outOfPins
+-                    ? tLootTrade('lock.stateOutOfPins')
+-                    : (closed
+-                      ? tLootTrade('terminal.stateClosed')
+-                      : (awaiting ? tLootTrade('terminal.stateAwaiting')
+-                        : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady'))));
++                  // Патч 535: блокировка Мастера видна в карточке точки.
++                  const stateLabel = terminal.gmBlocked
++                    ? tLootTrade('lock.gmBlocked')
++                    : (outOfPins
++                      ? tLootTrade('lock.stateOutOfPins')
++                      : (closed
++                        ? tLootTrade('terminal.stateClosed')
++                        : (awaiting ? tLootTrade('terminal.stateAwaiting')
++                          : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')))));
+                   const decide = (value) => useRoomStore.getState().actOnTerminal({
+                     code,
+                     containerId: activeContainer.id,
+@@ -2088,6 +2091,14 @@ export default function LootTradeScreen() {
+                     action: 'reissue',
+                     ownerToken: roomByCode[code]?.ownerToken,
+                   }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }));
++                  // Патч 535: ручной переключатель Мастера «блокировать /
++                  // открыть». «Открыть» выдаёт доступ сразу, без мини-игры.
++                  const gmToggle = (action) => useRoomStore.getState().setGmLockState({
++                    code,
++                    containerId: activeContainer.id,
++                    action,
++                    ownerToken: roomByCode[code]?.ownerToken,
++                  }).catch(() => showRawAlert({ title: tLootTrade('terminal.retryFailed') }));
+                   return (
+                     <View key={code} style={styles.terminalAdminStateRow}>
+                       <Text style={styles.terminalAdminText}>
+@@ -2108,6 +2119,24 @@ export default function LootTradeScreen() {
+                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
+                         </TouchableOpacity>
+                       )}
++                      {isLockState && (
++                        <View style={styles.terminalAdminActions}>
++                          <TouchableOpacity
++                            testID={`gm-block-${code}`}
++                            style={styles.terminalUnlockButton}
++                            onPress={() => gmToggle('gmBlock')}
++                          >
++                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('livePanel.gmBlock')}</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity
++                            testID={`gm-open-${code}`}
++                            style={styles.terminalUnlockButton}
++                            onPress={() => gmToggle('gmOpen')}
++                          >
++                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('livePanel.gmOpen')}</Text>
++                          </TouchableOpacity>
++                        </View>
++                      )}
+                     </View>
+                   );
+                 })}
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ce6256e..125d516 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,55 @@
+ # Changelog
+ ---
+ 
++## "The Game Master decides" and a shared board for bound rooms (patch 535)
++
++The owner accepted the proposal for a standard escape hatch: "the same Yes/No
++pattern the terminal already has, but available for any disputed situation, so
++we do not have to enumerate every exception in the rules. So the admin can
++block or open locks at their discretion". Clarifications: one step together
++with roadmap item 1; **both paths** — a player request and a manual GM switch;
++"open" = immediate ACCESS GRANTED without a hack; "locks for now, but leave
++room to manoeuvre", without guessing at future rulebooks.
++
++### 1. "The Game Master decides"
++
++- New protocol frames `gm.decisionRequest` / `gm.decisionState` /
++  `gm.decisionResolve` and error codes; the client mirror was updated.
++- Requests live in `room.gmDecisions` — Game Master state, server canon.
++  The 529 snapshot law holds: published sheets are never edited by the server.
++- A player whose point is blocked sees a hint and an "Ask the Game Master"
++  button; pressing twice does not create duplicate prompts.
++- `GmDecisionPromptHost` is mounted in `App.js` next to `TerminalRetryPromptHost`:
++  the Yes/No prompt appears above any screen and names both the point and the
++  requesting player.
++- "Yes" and the manual "Open" button grant `ACCESS GRANTED` immediately: a won
++  board (`hackedByGm`, not a key), a shared access event, the block lifted and
++  the 532 progress reset by the win. "No" leaves the point closed.
++- Manual `gmBlock` / `gmOpen` are available to the GM on the point card. The
++  block check was inserted **only** into `shouldBlockLock()`; automatic
++  blocking after failures (law 526) remains disabled.
++- The skeleton is extensible: `GM_DECISION_KINDS` on the server and
++  `gmDecisionTextKeys()` on the client. One kind exists now, `lock.open`;
++  unknown kinds get a generic string pair and an explicit server refusal. No
++  new screens or guesses about future situations.
++
++### 2. Roadmap item 1: shared board and shared access log
++
++- `boundScopeRooms()` walks location `roomCodes` to a fixed point;
++  `syncSharedTerminalScope()` merges **all** `terminalStates` and
++  `accessEvents` of the contour, not just the lock board (532).
++- A point issued in one room is visible in every bound room; the **terminal**
++  board (words, attempts, operator) and access events travel together.
++- A room that joins later adopts the hack already in progress instead of
++  starting a new secret; a fresh GM broadcast still resets the board.
++- Broadcasts use the existing `broadcastTerminalRooms()`; role/membership
++  checks, payload caps and JSON validation were not weakened.
++
++Checks: typecheck, build, full `npm test`, forward and reverse `git apply
++--check`, installer from the exact base and from 534 with byte comparison, live
++WS probe. The remaining items of thesis 13 are in `docs/roadmap.md`.
++
++
+ ## Restored at the owner's request (patch 534)
+ 
+ The owner pointed out that patch 533 rolled back more than asked: the progress
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ca45afe..c77a420 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,55 @@
+ 
+ ---
+ 
++## «Мастер решает» и общая доска привязанных комнат (патч 535)
++
++Владелец принял предложение о штатном выходе «Мастер решает»: «тот же паттерн
++„Да/Нет", что уже есть у терминала, но доступный для любой спорной ситуации,
++чтобы не перечислять все исключения в правилах. Чтобы админ мог
++блокировать/открывать замки по своему усмотрению». Уточнения владельца: одним
++шагом с первым пунктом плана; **оба пути** — запрос игрока и ручной
++переключатель; «открыть» = сразу ACCESS GRANTED без взлома; «сейчас замки, но
++оставить место для манёвра», без гадания о будущих книгах правил.
++
++### 1. «Мастер решает»
++
++- Новые кадры протокола `gm.decisionRequest` / `gm.decisionState` /
++  `gm.decisionResolve` и коды отказов; клиентское зеркало обновлено.
++- Запросы живут в `room.gmDecisions` — состояние Мастера, канон сервера.
++  Закон снимка 529 не нарушен: опубликованные листы сервер не правит.
++- Игрок, у которого точка заблокирована, видит подсказку и кнопку
++  «Попросить Мастера»; повторное нажатие не плодит диалоги.
++- `GmDecisionPromptHost` смонтирован в `App.js` рядом с
++  `TerminalRetryPromptHost`: вопрос «Да/Нет» всплывает поверх любого экрана,
++  Мастер видит имя точки и просившего игрока.
++- «Да» и ручная кнопка «Открыть» выдают `ACCESS GRANTED` сразу: доска
++  выигранная (`hackedByGm`, не ключ), событие доступа общее, блокировка снята,
++  прогресс 532 сбрасывается победой. «Нет» оставляет точку закрытой.
++- Ручные `gmBlock` / `gmOpen` доступны Мастеру в карточке точки. Проверка
++  блокировки вставлена **только** в `shouldBlockLock()`; автоблокировка по
++  провалам (закон 526) по-прежнему выключена.
++- Каркас расширяемый: `GM_DECISION_KINDS` на сервере и
++  `gmDecisionTextKeys()` на клиенте. Сейчас один вид — `lock.open`, для
++  неизвестных видов есть общая пара строк и явный отказ сервера. Новых экранов
++  и догадок о будущих ситуациях нет.
++
++### 2. Пункт 1 плана: общая доска и общий журнал доступа
++
++- `boundScopeRooms()` обходит `roomCodes` локаций до неподвижной точки;
++  `syncSharedTerminalScope()` объединяет **все** `terminalStates` и
++  `accessEvents` комнат контура, а не только доску замка (532).
++- Точка, выданная в одной комнате, видна во всех привязанных; доска
++  **терминала** (слова, попытки, оператор) и события доступа расходятся вместе.
++- Комната, подключившаяся позже, перенимает уже идущий взлом, а не начинает
++  новый секрет; новая трансляция Мастера по-прежнему сбрасывает доску.
++- Рассылка идёт через существующий `broadcastTerminalRooms()`; серверные
++  проверки роли/членства, лимиты размера и валидация JSON не ослаблены.
++
++Проверки: typecheck, build, полный `npm test`, `git apply --check` в обе
++стороны, установщик от точной базы и от 534 с побайтовым сравнением, живая
++WS-проба. Оставшиеся пункты тезиса 13 — в `docs/roadmap.md`.
++
++
+ ## Возврат по слову владельца (патч 534)
+ 
+ Владелец уточнил: в патче 533 я откатил сверх просьбы счётчик прогресса,
+diff --git a/docs/gm-snapshot-law.md b/docs/gm-snapshot-law.md
+index dccf303..bc8d00e 100644
+--- a/docs/gm-snapshot-law.md
++++ b/docs/gm-snapshot-law.md
+@@ -93,5 +93,10 @@
+   «Программиста») заменена командой `magazine.use`, снимки зафиксированы как
+   канал наблюдения между сессиями.
+ 
+-Связанные документы: `docs/lockpicking-mini-game-design.md` (§14–15),
++- **535** — `room.gmDecisions` (запросы «Мастер решает») отнесено к состоянию,
++  которым владеет Мастер: сервер хранит его в памяти и рассылает кадром
++  `gm.decisionState`. Пользовательские снимки по-прежнему меняются только
++  командами `char.command` → `char.refresh` → `char.publish`.
++
++Связанные документы: `docs/lockpicking-mini-game-design.md` (§14–15, §20),
+ `docs/location-hierarchy-design.md`, `docs/roadmap.md`.
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index ea6fb77..175829f 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -135,3 +135,21 @@
+ 
+ Сервер не менялся: закон снимка 529, граница видимости, адресный взлом,
+ общие ресурсы привязанных комнат и одна сессия сохранены.
++
++## 535. Общая доска и общий журнал доступа в контуре комнат
++
++Первый оставшийся пункт тезиса 13 закрыт. Раньше `terminalStates` и
++`accessEvents` жили на комнате, а 532 синхронизировал только доску ЗАМКА.
++Теперь `boundScopeRooms()` обходит `roomCodes` локаций до неподвижной точки, а
++`syncSharedTerminalScope()` объединяет все состояния точек и весь журнал
++событий для комнат контура: точка выданная в одной комнате видна во всех,
++доска **терминала** (слова, попытки, оператор) расходится вместе с замком,
++победа/отказ/блокировка Мастера и ACCESS GRANTED тоже общие. При равных
++`updatedAt` побеждает комната-инициатор — её правка и есть последнее слово;
++комната, подключившаяся позже, перенимает идущий взлом, а не начинает новый
++секрет; новая трансляция Мастера (reissue) по-прежнему сбрасывает доску.
++
++Рассылка идёт через `broadcastTerminalRooms()` и `ACCESS_STATE`; адресный
++взлом без каскада, граница видимости, одна сессия до выхода из родителя и
++закон снимка 529 сохранены. Решение Мастера «открыть точку» описано в
++`docs/lockpicking-mini-game-design.md` §20.
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 15b5b65..2e0f3fe 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -535,3 +535,36 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ описывают реальное поведение движка. Законы снимка 529 и защита сервера
+ не тронуты. Исторические тесты 527/531/532 обновлены под возвращённое
+ состояние.
++
++## 20. Уточнение 535: «Мастер решает» и блокировка по усмотрению
++
++Владелец принял предложение: единый штатный выход «Мастер решает» (тот же
++паттерн «Да/Нет», что у терминала), чтобы не перечислять в правилах все
++исключения: «Чтобы админ мог блокировать/открывать замки по своему
++усмотрению». Уточнения: оба пути (запрос игрока **и** ручной переключатель),
++«открыть» = сразу ACCESS GRANTED без взлома, «сейчас замки, но оставить место
++для манёвра», без гадания о следующих книгах правил.
++
++**Блокировка.** `LOCK_BLOCK_POLICY.enabled` остаётся `false` — автоблокировка
++по провалам (закон 526) не вернулась. Новое условие вставлено ТОЛЬКО в
++`shouldBlockLock({ game, config, gmBlocked })`: точка закрывается лишь по
++явному флагу Мастера. Повторная выдача снимает флаг, живая правка карточки —
++нет. Игрок при блокировке не может ни начать, ни продолжить взлом.
++
++**Открытие.** «Да» и кнопка «Открыть» дают `gmWonLockGame()` — выигранную
++доску с `hackedByGm: true` (НЕ ключ), без мини-игры. Прогресс 532 сбрасывается
++победой по его же условию, событие доступа уходит в общий журнал, навигация
++после ACCESS GRANTED работает по §530/§17. «Нет» оставляет точку закрытой.
++
++**Каркас решений.** `gm.decisionRequest` / `gm.decisionState` /
++`gm.decisionResolve` + `room.gmDecisions` (состояние Мастера, канон сервера —
++закон снимка 529). `GM_DECISION_KINDS` содержит пока один вид `lock.open`;
++неизвестный вид сервер отвергает, клиент берёт общую пару строк.
++Добавить будущую спорную ситуацию = один вид в список + пара строк, без
++переделки хоста `GmDecisionPromptHost`. Повторный запрос по той же точке не
++создаёт второй диалог; решать может только владелец комнаты.
++
++**Совместимость.** §16–19 не отменяются: четыре удаления стилей 531, перенос
++описания, счётчик с зелёными и серыми, строка о сохранённых позициях,
++подсказки под механику 532 — всё на месте. Серверные проверки роли/членства,
++лимиты кадра и закон снимка не ослаблены.
+diff --git a/docs/patch-535-install.md b/docs/patch-535-install.md
+new file mode 100644
+index 0000000..e8db87c
+--- /dev/null
++++ b/docs/patch-535-install.md
+@@ -0,0 +1,63 @@
++# Установка патча 535: «Мастер решает» + общая доска привязанных комнат
++
++Патч подготовлен от состояния **версии 534** (коммит `a216291`, ветка
++`arena/054e6676-fallout-2d20-companion`). Применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — установщик подтянет 493–535
++цепочкой. Файл установки: `patchs/535-gm-decision.patch`.
++
++> Владелец: «Это подходит: пригодится единый штатный выход „Мастер решает" —
++> тот же паттерн „Да/Нет", что уже есть у терминала, но доступный для любой
++> спорной ситуации… Чтобы админ мог блокировать/открывать замки по своему
++> усмотрению. И давай дальше по списку делать». Уточнения: одним патчем с
++> пунктом 1 плана; оба пути (запрос игрока и ручной переключатель);
++> «открыть» = сразу ACCESS GRANTED; «сейчас замки, но оставить место для
++> манёвра».
++
++## 1. «Мастер решает»
++
++| Слой | Что добавлено |
++| --- | --- |
++| `server/protocol.js`, `src/room/roomProtocol.ts` | `gm.decisionRequest`, `gm.decisionState`, `gm.decisionResolve` + 4 кода отказов |
++| `server/roomRegistry.js` | `room.gmDecisions`, `requestGmDecision()`, `resolveGmDecision()`, `getGmDecisions()`, `GM_DECISION_KINDS = ['lock.open']`, `grantGmAccess()`, `gmWonGame()` |
++| `server/lockPicking.js` | `shouldBlockLock({ gmBlocked })`, `gmWonLockGame()`; `LOCK_BLOCK_POLICY.enabled` оставлен `false` |
++| `server/roomServer.js` | три новых кадра, `broadcastGmDecisions()`, рассылка общего контура для сессий |
++| `src/room/roomStore.ts` | `gmDecisions` в состоянии комнаты, обработчик кадра, `requestGmDecision` / `resolveGmDecision` / `setGmLockState` |
++| `components/lootTrade/GmDecisionPromptHost.js`, `gmDecisionPrompt.js`, `App.js` | глобальный вопрос «Да/Нет» поверх любого экрана, чистый отбор нерешённых запросов |
++| `components/lootTrade/LockPickingModal.js` | панель заблокированной точки, «Попросить Мастера», ожидание/отказ |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | кнопки «Заблокировать» / «Открыть» в карточке точки |
++| RU/EN словари | раздел `gmDecision`, строки `lock.gmBlocked*`, `lock.askGm`, `livePanel.gmBlock/gmOpen` |
++
++Правила: решает только владелец комнаты; повторный запрос по той же точке не
++создаёт второй диалог; «Да»/«Открыть» выдают выигранную доску с
++`hackedByGm`, снимают блокировку и пишут общее событие `hacked`; «Нет»
++оставляет точку закрытой. Неизвестный вид решения сервер отвергает
++`GM_DECISION_KIND`, клиент берёт общую пару строк. Новых видов ситуаций не
++придумано — только место для них.
++
++## 2. Пункт 1 плана: общий контур
++
++`boundScopeRooms()` обходит `roomCodes` до неподвижной точки;
++`syncSharedTerminalScope()` объединяет **все** `terminalStates` и
++`accessEvents` комнат контура. Точка, выданная в одной комнате, появляется во
++всех; доска терминала и журнал доступа расходятся вместе с замком; комната,
++подключившаяся позже, перенимает идущий взлом; `reissue` по-прежнему сбрасывает
++доску. Автоблокировка 526 не возвращалась. Защита сервера (роль, членство,
++лимит кадра, валидация JSON, закон снимка 529) не ослаблена.
++
++## Проверки
++
++- `npm run typecheck`, `npm run build`: успешно; `dist/version.json` =
++  535/4/133+133.
++- `npm test`: полный набор зелёный; добавлен
++  `__tests__/room/gm-decision-535.test.js`, исторический тест 532 обновлён под
++  версию 535.
++- `git apply --check` вперёд от дерева 534 и в обратную сторону от 535.
++- `./apply-patch.sh 535` от версии 534 и полная цепочка 493–535 от чистого
++  `main` `a62ec71`; побайтовое сравнение с итоговым деревом.
++- Живая WS-проба: запрос игрока → «Да/Нет» Мастера → ACCESS GRANTED, ручная
++  блокировка/открытие, общая доска и журнал в привязанной комнате, закон снимка
++  529 (`char.command` → `char.refresh` до `char.publish`).
++
++В патче менялся `server/` — **после установки перезапустите процесс сервера
++комнат**, иначе новые кадры останутся неизвестными (`UNKNOWN_TYPE`). PWA-кэш
++обновится вместе с именем бандла.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index e425ab5..f5a294c 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-04. Текущая версия: **534**.
++Дата ревизии: 2026-11-05. Текущая версия: **535**.
+ 
+ ## Тезисы
+ 
+@@ -36,8 +36,10 @@
+ | 22 | Память угаданных позиций замка на весь взлом точки: поломка заколки не откатывает курсор, «Ещё подход»/«кончились заколки»/смена оператора продолжают ту же комбинацию, прогресс общий для привязанных комнат; сброс — победа или повторная выдача Мастером | ✅ сделано | **532** |
+ | 23 | Откат избыточных правок 531/532: у стрелок возвращены рамки, радиус, базовые стили формы, иконка 30 и пустышки 58×50; убраны statusLeft/flexShrink/maxWidth; счётчик снова считает только зелёные, подсказки и строка progressSaved возвращены к 527/531. Механика памяти позиций не тронута. Часть отката отменена в 534 | ✅ сделано | **533** |
+ | 24 | Возврат по слову владельца: перенос длинного описания (statusLeft/flexShrink/maxWidth), счётчик «Отгадано N из M» с зелёными и серыми, строка о сохранённых позициях и progressSaved RU/EN, подсказки под механику сохранения прогресса. Стилевой откат 533 и механика 532 не тронуты | ✅ сделано | **534** |
++| 25 | **«Мастер решает»:** единый штатный выход «Да/Нет» для спорных ситуаций; игрок просит решения, Мастер отвечает поверх любого экрана, плюс ручной переключатель «Заблокировать / Открыть» в карточке точки. «Открыть» = сразу ACCESS GRANTED без взлома. Каркас расширяемый, сейчас подключены только замки | ✅ сделано | **535** |
++| 26 | **Общая доска и общий журнал для привязанных комнат:** `terminalStates` и `accessEvents` объединены по контуру `roomCodes`, точки видны во всех комнатах контура, доска терминала (а не только замка) и события доступа расходятся вместе; автоблокировка 526 не возвращалась | ✅ сделано | **535** |
+ 
+-## Осталось после патча 534
++## Осталось после патча 535
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -47,7 +49,9 @@
+ Патч 533 откатил избыточные стилевые правки 531 по слову владельца, оставив
+ механику памяти и только четыре названных им удаления стилей; патч 534 вернул
+ перенос описания, счётчик, строку о прогрессе и подсказки — владелец их не
+-просил откатывать. Порядок тринадцатого тезиса не меняется: граф, граница видимости, адресный взлом,
++просил откатывать. Патч 535 закрыл первый оставшийся пункт тезиса 13 (общая
++доска/журнал) и добавил штатный выход «Мастер решает». Порядок тринадцатого
++тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+@@ -64,10 +68,8 @@
+    Осталось довести до конца (первый пункт закрыт в 530 ✅):
+    - ~~развести в интерфейсе семантику «взлом локации = вход» и «взлом
+      контейнера = содержимое»~~ ✅ **530**;
+-   - общая доска мини-игры и общий журнал событий для всех привязанных комнат
+-     (сейчас `terminalStates` / `accessEvents` живут на комнате; патч 532
+-     синхронизирует только доску ЗАМКА — память угаданных позиций и секрет,
+-     полного объединения состояний ещё нет);
++   - ~~общая доска мини-игры и общий журнал событий для всех привязанных
++     комнат (`terminalStates` / `accessEvents`)~~ ✅ **535**;
+    - ручное связывание второй строки «проверка» с уже созданными точками через
+      «ИЛИ» и запрет повторного выбора источника взлома;
+    - «Заблокировать всё» с сохранением в карточке Мастера и выбор конкретного
+@@ -77,7 +79,7 @@
+ в той же комнате (до двух, через «ИЛИ»), а не создаёт новую из формы. Мастер
+ по-прежнему может открыть доступ вручную, сняв блокировку узла локации.
+ Четыре технических допущения ассистента (общая доска на локацию с одним
+-оператором; БД Мастера + Drive / снимок в памяти / только чтение без Мастера;
++оператором — реализовано в 535; БД Мастера + Drive / снимок в памяти / только чтение без Мастера;
+ узлы без замка открыты; запрет повторного источника) приняты в 523 и записаны
+ в спецификации — владелец может поправить их следующим обновлением.
+ Семантика взлома 530 — `components/lootTrade/hackOutcome.js` и
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 5235d17..696eac2 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -220,7 +220,9 @@
+     "buyDeprControl": "Buyback depr. %",
+     "merchantCapsControl": "Register {CAP}",
+     "applyRates": "Apply",
+-    "lockAll": "🔒 Lock everything"
++    "lockAll": "🔒 Lock everything",
++    "gmBlock": "🔒 Block",
++    "gmOpen": "🔓 Open"
+   },
+   "player": {
+     "minimizedLoot": "📦 Loot: {name}",
+@@ -401,6 +403,20 @@
+     "arrowUp": "Up",
+     "arrowRight": "Right",
+     "arrowDown": "Down",
+-    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell."
++    "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell.",
++    "gmBlocked": "Lock blocked by the Game Master",
++    "gmBlockedHint": "The Game Master blocked this point. They can open it themselves or answer your request.",
++    "askGm": "Ask the Game Master",
++    "gmPending": "Request sent. Waiting for the Game Master decision.",
++    "gmDeclined": "The Game Master declined. The point stays blocked."
++  },
++  "gmDecision": {
++    "lockOpenTitle": "Open the lock?",
++    "lockOpenMessage": "{name}. Player {requester} asks for the Game Master decision. Open the point right away, without a hack?",
++    "genericTitle": "Game Master decision needed",
++    "genericMessage": "{name}. Player {requester} asks for the Game Master decision. Allow it?",
++    "yes": "Yes",
++    "no": "No",
++    "failed": "Could not apply the Game Master decision"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index a950f6b..185a9fc 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -221,7 +221,9 @@
+     "buyDeprControl": "% обесценивания скупки",
+     "merchantCapsControl": "Касса {CAP}",
+     "applyRates": "Применить",
+-    "lockAll": "🔒 Заблокировать всё"
++    "lockAll": "🔒 Заблокировать всё",
++    "gmBlock": "🔒 Заблокировать",
++    "gmOpen": "🔓 Открыть"
+   },
+   "player": {
+     "minimizedLoot": "📦 Добыча: {name}",
+@@ -402,6 +404,20 @@
+     "arrowUp": "Вверх",
+     "arrowRight": "Вправо",
+     "arrowDown": "Вниз",
+-    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки."
++    "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки.",
++    "gmBlocked": "Замок заблокирован Мастером",
++    "gmBlockedHint": "Мастер заблокировал эту точку. Он может открыть её сам или ответить на ваш запрос.",
++    "askGm": "Попросить Мастера",
++    "gmPending": "Запрос отправлен. Ждём решения Мастера.",
++    "gmDeclined": "Мастер отказал. Точка остаётся заблокированной."
++  },
++  "gmDecision": {
++    "lockOpenTitle": "Открыть замок?",
++    "lockOpenMessage": "{name}. Игрок {requester} просит решения Мастера. Открыть точку сразу, без взлома?",
++    "genericTitle": "Нужно решение Мастера",
++    "genericMessage": "{name}. Игрок {requester} просит решения Мастера. Разрешить?",
++    "yes": "Да",
++    "no": "Нет",
++    "failed": "Не удалось применить решение Мастера"
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 03fc1e6..3ebfdb8 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "534"
++  "baseline": "535"
+ }
+diff --git a/public/version.json b/public/version.json
+index b8b1915..2143e7e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,12 @@
+ {
+-  "version": "534",
++  "version": "535",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Мастер может заблокировать замок и открыть его сам: «Открыть» сразу даёт доступ к точке, без мини-игры.",
++      "Если ситуация спорная, игрок может попросить решения Мастера — вопрос «Да/Нет» всплывёт поверх любого экрана. Мастер видит, кто именно просит.",
++      "Точки, доски мини-игр и журнал доступа теперь общие для всех привязанных комнат: игроки в разных комнатах видят один и тот же взлом.",
++      "Автоматической блокировки замков после неудачи по-прежнему нет: точка закрывается только по явному решению Мастера.",
+       "Длинное описание правил снова переносится внутри окна и не уходит одной строкой за его границы.",
+       "Счётчик «Отгадано N из M» снова учитывает и зелёные, и серые ячейки: уже угаданные позиции остаются в прогрессе после поломки заколки.",
+       "В окне завершённого подхода снова видно, сколько угаданных позиций сохранено; строки для русского и английского языков на месте.",
+@@ -134,6 +138,10 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "The Game Master can block a lock and open it themselves: Open grants access to the point right away, without a mini-game.",
++      "When a situation is disputed, a player can ask for the Game Master decision — a Yes/No prompt appears above any screen, showing who asked.",
++      "Points, mini-game boards and the access log are now shared across all bound rooms: players in different rooms see the same hack.",
++      "Locks still are not blocked automatically after a failure: only an explicit Game Master decision closes a point.",
+       "The long rules description wraps inside the window again instead of running off the edge in a single line.",
+       "The «Solved N of M» counter counts green and grey cells again: positions already guessed stay in the progress after a bobby pin breaks.",
+       "The finished-approach panel shows how many solved positions are kept again, with both Russian and English strings in place.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index 7da3a2f..1946655 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -90,13 +90,18 @@ const luckSaveChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10)
+  * `enabled`): сервер, клиент и локальный резерв уже спрашивают её.
+  */
+ const LOCK_BLOCK_POLICY = Object.freeze({ enabled: false });
+-const shouldBlockLock = ({ game, config } = {}) => {
+-  if (!LOCK_BLOCK_POLICY.enabled) return false;
+-  // Будущее условие владельца встанет здесь. Аргументы уже передаются:
+-  // текущая доска, настройки точки и (при необходимости) снимок листа.
++/**
++ * Патч 535: владелец включил блокировку замка по усмотрению Мастера.
++ * Автоблокировка по провалам ПО-ПРЕЖНЕМУ выключена (закон 526):
++ * `LOCK_BLOCK_POLICY.enabled` не поднимаем. Единственное новое условие —
++ * явный флаг GM (`gmBlocked`), который приходит из состояния точки.
++ * Так будущие условия блокировки по-прежнему вставляются ТОЛЬКО сюда.
++ */
++const shouldBlockLock = ({ game, config, gmBlocked = false } = {}) => {
++  if (LOCK_BLOCK_POLICY.enabled) return true;
+   void game;
+   void config;
+-  return false;
++  return Boolean(gmBlocked);
+ };
+ 
+ // ---------------------------------------------------------------------------
+@@ -537,6 +542,17 @@ const publicLockGameState = (game) => {
+   const { secret, ...rest } = game;
+   return rest;
+ };
++/**
++ * Патч 535: Мастер открыл точку своим решением. Доска выигранная, доступ
++ * выдан сразу (семантика 530), но это НЕ ключ: `hackedByGm`, уведомление
++ * Мастеру не нужно — решение и так его. Прогресс 532 сбрасывается победой.
++ */
++const gmWonLockGame = (config, at = Date.now()) => ({
++  ...keyWonLockGame(config, at),
++  hackedByKey: false,
++  hackedByGm: true,
++});
++
+ 
+ /** Живая правка карточки не должна пересобирать доску (правило 504). */
+ const syncLockGameConfig = (game, config) => {
+@@ -718,6 +734,7 @@ module.exports = {
+   isResumableLockGame,
+   resumeLockGame,
+   keyWonLockGame,
++  gmWonLockGame,
+   publicLockGameState,
+   syncLockGameConfig,
+   closeLockGame,
+diff --git a/server/protocol.js b/server/protocol.js
+index 9885ce3..f59e74b 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -31,6 +31,11 @@ const MESSAGE = Object.freeze({
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
++  // Патч 535: штатный выход «Мастер решает». Один каркас запроса/ответа,
++  // первое применение — замки. Состояние запросов принадлежит Мастеру.
++  GM_DECISION_REQUEST: 'gm.decisionRequest',
++  GM_DECISION_STATE: 'gm.decisionState',
++  GM_DECISION_RESOLVE: 'gm.decisionResolve',
+   PEER_ASSIST: 'peer.assist',
+   // Выдача контейнеров добычи и торговли Мастером (патч 468):
+   SESSION_OPEN: 'session.open',
+@@ -98,8 +103,13 @@ const ERROR_CODE = Object.freeze({
+   LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
+   LOCK_NO_PINS: 'LOCK_NO_PINS',
+   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
+-  // Патч 526: будущее условие блокировки замка (политика пока выключена).
++  // Патч 526: будущее условие блокировки замка (автоблокировка выключена).
++  // Патч 535: явная блокировка Мастером приходит как gmBlocked.
+   LOCK_BLOCKED: 'LOCK_BLOCKED',
++  GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
++  GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
++  GM_DECISION_KIND: 'GM_DECISION_KIND',
++  GM_DECISION_CLOSED: 'GM_DECISION_CLOSED',
+ });
+ 
+ 
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 752b69b..8f42dc0 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -33,6 +33,7 @@ const {
+   isResumableLockGame,
+   resumeLockGame,
+   keyWonLockGame,
++  gmWonLockGame,
+   syncLockGameConfig,
+   publicLockGameState,
+   closeLockGame,
+@@ -105,6 +106,38 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     updatedAt: at,
+   }));
+ 
++  /**
++   * Патч 535: «Мастер решает». Сейчас единственный вид спорной ситуации —
++   * просьба открыть замок (`lock.open`). Список — единственное место, куда
++   * добавляются будущие виды; сервер не гадает, что ещё может потребоваться.
++   */
++  const GM_DECISION_KINDS = Object.freeze(['lock.open']);
++  let gmDecisionCounter = 0;
++  const newGmDecisionId = () => `gm-decision-${++gmDecisionCounter}`;
++
++  /** Доступ без мини-игры по решению Мастера (не ключ, уведомление не нужно). */
++  const gmWonGame = (config, at) => (config?.kind === 'lock'
++    ? gmWonLockGame(config, at)
++    : {
++      ...keyWonGame(config, at),
++      hackedByKey: false,
++      hackedByGm: true,
++    });
++
++  const gmDecisionPublic = (entry) => ({
++    id: entry.id,
++    kind: entry.kind,
++    containerId: entry.containerId,
++    roomCode: entry.roomCode,
++    name: entry.name,
++    requestedBy: { ...entry.requestedBy },
++    status: entry.status,
++    createdAt: entry.createdAt,
++    resolvedAt: entry.resolvedAt,
++    resolvedBy: entry.resolvedBy,
++    value: entry.value,
++  });
++
+   const recordAccessEvent = (room, containerId, kind = 'hacked', by = '') => {
+     const id = String(containerId || '').trim();
+     if (!id || room.accessEvents.has(id)) return false;
+@@ -175,6 +208,113 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     }
+   };
+ 
++  /** Патч 535: снять висящие запросы по точке, когда Мастер уже ответил. */
++  const closePendingDecisions = (room, containerId, status, by) => {
++    const id = String(containerId || '').trim();
++    for (const decision of room.gmDecisions?.values() || []) {
++      if (decision.status !== 'pending' || decision.containerId !== id) continue;
++      decision.status = status;
++      decision.value = status === 'approved' ? 'yes' : 'no';
++      decision.resolvedAt = now();
++      decision.resolvedBy = by;
++    }
++  };
++
++  /**
++   * Патч 535: «открыть замок» = сразу ACCESS GRANTED без мини-игры. Доска
++   * выигранная, прогресс 532 сбрасывается победой (его условие сброса),
++   * событие доступа общее на контур, ключ тут ни при чём.
++   */
++  const grantGmAccess = (room, containerId, by = 'gm') => {
++    const id = String(containerId || '').trim();
++    const entry = room.terminalStates.get(id);
++    if (!entry) return null;
++    entry.gmBlocked = false;
++    entry.closed = false;
++    entry.game = gmWonGame(entry.config, now());
++    entry.accessId = newBroadcastId();
++    entry.updatedAt = now();
++    recordAccessEvent(room, id, 'hacked', by);
++    closePendingDecisions(room, id, 'approved', by);
++    refreshKeyAccess(room);
++    return entry;
++  };
++
++  /** Патч 535: игрок просит Мастера решить спорную ситуацию. Пока — замки. */
++  const requestGmDecision = ({ code, clientId, containerId, kind = 'lock.open', characterId = '' }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const id = String(containerId || '').trim();
++    const entry = room.terminalStates.get(id);
++    if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
++    const kindId = String(kind || '').trim();
++    if (!GM_DECISION_KINDS.includes(kindId)) return { error: ERROR_CODE.GM_DECISION_KIND };
++    if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
++    const member = room.members.get(clientId);
++    if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
++    // Одна точка — один нерешённый запрос: повторное нажатие не плодит диалоги.
++    for (const existing of room.gmDecisions.values()) {
++      if (existing.status === 'pending' && existing.containerId === id && existing.kind === kindId) {
++        return { room, decision: gmDecisionPublic(existing), terminal: terminalPublic(id, entry) };
++      }
++    }
++    const decision = {
++      id: newGmDecisionId(),
++      kind: kindId,
++      containerId: id,
++      roomCode: room.code,
++      name: String(entry.config?.name || '').trim() || id,
++      requestedBy: {
++        clientId,
++        characterId: String(characterId || '').trim(),
++        name: String(member.name || '').trim(),
++      },
++      status: 'pending',
++      createdAt: now(),
++      resolvedAt: null,
++      resolvedBy: null,
++      value: null,
++    };
++    room.gmDecisions.set(decision.id, decision);
++    return { room, decision: gmDecisionPublic(decision), terminal: terminalPublic(id, entry) };
++  };
++
++  /** Патч 535: ответ Мастера «Да/Нет». Только владелец комнаты. */
++  const resolveGmDecision = ({ code, clientId, decisionId, value, ownerToken = null, ws = null }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++    if (!isOwner(code, clientId)) return { error: ERROR_CODE.GM_DECISION_GM_ONLY };
++    ensureOwnerMemberWs(room, clientId, ws);
++    const decision = room.gmDecisions.get(String(decisionId || '').trim());
++    if (!decision) return { error: ERROR_CODE.GM_DECISION_NOT_FOUND };
++    if (decision.status !== 'pending') return { error: ERROR_CODE.GM_DECISION_CLOSED };
++    const choice = value === 'yes' || value === true ? 'yes'
++      : (value === 'no' || value === false ? 'no' : null);
++    if (!choice) return { error: ERROR_CODE.BAD_MESSAGE };
++    decision.value = choice;
++    decision.status = choice === 'yes' ? 'approved' : 'declined';
++    decision.resolvedAt = now();
++    decision.resolvedBy = clientId;
++    let terminal = null;
++    if (choice === 'yes') {
++      const entry = grantGmAccess(room, decision.containerId, clientId);
++      if (entry) terminal = terminalPublic(decision.containerId, entry);
++    }
++    closePendingDecisions(room, decision.containerId, decision.status, clientId);
++    const terminalRooms = syncSharedTerminalScope(room);
++    return {
++      room,
++      decision: gmDecisionPublic(decision),
++      terminal,
++      terminalRooms,
++      granted: choice === 'yes',
++    };
++  };
++
++  const getGmDecisions = (code) => [...(rooms.get(code)?.gmDecisions?.values() || [])]
++    .map(gmDecisionPublic);
++
+   const touchRateLog = (log, key, windowMs, max) => {
+     const cutoff = now() - windowMs;
+     const list = (log.get(key) || []).filter((ts) => ts > cutoff);
+@@ -196,6 +336,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 517: ворота. Нейтральное событие `hacked` живёт на комнате, а не
+     // во вкладке игрока; точки ссылаются на него через linkedCheckId.
+     accessEvents: new Map(),
++    // Патч 535: запросы «Мастер решает». Состояние Мастера — канон сервера
++    // (закон снимка 529: пользовательские снимки здесь не правятся).
++    gmDecisions: new Map(),
+     // Патч 520/527/528/529: диагностический счётчик сломанных заколок.
+     // ЗАКОН СНИМКА (529): lastSnapshots — ТОЛЬКО наблюдение. Единственный
+     // писатель — сам клиент через char.publish (putSnapshot). Любое изменение
+@@ -261,6 +404,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     ])),
+     // Патч 517: при подключении игрок сразу видит, какие ворота уже пройдены.
+     accessEvents: Object.fromEntries(room.accessEvents || new Map()),
++    // Патч 535: Мастер видит все нерешённые запросы сразу после реконнекта.
++    gmDecisions: [...(room.gmDecisions?.values() || [])].map(gmDecisionPublic),
+     // Патч 508: игрок при подключении получает текущий снапшот хранилища.
+     // gmOnline говорит клиенту, можно ли сейчас класть/забирать.
+     partyStorage: storageSnapshot(room),
+@@ -491,37 +636,96 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   };
+ 
+   /**
+-   * Патч 532: угаданные позиции замка ОБЩИЕ для всех игроков точки, включая
+-   * привязанные комнаты. `terminalStates` по-прежнему живут на комнате (общая
+-   * доска мини-игры — отдельный пункт плана 13), но доска замка копируется в
+-   * связанные комнаты: любой игрок продолжает ТУ ЖЕ комбинацию и тот же
+-   * угаданный префикс.
++   * Патч 535 (пункт 1 плана): общий контур привязанных комнат. `roomCodes`
++   * локации по-прежнему решают, какие серверные комнаты делят ресурсы;
++   * обход до неподвижной точки покрывает цепочки сессий A→B→C.
++   */
++  const boundScopeRooms = (room) => {
++    if (!room) return [];
++    const codes = new Set([room.code]);
++    const links = [];
++    for (const candidate of rooms.values()) {
++      const session = candidate.activeSession;
++      if (!session || !Array.isArray(session.roomCodes) || !session.roomCodes.length) continue;
++      links.push({
++        room: candidate,
++        codes: session.roomCodes
++          .map((raw) => String(raw || '').trim().toUpperCase())
++          .filter(Boolean),
++      });
++    }
++    let changed = true;
++    while (changed) {
++      changed = false;
++      for (const link of links) {
++        if (!link.codes.some((code) => codes.has(code))) continue;
++        if (!codes.has(link.room.code)) { codes.add(link.room.code); changed = true; }
++        for (const code of link.codes) {
++          if (!codes.has(code)) { codes.add(code); changed = true; }
++        }
++      }
++    }
++    return [...codes].map((code) => rooms.get(code)).filter(Boolean);
++  };
++
++  const cloneTerminalEntry = (entry) => {
++    try { return JSON.parse(JSON.stringify(entry)); } catch { return { ...entry }; }
++  };
++
++  /**
++   * Патч 535: `terminalStates` и `accessEvents` ОБЩИЕ для привязанных комнат,
++   * а не только доска замка (532). Точка, выданная в одной комнате, видна во
++   * всех комнатах контура; победа/отказ/блокировка Мастера и журнал событий
++   * расходятся тем же контуром. При равных `updatedAt` побеждает инициатор —
++   * его правка и есть последнее слово.
+    */
++  const syncSharedTerminalScope = (origin) => {
++    const targets = boundScopeRooms(origin);
++    if (targets.length < 2) return targets.length ? targets : [origin];
++    const merged = new Map();
++    for (const target of targets) {
++      for (const [id, entry] of target.terminalStates) {
++        const prev = merged.get(id);
++        if (!prev || (entry.updatedAt || 0) > (prev.updatedAt || 0)) merged.set(id, entry);
++      }
++    }
++    for (const [id, entry] of origin.terminalStates) {
++      const winner = merged.get(id);
++      if (!winner || (entry.updatedAt || 0) >= (winner.updatedAt || 0)) merged.set(id, entry);
++    }
++    const events = new Map();
++    for (const target of targets) {
++      for (const [id, event] of target.accessEvents) if (!events.has(id)) events.set(id, event);
++    }
++    for (const target of targets) {
++      for (const [id, source] of merged) {
++        if (target.terminalStates.get(id) !== source) {
++          target.terminalStates.set(id, cloneTerminalEntry(source));
++        }
++      }
++      for (const [id, event] of events) {
++        if (!target.accessEvents.has(id)) target.accessEvents.set(id, { ...event });
++      }
++    }
++    for (const target of targets) refreshKeyAccess(target);
++    // refreshKeyAccess мог породить новые события доступа — добираем их.
++    const finalEvents = new Map();
++    for (const target of targets) {
++      for (const [id, event] of target.accessEvents) if (!finalEvents.has(id)) finalEvents.set(id, event);
++    }
++    for (const target of targets) {
++      for (const [id, event] of finalEvents) {
++        if (!target.accessEvents.has(id)) target.accessEvents.set(id, { ...event });
++      }
++    }
++    return targets;
++  };
++
++  /** Патч 532/535: комнаты контура, где точка уже зарегистрирована. */
+   const boundRoomsForTerminal = (room, containerId) => {
+     const id = String(containerId || '').trim();
+     if (!id) return [room];
+-    const codes = new Set([room.code]);
+-    const addSessionCodes = (session) => {
+-      if (!Array.isArray(session?.roomCodes)) return;
+-      for (const raw of session.roomCodes) {
+-        const code = String(raw || '').trim().toUpperCase();
+-        if (code) codes.add(code);
+-      }
+-    };
+-    addSessionCodes(room.activeSession);
+-    for (const other of rooms.values()) {
+-      const session = other.activeSession;
+-      if (!session) continue;
+-      const mentions = session === room.activeSession
+-        || (Array.isArray(session.roomCodes)
+-          && session.roomCodes.some((raw) => String(raw || '').trim().toUpperCase() === room.code));
+-      if (!mentions) continue;
+-      addSessionCodes(session);
+-      codes.add(other.code);
+-    }
+-    return [...codes]
+-      .map((code) => rooms.get(code))
+-      .filter((target) => target && target.terminalStates.has(id));
++    return boundScopeRooms(room).filter((target) => target.terminalStates.has(id));
+   };
+ 
+   /**
+@@ -540,20 +744,14 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return null;
+   };
+ 
+-  /** Разослать доску замка в привязанные комнаты. game=null — сброс Мастера. */
++  /**
++   * Патч 532 копировал только доску замка; патч 535 объединяет ВСЁ состояние
++   * точек и журнал доступа через syncSharedTerminalScope(). Сигнатуру и имя
++   * сохраняем — их ждут тесты и вызывающие места реестра.
++   */
+   const propagateLockGame = (room, containerId, game, closed = false) => {
+-    const id = String(containerId || '').trim();
+-    const targets = boundRoomsForTerminal(room, id);
+-    for (const target of targets) {
+-      if (target === room) continue;
+-      const entry = target.terminalStates.get(id);
+-      if (!entry || entry.config?.kind !== 'lock') continue;
+-      entry.game = game ? { ...game } : null;
+-      entry.closed = Boolean(closed);
+-      entry.updatedAt = now();
+-      refreshKeyAccess(target);
+-    }
+-    return targets;
++    void containerId; void game; void closed;
++    return syncSharedTerminalScope(room);
+   };
+ 
+   const propagateSharedSession = (session, fallbackCode = '') => {
+@@ -580,14 +778,17 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     refreshKeyAccess(room);
+     // Патч 504: открытие/повторная выдача локации — это новая трансляция,
+     // она снимает «Закрыт» с терминалов, которые Мастер закрыл решением «Нет».
+-    syncTerminalNodes(room, normalized, { reissue: true });
++    const terminalRooms = syncTerminalNodes(room, normalized, { reissue: true });
+     room.lastClosedSession = null;
+     // Привязанные комнаты видят ТУ ЖЕ сессию (общие ресурсы локации).
+-    return withBoundRooms(
+-      { room, session: room.activeSession || normalized },
+-      room.activeSession || normalized,
+-      code,
+-    );
++    return {
++      ...withBoundRooms(
++        { room, session: room.activeSession || normalized },
++        room.activeSession || normalized,
++        code,
++      ),
++      terminalRooms,
++    };
+   };
+ 
+   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
+@@ -600,8 +801,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (result.error) return result;
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = result.session;
+-    syncTerminalNodes(room, result.session);
+-    return withBoundRooms({ room, session: result.session }, result.session, code);
++    const terminalRooms = syncTerminalNodes(room, result.session);
++    return {
++      ...withBoundRooms({ room, session: result.session }, result.session, code),
++      terminalRooms,
++    };
+   };
+ 
+   const terminalPublic = (terminalId, entry) => ({
+@@ -619,6 +823,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       entry.config?.kind !== 'lock' && entry.game?.status === 'awaitingRetry',
+     ),
+     standaloneIssued: Boolean(entry.standaloneIssued),
++    // Патч 535: явная блокировка Мастером. Игрок видит её и может попросить
++    // решения; снимается «Открыть»/«Да» или повторной выдачей.
++    gmBlocked: Boolean(entry.gmBlocked),
+     // Патч 506/526: стабильный идентификатор текущей трансляции. Раньше
+     // служил «билетом» на один взлом; с 526 игрок сам решает, сколько
+     // подходов сделать, — поле остаётся для диагностики и совместимости.
+@@ -643,6 +850,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       return {
+         config,
+         closed: false,
++        gmBlocked: false,
+         standaloneIssued,
+         accessId: newBroadcastId(),
+         game: null,
+@@ -664,6 +872,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       ...previous,
+       config,
+       closed: reissue ? false : Boolean(previous.closed),
++      // Патч 535: живая правка карточки не снимает блокировку Мастера,
++      // повторная выдача — снимает (новая трансляция точки).
++      gmBlocked: reissue ? false : Boolean(previous.gmBlocked),
+       standaloneIssued: standaloneIssued || Boolean(previous.standaloneIssued),
+       // Повторная трансляция выдаёт новый «билет»; обычная правка карточки — нет.
+       accessId: reissue ? newBroadcastId() : (previous.accessId || newBroadcastId()),
+@@ -673,7 +884,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   };
+ 
+   const syncTerminalNodes = (room, session, options = {}) => {
+-    if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
++    if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return [room];
+     for (const node of session.nodes) {
+       // Патч 520: замки живут в том же реестре состояний проверок, что и
+       // терминалы — оператор, «Да/Нет» Мастера и общий журнал событий достаются
+@@ -696,12 +907,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         config.containerId,
+         mergeTerminalConfig(previous, config, options),
+       );
+-      // Патч 532: новая трансляция Мастера сбрасывает прогресс и в
+-      // привязанных комнатах, иначе там осталась бы старая комбинация.
+-      if (options.reissue && config.kind === 'lock') {
+-        propagateLockGame(room, config.containerId, null, false);
+-      }
++      // Патч 532: новая трансляция Мастера сбрасывает прогресс замка —
++      // mergeTerminalConfig() уже обнулил доску, а syncSharedTerminalScope()
++      // ниже разошлёт это состояние всему контуру (535).
+     }
++    // Патч 535: общий контур получает ВСЕ точки локации, а не только доску
++    // замка, которой уже начали взламывать.
++    return syncSharedTerminalScope(room);
+   };
+ 
+   /** Зарегистрировать доступный терминал в комнате (только владелец комнаты). */
+@@ -714,18 +926,37 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!config.containerId || !config.name) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     const previous = room.terminalStates.get(config.containerId);
+-    const entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
++    let entry = mergeTerminalConfig(previous, config, { reissue, standaloneIssued: true });
++    if (!previous && !reissue) {
++      // Патч 535: комната подключилась к контуру, где точка уже взламывается.
++      // Перенимаем ОБЩЕЕ состояние, иначе свежая выдача обнулила бы доску
++      // у остальных комнат (регрессия закона 532). Новая трансляция
++      // (reissue) по-прежнему начинает новую партию.
++      let shared = null;
++      for (const target of boundScopeRooms(room)) {
++        if (target === room) continue;
++        const other = target.terminalStates.get(config.containerId);
++        if (!other) continue;
++        if (!shared || (other.updatedAt || 0) > (shared.updatedAt || 0)) shared = other;
++      }
++      if (shared) {
++        entry = {
++          ...cloneTerminalEntry(shared),
++          config,
++          standaloneIssued: true,
++          updatedAt: now(),
++        };
++      }
++    }
+     room.terminalStates.set(config.containerId, entry);
+     refreshKeyAccess(room);
+-    // Патч 532: явная повторная выдача точки Мастером — сброс прогресса во
+-    // всех привязанных комнатах. Живая правка карточки доску не трогает.
+-    const terminalRooms = reissue && config.kind === 'lock'
+-      ? propagateLockGame(room, config.containerId, null, false)
+-      : null;
++    // Патч 535: точка и журнал доступа общие для всех привязанных комнат.
++    // Повторная выдача по-прежнему сбрасывает доску замка (532).
++    const terminalRooms = syncSharedTerminalScope(room);
+     return {
+       room,
+-      terminal: terminalPublic(config.containerId, entry),
+-      ...(terminalRooms ? { terminalRooms } : {}),
++      terminal: terminalPublic(config.containerId, room.terminalStates.get(config.containerId)),
++      terminalRooms,
+     };
+   };
+ 
+@@ -736,11 +967,36 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const id = String(containerId || '').trim();
+     const entry = room.terminalStates.get(id);
+     if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
++    // Патч 535: Мастер заблокировал точку — игрок не может ни начать, ни
++    // продолжать взлом. Единственная точка проверки — shouldBlockLock().
++    const gmAction = ['unlock', 'reset', 'reissue', 'retry', 'gmBlock', 'gmOpen']
++      .includes(action);
++    if (!gmAction && shouldBlockLock({
++      game: entry.game, config: entry.config, gmBlocked: entry.gmBlocked,
++    })) {
++      return { error: ERROR_CODE.LOCK_BLOCKED };
++    }
+     // Патч 504: решение о повторном взломе и повторная трансляция — действия
+     // Мастера. Игрок не может ни обойти отказ, ни сам «открыть» терминал.
+-    if (['unlock', 'reset', 'reissue', 'retry'].includes(action)) {
++    // Патч 535 добавил gmBlock / gmOpen — ручной переключатель Мастера.
++    if (gmAction) {
+       rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+       if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
++      if (action === 'gmBlock' || action === 'gmOpen') {
++        if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
++        if (action === 'gmOpen') {
++          grantGmAccess(room, id, clientId);
++        } else {
++          entry.gmBlocked = true;
++          entry.updatedAt = now();
++        }
++        const terminalRooms = syncSharedTerminalScope(room);
++        return {
++          room,
++          terminal: terminalPublic(id, room.terminalStates.get(id)),
++          terminalRooms,
++        };
++      }
+       if (action === 'retry') {
+         // Патч 526: замки пока не блокируются, решение Мастера «Да/Нет»
+         // относится только к терминалу. Владелец добавит условие блокировки
+@@ -758,7 +1014,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+             : closeGame(entry.game, { now: now() });
+           entry.closed = true;
+           entry.updatedAt = now();
+-          return { room, terminal: terminalPublic(id, entry) };
++          const declinedRooms = syncSharedTerminalScope(room);
++          return { room, terminal: terminalPublic(id, entry), terminalRooms: declinedRooms };
+         }
+         // «Да» — СРАЗУ новая доска по ТЕКУЩИМ настройкам карточки. Оператор
+         // сохраняется, но другой игрок может нажать «Взломать» и собрать
+@@ -797,7 +1054,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           room.recentTerminalWords = [...words, ...(room.recentTerminalWords || [])].slice(0, 60);
+         }
+         entry.updatedAt = now();
+-        return { room, terminal: terminalPublic(id, entry) };
++        const approvedRooms = syncSharedTerminalScope(room);
++        return { room, terminal: terminalPublic(id, entry), terminalRooms: approvedRooms };
+       }
+       // unlock/reset/reissue — повторная трансляция терминала.
+       // Патч 532: у замка это ещё и сброс запомненных позиций.
+@@ -805,13 +1063,13 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       entry.game = null;
+       entry.accessId = newBroadcastId();
+       entry.updatedAt = now();
+-      const terminalRooms = entry.config?.kind === 'lock'
+-        ? propagateLockGame(room, id, null, false)
+-        : null;
++      // Патч 535: повторная выдача расходится по всему общему контуру,
++      // включая терминалы (не только доску замка из 532).
++      const terminalRooms = syncSharedTerminalScope(room);
+       return {
+         room,
+-        terminal: terminalPublic(id, entry),
+-        ...(terminalRooms ? { terminalRooms } : {}),
++        terminal: terminalPublic(id, room.terminalStates.get(id)),
++        terminalRooms,
+       };
+     }
+     // Патч 516: без обязательного ключа или привязанной проверки мини-игра
+@@ -836,7 +1094,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // только Мастер («Да» или reissue) — для него новый подход недоступен.
+     if (action === 'newAttempt') {
+       if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+-      if (shouldBlockLock({ game: entry.game, config: entry.config })) {
++      if (shouldBlockLock({ game: entry.game, config: entry.config, gmBlocked: entry.gmBlocked })) {
+         return { error: ERROR_CODE.LOCK_BLOCKED };
+       }
+       // Патч 532: явный подход ПРОДОЛЖАЕТ взлом точки. Секрет и угаданные
+@@ -991,18 +1249,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // Патч 516: взлом привязанного терминала снимает NEEDS_CHECK у точек,
+     // для которых ключ был необязательным.
+     refreshKeyAccess(room);
+-    const terminalRooms = entry.config?.kind === 'lock'
+-      ? propagateLockGame(room, id, entry.game, entry.closed)
+-      : null;
++    // Патч 535 (пункт 1 плана): общая доска и журнал доступа для ВСЕХ точек
++    // контура, а не только для замка, как в 532. Терминал теперь тоже виден
++    // игрокам привязанных комнат, включая его слова и попытки.
++    const terminalRooms = syncSharedTerminalScope(room);
+     return {
+       room,
+-      terminal: terminalPublic(id, entry),
++      terminal: terminalPublic(id, room.terminalStates.get(id)),
+       usedDigest: Boolean(result.usedDigest),
+       pinsToSpend,
+       digestCommand,
+       characterId: charId,
+       clientId,
+-      ...(terminalRooms ? { terminalRooms } : {}),
++      terminalRooms,
+     };
+   };
+ 
+@@ -1632,6 +1891,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     updateSession,
+     issueTerminal,
+     terminalAction,
++    requestGmDecision,
++    resolveGmDecision,
++    getGmDecisions,
++    GM_DECISION_KINDS,
++    syncSharedTerminalScope,
+     closeSession,
+     playerCloseSession,
+     lootTake,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 8cb0031..f554305 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -402,6 +402,14 @@ const attachRoomWebSocketServer = (httpServer, {
+    * уже скопировал доску в их `terminalStates`; здесь рассылаем свежие
+    * состояния точек и журнал доступа всем участникам этих комнат.
+    */
++  /** Патч 535: запросы «Мастер решает» видны во всех вкладках комнаты. */
++  const broadcastGmDecisions = (room) => {
++    if (!room) return;
++    broadcastToRoom(room, null, MESSAGE.GM_DECISION_STATE, {
++      decisions: registry.getGmDecisions(room.code),
++    });
++  };
++
+   const broadcastTerminalRooms = (result, canonical) => {
+     const targets = Array.isArray(result?.terminalRooms) ? result.terminalRooms : [];
+     for (const target of targets) {
+@@ -724,6 +732,65 @@ const attachRoomWebSocketServer = (httpServer, {
+           break;
+         }
+ 
++        // Патч 535: «Мастер решает». Игрок просит решения, Мастер отвечает
++        // «Да/Нет»; состояние запросов — канон сервера (закон 529).
++        case MESSAGE.GM_DECISION_REQUEST: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.requestGmDecision({
++            code: canonical,
++            clientId,
++            containerId: payload.containerId,
++            kind: payload.kind,
++            characterId: payload.characterId,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          sendEnvelope(ws, MESSAGE.GM_DECISION_STATE, {
++            decisions: registry.getGmDecisions(canonical),
++            requestId: payload.requestId || null,
++          }, canonical, clientId);
++          broadcastGmDecisions(result.room);
++          break;
++        }
++
++        case MESSAGE.GM_DECISION_RESOLVE: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.resolveGmDecision({
++            code: canonical,
++            clientId,
++            decisionId: payload.decisionId,
++            value: payload.value,
++            ownerToken: payload.ownerToken || null,
++            ws,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          sendEnvelope(ws, MESSAGE.GM_DECISION_STATE, {
++            decisions: registry.getGmDecisions(canonical),
++            requestId: payload.requestId || null,
++          }, canonical, clientId);
++          broadcastGmDecisions(result.room);
++          if (result.terminal) {
++            sendEnvelope(ws, MESSAGE.TERMINAL_STATE, { terminal: result.terminal }, canonical, clientId);
++            broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
++            broadcastKeyAccessState(result.room, clientId);
++          }
++          broadcastTerminalRooms(result, canonical);
++          break;
++        }
++
+         case MESSAGE.TERMINAL_ISSUE: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) {
+@@ -948,6 +1015,8 @@ const attachRoomWebSocketServer = (httpServer, {
+           broadcastKeyAccessState(result.room, clientId);
+           // Патч 523: остальные привязанные комнаты сразу видят ту же локацию.
+           broadcastSessionStateForResult(result, clientId, { session: result.session });
++          // Патч 535: и общий реестр точек/журнал доступа тоже.
++          broadcastTerminalRooms(result, canonical);
+           break;
+         }
+ 
+@@ -983,6 +1052,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             session: result.session,
+           });
+           broadcastTerminalStates(result.room);
++          broadcastTerminalRooms(result, canonical);
+           break;
+         }
+ 
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 1772ec2..4d3c6c1 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -25,6 +25,10 @@ export const ROOM_MESSAGE = {
+   GM_DIRECTIVE: 'gm.directive',
+   GM_DIRECTIVE_ACK: 'gm.directiveAck',
+   GM_DIRECTIVE_STATE: 'gm.directiveState',
++  // Патч 535: «Мастер решает» — запрос игрока / состояние / ответ Мастера.
++  GM_DECISION_REQUEST: 'gm.decisionRequest',
++  GM_DECISION_STATE: 'gm.decisionState',
++  GM_DECISION_RESOLVE: 'gm.decisionResolve',
+   PEER_ASSIST: 'peer.assist',
+   SESSION_OPEN: 'session.open',
+   SESSION_STATE: 'session.state',
+@@ -91,6 +95,10 @@ export const ROOM_ERROR = {
+   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
+   // Патч 526: будущее условие блокировки замка (политика пока выключена).
+   LOCK_BLOCKED: 'LOCK_BLOCKED',
++  GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
++  GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
++  GM_DECISION_KIND: 'GM_DECISION_KIND',
++  GM_DECISION_CLOSED: 'GM_DECISION_CLOSED',
+ } as const;
+ 
+ 
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 97d285b..277d11d 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -44,6 +44,20 @@ export interface PartyStorageState {
+   gmOnline?: boolean;
+ }
+ 
++export interface GmDecisionEntry {
++  id: string;
++  kind: string;
++  containerId: string;
++  roomCode: string;
++  name: string;
++  requestedBy: { clientId: string; characterId: string; name: string };
++  status: 'pending' | 'approved' | 'declined';
++  createdAt: number;
++  resolvedAt: number | null;
++  resolvedBy: string | null;
++  value: 'yes' | 'no' | null;
++}
++
+ export interface RoomStateEntry {
+   code: string;
+   name: string;
+@@ -58,6 +72,8 @@ export interface RoomStateEntry {
+   /** Патч 517: нейтральные события доступа (ворота), общие на комнату. */
+   accessEvents?: Record<string, { containerId: string; kind: string; by?: string; at: number }>;
+   directives?: RoomDirectiveEntry[];
++  /** Патч 535: нерешённые запросы «Мастер решает». */
++  gmDecisions?: GmDecisionEntry[];
+   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
+   capabilities?: Record<string, boolean>;
+ }
+@@ -76,6 +92,7 @@ interface JoinRoomResult {
+   activeSession?: ActiveLootTradeSession | null;
+   terminalStates?: Record<string, any>;
+   directives?: RoomDirectiveEntry[];
++  gmDecisions?: GmDecisionEntry[];
+   capabilities?: Record<string, boolean>;
+ }
+ 
+@@ -110,6 +127,10 @@ interface RoomStoreState {
+   }) => Promise<void>;
+   issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
+   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
++  /** Патч 535: штатный выход «Мастер решает». */
++  requestGmDecision: (input: { code: string; containerId: string; kind?: string; characterId?: string }) => Promise<any>;
++  resolveGmDecision: (input: { code: string; decisionId: string; value: 'yes' | 'no'; ownerToken?: string }) => Promise<any>;
++  setGmLockState: (input: { code: string; containerId: string; action: 'gmBlock' | 'gmOpen'; ownerToken?: string }) => Promise<any>;
+   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
+   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
+   transferPartyStorage: (input: { code: string; deposits: any[]; withdrawals: any[] }) => Promise<{
+@@ -447,6 +468,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         } });
+       }
+     }
++    // Патч 535: «Мастер решает» — состояние запросов приходит всей комнате.
++    if (message.type === ROOM_MESSAGE.GM_DECISION_STATE) {
++      const code = message.roomCode;
++      const decisions = message.payload?.decisions;
++      const current = code ? get().rooms[code] : null;
++      if (code && current && Array.isArray(decisions)) {
++        set({ rooms: {
++          ...get().rooms,
++          [code]: { ...current, gmDecisions: decisions },
++        } });
++      }
++    }
+     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
+       const code = message.roomCode;
+       const terminal = message.payload?.terminal;
+@@ -646,6 +679,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             terminalStates: prev?.terminalStates || {},
+             partyStorage: prev?.partyStorage || { revision: 0, entries: [] },
+             directives: prev?.directives || [],
++            gmDecisions: prev?.gmDecisions || [],
+             capabilities: prev?.capabilities || {},
+           },
+         },
+@@ -708,6 +742,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
+               accessEvents: (payloadRooms.accessEvents as Record<string, any> | undefined) ?? {},
+               directives,
++              gmDecisions: Array.isArray(payloadRooms.gmDecisions)
++                ? payloadRooms.gmDecisions as GmDecisionEntry[]
++                : [],
+               capabilities,
+             },
+           },
+@@ -848,6 +885,28 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       return response.payload?.terminal;
+     },
+ 
++    requestGmDecision: async ({ code, containerId, kind, characterId }) => {
++      const payload: Record<string, unknown> = { code, containerId };
++      if (kind) payload.kind = kind;
++      if (characterId) payload.characterId = characterId;
++      const response = await sendRequest(ROOM_MESSAGE.GM_DECISION_REQUEST, payload, code);
++      return response.payload?.decisions;
++    },
++
++    resolveGmDecision: async ({ code, decisionId, value, ownerToken }) => {
++      const payload: Record<string, unknown> = { code, decisionId, value };
++      if (ownerToken) payload.ownerToken = ownerToken;
++      const response = await sendRequest(ROOM_MESSAGE.GM_DECISION_RESOLVE, payload, code);
++      return response.payload?.decisions;
++    },
++
++    setGmLockState: async ({ code, containerId, action, ownerToken }) => {
++      const payload: Record<string, unknown> = { code, containerId, action };
++      if (ownerToken) payload.ownerToken = ownerToken;
++      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
++      return response.payload?.terminal;
++    },
++
+     depositToPartyStorage: async ({ code, item, quantity, name }) => {
+       const response = await sendRequest(ROOM_MESSAGE.STORAGE_DEPOSIT, {
+         code, item, quantity, name,

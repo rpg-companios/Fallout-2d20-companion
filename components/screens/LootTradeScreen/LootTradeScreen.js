@@ -2069,12 +2069,15 @@ export default function LootTradeScreen() {
                   // трансляция — единственный способ начать новую партию
                   // терминала после ACCESS GRANTED (доска сама не пересобирается).
                   const won = !closed && !awaiting && terminal.game?.status === 'won';
-                  const stateLabel = outOfPins
-                    ? tLootTrade('lock.stateOutOfPins')
-                    : (closed
-                      ? tLootTrade('terminal.stateClosed')
-                      : (awaiting ? tLootTrade('terminal.stateAwaiting')
-                        : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady'))));
+                  // Патч 535: блокировка Мастера видна в карточке точки.
+                  const stateLabel = terminal.gmBlocked
+                    ? tLootTrade('lock.gmBlocked')
+                    : (outOfPins
+                      ? tLootTrade('lock.stateOutOfPins')
+                      : (closed
+                        ? tLootTrade('terminal.stateClosed')
+                        : (awaiting ? tLootTrade('terminal.stateAwaiting')
+                          : (won ? tLootTrade('terminal.stateWon') : tLootTrade('terminal.stateReady')))));
                   const decide = (value) => useRoomStore.getState().actOnTerminal({
                     code,
                     containerId: activeContainer.id,
@@ -2088,6 +2091,14 @@ export default function LootTradeScreen() {
                     action: 'reissue',
                     ownerToken: roomByCode[code]?.ownerToken,
                   }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }));
+                  // Патч 535: ручной переключатель Мастера «блокировать /
+                  // открыть». «Открыть» выдаёт доступ сразу, без мини-игры.
+                  const gmToggle = (action) => useRoomStore.getState().setGmLockState({
+                    code,
+                    containerId: activeContainer.id,
+                    action,
+                    ownerToken: roomByCode[code]?.ownerToken,
+                  }).catch(() => showRawAlert({ title: tLootTrade('terminal.retryFailed') }));
                   return (
                     <View key={code} style={styles.terminalAdminStateRow}>
                       <Text style={styles.terminalAdminText}>
@@ -2107,6 +2118,24 @@ export default function LootTradeScreen() {
                         <TouchableOpacity style={styles.terminalUnlockButton} onPress={reissue}>
                           <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.reissue')}</Text>
                         </TouchableOpacity>
+                      )}
+                      {isLockState && (
+                        <View style={styles.terminalAdminActions}>
+                          <TouchableOpacity
+                            testID={`gm-block-${code}`}
+                            style={styles.terminalUnlockButton}
+                            onPress={() => gmToggle('gmBlock')}
+                          >
+                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('livePanel.gmBlock')}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            testID={`gm-open-${code}`}
+                            style={styles.terminalUnlockButton}
+                            onPress={() => gmToggle('gmOpen')}
+                          >
+                            <Text style={styles.terminalUnlockButtonText}>{tLootTrade('livePanel.gmOpen')}</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   );
