@@ -67,6 +67,9 @@ const normalizeGraphNode = (raw) => {
     roomCodes: normalizeRoomCodes(raw),
     locked: Boolean(raw.locked),
     links: normalizeLinks(raw),
+    // Патч 542: админская матрёшка и особый выход — часть игрового графа.
+    parentLocationId: normalizeId(raw.parentLocationId),
+    exitLocationId: normalizeId(raw.exitLocationId),
   };
 };
 
@@ -80,6 +83,7 @@ const buildLocationGraph = (containers = []) => {
   const byId = new Map();
   const children = new Map();
   const parents = new Map();
+  const exits = new Map();
 
   for (const raw of list) {
     const node = normalizeGraphNode(raw);
@@ -88,18 +92,20 @@ const buildLocationGraph = (containers = []) => {
     children.set(node.id, []);
     parents.set(node.id, []);
   }
+  const addChild = (parentId, childId) => {
+    if (!byId.has(parentId) || !byId.has(childId) || parentId === childId) return;
+    if (!children.get(parentId).includes(childId)) children.get(parentId).push(childId);
+    if (!parents.get(childId).includes(parentId)) parents.get(childId).push(parentId);
+  };
   for (const node of byId.values()) {
-    for (const link of node.links) {
-      if (!byId.has(link.containerId)) continue;
-      if (!children.get(node.id).includes(link.containerId)) {
-        children.get(node.id).push(link.containerId);
-      }
-      if (!parents.get(link.containerId).includes(node.id)) {
-        parents.get(link.containerId).push(node.id);
-      }
+    for (const link of node.links) addChild(node.id, link.containerId);
+    // Патч 542: вложенная локация из дерева хаба — такой же родитель/ребёнок.
+    if (node.parentLocationId) addChild(node.parentLocationId, node.id);
+    if (node.exitLocationId && byId.has(node.exitLocationId) && node.exitLocationId !== node.id) {
+      exits.set(node.id, node.exitLocationId);
     }
   }
-  return { byId, children, parents };
+  return { byId, children, parents, exits };
 };
 
 /** Обход по рёбрам с защитой от циклов. Возвращает все достижимые id, кроме старта. */
@@ -188,16 +194,18 @@ const flattenForSession = (graph, rootId) => {
   const root = normalizeId(rootId);
   if (!root || !graph.byId.has(root)) return [];
   const result = new Map();
-  const queue = [{ id: root, parentId: '', depth: 0 }];
+  const queue = [{ id: root, parentId: '', depth: 0, viaExit: false }];
   const visited = new Set();
   while (queue.length) {
-    const { id, parentId, depth } = queue.shift();
+    const { id, parentId, depth, viaExit } = queue.shift();
     if (visited.has(id)) {
       const existing = result.get(id);
       if (existing && parentId && !existing.parentIds.includes(parentId)) {
         existing.parentIds.push(parentId);
         existing.depth = Math.min(existing.depth, depth);
       }
+      // Узел, достигнутый обычным входом, не остаётся «только выходом».
+      if (existing && !viaExit) existing.exitOnly = false;
       continue;
     }
     visited.add(id);
@@ -210,9 +218,17 @@ const flattenForSession = (graph, rootId) => {
       childIds: childIdsOf(graph, id),
       roomCodes: effectiveRoomCodes(graph, id),
       locked: node.locked,
+      // Патч 542: цель особого выхода есть в сессии, но не торчит дочерней
+      // карточкой в списке родителя — вход в неё идёт кнопкой «Выход».
+      exitOnly: Boolean(viaExit && parentId),
+      exitLocationId: node.exitLocationId || '',
     };
     if (id !== root) result.set(id, entry);
-    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1 });
+    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
+    const exitId = graph.exits?.get(id);
+    if (exitId && graph.byId.has(exitId)) {
+      queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
+    }
   }
   return [...result.values()];
 };
@@ -226,6 +242,7 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
   const byId = new Map();
   const children = new Map();
   const parents = new Map();
+  const exits = new Map();
   const root = normalizeId(rootId);
   if (root) {
     byId.set(root, { id: root, kind: 'hub', roomCodes: [], locked: false, links: [] });
@@ -243,6 +260,7 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
       roomCodes: normalizeRoomCodes(node),
       locked: Boolean(node.locked),
       links: [],
+      exitLocationId: normalizeId(node.exitLocationId),
     });
     children.set(id, []);
     parents.set(id, []);
@@ -266,8 +284,10 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
       if (!children.get(id).includes(child)) children.get(id).push(child);
       if (!parents.get(child).includes(id)) parents.get(child).push(id);
     }
+    const exitId = normalizeId(node.exitLocationId);
+    if (exitId && byId.has(exitId)) exits.set(id, exitId);
   }
-  return { byId, children, parents };
+  return { byId, children, parents, exits };
 };
 
 /** Адресный взлом: открыть РОВНО одну точку, без каскада по потомкам. */

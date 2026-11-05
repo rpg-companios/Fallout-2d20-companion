@@ -59,21 +59,24 @@ import useCharacterStore from '../../src/store/characterStore';
 import useRoomStore from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
 
-const CHECK = {
+const CHECK_LOCK = {
   containerId: 'lock-1', kind: 'lock', name: 'Замок', description: '', difficulty: 2,
 };
+const CHECK_TERMINAL = {
+  containerId: 'term-1', kind: 'terminal', name: 'Терминал', description: '', difficulty: 2,
+};
 
-const room = () => ({
+const room = (check) => ({
   joined: true,
   members: [{ clientId: 'player-client', role: 'player' }],
   activeSession: null,
   capabilities: { terminalHacking: true, lockPicking: true },
   terminalStates: {
-    'lock-1': {
-      containerId: 'lock-1',
+    [check.containerId]: {
+      containerId: check.containerId,
       standaloneIssued: true,
       accessId: 'broadcast-1',
-      config: CHECK,
+      config: check,
       game: null,
       closed: false,
       locked: false,
@@ -81,7 +84,16 @@ const room = () => ({
   },
 });
 
-const mount = async () => {
+const mount = async (check) => {
+  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
+  useCharacterStore.setState({
+    currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
+  });
+  useRoomStore.setState({
+    clientId: 'player-client',
+    status: 'online',
+    rooms: { ROOM1: room(check) },
+  });
   let renderer;
   await act(async () => {
     renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
@@ -90,44 +102,41 @@ const mount = async () => {
   return renderer;
 };
 
-describe('525: отдельно выданный замок через terminal.issue', () => {
-  beforeEach(() => {
-    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
-    useCharacterStore.setState({
-      currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
-    });
-    useRoomStore.setState({
-      clientId: 'player-client',
-      status: 'online',
-      rooms: { ROOM1: room() },
-    });
-  });
-
-  it('сначала входная модалка, мини-игры ещё нет и «Покинуть локацию» нет', async () => {
-    const renderer = await mount();
-    const entry = renderer.root.findByType('StandaloneCheckModal');
-    expect(entry.props.visible).toBe(true);
+describe('525: отдельная выдача точки игроку', () => {
+  it('самостоятельно выданный замок не становится отдельным окном игрока (542)', async () => {
+    // Патч 542, lock_never_standalone: владелец запретил отдельную выдачу
+    // замка — такая точка не открывает для игрока самостоятельной модалки.
+    const renderer = await mount(CHECK_LOCK);
+    expect(renderer.root.findAllByType('StandaloneCheckModal')).toHaveLength(0);
     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
     await act(async () => renderer.unmount());
   });
 
-  it('«Взломать» монтирует доску с autoStart, входная модалка скрыта', async () => {
-    const renderer = await mount();
+  it('отдельно выданный терминал по-прежнему начинается с входной модалки', async () => {
+    const renderer = await mount(CHECK_TERMINAL);
+    const entry = renderer.root.findByType('StandaloneCheckModal');
+    expect(entry.props.visible).toBe(true);
+    expect(renderer.root.findAllByType('TerminalHackingModal')).toHaveLength(0);
+    await act(async () => renderer.unmount());
+  });
+
+  it('«Взломать» терминала монтирует доску с autoStart, входная модалка скрыта', async () => {
+    const renderer = await mount(CHECK_TERMINAL);
     const entry = renderer.root.findByType('StandaloneCheckModal');
     await act(async () => { entry.props.onHack(); await Promise.resolve(); });
-    const modal = renderer.root.findByType('LockPickingModal');
-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
+    const modal = renderer.root.findByType('TerminalHackingModal');
+    expect(modal.props).toMatchObject({ containerId: 'term-1', autoStart: true });
     expect(renderer.root.findByType('StandaloneCheckModal').props.visible).toBe(false);
     await act(async () => renderer.unmount());
   });
 
-  it('«Смотреть» открывает окно доски без автозапуска партии', async () => {
-    const renderer = await mount();
+  it('«Смотреть» терминала открывает окно доски без автозапуска партии', async () => {
+    const renderer = await mount(CHECK_TERMINAL);
     const entry = renderer.root.findByType('StandaloneCheckModal');
     await act(async () => { entry.props.onView(); await Promise.resolve(); });
-    const modal = renderer.root.findByType('LockPickingModal');
-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: false });
+    const modal = renderer.root.findByType('TerminalHackingModal');
+    expect(modal.props).toMatchObject({ containerId: 'term-1', autoStart: false });
     await act(async () => renderer.unmount());
   });
 });

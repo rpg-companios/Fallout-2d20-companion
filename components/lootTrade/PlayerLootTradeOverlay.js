@@ -24,6 +24,10 @@ import {
   formatLootTrade,
 } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import {
+  expressionCheckIds,
+  resolveAccessExpression,
+} from '../../domain/accessExpression';
+import {
   CONTAINER_KIND,
   computeBarterSummary,
   computeMerchantBuybackPriceFromPlayer,
@@ -192,7 +196,10 @@ export default function PlayerLootTradeOverlay() {
     });
     for (const bind of ordered) {
       const states = Object.values(rooms[bind.code]?.terminalStates || {});
-      const terminalState = states.find((entry) => entry?.standaloneIssued && entry?.config?.containerId);
+      // Патч 542: замок не бывает самостоятельной точкой игрока.
+      const terminalState = states.find((entry) => entry?.standaloneIssued
+        && entry?.config?.containerId
+        && entry?.config?.kind !== CONTAINER_KIND.LOCK);
       if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
     }
     return null;
@@ -280,6 +287,7 @@ export default function PlayerLootTradeOverlay() {
     setBuyBuffer({});
     setSellBuffer({});
     setSelectedHubNodeId(null);
+    setParentStack([]);
     setMinimizedSessionId(null);
     setMobileTab('merchant');
   }, [activeSession?.sessionId]);
@@ -305,7 +313,8 @@ export default function PlayerLootTradeOverlay() {
   const handledWinRef = useRef('');
   const winTimerRef = useRef(null);
   useEffect(() => {
-    if (!isHubSession || !terminalSelection?.targetNodeId || !terminalSelection.autoStart) {
+    if (!isHubSession || !terminalSelection?.autoStart
+      || (!terminalSelection?.targetNodeId && !terminalSelection?.gateOnly)) {
       handledWinRef.current = '';
       return;
     }
@@ -321,6 +330,9 @@ export default function PlayerLootTradeOverlay() {
     winTimerRef.current = setTimeout(() => {
       winTimerRef.current = null;
       setTerminalSelection(null);
+      // Патч 542: преграда текущей локации уже пройдена изнутри — остаёмся
+      // на месте, сервер раскроет содержимое. Каскада нет.
+      if (!targetId) return;
       const target = nodes.find((n) => n.containerId === targetId) || { containerId: targetId };
       navigateHackOutcome(target);
     }, HACK_OUTCOME_DELAY_MS);
@@ -569,6 +581,9 @@ export default function PlayerLootTradeOverlay() {
   // и без «Покинуть локацию», и только по «Взломать» монтируется мини-игра
   // с уже собранной доской. Пустая «как бы запущенная» игра убрана.
   if (standaloneCheckSession && matchedContext) {
+    // Патч 542 (lock_never_standalone): самостоятельно выданный замок не
+    // бывает точкой игрока — для него окно не рисуем вовсе.
+    if (standaloneCheckSession.kind === CONTAINER_KIND.LOCK) return null;
     const roomCode = matchedContext.roomCode;
     const node = standaloneCheckSession.node;
     const state = rooms?.[roomCode]?.terminalStates?.[node.containerId];
@@ -655,14 +670,91 @@ export default function PlayerLootTradeOverlay() {
   if (isHubSession && !viewTarget) {
     const rootId = activeSession.containerId || '';
     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
+    const currentNode = currentParentId === rootId
+      ? null
+      : (activeSession.nodes || []).find((node) => node.containerId === currentParentId) || null;
+    const currentTarget = currentNode || { ...activeSession, containerId: rootId };
+    const currentTitle = currentNode?.name || activeSession.name;
+    const currentDescription = currentNode?.description ?? activeSession.description;
+    // Патч 542: вход в локацию с преградой показывает сначала только проверки.
+    const currentGatePending = currentTarget.keyAccessState === 'needs-check'
+      || currentTarget.keyAccessState === 'denied'
+      || (Boolean(currentTarget.locked)
+        && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
+    const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
+      const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+      if (!state) return null;
+      const kind = state.config?.kind === 'lock'
+        ? CONTAINER_KIND.LOCK
+        : CONTAINER_KIND.TERMINAL;
+      const accessKey = terminalAccessKey({
+        roomCode: matchedContext.roomCode,
+        containerId: id,
+        accessId: state?.accessId,
+      });
+      const closed = Boolean(
+        state.closed || state.locked || state.game?.status === 'closed',
+      );
+      const awaiting = Boolean(
+        state.awaitingGm || state.game?.status === 'awaitingRetry',
+      );
+      const hackAllowed = canHackTerminal({
+        key: accessKey,
+        game: state?.game,
+        terminalClosed: closed,
+        terminalAwaiting: awaiting,
+        isLock: kind === CONTAINER_KIND.LOCK,
+      });
+      const difficulty = state.config?.difficulty ?? 1;
+      return {
+        id,
+        kind,
+        accessKey,
+        hackAllowed,
+        label: formatLootTrade(
+          tLootTrade(kind === CONTAINER_KIND.LOCK
+            ? 'player.gateLockLabel'
+            : 'player.gateTerminalLabel'),
+          { difficulty },
+        ),
+        selection: {
+          ...(state.config || {}),
+          containerId: id,
+          kind,
+          name: state.config?.name || tLootTrade('player.gateTerminal'),
+          difficulty,
+        },
+      };
+    }).filter(Boolean);
+    const gateIdsFor = (node) => (node.keyAccessState !== 'denied'
+      ? [...new Set([
+        ...expressionCheckIds(resolveAccessExpression(node)),
+        ...normalizeLinkedCheckIds(node),
+      ])]
+      : []);
+    const gateSeparatorKeyFor = (node) => (
+      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === 'and')
+        ? 'player.gateAnd'
+        : 'player.gateOr'
+    );
+    const currentTargetIsLocation = currentNode ? nodeHasChildren(currentNode) : true;
+    const currentGateOptions = currentGatePending ? gateOptionsFor(currentTarget, gateIdsFor(currentTarget)) : [];
+    const currentGateSeparatorKey = gateSeparatorKeyFor(currentTarget);
     // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
     // считаются детьми корня. Запертые потомки уже скрыты сервером.
-    const hubNodes = (activeSession.nodes || []).filter((node) => {
+    // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
+    // никогда не самостоятельная строка игрока.
+    const hubNodes = currentGatePending ? [] : (activeSession.nodes || []).filter((node) => {
+      if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
       const parents = Array.isArray(node.parentIds) && node.parentIds.length
         ? node.parentIds
         : [rootId];
       return parents.includes(currentParentId);
     });
+    const exitLocationId = String(currentTarget.exitLocationId || '').trim();
+    const exitNode = exitLocationId && !currentGatePending
+      ? (activeSession.nodes || []).find((node) => node.containerId === exitLocationId)
+      : null;
     return (
       <>
         <Modal
@@ -676,7 +768,7 @@ export default function PlayerLootTradeOverlay() {
               <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
                 <View style={styles.modalTitleRow}>
                   <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
-                  <Text style={styles.modalTitle}>{activeSession.name}</Text>
+                  <Text style={styles.modalTitle}>{currentTitle}</Text>
                 </View>
                 <View style={styles.headerActionsRow}>
                   {/* Патч 506: «Свернуть» и «Покинуть локацию». Закрыть сцену
@@ -707,9 +799,9 @@ export default function PlayerLootTradeOverlay() {
                 </View>
               </View>
 
-              {Boolean(activeSession.description) && (
+              {Boolean(currentDescription) && (
                 <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
-                  {activeSession.description}
+                  {currentDescription}
                 </IconText>
               )}
 
@@ -717,7 +809,63 @@ export default function PlayerLootTradeOverlay() {
                 style={styles.lootScroll}
                 contentContainerStyle={styles.lootScrollContent}
               >
-                {hubNodes.length === 0 ? (
+                {currentGatePending ? (
+                  <View style={styles.terminalButtons}>
+                    <Text style={styles.hubLockedHintText}>
+                      {tLootTrade(currentTarget.keyAccessState === 'denied'
+                        ? 'player.keyRequiredError'
+                        : 'player.gateOptionsTitle')}
+                    </Text>
+                    {currentGateOptions.map((option, optionIdx) => (
+                      <View key={option.id} style={styles.terminalButtons}>
+                        {optionIdx > 0 && (
+                          <Text testID={`current-gate-or-${option.id}`} style={styles.hubLockedHintText}>
+                            {currentGateSeparatorKey === 'player.gateAnd'
+                              ? tLootTrade('player.gateAnd')
+                              : tLootTrade('player.gateOr')}
+                          </Text>
+                        )}
+                        <Text testID={`current-gate-option-${option.id}`} style={styles.hubLockedHintText}>
+                          {option.label}
+                        </Text>
+                        <View style={styles.terminalButtons}>
+                          <TouchableOpacity
+                            testID={`current-gate-view-${option.id}`}
+                            style={styles.terminalViewButton}
+                            onPress={() => setTerminalSelection({
+                              node: option.selection,
+                              kind: option.kind,
+                              autoStart: false,
+                            })}
+                          >
+                            <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            testID={`current-gate-hack-${option.id}`}
+                            style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
+                            disabled={!option.hackAllowed}
+                            onPress={() => setTerminalSelection({
+                              node: option.selection,
+                              kind: option.kind,
+                              autoStart: true,
+                              freshAttempt: option.kind === CONTAINER_KIND.LOCK,
+                              gateOnly: true,
+                            })}
+                          >
+                            <Text style={styles.terminalHackButtonText}>
+                              {tLootTrade(currentTargetIsLocation
+                                ? 'player.hackAndEnter'
+                                : 'player.hackAndOpen')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                    {currentGateOptions.length === 0 && currentTarget.keyAccessState !== 'denied' && (
+                      <Text style={styles.hubLockedHintText}>{tLootTrade('player.hubNodeLockedBadge')}</Text>
+                    )}
+                  </View>
+                ) : hubNodes.length === 0 ? (
                   <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
                 ) : (
                   hubNodes.map((rawNode) => {
@@ -796,56 +944,9 @@ export default function PlayerLootTradeOverlay() {
                     // отдельная карточка. Патч 520: источников может быть два
                     // (терминал ИЛИ замок) — они не блокируют точку одновременно.
                     // Обязательный ключ по-прежнему не обойти взломом.
-                    const gateIds = node.keyAccessState !== 'denied'
-                      ? normalizeLinkedCheckIds(node)
-                      : [];
-                    const gateOptions = nodeLocked
-                      ? gateIds.map((id) => {
-                          const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
-                          if (!state) return null;
-                          const kind = state.config?.kind === 'lock'
-                            ? CONTAINER_KIND.LOCK
-                            : CONTAINER_KIND.TERMINAL;
-                          const accessKey = terminalAccessKey({
-                            roomCode: matchedContext.roomCode,
-                            containerId: id,
-                            accessId: state?.accessId,
-                          });
-                          const closed = Boolean(
-                            state.closed || state.locked || state.game?.status === 'closed',
-                          );
-                          const awaiting = Boolean(
-                            state.awaitingGm || state.game?.status === 'awaitingRetry',
-                          );
-                          const hackAllowed = canHackTerminal({
-                            key: accessKey,
-                            game: state?.game,
-                            terminalClosed: closed,
-                            terminalAwaiting: awaiting,
-                            isLock: kind === CONTAINER_KIND.LOCK,
-                          });
-                          const difficulty = state.config?.difficulty ?? 1;
-                          return {
-                            id,
-                            kind,
-                            accessKey,
-                            hackAllowed,
-                            label: formatLootTrade(
-                              tLootTrade(kind === CONTAINER_KIND.LOCK
-                                ? 'player.gateLockLabel'
-                                : 'player.gateTerminalLabel'),
-                              { difficulty },
-                            ),
-                            selection: {
-                              ...(state.config || {}),
-                              containerId: id,
-                              kind,
-                              name: state.config?.name || tLootTrade('player.gateTerminal'),
-                              difficulty,
-                            },
-                          };
-                        }).filter(Boolean)
-                      : [];
+                    const gateIds = gateIdsFor(node);
+                    const gateOptions = nodeLocked ? gateOptionsFor(node, gateIds) : [];
+                    const gateSeparatorKey = gateSeparatorKeyFor(node);
                     const gateAvailable = gateOptions.length > 0;
                     const gateHackAllowed = gateOptions.some((option) => option.hackAllowed);
                     const piecesCount = (node.items || []).reduce(
@@ -920,14 +1021,16 @@ export default function PlayerLootTradeOverlay() {
                         </View>
 
                         <View style={styles.lootRowBtns}>
-                          {nodeLocked ? (
+                          {nodeLocked && !nodeIsLocation ? (
                             gateAvailable ? (
                               <View style={styles.terminalButtons}>
                                 {gateOptions.map((option, optionIdx) => (
                                   <View key={option.id} style={styles.terminalButtons}>
                                     {optionIdx > 0 && (
                                       <Text testID={`gate-or-${node.containerId}`} style={styles.hubLockedHintText}>
-                                        {tLootTrade('player.gateOr')}
+                                        {gateSeparatorKey === 'player.gateAnd'
+                                          ? tLootTrade('player.gateAnd')
+                                          : tLootTrade('player.gateOr')}
                                       </Text>
                                     )}
                                     <Text testID={`gate-option-${option.id}`} style={styles.hubLockedHintText}>
@@ -1037,6 +1140,7 @@ export default function PlayerLootTradeOverlay() {
                             </View>
                           ) : (
                             <TouchableOpacity
+                              testID={`hub-node-enter-${node.containerId}`}
                               style={styles.takeAllRowBtn}
                               onPress={() => {
                                 setBuyBuffer({});
@@ -1051,7 +1155,11 @@ export default function PlayerLootTradeOverlay() {
                               <Text style={styles.takeAllRowBtnText}>
                                 {tLootTrade(
                                   nodeIsLocation
-                                    ? 'player.hubNodeOpenLocation'
+                                    ? (nodeLocked
+                                      // Патч 542: запертая локация ведёт к
+                                      // экрану преград, а не мимо неё.
+                                      ? nodeHackLabelKey
+                                      : 'player.hubNodeOpenLocation')
                                     : (nodeIsMerch
                                       ? 'player.hubNodeOpenMerchant'
                                       : 'player.hubNodeOpenLoot'),
@@ -1063,6 +1171,20 @@ export default function PlayerLootTradeOverlay() {
                       </View>
                     );
                   })
+                )}
+                {exitNode && (
+                  <TouchableOpacity
+                    testID="hub-exit-button"
+                    style={styles.takeAllRowBtn}
+                    onPress={() => {
+                      setSelectedHubNodeId(null);
+                      setParentStack((stack) => [...stack, exitNode.containerId]);
+                    }}
+                  >
+                    <Text style={styles.takeAllRowBtnText}>
+                      {formatLootTrade(tLootTrade('player.exitToLocation'), { name: exitNode.name })}
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </ScrollView>
 

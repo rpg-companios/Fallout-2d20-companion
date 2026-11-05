@@ -632,6 +632,9 @@ const makeSessionNode = (child, link = {}) => ({
       linkedCheckId: String(child.linkedCheckId || '').trim(),
       // Патч 520: до двух источников через «ИЛИ».
       linkedCheckIds: normalizeLinkedCheckIds(child),
+      // Патч 542: явное И/ИЛИ-выражение и особый выход доходят до сессии.
+      accessExpression: resolveAccessExpression(child),
+      exitLocationId: String(child.exitLocationId || '').trim(),
       characterOverrides: {},
   items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
     ? []
@@ -689,7 +692,7 @@ export const buildLocationSessionNodes = (root, allContainers = []) => {
     }
   }
 
-  return flat
+  const nodes = flat
     .map((entry) => {
       const child = byId.get(entry.id);
       if (!child) return null;
@@ -701,10 +704,41 @@ export const buildLocationSessionNodes = (root, allContainers = []) => {
         depth: entry.depth,
         roomCodes: entry.roomCodes,
         locked: Boolean(link.locked || entry.locked),
+        // Патч 542: цель особого выхода есть в сессии, но не торчит дочерней
+        // карточкой в списке родителя — вход в неё идёт кнопкой «Выход».
+        exitOnly: Boolean(entry.exitOnly),
+        exitLocationId: entry.exitLocationId || String(child.exitLocationId || '').trim(),
       };
       return stampSessionNode(node);
     })
     .filter(Boolean);
+
+  // Преграда может ссылаться на замок/терминал, который не лежит структурно
+  // внутри выдаваемой локации. Чтобы мини-игра зарегистрировалась на комнате,
+  // добавляем такой источник скрытым служебным узлом (игрок его не видит).
+  const present = new Set(nodes.map((node) => node.containerId));
+  const checkIds = new Set([
+    ...expressionCheckIds(resolveAccessExpression(root)),
+    ...nodes.flatMap((node) => expressionCheckIds(resolveAccessExpression(node))),
+  ]);
+  for (const checkId of checkIds) {
+    if (present.has(checkId)) continue;
+    const source = byId.get(checkId);
+    if (!source || (source.kind !== CONTAINER_KIND.TERMINAL && source.kind !== CONTAINER_KIND.LOCK)) continue;
+    nodes.push(stampSessionNode({
+      ...makeSessionNode(source),
+      parentIds: [String(root.id)],
+      childIds: [],
+      depth: 1,
+      roomCodes: effectiveLocationRoomCodes(source, list),
+      locked: false,
+      hiddenForPlayers: true,
+      exitOnly: false,
+      exitLocationId: '',
+    }));
+    present.add(checkId);
+  }
+  return nodes;
 };
 
 /** Эффективные коды комнат корня: состояние и ресурсы общи для всех привязанных комнат. */

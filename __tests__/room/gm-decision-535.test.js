@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ�
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('541');
+    expect(version.version).toBe('542');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(140);
-    expect(version.notes['en-EN']).toHaveLength(140);
-    expect(json('patchs/baseline.json').baseline).toBe('541');
+    expect(version.notes['ru-RU']).toHaveLength(141);
+    expect(version.notes['en-EN']).toHaveLength(141);
+    expect(json('patchs/baseline.json').baseline).toBe('542');
     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
@@ -267,16 +267,19 @@ describe('535: протокол, клиент, строки и документ�
     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
     expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
+    expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **541**');
+    expect(roadmap).toContain('Текущая версия: **542**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');
     expect(roadmap).toContain('| 31 |');
     expect(roadmap).toContain('| 32 |');
-    expect(roadmap).toContain('Осталось после патча 541');
+    expect(roadmap).toContain('| 33 |');
+    expect(roadmap).toContain('Осталось после патча 542');
     expect(read('docs/patch-540-install.md')).toContain('540');
     expect(read('docs/patch-541-install.md')).toContain('541');
+    expect(read('docs/patch-542-install.md')).toContain('542');
     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });

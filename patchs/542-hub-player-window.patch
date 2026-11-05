@@ -1,0 +1,1857 @@
+diff --git a/__tests__/lootTrade/hack-outcome-530.test.js b/__tests__/lootTrade/hack-outcome-530.test.js
+index 0090a01..8a67eca 100644
+--- a/__tests__/lootTrade/hack-outcome-530.test.js
++++ b/__tests__/lootTrade/hack-outcome-530.test.js
+@@ -72,9 +72,13 @@ const hubSession = () => ({
+   kind: 'hub',
+   name: 'Убежище',
+   targetType: 'room',
++  // Патч 542 (lock_never_standalone): замок — часть локации/сундука, а не
++  // отдельная строка игрока. Дверь = запертая ЛОКАЦИЯ (преграда на ней,
++  // дети спрятаны до прохождения); ящик = запертый контейнер с проверкой.
+   nodes: [
+     {
+-      containerId: 'door-1', kind: 'lock', name: 'Дверь в бункер', difficulty: 2,
++      containerId: 'door-1', kind: 'loot', name: 'Дверь в бункер', locked: true,
++      linkedCheckIds: ['term-door'],
+       parentIds: ['vault'], childIds: ['inner-1'], items: [],
+     },
+     {
+@@ -82,7 +86,8 @@ const hubSession = () => ({
+       parentIds: ['door-1'], childIds: [], items: [],
+     },
+     {
+-      containerId: 'box-1', kind: 'lock', name: 'Запертый ящик', difficulty: 2,
++      containerId: 'box-1', kind: 'loot', name: 'Запертый ящик', locked: true,
++      linkedCheckIds: ['term-box'],
+       parentIds: ['vault'], childIds: [], items: [],
+     },
+     {
+@@ -136,7 +141,18 @@ beforeEach(() => {
+         members: [{ clientId: 'player-client', role: 'player' }],
+         capabilities: { terminalHacking: true, lockPicking: true },
+         activeSession: null,
+-        terminalStates: {},
++        terminalStates: {
++          'term-door': {
++            containerId: 'term-door',
++            config: { containerId: 'term-door', kind: 'lock', name: 'Замок двери', difficulty: 2 },
++            game: null, closed: false, locked: false,
++          },
++          'term-box': {
++            containerId: 'term-box',
++            config: { containerId: 'term-box', kind: 'lock', name: 'Замок ящика', difficulty: 2 },
++            game: null, closed: false, locked: false,
++          },
++        },
+       },
+     },
+   });
+@@ -206,7 +222,7 @@ describe('530: интерфейс локации', () => {
+ });
+ 
+ describe('530: исход ACCESS GRANTED', () => {
+-  const win = async (renderer, containerId) => {
++  const win = async (renderer, containerId, checkId = containerId) => {
+     await act(async () => {
+       useRoomStore.setState((state) => ({
+         rooms: {
+@@ -222,10 +238,10 @@ describe('530: исход ACCESS GRANTED', () => {
+             },
+             terminalStates: {
+               ...state.rooms.ROOM1.terminalStates,
+-              [containerId]: {
+-                containerId,
+-                accessId: `broadcast-${containerId}`,
+-                config: { containerId, kind: 'lock', name: nName(containerId), difficulty: 2 },
++              [checkId]: {
++                containerId: checkId,
++                accessId: `broadcast-${checkId}`,
++                config: { containerId: checkId, kind: 'lock', name: nName(checkId), difficulty: 2 },
+                 closed: false, locked: false, awaitingGm: false,
+                 game: { status: 'won', result: 'ACCESS GRANTED', revision: 2 },
+               },
+@@ -236,14 +252,22 @@ describe('530: исход ACCESS GRANTED', () => {
+       await Promise.resolve();
+     });
+   };
+-  const nName = (id) => (id === 'door-1' ? 'Дверь в бункер' : 'Запертый ящик');
++  const nName = (id) => (id === 'door-1' || id === 'term-door'
++    ? 'Дверь в бункер'
++    : 'Запертый ящик');
+ 
+   it('взлом локации ВВОДИТ игрока внутрь (кнопка «Назад» в родителя)', async () => {
+     const renderer = await mount();
+-    const hack = renderer.root.findAllByProps({ testID: 'terminal-hack-button' })[0];
+-    await act(async () => { hack.props.onPress(); await Promise.resolve(); });
++    // Патч 542: вход в запертую локацию сначала показывает ТОЛЬКО преграду.
++    const enter = renderer.root.findAllByType('TouchableOpacity')
++      .filter((n) => n.props.testID === 'hub-node-enter-door-1')[0];
++    await act(async () => { enter.props.onPress(); await Promise.resolve(); });
++    expect(allText(renderer)).not.toContain('Внутренний зал'); // ещё за дверью
++    const gateHack = renderer.root.findAllByType('TouchableOpacity')
++      .filter((n) => n.props.testID === 'current-gate-hack-term-door')[0];
++    await act(async () => { gateHack.props.onPress(); await Promise.resolve(); });
+     expect(renderer.root.findAllByType('LockPickingModal').length).toBeGreaterThan(0);
+-    await win(renderer, 'door-1');
++    await win(renderer, 'door-1', 'term-door');
+     await pause(HACK_OUTCOME_DELAY_MS + 150);
+     expect(renderer.root.findAllByProps({ testID: 'hub-back-button' }).length).toBeGreaterThan(0);
+     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
+@@ -253,15 +277,11 @@ describe('530: исход ACCESS GRANTED', () => {
+ 
+   it('взлом контейнера показывает СОДЕРЖИМОЕ, не вход в локацию', async () => {
+     const renderer = await mount();
+-    // В корне локации два источника проверки: door-1 (локация) и box-1
+-    // (контейнер). Второй — нужный нам контейнер.
+-    // RN-мок отдаёт и компонент, и host-узел для одного testID; берём только
+-    // host-кнопки, чтобы индексы соответствовали реальным точкам.
+-    const hacks = renderer.root.findAllByType('TouchableOpacity')
+-      .filter((n) => n.props.testID === 'terminal-hack-button');
+-    const boxHack = hacks[1];
++    // Замок ящика — преграда НА контейнере: проверка идёт прямо из строки.
++    const boxHack = renderer.root.findAllByType('TouchableOpacity')
++      .filter((n) => n.props.testID === 'gate-hack-button-box-1')[0];
+     await act(async () => { boxHack.props.onPress(); await Promise.resolve(); });
+-    await win(renderer, 'box-1');
++    await win(renderer, 'box-1', 'term-box');
+     await pause(HACK_OUTCOME_DELAY_MS + 150);
+     // Список локации сменился окном содержимого.
+     expect(renderer.root.findAllByProps({ testID: 'hack-outcome-hint-door-1' })).toHaveLength(0);
+@@ -274,7 +294,7 @@ describe('530: исход ACCESS GRANTED', () => {
+ 
+   it('победа без явного «Взломать» и отдельно выданная точка навигацию не дёргают', async () => {
+     const renderer = await mount();
+-    await win(renderer, 'box-1'); // terminalSelection нет вообще
++    await win(renderer, 'box-1', 'term-box'); // terminalSelection нет вообще
+     await pause(HACK_OUTCOME_DELAY_MS + 150);
+     expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
+     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
+diff --git a/__tests__/lootTrade/player-lock-overlay-524.test.js b/__tests__/lootTrade/player-lock-overlay-524.test.js
+index d24ee9a..2cbf336 100644
+--- a/__tests__/lootTrade/player-lock-overlay-524.test.js
++++ b/__tests__/lootTrade/player-lock-overlay-524.test.js
+@@ -60,6 +60,8 @@ import useCharacterStore from '../../src/store/characterStore';
+ import useRoomStore from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
+ 
++// Патч 542: замок больше не рисуется строкой игрока (lock_never_standalone),
++// поэтому для проверки берём терминал — законная самостоятельная дочерняя точка.
+ const location = () => ({
+   sessionId: 'session-524',
+   containerId: 'vault',
+@@ -67,7 +69,7 @@ const location = () => ({
+   name: 'Убежище',
+   targetType: 'room',
+   nodes: [
+-    { containerId: 'lock-1', kind: 'lock', name: 'Замок', difficulty: 2, parentIds: ['vault'], childIds: [] },
++    { containerId: 'term-1', kind: 'terminal', name: 'Терминал', difficulty: 2, parentIds: ['vault'], childIds: [] },
+     { containerId: 'box-1', kind: 'loot', name: 'Сундук', parentIds: ['vault'], childIds: [], items: [] },
+   ],
+ });
+@@ -116,7 +118,17 @@ describe('524: окно локации и «Покинуть локацию»',
+           joined: true,
+           members: [{ clientId: 'player-client', role: 'player' }],
+           activeSession: null,
+-          terminalStates: {},
++          terminalStates: {
++            'term-1': {
++              containerId: 'term-1',
++              config: {
++                containerId: 'term-1', kind: 'terminal', name: 'Терминал', difficulty: 2,
++              },
++              game: null,
++              closed: false,
++              locked: false,
++            },
++          },
+         },
+       },
+     });
+@@ -127,7 +139,7 @@ describe('524: окно локации и «Покинуть локацию»',
+     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' }).length).toBeGreaterThan(0);
+     const hack = renderer.root.findAllByProps({ testID: 'terminal-hack-button' })[0];
+     await act(async () => { hack.props.onPress(); await Promise.resolve(); });
+-    expect(renderer.root.findAllByType('LockPickingModal').length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByType('TerminalHackingModal').length).toBeGreaterThan(0);
+     // visible={!terminalSelection}: кнопка «Покинуть локацию» больше не видна
+     // и не «залипает» под затемнением мини-игры.
+     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
+@@ -146,15 +158,13 @@ describe('524: окно локации и «Покинуть локацию»',
+     await act(async () => renderer.unmount());
+   });
+ 
+-  it('отдельный замок сначала даёт входную модалку, доска — только по «Взломать» (525)', async () => {
++  it('отдельно выданный замок не становится точкой игрока (542)', async () => {
++    // lock_never_standalone: владелец убрал отдельную выдачу замка — такая
++    // сессия не открывает для игрока ни окна, ни кнопок.
+     const renderer = await mount(standaloneLock());
+-    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByType('StandaloneCheckModal')).toHaveLength(0);
+     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
+-    const entry = renderer.root.findByType('StandaloneCheckModal');
+-    expect(entry.props.visible).toBe(true);
+-    await act(async () => { entry.props.onHack(); await Promise.resolve(); });
+-    const modal = renderer.root.findByType('LockPickingModal');
+-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
++    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
+     const texts = renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? ''));
+     expect(texts.some((t) => t.includes('Покинуть локацию'))).toBe(false);
+     await act(async () => renderer.unmount());
+diff --git a/__tests__/lootTrade/standalone-direct-525.test.js b/__tests__/lootTrade/standalone-direct-525.test.js
+index 4209cbd..ec92c05 100644
+--- a/__tests__/lootTrade/standalone-direct-525.test.js
++++ b/__tests__/lootTrade/standalone-direct-525.test.js
+@@ -59,21 +59,24 @@ import useCharacterStore from '../../src/store/characterStore';
+ import useRoomStore from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
+ 
+-const CHECK = {
++const CHECK_LOCK = {
+   containerId: 'lock-1', kind: 'lock', name: 'Замок', description: '', difficulty: 2,
+ };
++const CHECK_TERMINAL = {
++  containerId: 'term-1', kind: 'terminal', name: 'Терминал', description: '', difficulty: 2,
++};
+ 
+-const room = () => ({
++const room = (check) => ({
+   joined: true,
+   members: [{ clientId: 'player-client', role: 'player' }],
+   activeSession: null,
+   capabilities: { terminalHacking: true, lockPicking: true },
+   terminalStates: {
+-    'lock-1': {
+-      containerId: 'lock-1',
++    [check.containerId]: {
++      containerId: check.containerId,
+       standaloneIssued: true,
+       accessId: 'broadcast-1',
+-      config: CHECK,
++      config: check,
+       game: null,
+       closed: false,
+       locked: false,
+@@ -81,7 +84,16 @@ const room = () => ({
+   },
+ });
+ 
+-const mount = async () => {
++const mount = async (check) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({
++    currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
++  });
++  useRoomStore.setState({
++    clientId: 'player-client',
++    status: 'online',
++    rooms: { ROOM1: room(check) },
++  });
+   let renderer;
+   await act(async () => {
+     renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
+@@ -90,44 +102,41 @@ const mount = async () => {
+   return renderer;
+ };
+ 
+-describe('525: отдельно выданный замок через terminal.issue', () => {
+-  beforeEach(() => {
+-    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
+-    useCharacterStore.setState({
+-      currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
+-    });
+-    useRoomStore.setState({
+-      clientId: 'player-client',
+-      status: 'online',
+-      rooms: { ROOM1: room() },
+-    });
++describe('525: отдельная выдача точки игроку', () => {
++  it('самостоятельно выданный замок не становится отдельным окном игрока (542)', async () => {
++    // Патч 542, lock_never_standalone: владелец запретил отдельную выдачу
++    // замка — такая точка не открывает для игрока самостоятельной модалки.
++    const renderer = await mount(CHECK_LOCK);
++    expect(renderer.root.findAllByType('StandaloneCheckModal')).toHaveLength(0);
++    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    await act(async () => renderer.unmount());
+   });
+ 
+-  it('сначала входная модалка, мини-игры ещё нет и «Покинуть локацию» нет', async () => {
+-    const renderer = await mount();
++  it('отдельно выданный терминал по-прежнему начинается с входной модалки', async () => {
++    const renderer = await mount(CHECK_TERMINAL);
+     const entry = renderer.root.findByType('StandaloneCheckModal');
+     expect(entry.props.visible).toBe(true);
+-    expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
+-    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
++    expect(renderer.root.findAllByType('TerminalHackingModal')).toHaveLength(0);
+     await act(async () => renderer.unmount());
+   });
+ 
+-  it('«Взломать» монтирует доску с autoStart, входная модалка скрыта', async () => {
+-    const renderer = await mount();
++  it('«Взломать» терминала монтирует доску с autoStart, входная модалка скрыта', async () => {
++    const renderer = await mount(CHECK_TERMINAL);
+     const entry = renderer.root.findByType('StandaloneCheckModal');
+     await act(async () => { entry.props.onHack(); await Promise.resolve(); });
+-    const modal = renderer.root.findByType('LockPickingModal');
+-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
++    const modal = renderer.root.findByType('TerminalHackingModal');
++    expect(modal.props).toMatchObject({ containerId: 'term-1', autoStart: true });
+     expect(renderer.root.findByType('StandaloneCheckModal').props.visible).toBe(false);
+     await act(async () => renderer.unmount());
+   });
+ 
+-  it('«Смотреть» открывает окно доски без автозапуска партии', async () => {
+-    const renderer = await mount();
++  it('«Смотреть» терминала открывает окно доски без автозапуска партии', async () => {
++    const renderer = await mount(CHECK_TERMINAL);
+     const entry = renderer.root.findByType('StandaloneCheckModal');
+     await act(async () => { entry.props.onView(); await Promise.resolve(); });
+-    const modal = renderer.root.findByType('LockPickingModal');
+-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: false });
++    const modal = renderer.root.findByType('TerminalHackingModal');
++    expect(modal.props).toMatchObject({ containerId: 'term-1', autoStart: false });
+     await act(async () => renderer.unmount());
+   });
+ });
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 9efad6c..2db59d7 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('541');
++    expect(version.version).toBe('542');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(140);
+-    expect(version.notes['en-EN']).toHaveLength(140);
+-    expect(json('patchs/baseline.json').baseline).toBe('541');
++    expect(version.notes['ru-RU']).toHaveLength(141);
++    expect(version.notes['en-EN']).toHaveLength(141);
++    expect(json('patchs/baseline.json').baseline).toBe('542');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -267,16 +267,19 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
++    expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **541**');
++    expect(roadmap).toContain('Текущая версия: **542**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+-    expect(roadmap).toContain('Осталось после патча 541');
++    expect(roadmap).toContain('| 33 |');
++    expect(roadmap).toContain('Осталось после патча 542');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
++    expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hub-player-window-542.test.js b/__tests__/room/hub-player-window-542.test.js
+new file mode 100644
+index 0000000..572bd18
+--- /dev/null
++++ b/__tests__/room/hub-player-window-542.test.js
+@@ -0,0 +1,297 @@
++// Патч 542: выдача хаба целиком и окно игрока по слову владельца.
++// 1) Граф строится по links + parentLocationId — Ниптон с вложенными
++//    локациями/терминалом/замком выдаётся целиком, а не пустым экраном.
++// 2) Верхний уровень окна — только прямые элементы; вложенные точки скрыты
++//    до входа, замок не бывает самостоятельной строкой игрока.
++// 3) Вход в запертую локацию сначала показывает ТОЛЬКО преграду
++//    (замок/терминал), после прохождения — содержимое.
++// 4) «Назад» возвращает в локацию, через которую пришёл (история входа),
++//    exitLocationId даёт переход в другую локацию.
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) =>
++    React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible, autoStart }) => React.createElement('LockPickingModal', {
++    containerId: lock?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
++    visible, onHack, onView,
++  }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++// Хаб «Убежище»: два прямых дома (у одного — сундук внутри), отдельный
++// сундук на корне; служебные узлы, которые игроку не должны торчать:
++// скрытый замок, скрытый привязанный терминал и цель особого выхода.
++const session = (extra = {}) => ({
++  sessionId: 'session-542',
++  containerId: 'vault',
++  kind: 'hub',
++  name: 'Убежище',
++  targetType: 'room',
++  exitLocationId: 'way-out',
++  nodes: [
++    {
++      containerId: 'house-1', kind: 'loot', name: 'Дом у дороги',
++      parentIds: ['vault'], childIds: ['chest-house'], items: [],
++    },
++    {
++      containerId: 'chest-house', kind: 'loot', name: 'Сундук в доме',
++      parentIds: ['house-1'], childIds: [], items: [],
++    },
++    {
++      containerId: 'box-root', kind: 'loot', name: 'Сундук во дворе',
++      parentIds: ['vault'], childIds: [], items: [],
++    },
++    {
++      containerId: 'lock-hidden', kind: 'lock', name: 'Скрытый замок',
++      parentIds: ['vault'], childIds: [],
++    },
++    {
++      containerId: 'gate-hidden', kind: 'terminal', name: 'Скрытый терминал',
++      parentIds: ['vault'], childIds: [], hiddenForPlayers: true,
++    },
++    {
++      containerId: 'way-out', kind: 'loot', name: 'Выход к перекрёстку',
++      parentIds: ['vault'], childIds: [], items: [], exitOnly: true,
++    },
++    ...(extra.nodes || []),
++  ],
++  ...extra.session,
++});
++
++const mount = async (activeSession) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({
++    currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
++  });
++  useRoomStore.setState({
++    clientId: 'player-client',
++    status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession: null,
++        terminalStates: {
++          'term-gate': {
++            containerId: 'term-gate',
++            config: {
++              containerId: 'term-gate', kind: 'lock', name: 'Замок двери', difficulty: 2,
++            },
++            game: null, closed: false, locked: false,
++          },
++        },
++      },
++    },
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await Promise.resolve();
++  });
++  await act(async () => {
++    useRoomStore.setState((state) => ({
++      rooms: { ...state.rooms, ROOM1: { ...state.rooms.ROOM1, activeSession } },
++    }));
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const allText = (renderer) => renderer.root.findAllByType('Text')
++  .map((node) => String(node.props.children ?? '')).join(' | ');
++const tap = async (renderer, testID) => {
++  const [button] = renderer.root
++    .findAllByType('TouchableOpacity')
++    .filter((node) => node.props.testID === testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++  return button;
++};
++
++describe('542: верхний уровень окна игрока — только прямые элементы', () => {
++  it('вложенные точки, замок, скрытый терминал и цель выхода не торчат на корне', async () => {
++    const renderer = await mount(session());
++    const text = allText(renderer);
++    expect(text).toContain('Дом у дороги');
++    expect(text).toContain('Сундук во дворе');
++    // Вложенный сундук виден только внутри дома.
++    expect(text).not.toContain('Сундук в доме');
++    // Замок никогда не самостоятельная строка игрока (lock_never_standalone).
++    expect(text).not.toContain('Скрытый замок');
++    // Привязанный терминал-преграда скрыт из списка.
++    expect(text).not.toContain('Скрытый терминал');
++    // Цель особого выхода — кнопка «Выход → …», а не дочерняя карточка.
++    expect(renderer.root.findAllByProps({ testID: 'hub-node-enter-way-out' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'hub-exit-button' }).length).toBeGreaterThan(0);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('542: вход в локацию с преградой', () => {
++  it('сначала только замок/терминал, содержимое скрыто до прохождения', async () => {
++    const renderer = await mount(session());
++    // Запираем дом: преграда на самой локации, дети спрятаны за ней.
++    const lockedHouse = {
++      containerId: 'house-1', kind: 'loot', name: 'Дом у дороги', locked: true,
++      linkedCheckIds: ['term-gate'],
++      parentIds: ['vault'], childIds: ['chest-house'], items: [],
++    };
++    const nodes = session().nodes
++      .map((node) => (node.containerId === 'house-1' ? lockedHouse : node));
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: { ...state.rooms, ROOM1: { ...state.rooms.ROOM1, activeSession: { ...session(), nodes } } },
++      }));
++      await Promise.resolve();
++    });
++    // Запертая локация ведёт к экрану преград, а не мимо неё.
++    await tap(renderer, 'hub-node-enter-house-1');
++    const gated = allText(renderer);
++    expect(gated).not.toContain('Сундук в доме'); // содержимое ещё за преградой
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-option-term-gate' }).length)
++      .toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-term-gate' }).length)
++      .toBeGreaterThan(0);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('542: назад и особый выход', () => {
++  it('выход ведёт в свою локацию, «Назад» возвращает по истории входа', async () => {
++    const renderer = await mount(session());
++    // Ещё не вошли — кнопки «Назад» нет.
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
++    await tap(renderer, 'hub-exit-button');
++    const outside = allText(renderer);
++    expect(outside).toContain('Выход к перекрёстку');
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' }).length).toBeGreaterThan(0);
++    // Назад — ровно один шаг по стеку истории, корень на месте.
++    await tap(renderer, 'hub-back-button');
++    const back = allText(renderer);
++    expect(back).toContain('Убежище');
++    expect(back).toContain('Дом у дороги');
++    expect(renderer.root.findAllByProps({ testID: 'hub-node-enter-way-out' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('542: контракт по файлам', () => {
++  const graph = read('server/locationGraph.js');
++  const domain = read('domain/lootTrade.js');
++  const sessionSrc = read('server/lootTradeSession.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++  const store = read('src/room/roomStore.ts');
++
++  it('граф хаба строится по links + parentLocationId, выходы помечены exitOnly', () => {
++    expect(graph).toContain('buildGraphFromSession');
++    expect(graph).toContain('viaExit');
++    expect(graph).toContain('exitOnly: Boolean(viaExit && parentId)');
++    expect(graph).toContain('parentLocationId');
++    expect(domain).toContain('exitLocationId');
++    expect(domain).toContain('accessExpression');
++  });
++
++  it('сервер скрывает замки/привязанные терминалы и закрывает корень-преграду пустым списком', () => {
++    expect(sessionSrc).toContain("session.keyAccessState === 'needs-check'");
++    expect(sessionSrc).toContain('return { ...session, nodes: [] }');
++    expect(sessionSrc).toContain('exitOnly');
++    expect(sessionSrc).toContain('next.accessExpression = normalizeAccessExpression');
++  });
++
++  it('Мастер отдаёт хабу требование доступа и особый выход, сложность — nodeDifficulty', () => {
++    expect(screen).toContain('exitLocationId: saved.exitLocationId || ');
++    expect(screen).toContain('exitLocationId: freshSource.exitLocationId || ');
++    expect(screen).toContain('nodeDifficulty');
++    expect(store).toContain('exitLocationId?: string;');
++    expect(store).toContain('accessExpression?: unknown[];');
++  });
++
++  it('окно игрока: gate-first, фильтры списка, сброс истории и кнопка выхода', () => {
++    expect(overlay).toContain('normalizeLinkedCheckIds(node)');
++    expect(overlay).toContain("node.keyAccessState !== 'denied'");
++    expect(overlay).toContain("tLootTrade('player.gateOr')");
++    expect(overlay).toContain("tLootTrade('player.gateAnd')");
++    expect(overlay).toContain('current-gate-hack-');
++    expect(overlay).toContain('gateOnly: true');
++    expect(overlay).toContain('node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK');
++    expect(overlay).toContain('testID="hub-exit-button"');
++    expect(overlay).toContain('setParentStack((stack) => [...stack, exitNode.containerId])');
++    expect(overlay).toContain('setParentStack([])');
++    expect(overlay).toContain('standaloneIssued');
++    expect(overlay).toContain('lock_never_standalone');
++  });
++
++  it('словари RU/EN парные: выход, «и» между проверками', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    expect(Object.keys(ru.player).sort()).toEqual(Object.keys(en.player).sort());
++    expect(ru.player.exitToLocation).toContain('{name}');
++    expect(en.player.exitToLocation).toContain('{name}');
++    expect(ru.player.gateAnd).toBe('и');
++    expect(en.player.gateAnd).toBe('and');
++  });
++});
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 42d83d4..874dd0f 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('541');
++    expect(version.version).toBe('542');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(140);
+-    expect(version.notes['en-EN']).toHaveLength(140);
+-    expect(json('patchs/baseline.json').baseline).toBe('541');
++    expect(version.notes['ru-RU']).toHaveLength(141);
++    expect(version.notes['en-EN']).toHaveLength(141);
++    expect(json('patchs/baseline.json').baseline).toBe('542');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -451,16 +451,19 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
++    expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **541**');
++    expect(roadmap).toContain('Текущая версия: **542**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+-    expect(roadmap).toContain('Осталось после патча 541');
++    expect(roadmap).toContain('| 33 |');
++    expect(roadmap).toContain('Осталось после патча 542');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
++    expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index eddbeb2..ad67812 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -23,6 +23,10 @@ import {
+   tLootTrade,
+   formatLootTrade,
+ } from '../screens/LootTradeScreen/logic/lootTradeI18n';
++import {
++  expressionCheckIds,
++  resolveAccessExpression,
++} from '../../domain/accessExpression';
+ import {
+   CONTAINER_KIND,
+   computeBarterSummary,
+@@ -192,7 +196,10 @@ export default function PlayerLootTradeOverlay() {
+     });
+     for (const bind of ordered) {
+       const states = Object.values(rooms[bind.code]?.terminalStates || {});
+-      const terminalState = states.find((entry) => entry?.standaloneIssued && entry?.config?.containerId);
++      // Патч 542: замок не бывает самостоятельной точкой игрока.
++      const terminalState = states.find((entry) => entry?.standaloneIssued
++        && entry?.config?.containerId
++        && entry?.config?.kind !== CONTAINER_KIND.LOCK);
+       if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
+     }
+     return null;
+@@ -280,6 +287,7 @@ export default function PlayerLootTradeOverlay() {
+     setBuyBuffer({});
+     setSellBuffer({});
+     setSelectedHubNodeId(null);
++    setParentStack([]);
+     setMinimizedSessionId(null);
+     setMobileTab('merchant');
+   }, [activeSession?.sessionId]);
+@@ -305,7 +313,8 @@ export default function PlayerLootTradeOverlay() {
+   const handledWinRef = useRef('');
+   const winTimerRef = useRef(null);
+   useEffect(() => {
+-    if (!isHubSession || !terminalSelection?.targetNodeId || !terminalSelection.autoStart) {
++    if (!isHubSession || !terminalSelection?.autoStart
++      || (!terminalSelection?.targetNodeId && !terminalSelection?.gateOnly)) {
+       handledWinRef.current = '';
+       return;
+     }
+@@ -321,6 +330,9 @@ export default function PlayerLootTradeOverlay() {
+     winTimerRef.current = setTimeout(() => {
+       winTimerRef.current = null;
+       setTerminalSelection(null);
++      // Патч 542: преграда текущей локации уже пройдена изнутри — остаёмся
++      // на месте, сервер раскроет содержимое. Каскада нет.
++      if (!targetId) return;
+       const target = nodes.find((n) => n.containerId === targetId) || { containerId: targetId };
+       navigateHackOutcome(target);
+     }, HACK_OUTCOME_DELAY_MS);
+@@ -569,6 +581,9 @@ export default function PlayerLootTradeOverlay() {
+   // и без «Покинуть локацию», и только по «Взломать» монтируется мини-игра
+   // с уже собранной доской. Пустая «как бы запущенная» игра убрана.
+   if (standaloneCheckSession && matchedContext) {
++    // Патч 542 (lock_never_standalone): самостоятельно выданный замок не
++    // бывает точкой игрока — для него окно не рисуем вовсе.
++    if (standaloneCheckSession.kind === CONTAINER_KIND.LOCK) return null;
+     const roomCode = matchedContext.roomCode;
+     const node = standaloneCheckSession.node;
+     const state = rooms?.[roomCode]?.terminalStates?.[node.containerId];
+@@ -655,14 +670,91 @@ export default function PlayerLootTradeOverlay() {
+   if (isHubSession && !viewTarget) {
+     const rootId = activeSession.containerId || '';
+     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
++    const currentNode = currentParentId === rootId
++      ? null
++      : (activeSession.nodes || []).find((node) => node.containerId === currentParentId) || null;
++    const currentTarget = currentNode || { ...activeSession, containerId: rootId };
++    const currentTitle = currentNode?.name || activeSession.name;
++    const currentDescription = currentNode?.description ?? activeSession.description;
++    // Патч 542: вход в локацию с преградой показывает сначала только проверки.
++    const currentGatePending = currentTarget.keyAccessState === 'needs-check'
++      || currentTarget.keyAccessState === 'denied'
++      || (Boolean(currentTarget.locked)
++        && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
++    const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
++      const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
++      if (!state) return null;
++      const kind = state.config?.kind === 'lock'
++        ? CONTAINER_KIND.LOCK
++        : CONTAINER_KIND.TERMINAL;
++      const accessKey = terminalAccessKey({
++        roomCode: matchedContext.roomCode,
++        containerId: id,
++        accessId: state?.accessId,
++      });
++      const closed = Boolean(
++        state.closed || state.locked || state.game?.status === 'closed',
++      );
++      const awaiting = Boolean(
++        state.awaitingGm || state.game?.status === 'awaitingRetry',
++      );
++      const hackAllowed = canHackTerminal({
++        key: accessKey,
++        game: state?.game,
++        terminalClosed: closed,
++        terminalAwaiting: awaiting,
++        isLock: kind === CONTAINER_KIND.LOCK,
++      });
++      const difficulty = state.config?.difficulty ?? 1;
++      return {
++        id,
++        kind,
++        accessKey,
++        hackAllowed,
++        label: formatLootTrade(
++          tLootTrade(kind === CONTAINER_KIND.LOCK
++            ? 'player.gateLockLabel'
++            : 'player.gateTerminalLabel'),
++          { difficulty },
++        ),
++        selection: {
++          ...(state.config || {}),
++          containerId: id,
++          kind,
++          name: state.config?.name || tLootTrade('player.gateTerminal'),
++          difficulty,
++        },
++      };
++    }).filter(Boolean);
++    const gateIdsFor = (node) => (node.keyAccessState !== 'denied'
++      ? [...new Set([
++        ...expressionCheckIds(resolveAccessExpression(node)),
++        ...normalizeLinkedCheckIds(node),
++      ])]
++      : []);
++    const gateSeparatorKeyFor = (node) => (
++      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === 'and')
++        ? 'player.gateAnd'
++        : 'player.gateOr'
++    );
++    const currentTargetIsLocation = currentNode ? nodeHasChildren(currentNode) : true;
++    const currentGateOptions = currentGatePending ? gateOptionsFor(currentTarget, gateIdsFor(currentTarget)) : [];
++    const currentGateSeparatorKey = gateSeparatorKeyFor(currentTarget);
+     // Узел может иметь НЕСКОЛЬКО родителей; старые сессии без parentIds
+     // считаются детьми корня. Запертые потомки уже скрыты сервером.
+-    const hubNodes = (activeSession.nodes || []).filter((node) => {
++    // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
++    // никогда не самостоятельная строка игрока.
++    const hubNodes = currentGatePending ? [] : (activeSession.nodes || []).filter((node) => {
++      if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
+       const parents = Array.isArray(node.parentIds) && node.parentIds.length
+         ? node.parentIds
+         : [rootId];
+       return parents.includes(currentParentId);
+     });
++    const exitLocationId = String(currentTarget.exitLocationId || '').trim();
++    const exitNode = exitLocationId && !currentGatePending
++      ? (activeSession.nodes || []).find((node) => node.containerId === exitLocationId)
++      : null;
+     return (
+       <>
+         <Modal
+@@ -676,7 +768,7 @@ export default function PlayerLootTradeOverlay() {
+               <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+                 <View style={styles.modalTitleRow}>
+                   <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
+-                  <Text style={styles.modalTitle}>{activeSession.name}</Text>
++                  <Text style={styles.modalTitle}>{currentTitle}</Text>
+                 </View>
+                 <View style={styles.headerActionsRow}>
+                   {/* Патч 506: «Свернуть» и «Покинуть локацию». Закрыть сцену
+@@ -707,9 +799,9 @@ export default function PlayerLootTradeOverlay() {
+                 </View>
+               </View>
+ 
+-              {Boolean(activeSession.description) && (
++              {Boolean(currentDescription) && (
+                 <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+-                  {activeSession.description}
++                  {currentDescription}
+                 </IconText>
+               )}
+ 
+@@ -717,7 +809,63 @@ export default function PlayerLootTradeOverlay() {
+                 style={styles.lootScroll}
+                 contentContainerStyle={styles.lootScrollContent}
+               >
+-                {hubNodes.length === 0 ? (
++                {currentGatePending ? (
++                  <View style={styles.terminalButtons}>
++                    <Text style={styles.hubLockedHintText}>
++                      {tLootTrade(currentTarget.keyAccessState === 'denied'
++                        ? 'player.keyRequiredError'
++                        : 'player.gateOptionsTitle')}
++                    </Text>
++                    {currentGateOptions.map((option, optionIdx) => (
++                      <View key={option.id} style={styles.terminalButtons}>
++                        {optionIdx > 0 && (
++                          <Text testID={`current-gate-or-${option.id}`} style={styles.hubLockedHintText}>
++                            {currentGateSeparatorKey === 'player.gateAnd'
++                              ? tLootTrade('player.gateAnd')
++                              : tLootTrade('player.gateOr')}
++                          </Text>
++                        )}
++                        <Text testID={`current-gate-option-${option.id}`} style={styles.hubLockedHintText}>
++                          {option.label}
++                        </Text>
++                        <View style={styles.terminalButtons}>
++                          <TouchableOpacity
++                            testID={`current-gate-view-${option.id}`}
++                            style={styles.terminalViewButton}
++                            onPress={() => setTerminalSelection({
++                              node: option.selection,
++                              kind: option.kind,
++                              autoStart: false,
++                            })}
++                          >
++                            <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity
++                            testID={`current-gate-hack-${option.id}`}
++                            style={[styles.terminalHackButton, !option.hackAllowed && styles.terminalButtonDisabled]}
++                            disabled={!option.hackAllowed}
++                            onPress={() => setTerminalSelection({
++                              node: option.selection,
++                              kind: option.kind,
++                              autoStart: true,
++                              freshAttempt: option.kind === CONTAINER_KIND.LOCK,
++                              gateOnly: true,
++                            })}
++                          >
++                            <Text style={styles.terminalHackButtonText}>
++                              {tLootTrade(currentTargetIsLocation
++                                ? 'player.hackAndEnter'
++                                : 'player.hackAndOpen')}
++                            </Text>
++                          </TouchableOpacity>
++                        </View>
++                      </View>
++                    ))}
++                    {currentGateOptions.length === 0 && currentTarget.keyAccessState !== 'denied' && (
++                      <Text style={styles.hubLockedHintText}>{tLootTrade('player.hubNodeLockedBadge')}</Text>
++                    )}
++                  </View>
++                ) : hubNodes.length === 0 ? (
+                   <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+                 ) : (
+                   hubNodes.map((rawNode) => {
+@@ -796,56 +944,9 @@ export default function PlayerLootTradeOverlay() {
+                     // отдельная карточка. Патч 520: источников может быть два
+                     // (терминал ИЛИ замок) — они не блокируют точку одновременно.
+                     // Обязательный ключ по-прежнему не обойти взломом.
+-                    const gateIds = node.keyAccessState !== 'denied'
+-                      ? normalizeLinkedCheckIds(node)
+-                      : [];
+-                    const gateOptions = nodeLocked
+-                      ? gateIds.map((id) => {
+-                          const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+-                          if (!state) return null;
+-                          const kind = state.config?.kind === 'lock'
+-                            ? CONTAINER_KIND.LOCK
+-                            : CONTAINER_KIND.TERMINAL;
+-                          const accessKey = terminalAccessKey({
+-                            roomCode: matchedContext.roomCode,
+-                            containerId: id,
+-                            accessId: state?.accessId,
+-                          });
+-                          const closed = Boolean(
+-                            state.closed || state.locked || state.game?.status === 'closed',
+-                          );
+-                          const awaiting = Boolean(
+-                            state.awaitingGm || state.game?.status === 'awaitingRetry',
+-                          );
+-                          const hackAllowed = canHackTerminal({
+-                            key: accessKey,
+-                            game: state?.game,
+-                            terminalClosed: closed,
+-                            terminalAwaiting: awaiting,
+-                            isLock: kind === CONTAINER_KIND.LOCK,
+-                          });
+-                          const difficulty = state.config?.difficulty ?? 1;
+-                          return {
+-                            id,
+-                            kind,
+-                            accessKey,
+-                            hackAllowed,
+-                            label: formatLootTrade(
+-                              tLootTrade(kind === CONTAINER_KIND.LOCK
+-                                ? 'player.gateLockLabel'
+-                                : 'player.gateTerminalLabel'),
+-                              { difficulty },
+-                            ),
+-                            selection: {
+-                              ...(state.config || {}),
+-                              containerId: id,
+-                              kind,
+-                              name: state.config?.name || tLootTrade('player.gateTerminal'),
+-                              difficulty,
+-                            },
+-                          };
+-                        }).filter(Boolean)
+-                      : [];
++                    const gateIds = gateIdsFor(node);
++                    const gateOptions = nodeLocked ? gateOptionsFor(node, gateIds) : [];
++                    const gateSeparatorKey = gateSeparatorKeyFor(node);
+                     const gateAvailable = gateOptions.length > 0;
+                     const gateHackAllowed = gateOptions.some((option) => option.hackAllowed);
+                     const piecesCount = (node.items || []).reduce(
+@@ -920,14 +1021,16 @@ export default function PlayerLootTradeOverlay() {
+                         </View>
+ 
+                         <View style={styles.lootRowBtns}>
+-                          {nodeLocked ? (
++                          {nodeLocked && !nodeIsLocation ? (
+                             gateAvailable ? (
+                               <View style={styles.terminalButtons}>
+                                 {gateOptions.map((option, optionIdx) => (
+                                   <View key={option.id} style={styles.terminalButtons}>
+                                     {optionIdx > 0 && (
+                                       <Text testID={`gate-or-${node.containerId}`} style={styles.hubLockedHintText}>
+-                                        {tLootTrade('player.gateOr')}
++                                        {gateSeparatorKey === 'player.gateAnd'
++                                          ? tLootTrade('player.gateAnd')
++                                          : tLootTrade('player.gateOr')}
+                                       </Text>
+                                     )}
+                                     <Text testID={`gate-option-${option.id}`} style={styles.hubLockedHintText}>
+@@ -1037,6 +1140,7 @@ export default function PlayerLootTradeOverlay() {
+                             </View>
+                           ) : (
+                             <TouchableOpacity
++                              testID={`hub-node-enter-${node.containerId}`}
+                               style={styles.takeAllRowBtn}
+                               onPress={() => {
+                                 setBuyBuffer({});
+@@ -1051,7 +1155,11 @@ export default function PlayerLootTradeOverlay() {
+                               <Text style={styles.takeAllRowBtnText}>
+                                 {tLootTrade(
+                                   nodeIsLocation
+-                                    ? 'player.hubNodeOpenLocation'
++                                    ? (nodeLocked
++                                      // Патч 542: запертая локация ведёт к
++                                      // экрану преград, а не мимо неё.
++                                      ? nodeHackLabelKey
++                                      : 'player.hubNodeOpenLocation')
+                                     : (nodeIsMerch
+                                       ? 'player.hubNodeOpenMerchant'
+                                       : 'player.hubNodeOpenLoot'),
+@@ -1064,6 +1172,20 @@ export default function PlayerLootTradeOverlay() {
+                     );
+                   })
+                 )}
++                {exitNode && (
++                  <TouchableOpacity
++                    testID="hub-exit-button"
++                    style={styles.takeAllRowBtn}
++                    onPress={() => {
++                      setSelectedHubNodeId(null);
++                      setParentStack((stack) => [...stack, exitNode.containerId]);
++                    }}
++                  >
++                    <Text style={styles.takeAllRowBtnText}>
++                      {formatLootTrade(tLootTrade('player.exitToLocation'), { name: exitNode.name })}
++                    </Text>
++                  </TouchableOpacity>
++                )}
+               </ScrollView>
+ 
+               <Text style={styles.hubMasterClosesHint}>
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index a486f64..167e1a9 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -40,9 +40,7 @@ import {
+   buildLocationSessionNodes,
+   effectiveLocationRoomCodes,
+   buildStandaloneTerminalSessionNode,
+-  buildStandaloneLockSessionNode,
+   decodeTerminalNodeMarker,
+-  decodeLockNodeMarker,
+   normalizeLinkedCheckIds,
+   computeMerchantSellPriceToPlayer,
+   getEffectiveMerchantRates,
+@@ -339,19 +337,21 @@ const ContainerCardCell = ({
+         <Pressable style={styles.menuBackdrop} onPress={() => setMenuPos(null)}>
+           {menuPos && (
+             <View style={[styles.actionMenu, menuPos]}>
+-              <TouchableOpacity
+-                style={styles.actionMenuItem}
+-                onPress={() => runMenuAction(onIssueOrClose)}
+-              >
+-                <MaterialCommunityIcons
+-                  name={isLive ? 'close-octagon-outline' : 'broadcast'}
+-                  size={19}
+-                  color={isLive ? '#e57373' : '#f0e68c'}
+-                />
+-                <Text style={styles.actionMenuText}>
+-                  {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
+-                </Text>
+-              </TouchableOpacity>
++              {container.kind !== CONTAINER_KIND.LOCK && (
++                <TouchableOpacity
++                  style={styles.actionMenuItem}
++                  onPress={() => runMenuAction(onIssueOrClose)}
++                >
++                  <MaterialCommunityIcons
++                    name={isLive ? 'close-octagon-outline' : 'broadcast'}
++                    size={19}
++                    color={isLive ? '#e57373' : '#f0e68c'}
++                  />
++                  <Text style={styles.actionMenuText}>
++                    {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
++                  </Text>
++                </TouchableOpacity>
++              )}
+ 
+               {canMoveToHub && onMoveToHub && (
+                 <TouchableOpacity
+@@ -658,7 +658,9 @@ export default function LootTradeScreen() {
+ 
+     // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
+     const liveEntries = getActiveLiveEntriesForContainer(saved);
+-    if (saved.kind === CONTAINER_KIND.TERMINAL || saved.kind === CONTAINER_KIND.LOCK) {
++    // Патч 542: отдельно выдаётся только терминал. Замок живёт узлом сессии
++    // цели и не регистрируется через terminal.issue как самостоятельная точка.
++    if (saved.kind === CONTAINER_KIND.TERMINAL) {
+       for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
+         const registered = Boolean(roomEntry?.terminalStates?.[saved.id]);
+         const liveSession = roomEntry?.activeSession;
+@@ -682,6 +684,7 @@ export default function LootTradeScreen() {
+                 keyRequirement: saved.keyRequirement || 'none',
+                 linkedCheckId: saved.linkedCheckId || '',
+                 linkedCheckIds: normalizeLinkedCheckIds(saved),
++                accessExpression: Array.isArray(saved.accessExpression) ? saved.accessExpression : [],
+               },
+             });
+           } else if (terminalNode) {
+@@ -692,15 +695,10 @@ export default function LootTradeScreen() {
+               sessionId: liveSession.sessionId,
+               nodes: (liveSession.nodes || []).map((n) => (
+                 n.containerId === saved.id
+-                  ? (saved.kind === CONTAINER_KIND.LOCK
+-                      ? buildStandaloneLockSessionNode(saved, {
+-                          locked: n.locked,
+-                          lockLabel: decodeLockNodeMarker(n.lockLabel)?.label || n.lockLabel,
+-                        })
+-                      : buildStandaloneTerminalSessionNode(saved, {
+-                          locked: n.locked,
+-                          lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
+-                        }))
++                  ? buildStandaloneTerminalSessionNode(saved, {
++                      locked: n.locked,
++                      lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
++                    })
+                   : n
+               )),
+             });
+@@ -719,6 +717,12 @@ export default function LootTradeScreen() {
+             name: saved.name,
+             description: saved.description,
+             nodes: buildLocationSessionNodes(saved, freshList),
++            requiredKeyItemId: saved.requiredKeyItemId || '',
++            keyRequirement: saved.keyRequirement || 'none',
++            linkedCheckIds: saved.linkedCheckIds || [],
++            linkedCheckId: saved.linkedCheckId || '',
++            accessExpression: Array.isArray(saved.accessExpression) ? saved.accessExpression : [],
++            exitLocationId: saved.exitLocationId || '',
+           });
+         } else {
+           await useRoomStore.getState().updateRoomSessionRates({
+@@ -757,7 +761,7 @@ export default function LootTradeScreen() {
+               nodeName: saved.name,
+               nodeDescription: saved.description,
+               nodeItems: saved.items,
+-              ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
++              ...(saved.kind === CONTAINER_KIND.TERMINAL || saved.kind === CONTAINER_KIND.LOCK ? {
+                 nodeDifficulty: saved.difficulty,
+               } : {}),
+               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
+@@ -1231,6 +1235,9 @@ export default function LootTradeScreen() {
+       return;
+     }
+ 
++    // Патч 542: замок — только преграда цели, отдельной выдачи у него нет.
++    if (container.kind === CONTAINER_KIND.LOCK) return;
++
+     if (container.kind === CONTAINER_KIND.HUB) {
+       const resolvedNodes = buildLocationSessionNodes(container, containers);
+       if (resolvedNodes.length === 0) {
+@@ -1264,8 +1271,8 @@ export default function LootTradeScreen() {
+       const freshAllContainers = await db.getGmContainersList();
+       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
+       const terminalProtocol = roomSupportsTerminalProtocol(effectiveRoomCode);
+-      const isCheckSource = freshSource.kind === CONTAINER_KIND.TERMINAL
+-        || freshSource.kind === CONTAINER_KIND.LOCK;
++      // Патч 542: замок не выдаётся отдельно; одиночная выдача — только терминал.
++      const isCheckSource = freshSource.kind === CONTAINER_KIND.TERMINAL;
+       if (isCheckSource && terminalProtocol) {
+         await useRoomStore.getState().issueTerminal({
+           code: effectiveRoomCode,
+@@ -1281,6 +1288,7 @@ export default function LootTradeScreen() {
+             keyRequirement: freshSource.keyRequirement || 'none',
+             linkedCheckId: freshSource.linkedCheckId || '',
+             linkedCheckIds: normalizeLinkedCheckIds(freshSource),
++            accessExpression: Array.isArray(freshSource.accessExpression) ? freshSource.accessExpression : [],
+           },
+         });
+       } else if (isCheckSource) {
+@@ -1299,9 +1307,7 @@ export default function LootTradeScreen() {
+             targetCharacterId,
+             targetCharacterName,
+             items: [],
+-            nodes: [freshSource.kind === CONTAINER_KIND.LOCK
+-              ? buildStandaloneLockSessionNode(freshSource)
+-              : buildStandaloneTerminalSessionNode(freshSource)],
++            nodes: [buildStandaloneTerminalSessionNode(freshSource)],
+           },
+         });
+       } else {
+@@ -1330,6 +1336,8 @@ export default function LootTradeScreen() {
+               keyRequirement: freshSource.keyRequirement || 'none',
+               linkedCheckIds: freshSource.linkedCheckIds || [],
+               linkedCheckId: freshSource.linkedCheckId || '',
++              accessExpression: Array.isArray(freshSource.accessExpression) ? freshSource.accessExpression : [],
++              exitLocationId: freshSource.exitLocationId || '',
+             } : {}),
+           },
+         });
+@@ -2061,22 +2069,24 @@ export default function LootTradeScreen() {
+                   <Text style={styles.smallHeaderBtnText}>{tLootTrade('detail.editSettings')}</Text>
+                 </TouchableOpacity>
+ 
+-                <TouchableOpacity
+-                  style={[
+-                    styles.smallHeaderBtn,
+-                    activeLiveSession ? styles.stopIssueHeaderBtn : styles.issueHeaderBtn,
+-                  ]}
+-                  onPress={() => handleIssueOrClosePress(activeContainer)}
+-                >
+-                  <MaterialCommunityIcons
+-                    name={activeLiveSession ? 'stop-circle-outline' : 'broadcast'}
+-                    size={15}
+-                    color="#fff"
+-                  />
+-                  <Text style={styles.smallHeaderBtnText}>
+-                    {tLootTrade(activeLiveSession ? 'detail.stopIssueButton' : 'detail.issueButton')}
+-                  </Text>
+-                </TouchableOpacity>
++                {activeContainer.kind !== CONTAINER_KIND.LOCK && (
++                  <TouchableOpacity
++                    style={[
++                      styles.smallHeaderBtn,
++                      activeLiveSession ? styles.stopIssueHeaderBtn : styles.issueHeaderBtn,
++                    ]}
++                    onPress={() => handleIssueOrClosePress(activeContainer)}
++                  >
++                    <MaterialCommunityIcons
++                      name={activeLiveSession ? 'stop-circle-outline' : 'broadcast'}
++                      size={15}
++                      color="#fff"
++                    />
++                    <Text style={styles.smallHeaderBtnText}>
++                      {tLootTrade(activeLiveSession ? 'detail.stopIssueButton' : 'detail.issueButton')}
++                    </Text>
++                  </TouchableOpacity>
++                )}
+               </View>
+             </View>
+ 
+@@ -2633,7 +2643,7 @@ export default function LootTradeScreen() {
+           void ensureGmRoomConnected(code).catch(() => {});
+         }}
+         onConfirmIssue={handleConfirmIssue}
+-        roomWideOnly={[CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(issueTargetContainer?.kind) || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL || node.kind === CONTAINER_KIND.LOCK))}
++        roomWideOnly={issueTargetContainer?.kind === CONTAINER_KIND.TERMINAL || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildLocationSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL || node.kind === CONTAINER_KIND.LOCK))}
+         onClose={() => setIssueTargetContainer(null)}
+       />
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7eb7d16..865d360 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,38 @@
+ # Changelog
+ ---
+ 
++## A whole hub issue and the player window (patch 542)
++
++The owner's clarifications are closed in one patch: hubs issue whole, the
++player window follows entry history, and the lock is finally removed from
++standalone points.
++
++- **Graph from links plus parents.** The session is built from `links` +
++  `parentLocationId`: Nipton with nested locations, a terminal and a lock
++  issues whole instead of an empty screen with the "add at least one container
++  or merchant" warning.
++- **The top level holds only direct elements.** Top-level locations, chests
++  and merchants show immediately; nested points (a chest inside a house) stay
++  hidden until you enter. The special exit target no longer sticks out as a
++  child card — it is an "Exit → …" button.
++- **A barrier is a gatekeeper screen.** Entering a locked location first shows
++  only the lock/terminal (AND/OR options labelled "and"/"or"); contents and
++  children open after the check passes. A locked chest hides its contents, a
++  locked location hides its children.
++- **The lock is never a standalone player point** (`lock_never_standalone`):
++  standalone lock issuing is removed from the UI, lock rows and standalone
++  lock sessions are not drawn for the player; the server issuing API stays for
++  internal calls. A terminal can still be both a standalone child point and a
++  barrier.
++- **Navigation follows entry history.** Back returns only to the location you
++  came through (A→B, A→C, C→D ⇒ from D back only to C), even when it belongs
++  to another hub; `exitLocationId` lets you enter the configured location, and
++  the way back follows history rather than the administrative tree. History
++  resets when the session changes.
++- **Master hub edits reach the server:** live location updates carry the
++  access requirement and special exit, and lock/terminal difficulty syncs via
++  `nodeDifficulty` without recreating the point.
++
+ ## Element parameters in the hub tree row (patch 541)
+ 
+ A targeted admin hub-tree change at the owner's word (thesis 32). Admin-only;
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index fc9451d..759fa84 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,37 @@
+ 
+ ---
+ 
++## Выдача хаба целиком и окно игрока (патч 542)
++
++Уточнения владельца закрыты одним патчем: хаб выдаётся целиком, окно игрока
++строится по истории входа, замок окончательно убран из самостоятельных точек.
++
++- **Граф по связям и родителям.** Сессия строится по `links` +
++  `parentLocationId`: Ниптон с вложенными локациями, терминалом и замком
++  выдаётся целиком, а не пустым экраном с предупреждением «добавьте хоть один
++  контейнер или торговца».
++- **Верхний уровень — только прямые элементы.** Локации, сундуки и торговцы
++  верхнего уровня видны сразу; вложенные точки (сундук внутри дома) скрыты до
++  входа. Цель особого выхода больше не торчит дочерней карточкой — это кнопка
++  «Выход → …».
++- **Преграда — экран-«привратник».** Вход в запертую локацию сначала показывает
++  только замок/терминал (варианты И/ИЛИ с подписью «и»/«или»), содержимое и
++  дети открываются после прохождения. Запертый сундук прячет содержимое,
++  запертая локация — дочерние элементы.
++- **Замок никогда не самостоятельная точка игрока** (`lock_never_standalone`):
++  отдельная выдача замка убрана из интерфейса, строки замков и отдельно
++  выданные замковые сессии игроку не рисуются; серверный API выдачи остался
++  для внутренних вызовов. Терминал по-прежнему может быть и самостоятельной
++  дочерней точкой, и преградой.
++- **Навигация по истории входа.** «Назад» возвращает только в локацию, через
++  которую игрок пришёл (A→Б, A→В, В→Г ⇒ из Г назад только в В), даже если это
++  локация другого хаба; `exitLocationId` позволяет войти в указанную локацию,
++  а возврат идёт по истории, а не по административному дереву. История
++  сбрасывается при смене сессии.
++- **Мастерские правки хаба** дошли до сервера: живое обновление локации
++  передаёт требование доступа и особый выход, сложность замка/терминала
++  синхронизируется `nodeDifficulty` без пересоздания точки.
++
+ ## Параметры элемента в строке дерева хаба (патч 541)
+ 
+ Точечная правка админского дерева хаба по слову владельца (тезис 32). Только
+diff --git a/docs/patch-542-install.md b/docs/patch-542-install.md
+new file mode 100644
+index 0000000..82cd966
+--- /dev/null
++++ b/docs/patch-542-install.md
+@@ -0,0 +1,63 @@
++# Установка патча 542: выдача хаба целиком и окно игрока
++
++Патч подготовлен от состояния **версии 541**. Файл установки:
++`patchs/542-hub-player-window.patch`.
++
++> Владелец: «Выдача Ниптона с вложенными локациями/терминалом/замком падает
++> с “добавьте в локацию хотя бы один контейнер или торговца” — это баг»;
++> верхний уровень хаба — любые прямые элементы, вложенные точки не видны до
++> входа; вход в локацию с преградой сначала показывает замок/терминал, после
++> прохождения — содержимое; замок отдельно НЕ выдаётся
++> (`lock_never_standalone`); «Назад» возвращает только в локацию, через
++> которую пришёл; `exitLocationId` — вход в другую локацию, возврат по
++> истории входа.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `server/locationGraph.js` | `buildGraphFromSession(rootId, nodes)` — граф сессии по `links` + `parentLocationId`; очередь с `viaExit`, `exits`, `exitOnly` в `flattenForSession` (узел, достигнутый обычным входом, сбрасывает `exitOnly`) |
++| `domain/lootTrade.js` | `makeSessionNode` несёт `accessExpression`/`exitLocationId`; `buildLocationSessionNodes` ставит `exitOnly` и прячет check-источники (замки и привязанные терминалы) у игроков |
++| `server/lootTradeSession.js` | `exitLocationId`/`exitOnly` в узле и сессии; скрытие замков и referenced-терминалов; корень-преграда (`needs-check`/`denied`) отдаёт `nodes: []`; `applySessionUpdate` принимает `requiredKeyItemId`/`keyRequirement`/`linkedCheckIds`/`accessExpression`/`exitLocationId` корня |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | выдача хаба и живое обновление передают `accessExpression`/`exitLocationId`/`nodeDifficulty`; отдельная выдача замка убрана из интерфейса (плитка создания и серверный API остались), fallback-выдача — только терминал |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | gate-first: вход в запертую локацию сначала показывает проверки (без двойного шага в стек и без авто-закрытия по победе); список корня/точки фильтрует `exitOnly`/`hiddenForPlayers`/строки замков; кнопка «Выход → …» пушит цель в историю; «Назад» — `pop` истории; сброс истории при смене сессии; отдельно выданный замок не открывает окно игрока; заголовок/описание текущей локации |
++| `src/room/roomStore.ts` | тип `updateRoomSessionRates` расширен полями `requiredKeyItemId`/`keyRequirement`/`linkedCheckIds`/`linkedCheckId`/`accessExpression`/`exitLocationId` |
++| `i18n/{ru-RU,en-EN}/screens/lootTrade/screen.json` | новые парные ключи `player.exitToLocation` («Выход → {name}») и `player.gateAnd` («и» / «and») |
++| `__tests__/room/hub-player-window-542.test.js` | новый приёмочный тест: фильтры верхнего уровня, gate-first, назад/выход, контракт файлов |
++| `__tests__/lootTrade/hack-outcome-530.test.js`, `__tests__/lootTrade/player-lock-overlay-524.test.js`, `__tests__/lootTrade/standalone-direct-525.test.js` | исторические фикстуры перенацелены на модель 542: замок — часть локации/сундука, отдельной точкой не является |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 542, тезис 33, «Осталось после патча 542» |
++
++## Границы
++
++- Плитка создания замка, конструктор И/ИЛИ и серверный `issueTerminal(kind:lock)`
++  (внутренний API, используют сборки 516–535) сохранены — убрана только
++  выдача замка игроку как отдельной точки.
++- Закон снимка 529, адресный взлом 523, общая доска/журнал 535 и семантика
++  530 не менялись.
++- `apply-patch.sh` смотрит на ту же ветку доставки
++  `arena/aa289f1c-fallout-2d20-companion`.
++
++## Установка через консоль
++
++Из корня репозитория приложения: сначала заменить `apply-patch.sh` свежей
++версией из ветки доставки, затем поставить патч 542.
++
++```bash
++git fetch --no-tags origin arena/aa289f1c-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 542
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 541, патч 542 их не трогает.
++- `git apply --check` вперёд от дерева 541 и в обратную сторону от 542.
++
++## Откат
++
++`git apply -R patchs/542-hub-player-window.patch` вернёт граф, окно игрока,
++словари и версию к состоянию 541.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index a0dc0d6..1a66155 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **541**.
++Дата ревизии: 2026-11-05. Текущая версия: **542**.
+ 
+ ## Тезисы
+ 
+@@ -44,8 +44,9 @@
+ | 30 | **Хаб — сам папка-дерево (переработка 538 по слову владельца):** отдельной карточки «Структура локаций» больше нет — открыл хаб и видишь дерево вложенного. Локации — спойлерами (нажал — видно, что входит), пунктирные линии показывают, что от чего зависит (что чем заблокировано, какой ключ нужен, что во что выходит); узел открывает настройки. У хаба-папки нет родителя/выхода (он сам родитель), остаются серверные комнаты; хабы вкладываются друг в друга. Родитель/выход обычной локации — выпадающие списки с поиском, не кнопки. Локацию таскают за стрелки и кладут в локацию — она становится дочерней, как папки в Windows; вложенную можно вынуть обратно. Ключ и замок/терминал — отдельные поля с понятными подписями; И/ИЛИ = войти, только пройдя обе преграды или одну из них. Только админка | ✅ сделано (админка) | **539** |
+ | 31 | **Вложенная локация — только внутри родителя + параметры в дереве:** папка, вложенная в папку, исчезает с корневого экрана (не дублируется карточкой), живёт в дереве родителя и открывается из него. У вложенной локации в дереве видны параметры, как у других записей в хабе: комнаты, число объектов и запертых точек, ключ, замок/терминал, выход. Кнопка «Содержимое» открывает вложенную локацию (переход внутрь). При удалении родителя вложенные локации возвращаются на корень и не теряются | ✅ сделано (админка) | **540** |
+ | 32 | **Параметры элемента в строке дерева хаба:** название элемента больше не открывает настройки; кнопка «Параметры» стоит в правой части строки названия у каждого элемента дерева (локация, сундук, торговец, терминал, замок, ключ), включая вложенные после раскрытия. С экрана локации убраны отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца». Ключи показываются строками дерева; зависимости ворот остаются пунктирными линиями. `apply-patch.sh` смотрит на ветку доставки 541. Только админка, игровые механики не менялись | ✅ сделано (админка) | **541** |
++| 33 | **Выдача хаба целиком и окно игрока (542):** граф сессии собирается по `links` + `parentLocationId`, поэтому выдача Ниптона с вложенными локациями/терминалом/замком больше не падает пустым экраном. Верхний уровень окна игрока — только прямые элементы (локации, сундуки, торговцы); вложенные точки скрыты до входа. Вход в запертую локацию сначала показывает экран преграды (замок/терминал, варианты И/ИЛИ), после прохождения — содержимое; особый выход вынесен в кнопку «Выход → …». Замок никогда не бывает самостоятельной точкой игрока: отдельная выдача убрана из интерфейса, строки замков скрыты, `lock_never_standalone`. «Назад» возвращает только в локацию, через которую пришёл (история входа), `exitLocationId` даёт вход в другую локацию, возврат — по истории, а не по административному дереву | ✅ сделано | **542** |
+ 
+-## Осталось после патча 541
++## Осталось после патча 542
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -106,9 +107,13 @@
+ замок, ключ) стоит кнопка «Параметры». Отдельные области «Ключи и записки в
+ локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца»
+ убраны с экрана локации; ключи показываются строками дерева, зависимости
+-ворот остаются пунктирными линиями. Игровое окно, сервер и механики доступа
+-не менялись.
+-Порядок тринадцатого
++ворот остаются пунктирными линиями.
++Патч 542 открыл окно игрока по уточнениям владельца: граф сессии строится по
++`links` + `parentLocationId` (выдача Ниптона с вложенными локациями больше не
++пустая), верхний уровень — только прямые элементы, вход в запертую локацию
++сначала показывает преграду, замок окончательно убран из самостоятельных
++точек игрока, «Назад» идёт по истории входа, `exitLocationId` исполняется как
++переход в другую локацию. Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+@@ -151,16 +156,14 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+-### Что осталось после 541 (структура локаций)
++### Что осталось после 542 (структура локаций)
+ 
+-- **Окно просмотра локаций для игрока** — админская часть готова в 538–541
+-  (хаб — папка-дерево, вложенность без дублей, параметры элемента в строке
+-  дерева), игрок пока не видит дерево/переходы; это следующий отдельный шаг.
+-- **Переходы между локациями в игре** — модель `parentLocationId` /
+-  `exitLocationId` хранится и редактируется, но сам переход (вход через
+-  родителя, особый выход/телепорт) ещё не исполняется в сессии; ручная
+-  блокировка прохода Мастером под любой нарратив — по модели тезиса 28
+-  (`docs/location-level-design.md`), без автоправил.
++- ~~**Окно просмотра локаций для игрока**~~ ✅ **542** — игрок видит хаб
++  целиком, верхний уровень = прямые элементы, преграды — экраном-«привратником».
++- ~~**Переходы между локациями в игре**~~ ✅ **542** — вход через родителя и
++  особый выход (`exitLocationId`) исполняются в сессии, «Назад» идёт по
++  истории входа. Ручная блокировка прохода Мастером под любой нарратив — по
++  модели тезиса 28 (`docs/location-level-design.md`), без автоправил.
+ - **«Заблокировать всё» из карточки** — по-прежнему ⏸ отложено владельцем.
+ - **Экспорт структуры в Owlbear** — задел на будущее: приложение-кампаньон
+   отдаёт данные из админки, карта внутри приложения не строится.
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index f4b9f9a..79f7526 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -632,6 +632,9 @@ const makeSessionNode = (child, link = {}) => ({
+       linkedCheckId: String(child.linkedCheckId || '').trim(),
+       // Патч 520: до двух источников через «ИЛИ».
+       linkedCheckIds: normalizeLinkedCheckIds(child),
++      // Патч 542: явное И/ИЛИ-выражение и особый выход доходят до сессии.
++      accessExpression: resolveAccessExpression(child),
++      exitLocationId: String(child.exitLocationId || '').trim(),
+       characterOverrides: {},
+   items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+     ? []
+@@ -689,7 +692,7 @@ export const buildLocationSessionNodes = (root, allContainers = []) => {
+     }
+   }
+ 
+-  return flat
++  const nodes = flat
+     .map((entry) => {
+       const child = byId.get(entry.id);
+       if (!child) return null;
+@@ -701,10 +704,41 @@ export const buildLocationSessionNodes = (root, allContainers = []) => {
+         depth: entry.depth,
+         roomCodes: entry.roomCodes,
+         locked: Boolean(link.locked || entry.locked),
++        // Патч 542: цель особого выхода есть в сессии, но не торчит дочерней
++        // карточкой в списке родителя — вход в неё идёт кнопкой «Выход».
++        exitOnly: Boolean(entry.exitOnly),
++        exitLocationId: entry.exitLocationId || String(child.exitLocationId || '').trim(),
+       };
+       return stampSessionNode(node);
+     })
+     .filter(Boolean);
++
++  // Преграда может ссылаться на замок/терминал, который не лежит структурно
++  // внутри выдаваемой локации. Чтобы мини-игра зарегистрировалась на комнате,
++  // добавляем такой источник скрытым служебным узлом (игрок его не видит).
++  const present = new Set(nodes.map((node) => node.containerId));
++  const checkIds = new Set([
++    ...expressionCheckIds(resolveAccessExpression(root)),
++    ...nodes.flatMap((node) => expressionCheckIds(resolveAccessExpression(node))),
++  ]);
++  for (const checkId of checkIds) {
++    if (present.has(checkId)) continue;
++    const source = byId.get(checkId);
++    if (!source || (source.kind !== CONTAINER_KIND.TERMINAL && source.kind !== CONTAINER_KIND.LOCK)) continue;
++    nodes.push(stampSessionNode({
++      ...makeSessionNode(source),
++      parentIds: [String(root.id)],
++      childIds: [],
++      depth: 1,
++      roomCodes: effectiveLocationRoomCodes(source, list),
++      locked: false,
++      hiddenForPlayers: true,
++      exitOnly: false,
++      exitLocationId: '',
++    }));
++    present.add(checkId);
++  }
++  return nodes;
+ };
+ 
+ /** Эффективные коды комнат корня: состояние и ресурсы общи для всех привязанных комнат. */
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 0c96c65..27e8c62 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -318,7 +318,9 @@
+     "hackAndEnter": "Hack & enter",
+     "hackAndOpen": "Hack & open",
+     "hackLocationHint": "Hacking unlocks entry to this location",
+-    "hackContainerHint": "Hacking unlocks the contents"
++    "hackContainerHint": "Hacking unlocks the contents",
++    "gateAnd": "and",
++    "exitToLocation": "Exit → {name}"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 87bba99..1179c6f 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -319,7 +319,9 @@
+     "hackAndEnter": "Взломать и войти",
+     "hackAndOpen": "Взломать и открыть",
+     "hackLocationHint": "Взлом откроет вход в локацию",
+-    "hackContainerHint": "Взлом откроет содержимое"
++    "hackContainerHint": "Взлом откроет содержимое",
++    "gateAnd": "и",
++    "exitToLocation": "Выход → {name}"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 09bf80b..999ddc3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "541"
++  "baseline": "542"
+ }
+diff --git a/public/version.json b/public/version.json
+index bd05f08..b1373ba 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,9 +1,10 @@
+ {
+-  "version": "541",
++  "version": "542",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+-      "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик патчей обновлён на ветку доставки 541.",
++      "Хаб выдаётся целиком: граф собирается по связям и родительским локациям, поэтому Ниптон с вложенными локациями, терминалом и замком больше не рисует пустой экран. В окне игрока на верхнем уровне видны только прямые элементы — локации, сундуки, торговцы, а вложенные точки открываются после входа. Вход в запертую локацию сначала показывает только преграду (замок или терминал), после прохождения — содержимое. Замок стал частью локации, сундука или двери и больше не выдаётся отдельной точкой игрока. «Назад» возвращает в локацию, из которой игрок пришёл, а особый выход ведёт в указанную локацию.",
++      "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик обновлён на ветку доставки 541.",
+       "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
+       "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
+       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+@@ -145,7 +146,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
+-      "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The patch installer now points at the patch 541 delivery branch.",
++      "A hub now issues whole: the graph is built from links plus parent locations, so Nipton with nested locations, a terminal and a lock no longer renders an empty screen. The player's top level shows only direct elements — locations, chests, merchants — and nested points appear after you enter. Entering a locked location shows only the barrier (lock or terminal) first, and its contents once the check is passed. The lock is now part of a location, chest or door and is never issued as a standalone player point. Back returns only to the location you came through, and the special exit leads to its configured location.",
++      "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The installer now points at the delivery branch 541.",
+       "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
+       "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
+       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
+diff --git a/server/locationGraph.js b/server/locationGraph.js
+index 24126f7..be7f912 100644
+--- a/server/locationGraph.js
++++ b/server/locationGraph.js
+@@ -67,6 +67,9 @@ const normalizeGraphNode = (raw) => {
+     roomCodes: normalizeRoomCodes(raw),
+     locked: Boolean(raw.locked),
+     links: normalizeLinks(raw),
++    // Патч 542: админская матрёшка и особый выход — часть игрового графа.
++    parentLocationId: normalizeId(raw.parentLocationId),
++    exitLocationId: normalizeId(raw.exitLocationId),
+   };
+ };
+ 
+@@ -80,6 +83,7 @@ const buildLocationGraph = (containers = []) => {
+   const byId = new Map();
+   const children = new Map();
+   const parents = new Map();
++  const exits = new Map();
+ 
+   for (const raw of list) {
+     const node = normalizeGraphNode(raw);
+@@ -88,18 +92,20 @@ const buildLocationGraph = (containers = []) => {
+     children.set(node.id, []);
+     parents.set(node.id, []);
+   }
++  const addChild = (parentId, childId) => {
++    if (!byId.has(parentId) || !byId.has(childId) || parentId === childId) return;
++    if (!children.get(parentId).includes(childId)) children.get(parentId).push(childId);
++    if (!parents.get(childId).includes(parentId)) parents.get(childId).push(parentId);
++  };
+   for (const node of byId.values()) {
+-    for (const link of node.links) {
+-      if (!byId.has(link.containerId)) continue;
+-      if (!children.get(node.id).includes(link.containerId)) {
+-        children.get(node.id).push(link.containerId);
+-      }
+-      if (!parents.get(link.containerId).includes(node.id)) {
+-        parents.get(link.containerId).push(node.id);
+-      }
++    for (const link of node.links) addChild(node.id, link.containerId);
++    // Патч 542: вложенная локация из дерева хаба — такой же родитель/ребёнок.
++    if (node.parentLocationId) addChild(node.parentLocationId, node.id);
++    if (node.exitLocationId && byId.has(node.exitLocationId) && node.exitLocationId !== node.id) {
++      exits.set(node.id, node.exitLocationId);
+     }
+   }
+-  return { byId, children, parents };
++  return { byId, children, parents, exits };
+ };
+ 
+ /** Обход по рёбрам с защитой от циклов. Возвращает все достижимые id, кроме старта. */
+@@ -188,16 +194,18 @@ const flattenForSession = (graph, rootId) => {
+   const root = normalizeId(rootId);
+   if (!root || !graph.byId.has(root)) return [];
+   const result = new Map();
+-  const queue = [{ id: root, parentId: '', depth: 0 }];
++  const queue = [{ id: root, parentId: '', depth: 0, viaExit: false }];
+   const visited = new Set();
+   while (queue.length) {
+-    const { id, parentId, depth } = queue.shift();
++    const { id, parentId, depth, viaExit } = queue.shift();
+     if (visited.has(id)) {
+       const existing = result.get(id);
+       if (existing && parentId && !existing.parentIds.includes(parentId)) {
+         existing.parentIds.push(parentId);
+         existing.depth = Math.min(existing.depth, depth);
+       }
++      // Узел, достигнутый обычным входом, не остаётся «только выходом».
++      if (existing && !viaExit) existing.exitOnly = false;
+       continue;
+     }
+     visited.add(id);
+@@ -210,9 +218,17 @@ const flattenForSession = (graph, rootId) => {
+       childIds: childIdsOf(graph, id),
+       roomCodes: effectiveRoomCodes(graph, id),
+       locked: node.locked,
++      // Патч 542: цель особого выхода есть в сессии, но не торчит дочерней
++      // карточкой в списке родителя — вход в неё идёт кнопкой «Выход».
++      exitOnly: Boolean(viaExit && parentId),
++      exitLocationId: node.exitLocationId || '',
+     };
+     if (id !== root) result.set(id, entry);
+-    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1 });
++    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
++    const exitId = graph.exits?.get(id);
++    if (exitId && graph.byId.has(exitId)) {
++      queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
++    }
+   }
+   return [...result.values()];
+ };
+@@ -226,6 +242,7 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
+   const byId = new Map();
+   const children = new Map();
+   const parents = new Map();
++  const exits = new Map();
+   const root = normalizeId(rootId);
+   if (root) {
+     byId.set(root, { id: root, kind: 'hub', roomCodes: [], locked: false, links: [] });
+@@ -243,6 +260,7 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
+       roomCodes: normalizeRoomCodes(node),
+       locked: Boolean(node.locked),
+       links: [],
++      exitLocationId: normalizeId(node.exitLocationId),
+     });
+     children.set(id, []);
+     parents.set(id, []);
+@@ -266,8 +284,10 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
+       if (!children.get(id).includes(child)) children.get(id).push(child);
+       if (!parents.get(child).includes(id)) parents.get(child).push(id);
+     }
++    const exitId = normalizeId(node.exitLocationId);
++    if (exitId && byId.has(exitId)) exits.set(id, exitId);
+   }
+-  return { byId, children, parents };
++  return { byId, children, parents, exits };
+ };
+ 
+ /** Адресный взлом: открыть РОВНО одну точку, без каскада по потомкам. */
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 679a8fe..e6e1c15 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -12,7 +12,7 @@ const {
+   effectiveItemWeight,
+ } = require('./itemStacking.js');
+ const locationGraph = require('./locationGraph.js');
+-const { normalizeAccessExpression } = require('./accessExpression.js');
++const { expressionCheckIds, normalizeAccessExpression, resolveAccessExpression } = require('./accessExpression.js');
+ const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+ 
+@@ -196,6 +196,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+     linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+     accessExpression: normalizeAccessExpression(raw.accessExpression),
++    // Патч 542: особый выход и признак «только через выход» переживают WS.
++    exitLocationId: String(raw.exitLocationId || '').trim(),
++    exitOnly: Boolean(raw.exitOnly),
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
+     // Патч 519: терминал, привязанный к другой точке как замок, не должен
+@@ -231,13 +234,16 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
+   // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
+   // скрытого терминала состояние мини-игры (syncTerminalNodes).
+   const referenced = new Set(
+-    out.flatMap((n) => normalizeLinkedCheckIds(n)),
++    out.flatMap((n) => expressionCheckIds(resolveAccessExpression(n))),
+   );
+-  return out.map((node) => (
+-    (node.kind === 'terminal' || node.kind === 'lock') && referenced.has(node.containerId)
+-      ? { ...node, hiddenForPlayers: true }
+-      : node
+-  ));
++  return out.map((node) => {
++    // Патч 542: замок никогда не самостоятельная точка игрока — только
++    // преграда цели. Терминал-источник скрыт, если на него ссылается доступ;
++    // непривязанный терминал остаётся отдельной дочерней точкой.
++    const hidden = node.kind === 'lock'
++      || (node.kind === 'terminal' && referenced.has(node.containerId));
++    return hidden ? { ...node, hiddenForPlayers: true } : node;
++  });
+ };
+ 
+ /**
+@@ -246,6 +252,11 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
+  */
+ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   if (!session || isGm || session.kind !== 'hub') return session;
++  // Патч 542: преграда на самой выданной локации скрывает всё её содержимое
++  // до прохождения. Игрок видит только проверку входа (узел сессии-корня).
++  if (session.keyAccessState === 'needs-check' || session.keyAccessState === 'denied') {
++    return { ...session, nodes: [] };
++  }
+   const nodes = session.nodes || [];
+   // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
+   // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
+@@ -358,6 +369,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+     linkedCheckIds: normalizeLinkedCheckIds(raw),
+     linkedCheckId: String(raw.linkedCheckId || '').trim(),
+     accessExpression: normalizeAccessExpression(raw.accessExpression),
++    exitLocationId: String(raw.exitLocationId || '').trim(),
+     // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
+     roomCodes: Array.isArray(raw.roomCodes)
+       ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
+@@ -567,6 +579,24 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+     if (payload.description !== undefined) {
+       next.description = String(payload.description || '').trim();
+     }
++    // Патч 542: живая правка корня локации переносит требование доступа и
++    // особый выход в сессию, а не только имя/описание/узлы.
++    if (payload.requiredKeyItemId !== undefined) {
++      next.requiredKeyItemId = String(payload.requiredKeyItemId || '').trim();
++    }
++    if (payload.keyRequirement !== undefined) {
++      next.keyRequirement = String(payload.keyRequirement || 'none');
++    }
++    if (payload.linkedCheckIds !== undefined || payload.linkedCheckId !== undefined) {
++      next.linkedCheckIds = normalizeLinkedCheckIds(payload);
++      next.linkedCheckId = String(payload.linkedCheckId || next.linkedCheckIds[0] || '').trim();
++    }
++    if (payload.accessExpression !== undefined) {
++      next.accessExpression = normalizeAccessExpression(payload.accessExpression);
++    }
++    if (payload.exitLocationId !== undefined) {
++      next.exitLocationId = String(payload.exitLocationId || '').trim();
++    }
+ 
+     if (Array.isArray(payload.nodes)) {
+       // Сохраняем живые characterOverrides уже открытых торговцев при обновлении списка узлов
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 277d11d..dbfecae 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -166,6 +166,13 @@ interface RoomStoreState {
+     nodeDifficulty?: number;
+     locked?: boolean;
+     lockLabel?: string;
++    // Патч 542: живая правка требования доступа и особого выхода корня.
++    requiredKeyItemId?: string;
++    keyRequirement?: string;
++    linkedCheckId?: string;
++    linkedCheckIds?: unknown[];
++    accessExpression?: unknown[];
++    exitLocationId?: string;
+     // Патч 523: «заблокировать всё» на узле с детьми и адресное открытие.
+     lockAll?: string | null;
+     unlock?: string | null;

@@ -72,9 +72,13 @@ const hubSession = () => ({
   kind: 'hub',
   name: 'Убежище',
   targetType: 'room',
+  // Патч 542 (lock_never_standalone): замок — часть локации/сундука, а не
+  // отдельная строка игрока. Дверь = запертая ЛОКАЦИЯ (преграда на ней,
+  // дети спрятаны до прохождения); ящик = запертый контейнер с проверкой.
   nodes: [
     {
-      containerId: 'door-1', kind: 'lock', name: 'Дверь в бункер', difficulty: 2,
+      containerId: 'door-1', kind: 'loot', name: 'Дверь в бункер', locked: true,
+      linkedCheckIds: ['term-door'],
       parentIds: ['vault'], childIds: ['inner-1'], items: [],
     },
     {
@@ -82,7 +86,8 @@ const hubSession = () => ({
       parentIds: ['door-1'], childIds: [], items: [],
     },
     {
-      containerId: 'box-1', kind: 'lock', name: 'Запертый ящик', difficulty: 2,
+      containerId: 'box-1', kind: 'loot', name: 'Запертый ящик', locked: true,
+      linkedCheckIds: ['term-box'],
       parentIds: ['vault'], childIds: [], items: [],
     },
     {
@@ -136,7 +141,18 @@ beforeEach(() => {
         members: [{ clientId: 'player-client', role: 'player' }],
         capabilities: { terminalHacking: true, lockPicking: true },
         activeSession: null,
-        terminalStates: {},
+        terminalStates: {
+          'term-door': {
+            containerId: 'term-door',
+            config: { containerId: 'term-door', kind: 'lock', name: 'Замок двери', difficulty: 2 },
+            game: null, closed: false, locked: false,
+          },
+          'term-box': {
+            containerId: 'term-box',
+            config: { containerId: 'term-box', kind: 'lock', name: 'Замок ящика', difficulty: 2 },
+            game: null, closed: false, locked: false,
+          },
+        },
       },
     },
   });
@@ -206,7 +222,7 @@ describe('530: интерфейс локации', () => {
 });
 
 describe('530: исход ACCESS GRANTED', () => {
-  const win = async (renderer, containerId) => {
+  const win = async (renderer, containerId, checkId = containerId) => {
     await act(async () => {
       useRoomStore.setState((state) => ({
         rooms: {
@@ -222,10 +238,10 @@ describe('530: исход ACCESS GRANTED', () => {
             },
             terminalStates: {
               ...state.rooms.ROOM1.terminalStates,
-              [containerId]: {
-                containerId,
-                accessId: `broadcast-${containerId}`,
-                config: { containerId, kind: 'lock', name: nName(containerId), difficulty: 2 },
+              [checkId]: {
+                containerId: checkId,
+                accessId: `broadcast-${checkId}`,
+                config: { containerId: checkId, kind: 'lock', name: nName(checkId), difficulty: 2 },
                 closed: false, locked: false, awaitingGm: false,
                 game: { status: 'won', result: 'ACCESS GRANTED', revision: 2 },
               },
@@ -236,14 +252,22 @@ describe('530: исход ACCESS GRANTED', () => {
       await Promise.resolve();
     });
   };
-  const nName = (id) => (id === 'door-1' ? 'Дверь в бункер' : 'Запертый ящик');
+  const nName = (id) => (id === 'door-1' || id === 'term-door'
+    ? 'Дверь в бункер'
+    : 'Запертый ящик');
 
   it('взлом локации ВВОДИТ игрока внутрь (кнопка «Назад» в родителя)', async () => {
     const renderer = await mount();
-    const hack = renderer.root.findAllByProps({ testID: 'terminal-hack-button' })[0];
-    await act(async () => { hack.props.onPress(); await Promise.resolve(); });
+    // Патч 542: вход в запертую локацию сначала показывает ТОЛЬКО преграду.
+    const enter = renderer.root.findAllByType('TouchableOpacity')
+      .filter((n) => n.props.testID === 'hub-node-enter-door-1')[0];
+    await act(async () => { enter.props.onPress(); await Promise.resolve(); });
+    expect(allText(renderer)).not.toContain('Внутренний зал'); // ещё за дверью
+    const gateHack = renderer.root.findAllByType('TouchableOpacity')
+      .filter((n) => n.props.testID === 'current-gate-hack-term-door')[0];
+    await act(async () => { gateHack.props.onPress(); await Promise.resolve(); });
     expect(renderer.root.findAllByType('LockPickingModal').length).toBeGreaterThan(0);
-    await win(renderer, 'door-1');
+    await win(renderer, 'door-1', 'term-door');
     await pause(HACK_OUTCOME_DELAY_MS + 150);
     expect(renderer.root.findAllByProps({ testID: 'hub-back-button' }).length).toBeGreaterThan(0);
     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
@@ -253,15 +277,11 @@ describe('530: исход ACCESS GRANTED', () => {
 
   it('взлом контейнера показывает СОДЕРЖИМОЕ, не вход в локацию', async () => {
     const renderer = await mount();
-    // В корне локации два источника проверки: door-1 (локация) и box-1
-    // (контейнер). Второй — нужный нам контейнер.
-    // RN-мок отдаёт и компонент, и host-узел для одного testID; берём только
-    // host-кнопки, чтобы индексы соответствовали реальным точкам.
-    const hacks = renderer.root.findAllByType('TouchableOpacity')
-      .filter((n) => n.props.testID === 'terminal-hack-button');
-    const boxHack = hacks[1];
+    // Замок ящика — преграда НА контейнере: проверка идёт прямо из строки.
+    const boxHack = renderer.root.findAllByType('TouchableOpacity')
+      .filter((n) => n.props.testID === 'gate-hack-button-box-1')[0];
     await act(async () => { boxHack.props.onPress(); await Promise.resolve(); });
-    await win(renderer, 'box-1');
+    await win(renderer, 'box-1', 'term-box');
     await pause(HACK_OUTCOME_DELAY_MS + 150);
     // Список локации сменился окном содержимого.
     expect(renderer.root.findAllByProps({ testID: 'hack-outcome-hint-door-1' })).toHaveLength(0);
@@ -274,7 +294,7 @@ describe('530: исход ACCESS GRANTED', () => {
 
   it('победа без явного «Взломать» и отдельно выданная точка навигацию не дёргают', async () => {
     const renderer = await mount();
-    await win(renderer, 'box-1'); // terminalSelection нет вообще
+    await win(renderer, 'box-1', 'term-box'); // terminalSelection нет вообще
     await pause(HACK_OUTCOME_DELAY_MS + 150);
     expect(renderer.root.findAllByProps({ testID: 'hub-back-button' })).toHaveLength(0);
     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);

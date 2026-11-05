@@ -12,7 +12,7 @@ const {
   effectiveItemWeight,
 } = require('./itemStacking.js');
 const locationGraph = require('./locationGraph.js');
-const { normalizeAccessExpression } = require('./accessExpression.js');
+const { expressionCheckIds, normalizeAccessExpression, resolveAccessExpression } = require('./accessExpression.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
 
@@ -196,6 +196,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
     linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
     accessExpression: normalizeAccessExpression(raw.accessExpression),
+    // Патч 542: особый выход и признак «только через выход» переживают WS.
+    exitLocationId: String(raw.exitLocationId || '').trim(),
+    exitOnly: Boolean(raw.exitOnly),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
     // Патч 519: терминал, привязанный к другой точке как замок, не должен
@@ -231,13 +234,16 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
   // Мастер продолжает видеть все узлы, а сервер по-прежнему создаёт для
   // скрытого терминала состояние мини-игры (syncTerminalNodes).
   const referenced = new Set(
-    out.flatMap((n) => normalizeLinkedCheckIds(n)),
+    out.flatMap((n) => expressionCheckIds(resolveAccessExpression(n))),
   );
-  return out.map((node) => (
-    (node.kind === 'terminal' || node.kind === 'lock') && referenced.has(node.containerId)
-      ? { ...node, hiddenForPlayers: true }
-      : node
-  ));
+  return out.map((node) => {
+    // Патч 542: замок никогда не самостоятельная точка игрока — только
+    // преграда цели. Терминал-источник скрыт, если на него ссылается доступ;
+    // непривязанный терминал остаётся отдельной дочерней точкой.
+    const hidden = node.kind === 'lock'
+      || (node.kind === 'terminal' && referenced.has(node.containerId));
+    return hidden ? { ...node, hiddenForPlayers: true } : node;
+  });
 };
 
 /**
@@ -246,6 +252,11 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
  */
 const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   if (!session || isGm || session.kind !== 'hub') return session;
+  // Патч 542: преграда на самой выданной локации скрывает всё её содержимое
+  // до прохождения. Игрок видит только проверку входа (узел сессии-корня).
+  if (session.keyAccessState === 'needs-check' || session.keyAccessState === 'denied') {
+    return { ...session, nodes: [] };
+  }
   const nodes = session.nodes || [];
   // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
   // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
@@ -358,6 +369,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
     linkedCheckIds: normalizeLinkedCheckIds(raw),
     linkedCheckId: String(raw.linkedCheckId || '').trim(),
     accessExpression: normalizeAccessExpression(raw.accessExpression),
+    exitLocationId: String(raw.exitLocationId || '').trim(),
     // Патч 523: состояние и ресурсы локации общи для всех привязанных комнат.
     roomCodes: Array.isArray(raw.roomCodes)
       ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
@@ -566,6 +578,24 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
     }
     if (payload.description !== undefined) {
       next.description = String(payload.description || '').trim();
+    }
+    // Патч 542: живая правка корня локации переносит требование доступа и
+    // особый выход в сессию, а не только имя/описание/узлы.
+    if (payload.requiredKeyItemId !== undefined) {
+      next.requiredKeyItemId = String(payload.requiredKeyItemId || '').trim();
+    }
+    if (payload.keyRequirement !== undefined) {
+      next.keyRequirement = String(payload.keyRequirement || 'none');
+    }
+    if (payload.linkedCheckIds !== undefined || payload.linkedCheckId !== undefined) {
+      next.linkedCheckIds = normalizeLinkedCheckIds(payload);
+      next.linkedCheckId = String(payload.linkedCheckId || next.linkedCheckIds[0] || '').trim();
+    }
+    if (payload.accessExpression !== undefined) {
+      next.accessExpression = normalizeAccessExpression(payload.accessExpression);
+    }
+    if (payload.exitLocationId !== undefined) {
+      next.exitLocationId = String(payload.exitLocationId || '').trim();
     }
 
     if (Array.isArray(payload.nodes)) {
