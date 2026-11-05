@@ -1,0 +1,855 @@
+diff --git a/__tests__/installer/baseline-sync-patchs-493.test.js b/__tests__/installer/baseline-sync-patchs-493.test.js
+index b151af9..5a098eb 100644
+--- a/__tests__/installer/baseline-sync-patchs-493.test.js
++++ b/__tests__/installer/baseline-sync-patchs-493.test.js
+@@ -10,7 +10,7 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
+-const BRANCH = 'arena/0fa5e3ce-fallout-2d20-companion';
++const BRANCH = 'arena/aa289f1c-fallout-2d20-companion';
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+diff --git a/__tests__/installer/cleanup-gitlinks-460.test.js b/__tests__/installer/cleanup-gitlinks-460.test.js
+index 865418f..ab1cc06 100644
+--- a/__tests__/installer/cleanup-gitlinks-460.test.js
++++ b/__tests__/installer/cleanup-gitlinks-460.test.js
+@@ -73,7 +73,7 @@ describe('Патч 460: уборка неиспользуемых папок/ф
+       const subSha = git(subRepo, ['rev-parse', 'HEAD']).trim();
+ 
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/aa289f1c-fallout-2d20-companion']);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, '.kiro/specs/old'), { recursive: true });
+diff --git a/__tests__/installer/concise-installer-output-455.test.js b/__tests__/installer/concise-installer-output-455.test.js
+index 36308a7..6925355 100644
+--- a/__tests__/installer/concise-installer-output-455.test.js
++++ b/__tests__/installer/concise-installer-output-455.test.js
+@@ -36,7 +36,7 @@ describe('Патч 455: лаконичный отчёт apply-patch.sh и явн
+ 
+     try {
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/aa289f1c-fallout-2d20-companion']);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+diff --git a/__tests__/installer/preserve-owner-commits-464.test.js b/__tests__/installer/preserve-owner-commits-464.test.js
+index 79623a8..e7b7fd9 100644
+--- a/__tests__/installer/preserve-owner-commits-464.test.js
++++ b/__tests__/installer/preserve-owner-commits-464.test.js
+@@ -52,7 +52,7 @@ describe('Патч 464: восстановление ghoul.png из 39bb559 и 
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'modules/fallout/assets/origins'), { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', 'arena/aa289f1c-fallout-2d20-companion']);
+ 
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+       fs.writeFileSync(path.join(upstream, 'modules/fallout/assets/origins/survivor.png'), 'arena-survivor-v1');
+diff --git a/__tests__/room/container-gates-517.test.js b/__tests__/room/container-gates-517.test.js
+index ec953fe..98b820e 100644
+--- a/__tests__/room/container-gates-517.test.js
++++ b/__tests__/room/container-gates-517.test.js
+@@ -123,12 +123,16 @@ describe('517: связи видны Мастеру и план обновлён
+       .toContain('check.kindLabel');
+   });
+ 
+-  it('карточка и локация показывают ворота и состояние события', () => {
++  it('карточка показывает ворота; отдельная область ворот в локации убрана (541)', () => {
+     expect(screen).toContain('card-gate-');
+     expect(screen).toContain("tLootTrade('card.gateAfter')");
+-    expect(screen).toContain('hub-gate-');
+-    expect(screen).toContain("tLootTrade('detail.hubGatesTitle')");
+     expect(screen).toContain('gateEvents');
++    // Патч 541: отдельная область «Ворота между точками» убрана с экрана
++    // локации; зависимости остаются в дереве хаба пунктирными строками.
++    expect(screen).not.toContain('hub-gate-');
++    expect(screen).not.toContain("tLootTrade('detail.hubGatesTitle')");
++    expect(read('components/screens/LootTradeScreen/modals/HubTreeView.js'))
++      .toContain("tLootTrade('form.locationTreeBlockedBy')");
+   });
+ 
+   it('клиентский стор хранит общие события комнаты', () => {
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 41366a4..9efad6c 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,25 +255,28 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('540');
++    expect(version.version).toBe('541');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(139);
+-    expect(version.notes['en-EN']).toHaveLength(139);
+-    expect(json('patchs/baseline.json').baseline).toBe('540');
++    expect(version.notes['ru-RU']).toHaveLength(140);
++    expect(version.notes['en-EN']).toHaveLength(140);
++    expect(json('patchs/baseline.json').baseline).toBe('541');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
++    expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **540**');
++    expect(roadmap).toContain('Текущая версия: **541**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+-    expect(roadmap).toContain('Осталось после патча 540');
++    expect(roadmap).toContain('| 32 |');
++    expect(roadmap).toContain('Осталось после патча 541');
+     expect(read('docs/patch-540-install.md')).toContain('540');
++    expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hub-tree-parameters-541.test.js b/__tests__/room/hub-tree-parameters-541.test.js
+new file mode 100644
+index 0000000..b8351b0
+--- /dev/null
++++ b/__tests__/room/hub-tree-parameters-541.test.js
+@@ -0,0 +1,168 @@
++// Патч 541: кнопка «Параметры» в правой части строки названия у каждого
++// элемента дерева хаба; название больше не открывает настройки. Отдельные
++// области «Ключи и записки в локации», «Ворота между точками» и кнопка
++// «Добавить контейнер / торговца» убраны с экрана локации.
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    View: host('View'),
++    Text: host('Text'),
++    TouchableOpacity: host('TouchableOpacity'),
++    TextInput: host('TextInput'),
++    ScrollView: host('ScrollView'),
++    StyleSheet: { create: (styles) => styles },
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: () => null,
++}));
++
++vi.mock('../../i18n/locale', () => ({
++  useLocale: () => 'ru-RU',
++}));
++
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (template, values) => `${template}:${JSON.stringify(values || {})}`,
++}));
++
++import HubTreeView from '../../components/screens/LootTradeScreen/modals/HubTreeView';
++import { CONTAINER_KIND, normalizeContainerEntity } from '../../domain/lootTrade';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id,
++  kind: CONTAINER_KIND.HUB,
++  name: id,
++  roomCodes: ['GM-AAA111'],
++  ...extra,
++});
++
++const child = (id, kind) => normalizeContainerEntity({ id, kind, name: id });
++
++const findAll = (root, testID) => root.findAll((node) => node.props?.testID === testID);
++
++describe('541: «Параметры» у каждой строки дерева, название не кликабельно', () => {
++  const setup = () => {
++    const nested = hub('nested', { parentLocationId: 'root', keyItemIds: ['key-nested'] });
++    const deepChest = child('deep-chest', CONTAINER_KIND.LOOT);
++    nested.links = [{ containerId: deepChest.id, locked: false, lockLabel: '' }];
++    const containers = [
++      hub('root', { keyItemIds: ['key-root'] }),
++      nested,
++      child('chest', CONTAINER_KIND.LOOT),
++      child('merchant', CONTAINER_KIND.MERCHANT),
++      child('terminal', CONTAINER_KIND.TERMINAL),
++      child('lock', CONTAINER_KIND.LOCK),
++      deepChest,
++    ];
++    containers[0].links = ['chest', 'merchant', 'terminal', 'lock'].map((id) => ({
++      containerId: id, locked: false, lockLabel: '',
++    }));
++    const keyItems = [
++      { id: 'key-root', name: 'Ключ корня' },
++      { id: 'key-nested', name: 'Ключ вложенной' },
++    ];
++    const onOpenSettings = vi.fn();
++    const onOpenKeySettings = vi.fn();
++    let renderer;
++    act(() => {
++      renderer = create(React.createElement(HubTreeView, {
++        hub: containers[0],
++        containers,
++        keyItems,
++        onOpenSettings,
++        onOpenKeySettings,
++      }));
++    });
++    return { renderer, containers, onOpenSettings, onOpenKeySettings };
++  };
++
++  it('название элемента не имеет onPress', () => {
++    const { renderer } = setup();
++    for (const id of ['nested', 'chest', 'merchant', 'terminal', 'lock', 'key-root']) {
++      const testID = id === 'key-root' ? `hub-tree-key-${id}` : `hub-tree-node-${id}`;
++      const [title] = findAll(renderer.root, testID);
++      expect(title, testID).toBeTruthy();
++      expect(title.props.onPress).toBeUndefined();
++    }
++  });
++
++  it('кнопка «Параметры» есть у всех типов прямых элементов и открывает настройки', () => {
++    const { renderer, containers, onOpenSettings } = setup();
++    for (const id of ['nested', 'chest', 'merchant', 'terminal', 'lock']) {
++      const [button] = findAll(renderer.root, `hub-tree-parameters-${id}`);
++      expect(button, id).toBeTruthy();
++      act(() => button.props.onPress());
++      expect(onOpenSettings).toHaveBeenCalledWith(containers.find((c) => c.id === id));
++    }
++  });
++
++  it('ключи — строки дерева с «Параметрами»', () => {
++    const { renderer, onOpenKeySettings } = setup();
++    const [button] = findAll(renderer.root, 'hub-tree-parameters-key-key-root');
++    expect(button).toBeTruthy();
++    act(() => button.props.onPress());
++    expect(onOpenKeySettings).toHaveBeenCalledWith(
++      expect.objectContaining({ id: 'key-root', name: 'Ключ корня' }),
++      expect.objectContaining({ id: 'root' }),
++    );
++  });
++
++  it('у вложенных элементов после раскрытия тоже есть «Параметры»', () => {
++    const { renderer, onOpenSettings, onOpenKeySettings } = setup();
++    const [toggle] = findAll(renderer.root, 'hub-tree-toggle-nested');
++    act(() => toggle.props.onPress());
++    const [deepButton] = findAll(renderer.root, 'hub-tree-parameters-deep-chest');
++    expect(deepButton).toBeTruthy();
++    act(() => deepButton.props.onPress());
++    expect(onOpenSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'deep-chest' }));
++    const [keyButton] = findAll(renderer.root, 'hub-tree-parameters-key-key-nested');
++    expect(keyButton).toBeTruthy();
++    act(() => keyButton.props.onPress());
++    expect(onOpenKeySettings).toHaveBeenCalledWith(
++      expect.objectContaining({ id: 'key-nested' }),
++      expect.objectContaining({ id: 'nested' }),
++    );
++  });
++});
++
++describe('541: экран локации без удалённых областей', () => {
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++
++  it('области ключей/ворот и кнопка добавления контейнера/торговца убраны', () => {
++    expect(screen).not.toContain("tLootTrade('detail.hubKeysTitle')");
++    expect(screen).not.toContain("tLootTrade('detail.hubGatesTitle')");
++    expect(screen).not.toContain("tLootTrade('detail.addHubNode')");
++    expect(screen).not.toContain('hub-key-detach-');
++    expect(screen).not.toContain('hub-gate-');
++  });
++
++  it('дерево получает ключи и обработчик их параметров', () => {
++    expect(screen).toContain('keyItems={keyItems}');
++    expect(screen).toContain('onOpenKeySettings=');
++    expect(tree).toContain('hub-tree-parameters-${container.id}');
++    expect(tree).toContain('hub-tree-parameters-key-${keyId}');
++    expect(tree).toContain("tLootTrade('detail.editSettings')");
++  });
++
++  it('подпись пустого хаба больше не ссылается на удалённую кнопку', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    expect(ru.detail.emptyHubNodes).not.toContain('Добавить контейнер');
++    expect(en.detail.emptyHubNodes).not.toContain('Add container');
++    expect(ru.detail.editSettings).toBe('Параметры');
++  });
++});
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index dfd08d0..63c4db4 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -136,8 +136,10 @@ describe('514: вложенность и перетаскивание', () => {
+     expect(screen).toContain('const handleMoveKeyItemIntoHub');
+     expect(screen).toContain('setMovingKeyItemId');
+     expect(screen).toContain('const attachedKeyItemIds');
+-    expect(screen).toContain('hubKeysSection');
+-    expect(screen).toContain('hub-key-detach-');
++    // Патч 541: отдельная область ключей в локации убрана; ключи — строки
++    // дерева хаба с кнопкой «Параметры».
++    expect(screen).toContain('keyItems={keyItems}');
++    expect(screen).toContain('onOpenKeySettings=');
+   });
+ 
+   it('пункт выдачи ключа сохранён (исключение совместимости)', () => {
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 629a262..42d83d4 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('540');
++    expect(version.version).toBe('541');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(139);
+-    expect(version.notes['en-EN']).toHaveLength(139);
+-    expect(json('patchs/baseline.json').baseline).toBe('540');
++    expect(version.notes['ru-RU']).toHaveLength(140);
++    expect(version.notes['en-EN']).toHaveLength(140);
++    expect(json('patchs/baseline.json').baseline).toBe('541');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -450,14 +450,17 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+     expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
++    expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **540**');
++    expect(roadmap).toContain('Текущая версия: **541**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+-    expect(roadmap).toContain('Осталось после патча 540');
++    expect(roadmap).toContain('| 32 |');
++    expect(roadmap).toContain('Осталось после патча 541');
+     expect(read('docs/patch-540-install.md')).toContain('540');
++    expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/screens/character-screen-boot-451.test.js b/__tests__/screens/character-screen-boot-451.test.js
+index cef025f..0f582dd 100644
+--- a/__tests__/screens/character-screen-boot-451.test.js
++++ b/__tests__/screens/character-screen-boot-451.test.js
+@@ -154,7 +154,7 @@ describe('патч 451: целостность запуска приложени
+ 
+   it('apply-patch.sh указывает на рабочую ветку и проверяет целостность node_modules', () => {
+     const script = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
+-    expect(script).toContain('ARENA_BRANCH="arena/0fa5e3ce-fallout-2d20-companion"');
++    expect(script).toContain('ARENA_BRANCH="arena/aa289f1c-fallout-2d20-companion"');
+     expect(script).toContain('deps_check()');
+     expect(script).toContain('deps_check || exit 1');
+   });
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 7eb3fd9..ab65817 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -2,7 +2,7 @@
+ 
+ set -euo pipefail
+ 
+-ARENA_BRANCH="arena/0fa5e3ce-fallout-2d20-companion"
++ARENA_BRANCH="arena/aa289f1c-fallout-2d20-companion"
+ REMOTE="origin"
+ 
+ ROOT_DIR="$(
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 51b6e3b..a486f64 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -2432,73 +2432,21 @@ export default function LootTradeScreen() {
+ 
+           {activeContainer.kind === CONTAINER_KIND.HUB ? (
+             <>
+-              <TouchableOpacity
+-                style={styles.addItemPrimaryBtn}
+-                onPress={() => setHubPickerOpen(true)}
+-              >
+-                <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
+-              </TouchableOpacity>
+-
+-              <View style={styles.hubKeysSection}>
+-                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubKeysTitle')}</Text>
+-                {(activeContainer.keyItemIds || []).length === 0 ? (
+-                  <Text style={styles.emptyListText}>{tLootTrade('detail.hubKeysEmpty')}</Text>
+-                ) : (activeContainer.keyItemIds || []).map((keyId) => {
+-                  const record = keyItems.find((k) => k.id === keyId);
+-                  if (!record) return null;
+-                  return (
+-                    <View key={keyId} testID={`hub-key-${keyId}`} style={styles.hubKeyRow}>
+-                      <MaterialCommunityIcons name="key-variant" size={18} color="#d4af37" />
+-                      <Text style={styles.hubKeyRowName} numberOfLines={1}>{record.name}</Text>
+-                      <TouchableOpacity
+-                        testID={`hub-key-detach-${keyId}`}
+-                        style={styles.hubKeyDetachBtn}
+-                        onPress={() => void handleDetachKeyItem(keyId)}
+-                      >
+-                        <Text style={styles.hubKeyDetachText}>{tLootTrade('detail.hubKeyDetach')}</Text>
+-                      </TouchableOpacity>
+-                    </View>
+-                  );
+-                })}
+-              </View>
+-
+-              {/* Патч 517: видимые Мастеру связи между точками локации. */}
+-              <View style={styles.hubKeysSection}>
+-                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
+-                {(() => {
+-                  const linked = (activeContainer.links || [])
+-                    .map((link) => containers.find((c) => c.id === link.containerId))
+-                    .filter((child) => normalizeLinkedCheckIds(child).length > 0);
+-                  if (linked.length === 0) {
+-                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
+-                  }
+-                  return linked.map((child) => (
+-                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
+-                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
+-                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
+-                        {`${child.name} ← ${normalizeLinkedCheckIds(child)
+-                          .map((id) => gateSourceNames[id] || id)
+-                          .join(` ${tLootTrade('detail.hubGateOr')} `)}`}
+-                      </Text>
+-                      <Text style={styles.hubKeyDetachText}>
+-                        {tLootTrade(normalizeLinkedCheckIds(child).some((id) => gateEvents[id])
+-                          ? 'detail.hubGatePassed'
+-                          : 'detail.hubGatePending')}
+-                      </Text>
+-                    </View>
+-                  ));
+-                })()}
+-              </View>
+-
+-              {/* Патч 539: хаб — сам папка-дерево. Локации-спойлеры, пунктирные
+-                  линии зависимостей; узел открывает настройки секции. */}
++              {/* Патч 541: отдельные области «Ключи и записки в локации»,
++                  «Ворота между точками» и кнопка «Добавить контейнер / торговца»
++                  убраны. Дерево хаба показывает элементы и их зависимости;
++                  настройки открываются кнопкой «Параметры» в строке элемента. */}
+               <Text style={styles.hubKeysTitle}>{tLootTrade('detail.locationsInside')}</Text>
+               <HubTreeView
+                 hub={activeContainer}
+                 containers={containers}
++                keyItems={keyItems}
+                 keyItemNames={keyItemNames}
+                 roomLabelOf={formatHubCardRoomLabel}
+                 onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
++                onOpenKeySettings={(keyItem, parentNode) => setKeyItemForm({
++                  initialKeyItem: { ...keyItem, attachedTo: parentNode?.id || '' },
++                })}
+                 onOpenChild={(child) => {
+                   setReturnHubId(activeContainer.id);
+                   setActiveContainerId(child.id);
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index 155f15e..8f332f2 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -22,15 +22,22 @@ import {
+  *
+  * Дети узла = объединение (без дублей):
+  *   - вложенные локации: containers с parentLocationId === node.id (матрёшка);
+- *   - не-локационные узлы из node.links (контейнеры/торговцы/замки/терминалы).
++ *   - не-локационные узлы из node.links (контейнеры/торговцы/замки/терминалы);
++ *   - патч 541: ключевые записи узла (keyItemIds) — отдельными строками дерева.
+  * Игровой путь (links) не трогаем — дерево только читает и то, и другое.
++ *
++ * Патч 541: название элемента больше не открывает настройки. У каждой строки
++ * (локация, сундук, торговец, терминал, замок, ключ) справа стоит кнопка
++ * «Параметры»; раскрытие вложенных локаций по-прежнему идёт стрелкой-шевроном.
+  */
+ const HubTreeView = ({
+   hub,
+   containers = [],
++  keyItems = [],
+   keyItemNames = {},
+   roomLabelOf,
+   onOpenSettings,
++  onOpenKeySettings,
+   onOpenChild,
+   onToggleLock,
+   onMoveOut,
+@@ -48,7 +55,13 @@ const HubTreeView = ({
+     return map;
+   }, [list]);
+ 
+-  const nameOf = (id) => byId.get(id)?.name || keyItemNames[id] || id;
++  const keyById = useMemo(() => {
++    const map = new Map();
++    for (const k of Array.isArray(keyItems) ? keyItems : []) if (k?.id) map.set(k.id, k);
++    return map;
++  }, [keyItems]);
++
++  const nameOf = (id) => byId.get(id)?.name || keyItemNames[id] || keyById.get(id)?.name || id;
+ 
+   const blockedLabel = (container) => {
+     const tokens = resolveAccessExpression(container || {});
+@@ -104,6 +117,41 @@ const HubTreeView = ({
+     if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
+   };
+ 
++  const openKey = (keyItem, parentNode) => {
++    if (typeof onOpenKeySettings === 'function' && keyItem) onOpenKeySettings(keyItem, parentNode);
++  };
++
++  // Патч 541: единая кнопка «Параметры» в правой части строки названия.
++  const renderParametersButton = (testID, onPress) => (
++    <TouchableOpacity
++      testID={testID}
++      style={styles.smallBtn}
++      onPress={onPress}
++      accessibilityRole="button"
++    >
++      <Text style={styles.smallBtnText}>{tLootTrade('detail.editSettings')}</Text>
++    </TouchableOpacity>
++  );
++
++  // Патч 541: ключевые записи узла — такие же строки дерева с «Параметрами».
++  const renderKeyNode = (keyId, depth, parentNode) => {
++    const record = keyById.get(keyId);
++    const label = record?.name || keyItemNames[keyId] || keyId;
++    return (
++      <View key={`key-${keyId}`} style={[styles.node, { marginLeft: depth * 16 }]}>
++        <View style={styles.nodeHeader}>
++          <View style={styles.chevronBtn}>
++            <MaterialCommunityIcons name="key-variant" size={16} color={ADMIN_MODAL_PALETTE.gold} />
++          </View>
++          <View testID={`hub-tree-key-${keyId}`} style={styles.nodeNameBtn}>
++            <Text style={styles.nodeName} numberOfLines={1}>{label}</Text>
++          </View>
++          {renderParametersButton(`hub-tree-parameters-key-${keyId}`, () => openKey(record || { id: keyId, name: label }, parentNode))}
++        </View>
++      </View>
++    );
++  };
++
+   // Пунктирные строки зависимости: что блокирует, куда выход, какой ключ.
+   const renderDependencies = (container) => {
+     const blocked = blockedLabel(container);
+@@ -205,10 +253,11 @@ const HubTreeView = ({
+             </View>
+           )}
+ 
+-          <TouchableOpacity
++          {/* Патч 541: название больше не открывает настройки — только кнопка
++              «Параметры» в правой части строки. */}
++          <View
+             testID={`hub-tree-node-${container.id}`}
+             style={styles.nodeNameBtn}
+-            onPress={() => open(container)}
+           >
+             {isHub && (
+               <MaterialCommunityIcons name={kindIcon(container.kind)} size={16} color={ADMIN_MODAL_PALETTE.text} />
+@@ -224,7 +273,7 @@ const HubTreeView = ({
+                 {formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}
+               </Text>
+             )}
+-          </TouchableOpacity>
++          </View>
+ 
+           {/* Патч 539/540: вложенную локацию можно открыть (перейти внутрь) и
+               вынуть обратно на корень. */}
+@@ -271,6 +320,10 @@ const HubTreeView = ({
+               )}
+             </View>
+           )}
++
++          {/* Патч 541: «Параметры» в правой части строки названия — у каждого
++              элемента дерева, а не только у прямого ребёнка активного хаба. */}
++          {renderParametersButton(`hub-tree-parameters-${container.id}`, () => open(container))}
+         </View>
+ 
+         {isHub && renderHubMeta(container)}
+@@ -290,9 +343,14 @@ const HubTreeView = ({
+ 
+         {isHub && isOpen && (
+           <View style={styles.childrenBlock}>
+-            {kids.length === 0 ? (
++            {kids.length === 0 && (container.keyItemIds || []).length === 0 ? (
+               <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmptyNode')}</Text>
+-            ) : kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
++            ) : (
++              <>
++                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
++                {(container.keyItemIds || []).map((keyId) => renderKeyNode(keyId, depth + 1, container))}
++              </>
++            )}
+           </View>
+         )}
+       </View>
+@@ -301,13 +359,17 @@ const HubTreeView = ({
+ 
+   if (!hub) return null;
+   const directKids = childrenOf(hub);
++  const directKeyIds = Array.isArray(hub.keyItemIds) ? hub.keyItemIds : [];
+ 
+   return (
+     <ScrollView style={styles.scroll} nestedScrollEnabled>
+-      {directKids.length === 0 ? (
++      {directKids.length === 0 && directKeyIds.length === 0 ? (
+         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+       ) : (
+-        directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))
++        <>
++          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))}
++          {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
++        </>
+       )}
+     </ScrollView>
+   );
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 19f0aaa..7eb7d16 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,24 @@
+ # Changelog
+ ---
+ 
++## Element parameters in the hub tree row (patch 541)
++
++A targeted admin hub-tree change at the owner's word (thesis 32). Admin-only;
++the player window and gameplay mechanics are unchanged.
++
++- **The name no longer opens settings.** Tap/click on an element title in the
++  hub tree is removed. Settings open via a "Parameters" button on the right
++  side of the name row — for every element: location, chest, merchant,
++  terminal, lock, key. Nested elements get the button too once expanded.
++- **Keys are tree rows.** Key records attached to a location appear as rows in
++  the tree with their own "Parameters" button.
++- **The location screen is decluttered.** The separate "Keys and notes in this
++  location" and "Gates between points" areas and the "Add container / merchant"
++  button are removed. Gate dependencies remain as dashed lines in the tree;
++  creating cards on the main screen and moving them with the arrows still work.
++- **Patch delivery.** `apply-patch.sh` points at
++  `arena/aa289f1c-fallout-2d20-companion`, the branch carrying patch 541.
++
+ ## A nested location lives only inside its parent + parameters in the tree (patch 540)
+ 
+ A refinement of nesting at the owner's word (thesis 31). Still admin-only; the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 48e3176..fc9451d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,24 @@
+ 
+ ---
+ 
++## Параметры элемента в строке дерева хаба (патч 541)
++
++Точечная правка админского дерева хаба по слову владельца (тезис 32). Только
++админская часть; окно игрока и игровые механики не менялись.
++
++- **Название больше не открывает настройки.** Тап/клик по заголовку элемента в
++  дереве хаба убран. Настройки открывает кнопка «Параметры» в правой части
++  строки названия — у каждого элемента: локация, сундук, торговец, терминал,
++  замок, ключ. Кнопка есть и у вложенных элементов после раскрытия спойлера.
++- **Ключи — строки дерева.** Ключевые записи локации показываются в дереве
++  отдельными строками со своей кнопкой «Параметры».
++- **Экран локации очищен.** Убраны отдельные области «Ключи и записки в
++  локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца».
++  Зависимости ворот по-прежнему видны пунктирными линиями в дереве; создание
++  карточек на главном экране и перенос стрелками сохранены.
++- **Доставка патча.** `apply-patch.sh` смотрит на ветку
++  `arena/aa289f1c-fallout-2d20-companion`, где опубликован патч 541.
++
+ ## Вложенная локация — только внутри родителя + параметры в дереве (патч 540)
+ 
+ Доработка вложенности по слову владельца (тезис 31). По-прежнему только
+diff --git a/docs/patch-541-install.md b/docs/patch-541-install.md
+new file mode 100644
+index 0000000..eb6802a
+--- /dev/null
++++ b/docs/patch-541-install.md
+@@ -0,0 +1,64 @@
++# Установка патча 541: параметры элемента в строке дерева хаба
++
++Патч подготовлен от состояния **версии 540**. Файл установки:
++`patchs/541-hub-tree-parameters.patch`.
++
++> Владелец: «Тап/клик по заголовку открывает настройки — лучше изменить: не по
++> тапу на заголовке, а в строке справа сделать кнопку “Параметры”. Удалить
++> области “Ключи и записки в локации” и “Ворота между точками”, удалить строку
++> “Добавить контейнер/торговца”. Остальное не трогай». Уточнение: кнопка нужна
++> у каждого типа элемента в хабе/локации — сундук, торговец, локация, терминал,
++> замок, ключ — в правой части строки с названием.
++
++## Что меняется
++
++Только админская часть. Окно игрока, сервер, закон снимка и механики доступа
++не менялись.
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | название элемента — не кнопка; у каждой строки дерева справа кнопка «Параметры»; ключевые записи узла показываются строками дерева со своей кнопкой «Параметры» |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | убраны области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца»; дерево получает `keyItems` и обработчик параметров ключа |
++| `apply-patch.sh` | `ARENA_BRANCH` указывает на ветку доставки патча 541: `arena/aa289f1c-fallout-2d20-companion` |
++| `i18n/{ru-RU,en-EN}/screens/lootTrade/screen.json` | подпись пустого хаба больше не ссылается на удалённую кнопку; кнопка использует существующую пару `detail.editSettings` («Параметры» / «Settings») |
++| `__tests__/room/hub-tree-parameters-541.test.js` | новый приёмочный тест: название не кликабельно, «Параметры» у всех типов элементов и ключей, удалённые области отсутствуют |
++| `__tests__/room/key-items-fields-514.test.js`, `__tests__/room/container-gates-517.test.js` | предохранители перенацелены на новый контракт дерева |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 541, тезис 32, «Осталось после патча 541» |
++
++## Границы
++
++- Раскрытие вложенных локаций шевроном, кнопки «Содержимое», «На экран»,
++  «Отвязать», замки и пунктирные зависимости сохранены.
++- Данные ключей, связи `links`, `accessExpression`, серверная проверка доступа
++  и закон снимка 529 не менялись.
++- Кнопка «Добавить контейнер / торговца» убрана только с экрана локации;
++  создание карточек на главном экране и перенос стрелками работают как прежде.
++
++## Установка через консоль
++
++Из корня репозитория приложения: сначала заменить `apply-patch.sh` свежей
++версией из ветки доставки, затем поставить патч 541.
++
++```bash
++git fetch --no-tags origin arena/aa289f1c-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 541
++```
++
++Старый локальный `apply-patch.sh` смотрел на предыдущую ветку и не видел
++патч 541, поэтому его нужно обновить до запуска. После установки скрипт
++берёт патчи из `arena/aa289f1c-fallout-2d20-companion`.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: 267 файлов зелёные; единственный падающий файл
++  `__tests__/room/terminal-hacking-balance-496.test.js` (8 тестов) падает теми
++  же ошибками и на чистом дереве 540 — патч 541 его не трогает.
++- `git apply --check` вперёд от дерева 540 и в обратную сторону от 541.
++
++## Откат
++
++`git apply -R patchs/541-hub-tree-parameters.patch` вернёт экран локации,
++дерево, словари и версию к состоянию 540.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 9beec80..a0dc0d6 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **540**.
++Дата ревизии: 2026-11-05. Текущая версия: **541**.
+ 
+ ## Тезисы
+ 
+@@ -43,8 +43,9 @@
+ | 29 | **Структура локаций в админке:** строки «Родительская локация» и «Выход из локации», чекбокс «Хаб» после названия (2 ячейки: чекбокс + пояснение), дерево структуры с переходом в настройки секции, матрёшка «локация в локацию». Требование доступа — конструктор И/ИЛИ (`+` = И, `/` = ИЛИ), нельзя начать/закончить оператором; `+` связывает сильнее `/`. Только админка; окно игрока — следующим шагом | ✅ сделано (админка) | **538** |
+ | 30 | **Хаб — сам папка-дерево (переработка 538 по слову владельца):** отдельной карточки «Структура локаций» больше нет — открыл хаб и видишь дерево вложенного. Локации — спойлерами (нажал — видно, что входит), пунктирные линии показывают, что от чего зависит (что чем заблокировано, какой ключ нужен, что во что выходит); узел открывает настройки. У хаба-папки нет родителя/выхода (он сам родитель), остаются серверные комнаты; хабы вкладываются друг в друга. Родитель/выход обычной локации — выпадающие списки с поиском, не кнопки. Локацию таскают за стрелки и кладут в локацию — она становится дочерней, как папки в Windows; вложенную можно вынуть обратно. Ключ и замок/терминал — отдельные поля с понятными подписями; И/ИЛИ = войти, только пройдя обе преграды или одну из них. Только админка | ✅ сделано (админка) | **539** |
+ | 31 | **Вложенная локация — только внутри родителя + параметры в дереве:** папка, вложенная в папку, исчезает с корневого экрана (не дублируется карточкой), живёт в дереве родителя и открывается из него. У вложенной локации в дереве видны параметры, как у других записей в хабе: комнаты, число объектов и запертых точек, ключ, замок/терминал, выход. Кнопка «Содержимое» открывает вложенную локацию (переход внутрь). При удалении родителя вложенные локации возвращаются на корень и не теряются | ✅ сделано (админка) | **540** |
++| 32 | **Параметры элемента в строке дерева хаба:** название элемента больше не открывает настройки; кнопка «Параметры» стоит в правой части строки названия у каждого элемента дерева (локация, сундук, торговец, терминал, замок, ключ), включая вложенные после раскрытия. С экрана локации убраны отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца». Ключи показываются строками дерева; зависимости ворот остаются пунктирными линиями. `apply-patch.sh` смотрит на ветку доставки 541. Только админка, игровые механики не менялись | ✅ сделано (админка) | **541** |
+ 
+-## Осталось после патча 540
++## Осталось после патча 541
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -99,6 +100,14 @@
+ видны пунктиром. Вложенную локацию можно открыть кнопкой «Содержимое»
+ (переход внутрь), а при удалении родителя вложенные локации возвращаются на
+ корень и не теряются. Окно игрока по-прежнему отложено.
++Патч 541 — точечная правка админского дерева хаба по слову владельца:
++название элемента больше не открывает настройки, вместо этого в правой части
++строки названия у каждого элемента (локация, сундук, торговец, терминал,
++замок, ключ) стоит кнопка «Параметры». Отдельные области «Ключи и записки в
++локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца»
++убраны с экрана локации; ключи показываются строками дерева, зависимости
++ворот остаются пунктирными линиями. Игровое окно, сервер и механики доступа
++не менялись.
+ Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+@@ -142,11 +151,11 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+-### Что осталось после 540 (структура локаций)
++### Что осталось после 541 (структура локаций)
+ 
+-- **Окно просмотра локаций для игрока** — админская часть готова в 538–540
+-  (хаб — папка-дерево, вложенность без дублей), игрок пока не видит
+-  дерево/переходы; это следующий отдельный шаг.
++- **Окно просмотра локаций для игрока** — админская часть готова в 538–541
++  (хаб — папка-дерево, вложенность без дублей, параметры элемента в строке
++  дерева), игрок пока не видит дерево/переходы; это следующий отдельный шаг.
+ - **Переходы между локациями в игре** — модель `parentLocationId` /
+   `exitLocationId` хранится и редактируется, но сам переход (вход через
+   родителя, особый выход/телепорт) ещё не исполняется в сессии; ручная
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 32c7d23..0c96c65 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -133,7 +133,7 @@
+     "addItem": "+ Add item",
+     "emptyItems": "Empty. Tap «+ Add item» to populate contents.",
+     "addHubNode": "+ Add container / merchant",
+-    "emptyHubNodes": "No objects in this location yet. Tap «+ Add container / merchant» to link shops and containers.",
++    "emptyHubNodes": "No objects in this location yet. Drag a card here with the arrows or create it on the main screen.",
+     "hubPickerTitle": "Add to Location",
+     "hubPickerEmpty": "No available containers or merchants yet. Create them on the main screen first.",
+     "hubPickerSameRoomHint": "Showing containers and merchants (1 nesting level).",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index ffedf6a..87bba99 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -134,7 +134,7 @@
+     "addItem": "+ Добавить предмет",
+     "emptyItems": "Список пуст. Нажмите «+ Добавить предмет», чтобы наполнить содержимое.",
+     "addHubNode": "+ Добавить контейнер / торговца",
+-    "emptyHubNodes": "В локации пока нет объектов. Нажмите «+ Добавить контейнер / торговца», чтобы собрать внутри неё лавки и контейнеры.",
++    "emptyHubNodes": "В локации пока нет объектов. Перетащите сюда карточку стрелками или создайте её на главном экране раздела.",
+     "hubPickerTitle": "Добавить в локацию",
+     "hubPickerEmpty": "Нет свободных контейнеров или торговцев. Создайте их на главном экране раздела.",
+     "hubPickerSameRoomHint": "Показаны контейнеры и торговцы (вложенность — 1 уровень).",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index de8cdcc..09bf80b 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "540"
++  "baseline": "541"
+ }
+diff --git a/public/version.json b/public/version.json
+index bd86c95..bd05f08 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "540",
++  "version": "541",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик патчей обновлён на ветку доставки 541.",
+       "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
+       "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
+       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+@@ -144,6 +145,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The patch installer now points at the patch 541 delivery branch.",
+       "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
+       "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
+       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",

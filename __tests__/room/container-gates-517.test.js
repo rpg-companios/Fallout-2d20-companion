@@ -123,12 +123,16 @@ describe('517: связи видны Мастеру и план обновлён
       .toContain('check.kindLabel');
   });
 
-  it('карточка и локация показывают ворота и состояние события', () => {
+  it('карточка показывает ворота; отдельная область ворот в локации убрана (541)', () => {
     expect(screen).toContain('card-gate-');
     expect(screen).toContain("tLootTrade('card.gateAfter')");
-    expect(screen).toContain('hub-gate-');
-    expect(screen).toContain("tLootTrade('detail.hubGatesTitle')");
     expect(screen).toContain('gateEvents');
+    // Патч 541: отдельная область «Ворота между точками» убрана с экрана
+    // локации; зависимости остаются в дереве хаба пунктирными строками.
+    expect(screen).not.toContain('hub-gate-');
+    expect(screen).not.toContain("tLootTrade('detail.hubGatesTitle')");
+    expect(read('components/screens/LootTradeScreen/modals/HubTreeView.js'))
+      .toContain("tLootTrade('form.locationTreeBlockedBy')");
   });
 
   it('клиентский стор хранит общие события комнаты', () => {

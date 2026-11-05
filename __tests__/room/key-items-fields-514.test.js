@@ -136,8 +136,10 @@ describe('514: вложенность и перетаскивание', () => {
     expect(screen).toContain('const handleMoveKeyItemIntoHub');
     expect(screen).toContain('setMovingKeyItemId');
     expect(screen).toContain('const attachedKeyItemIds');
-    expect(screen).toContain('hubKeysSection');
-    expect(screen).toContain('hub-key-detach-');
+    // Патч 541: отдельная область ключей в локации убрана; ключи — строки
+    // дерева хаба с кнопкой «Параметры».
+    expect(screen).toContain('keyItems={keyItems}');
+    expect(screen).toContain('onOpenKeySettings=');
   });
 
   it('пункт выдачи ключа сохранён (исключение совместимости)', () => {

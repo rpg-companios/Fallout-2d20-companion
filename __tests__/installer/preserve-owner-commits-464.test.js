@@ -52,7 +52,7 @@ describe('Патч 464: восстановление ghoul.png из 39bb559 и �
       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
       fs.mkdirSync(path.join(upstream, 'modules/fallout/assets/origins'), { recursive: true });
-      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
+      git(upstream, ['init', '-b', 'arena/aa289f1c-fallout-2d20-companion']);
 
       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
       fs.writeFileSync(path.join(upstream, 'modules/fallout/assets/origins/survivor.png'), 'arena-survivor-v1');

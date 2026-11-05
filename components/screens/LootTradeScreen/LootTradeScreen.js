@@ -2432,73 +2432,21 @@ export default function LootTradeScreen() {
 
           {activeContainer.kind === CONTAINER_KIND.HUB ? (
             <>
-              <TouchableOpacity
-                style={styles.addItemPrimaryBtn}
-                onPress={() => setHubPickerOpen(true)}
-              >
-                <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
-              </TouchableOpacity>
-
-              <View style={styles.hubKeysSection}>
-                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubKeysTitle')}</Text>
-                {(activeContainer.keyItemIds || []).length === 0 ? (
-                  <Text style={styles.emptyListText}>{tLootTrade('detail.hubKeysEmpty')}</Text>
-                ) : (activeContainer.keyItemIds || []).map((keyId) => {
-                  const record = keyItems.find((k) => k.id === keyId);
-                  if (!record) return null;
-                  return (
-                    <View key={keyId} testID={`hub-key-${keyId}`} style={styles.hubKeyRow}>
-                      <MaterialCommunityIcons name="key-variant" size={18} color="#d4af37" />
-                      <Text style={styles.hubKeyRowName} numberOfLines={1}>{record.name}</Text>
-                      <TouchableOpacity
-                        testID={`hub-key-detach-${keyId}`}
-                        style={styles.hubKeyDetachBtn}
-                        onPress={() => void handleDetachKeyItem(keyId)}
-                      >
-                        <Text style={styles.hubKeyDetachText}>{tLootTrade('detail.hubKeyDetach')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-              </View>
-
-              {/* Патч 517: видимые Мастеру связи между точками локации. */}
-              <View style={styles.hubKeysSection}>
-                <Text style={styles.hubKeysTitle}>{tLootTrade('detail.hubGatesTitle')}</Text>
-                {(() => {
-                  const linked = (activeContainer.links || [])
-                    .map((link) => containers.find((c) => c.id === link.containerId))
-                    .filter((child) => normalizeLinkedCheckIds(child).length > 0);
-                  if (linked.length === 0) {
-                    return <Text style={styles.emptyListText}>{tLootTrade('detail.hubGatesEmpty')}</Text>;
-                  }
-                  return linked.map((child) => (
-                    <View key={child.id} testID={`hub-gate-${child.id}`} style={styles.hubKeyRow}>
-                      <MaterialCommunityIcons name="link-variant" size={18} color="#d4af37" />
-                      <Text style={styles.hubKeyRowName} numberOfLines={1}>
-                        {`${child.name} ← ${normalizeLinkedCheckIds(child)
-                          .map((id) => gateSourceNames[id] || id)
-                          .join(` ${tLootTrade('detail.hubGateOr')} `)}`}
-                      </Text>
-                      <Text style={styles.hubKeyDetachText}>
-                        {tLootTrade(normalizeLinkedCheckIds(child).some((id) => gateEvents[id])
-                          ? 'detail.hubGatePassed'
-                          : 'detail.hubGatePending')}
-                      </Text>
-                    </View>
-                  ));
-                })()}
-              </View>
-
-              {/* Патч 539: хаб — сам папка-дерево. Локации-спойлеры, пунктирные
-                  линии зависимостей; узел открывает настройки секции. */}
+              {/* Патч 541: отдельные области «Ключи и записки в локации»,
+                  «Ворота между точками» и кнопка «Добавить контейнер / торговца»
+                  убраны. Дерево хаба показывает элементы и их зависимости;
+                  настройки открываются кнопкой «Параметры» в строке элемента. */}
               <Text style={styles.hubKeysTitle}>{tLootTrade('detail.locationsInside')}</Text>
               <HubTreeView
                 hub={activeContainer}
                 containers={containers}
+                keyItems={keyItems}
                 keyItemNames={keyItemNames}
                 roomLabelOf={formatHubCardRoomLabel}
                 onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
+                onOpenKeySettings={(keyItem, parentNode) => setKeyItemForm({
+                  initialKeyItem: { ...keyItem, attachedTo: parentNode?.id || '' },
+                })}
                 onOpenChild={(child) => {
                   setReturnHubId(activeContainer.id);
                   setActiveContainerId(child.id);
