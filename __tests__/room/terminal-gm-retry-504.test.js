@@ -335,9 +335,10 @@ describe('504: lockOnFailure удалён полностью', () => {
     // Патч 516: конфигурация терминала несёт ещё и требование ключа.
     // Патч 520: общий реестр проверок различает терминал и замок и хранит
     // до двух источников ворот через «ИЛИ».
+    // Патч 538: добавлено выражение И/ИЛИ (accessExpression).
     expect(Object.keys(config).sort()).toEqual([
-      'containerId', 'description', 'difficulty', 'keyRequirement', 'kind',
-      'linkedCheckId', 'linkedCheckIds', 'name', 'requiredKeyItemId',
+      'accessExpression', 'containerId', 'description', 'difficulty', 'keyRequirement',
+      'kind', 'linkedCheckId', 'linkedCheckIds', 'name', 'requiredKeyItemId',
     ]);
     const game = createGame({
       config, operatorClientId: 'p', operatorCharacterId: 'c',

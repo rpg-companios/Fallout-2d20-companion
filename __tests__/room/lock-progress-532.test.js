@@ -414,10 +414,10 @@ describe('532/534: строки, документы и версия', () => {
     expect(modal).toContain("tLootTrade('lock.progressSaved')");
     expect(modal).toContain('saveLocalLockState');
     expect(modal).toContain('initialLocalLockState(containerId)');
-    // Перенос длинного описания тоже возвращён.
-    expect(modal).toContain('<View style={styles.statusLeft}>');
+    // Перенос длинного описания тоже возвращён (патч 536: отдельный блок правил).
+    expect(modal).toContain('testID="lock-rules-block"');
     const styles = read('components/lootTrade/lockPickingStyles.js');
-    expect(styles).toContain('statusLeft:');
+    expect(styles).toContain('rulesBlock:');
     expect(styles).toContain('flexShrink: 1');
   });
 
@@ -436,19 +436,24 @@ describe('532/534: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('534');
+    expect(version.version).toBe('538');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(129);
-    expect(version.notes['en-EN']).toHaveLength(129);
-    expect(json('patchs/baseline.json').baseline).toBe('534');
+    expect(version.notes['ru-RU']).toHaveLength(137);
+    expect(version.notes['en-EN']).toHaveLength(137);
+    expect(json('patchs/baseline.json').baseline).toBe('538');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+    expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+    expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+    expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+    expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **534**');
-    expect(roadmap).toContain('| 24 |');
-    expect(roadmap).toContain('Осталось после патча 534');
-    expect(read('docs/patch-534-install.md')).toContain('534');
-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 19.');
+    expect(roadmap).toContain('Текущая версия: **538**');
+    expect(roadmap).toContain('| 28 |');
+    expect(roadmap).toContain('| 29 |');
+    expect(roadmap).toContain('Осталось после патча 538');
+    expect(read('docs/patch-538-install.md')).toContain('538');
+    expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });

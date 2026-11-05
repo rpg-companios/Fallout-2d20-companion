@@ -93,5 +93,10 @@
   «Программиста») заменена командой `magazine.use`, снимки зафиксированы как
   канал наблюдения между сессиями.
 
-Связанные документы: `docs/lockpicking-mini-game-design.md` (§14–15),
+- **535** — `room.gmDecisions` (запросы «Мастер решает») отнесено к состоянию,
+  которым владеет Мастер: сервер хранит его в памяти и рассылает кадром
+  `gm.decisionState`. Пользовательские снимки по-прежнему меняются только
+  командами `char.command` → `char.refresh` → `char.publish`.
+
+Связанные документы: `docs/lockpicking-mini-game-design.md` (§14–15, §20),
 `docs/location-hierarchy-design.md`, `docs/roadmap.md`.

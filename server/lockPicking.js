@@ -90,13 +90,18 @@ const luckSaveChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10)
  * `enabled`): сервер, клиент и локальный резерв уже спрашивают её.
  */
 const LOCK_BLOCK_POLICY = Object.freeze({ enabled: false });
-const shouldBlockLock = ({ game, config } = {}) => {
-  if (!LOCK_BLOCK_POLICY.enabled) return false;
-  // Будущее условие владельца встанет здесь. Аргументы уже передаются:
-  // текущая доска, настройки точки и (при необходимости) снимок листа.
+/**
+ * Патч 535: владелец включил блокировку замка по усмотрению Мастера.
+ * Автоблокировка по провалам ПО-ПРЕЖНЕМУ выключена (закон 526):
+ * `LOCK_BLOCK_POLICY.enabled` не поднимаем. Единственное новое условие —
+ * явный флаг GM (`gmBlocked`), который приходит из состояния точки.
+ * Так будущие условия блокировки по-прежнему вставляются ТОЛЬКО сюда.
+ */
+const shouldBlockLock = ({ game, config, gmBlocked = false } = {}) => {
+  if (LOCK_BLOCK_POLICY.enabled) return true;
   void game;
   void config;
-  return false;
+  return Boolean(gmBlocked);
 };
 
 // ---------------------------------------------------------------------------
@@ -537,6 +542,17 @@ const publicLockGameState = (game) => {
   const { secret, ...rest } = game;
   return rest;
 };
+/**
+ * Патч 535: Мастер открыл точку своим решением. Доска выигранная, доступ
+ * выдан сразу (семантика 530), но это НЕ ключ: `hackedByGm`, уведомление
+ * Мастеру не нужно — решение и так его. Прогресс 532 сбрасывается победой.
+ */
+const gmWonLockGame = (config, at = Date.now()) => ({
+  ...keyWonLockGame(config, at),
+  hackedByKey: false,
+  hackedByGm: true,
+});
+
 
 /** Живая правка карточки не должна пересобирать доску (правило 504). */
 const syncLockGameConfig = (game, config) => {
@@ -718,6 +734,7 @@ module.exports = {
   isResumableLockGame,
   resumeLockGame,
   keyWonLockGame,
+  gmWonLockGame,
   publicLockGameState,
   syncLockGameConfig,
   closeLockGame,

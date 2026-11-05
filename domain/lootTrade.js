@@ -9,6 +9,11 @@
 
 import itemStacking from './itemStacking.js';
 import locationGraph from './locationGraph.js';
+import {
+  normalizeAccessExpression,
+  expressionCheckIds,
+  resolveAccessExpression,
+} from './accessExpression.js';
 import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
 import {
   AMMO_FOUND_BY_ID,
@@ -771,11 +776,27 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     keyRequirement: containerCanRequireKey(kind)
       ? normalizeKeyRequirement(raw.keyRequirement || (raw.keyRequired ? KEY_REQUIREMENT.REQUIRED : KEY_REQUIREMENT.NONE))
       : KEY_REQUIREMENT.NONE,
-    linkedCheckIds: containerCanRequireKey(kind) ? normalizeLinkedCheckIds(raw) : [],
+    // Патч 538: требование доступа — выражение И/ИЛИ (+ = И, / = ИЛИ).
+    // Источник истины — accessExpression; linkedCheckIds остаётся списком
+    // операндов для старых читателей, linkedCheckId — первый операнд.
+    accessExpression: containerCanRequireKey(kind) ? resolveAccessExpression(raw) : [],
+    linkedCheckIds: containerCanRequireKey(kind)
+      ? expressionCheckIds(resolveAccessExpression(raw))
+      : [],
     // Legacy-поле: первый источник. Старые карточки и сервер 516–519 читают его.
     linkedCheckId: containerCanRequireKey(kind)
-      ? normalizeLinkedCheckIds(raw)[0] || ''
+      ? (expressionCheckIds(resolveAccessExpression(raw))[0] || '')
       : '',
+    // Патч 538: строки локации — родительская локация (вложенность/ветвление)
+    // и выход из локации (особый переход/телепорт, если ведёт не к родителю).
+    // Флаг «Хаб» помечает локацию-каталог для просмотра структуры деревом.
+    parentLocationId: kind === CONTAINER_KIND.HUB
+      ? String(raw.parentLocationId || '').trim()
+      : '',
+    exitLocationId: kind === CONTAINER_KIND.HUB
+      ? String(raw.exitLocationId || '').trim()
+      : '',
+    isCatalogHub: kind === CONTAINER_KIND.HUB ? Boolean(raw.isCatalogHub) : false,
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };

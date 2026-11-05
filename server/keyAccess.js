@@ -10,6 +10,11 @@
  * 3.3–3.4 и 7.3–7.4 `docs/key-items-and-gates-design.md`.
  */
 
+const {
+  resolveAccessExpression,
+  evaluateAccessExpression,
+} = require('./accessExpression.js');
+
 const KEY_ACCESS = Object.freeze({
   NONE: 'none',                 // требования нет
   OPEN_BY_KEY: 'open-by-key',   // ключ добыт: мини-игра не запускается
@@ -50,9 +55,25 @@ const linkedCheckIdsOf = (requirement = {}) => {
 /**
  * Патч 520: если в требованиях указаны и терминал, и замок, они НЕ блокируют
  * точку одновременно. Достаточно любого пройденного источника — «ИЛИ».
+ * Патч 538: legacy-ИЛИ сохранён как частный случай выражения из одних '/'.
  */
 const anyCheckPassed = (options, requirement) => linkedCheckIdsOf(requirement)
   .some((id) => isCheckPassed(options, id));
+
+/**
+ * Патч 538: ворота-выражение И/ИЛИ. Источник истины — accessExpression
+ * (+ = И, / = ИЛИ); у старых карточек без него собирается legacy-ИЛИ из
+ * linkedCheckIds. Пустое выражение = требования нет (возвращаем false, а
+ * решение «требования нет» принимает resolveKeyAccess по длине списка).
+ */
+const gateExpressionPassed = (options, requirement) => {
+  const expression = resolveAccessExpression(requirement);
+  if (expression.length === 0) return false;
+  return evaluateAccessExpression(expression, (id) => isCheckPassed(options, id));
+};
+
+/** Есть ли у точки хоть одна проверка-операнд в требовании. */
+const hasGateChecks = (requirement) => resolveAccessExpression(requirement).length > 0;
 
 const isCheckPassed = (sources, linkedCheckId) => {
   const id = String(linkedCheckId || '').trim();
@@ -76,11 +97,11 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
   const keyItemId = String(requirement.requiredKeyItemId || '').trim();
   if (!keyItemId) {
     // Патч 517: ворота работают и без требования ключа.
-    const linkedCheckIds = linkedCheckIdsOf(requirement);
-    if (linkedCheckIds.length === 0) {
+    // Патч 538: выражение И/ИЛИ вместо принудительного ИЛИ.
+    if (!hasGateChecks(requirement)) {
       return { state: KEY_ACCESS.NONE, keyItemId: '', reason: 'no-requirement' };
     }
-    return anyCheckPassed(options, requirement)
+    return gateExpressionPassed(options, requirement)
       ? { state: KEY_ACCESS.OPEN, keyItemId: '', reason: 'gate-passed' }
       : { state: KEY_ACCESS.NEEDS_CHECK, keyItemId: '', reason: 'gate-pending' };
   }
@@ -90,7 +111,7 @@ const resolveKeyAccess = (requirement = {}, options = {}) => {
   if (requirement.keyRequirement === 'required') {
     return { state: KEY_ACCESS.DENIED, keyItemId, reason: 'mandatory-key-missing' };
   }
-  if (linkedCheckIdsOf(requirement).length > 0 && anyCheckPassed(options, requirement)) {
+  if (hasGateChecks(requirement) && gateExpressionPassed(options, requirement)) {
     return { state: KEY_ACCESS.OPEN, keyItemId, reason: 'linked-check-passed' };
   }
   return { state: KEY_ACCESS.NEEDS_CHECK, keyItemId, reason: 'optional-key-missing' };
@@ -112,6 +133,8 @@ module.exports = {
   isCheckPassed,
   linkedCheckIdsOf,
   anyCheckPassed,
+  gateExpressionPassed,
+  hasGateChecks,
   resolveKeyAccess,
   isKeyAccessOpen,
   isUnlockedByKey,

@@ -44,6 +44,20 @@ export interface PartyStorageState {
   gmOnline?: boolean;
 }
 
+export interface GmDecisionEntry {
+  id: string;
+  kind: string;
+  containerId: string;
+  roomCode: string;
+  name: string;
+  requestedBy: { clientId: string; characterId: string; name: string };
+  status: 'pending' | 'approved' | 'declined';
+  createdAt: number;
+  resolvedAt: number | null;
+  resolvedBy: string | null;
+  value: 'yes' | 'no' | null;
+}
+
 export interface RoomStateEntry {
   code: string;
   name: string;
@@ -58,6 +72,8 @@ export interface RoomStateEntry {
   /** Патч 517: нейтральные события доступа (ворота), общие на комнату. */
   accessEvents?: Record<string, { containerId: string; kind: string; by?: string; at: number }>;
   directives?: RoomDirectiveEntry[];
+  /** Патч 535: нерешённые запросы «Мастер решает». */
+  gmDecisions?: GmDecisionEntry[];
   /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
   capabilities?: Record<string, boolean>;
 }
@@ -76,6 +92,7 @@ interface JoinRoomResult {
   activeSession?: ActiveLootTradeSession | null;
   terminalStates?: Record<string, any>;
   directives?: RoomDirectiveEntry[];
+  gmDecisions?: GmDecisionEntry[];
   capabilities?: Record<string, boolean>;
 }
 
@@ -110,6 +127,10 @@ interface RoomStoreState {
   }) => Promise<void>;
   issueTerminal: (input: { code: string; config: Record<string, unknown>; reissue?: boolean; ownerToken?: string }) => Promise<any>;
   actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
+  /** Патч 535: штатный выход «Мастер решает». */
+  requestGmDecision: (input: { code: string; containerId: string; kind?: string; characterId?: string }) => Promise<any>;
+  resolveGmDecision: (input: { code: string; decisionId: string; value: 'yes' | 'no'; ownerToken?: string }) => Promise<any>;
+  setGmLockState: (input: { code: string; containerId: string; action: 'gmBlock' | 'gmOpen'; ownerToken?: string }) => Promise<any>;
   depositToPartyStorage: (input: { code: string; item: Record<string, unknown>; quantity: number; name?: string }) => Promise<PartyStorageState | null>;
   withdrawFromPartyStorage: (input: { code: string; entryId: string; quantity?: number }) => Promise<{ storage: PartyStorageState | null; withdrawn?: { item: Record<string, unknown>; quantity: number; name: string } }>;
   transferPartyStorage: (input: { code: string; deposits: any[]; withdrawals: any[] }) => Promise<{
@@ -447,6 +468,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         } });
       }
     }
+    // Патч 535: «Мастер решает» — состояние запросов приходит всей комнате.
+    if (message.type === ROOM_MESSAGE.GM_DECISION_STATE) {
+      const code = message.roomCode;
+      const decisions = message.payload?.decisions;
+      const current = code ? get().rooms[code] : null;
+      if (code && current && Array.isArray(decisions)) {
+        set({ rooms: {
+          ...get().rooms,
+          [code]: { ...current, gmDecisions: decisions },
+        } });
+      }
+    }
     if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
       const code = message.roomCode;
       const terminal = message.payload?.terminal;
@@ -646,6 +679,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             terminalStates: prev?.terminalStates || {},
             partyStorage: prev?.partyStorage || { revision: 0, entries: [] },
             directives: prev?.directives || [],
+            gmDecisions: prev?.gmDecisions || [],
             capabilities: prev?.capabilities || {},
           },
         },
@@ -708,6 +742,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               partyStorage: (payloadRooms.partyStorage as PartyStorageState | undefined) ?? { revision: 0, entries: [] },
               accessEvents: (payloadRooms.accessEvents as Record<string, any> | undefined) ?? {},
               directives,
+              gmDecisions: Array.isArray(payloadRooms.gmDecisions)
+                ? payloadRooms.gmDecisions as GmDecisionEntry[]
+                : [],
               capabilities,
             },
           },
@@ -843,6 +880,28 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       const payload: Record<string, unknown> = { code, containerId, action };
       if (characterId) payload.characterId = characterId;
       if (value) payload.value = value;
+      if (ownerToken) payload.ownerToken = ownerToken;
+      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
+      return response.payload?.terminal;
+    },
+
+    requestGmDecision: async ({ code, containerId, kind, characterId }) => {
+      const payload: Record<string, unknown> = { code, containerId };
+      if (kind) payload.kind = kind;
+      if (characterId) payload.characterId = characterId;
+      const response = await sendRequest(ROOM_MESSAGE.GM_DECISION_REQUEST, payload, code);
+      return response.payload?.decisions;
+    },
+
+    resolveGmDecision: async ({ code, decisionId, value, ownerToken }) => {
+      const payload: Record<string, unknown> = { code, decisionId, value };
+      if (ownerToken) payload.ownerToken = ownerToken;
+      const response = await sendRequest(ROOM_MESSAGE.GM_DECISION_RESOLVE, payload, code);
+      return response.payload?.decisions;
+    },
+
+    setGmLockState: async ({ code, containerId, action, ownerToken }) => {
+      const payload: Record<string, unknown> = { code, containerId, action };
       if (ownerToken) payload.ownerToken = ownerToken;
       const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
       return response.payload?.terminal;

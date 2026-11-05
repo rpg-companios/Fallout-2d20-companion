@@ -1,0 +1,710 @@
+diff --git a/__tests__/lootTrade/lock-arrows-legacy-531.test.js b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+index b39685a..6a2404d 100644
+--- a/__tests__/lootTrade/lock-arrows-legacy-531.test.js
++++ b/__tests__/lootTrade/lock-arrows-legacy-531.test.js
+@@ -4,8 +4,10 @@
+ // Патч 533 откатил ИЗБЫТОЧНЫЕ правки 531: возвращены рамка/радиус/
+ // нулевые паддинги кнопки, рамка области, базовые стили формы, иконка 30
+ // и пустышки 58×50. Оставлены четыре названных removal'а и центрирование.
+-// Патч 534 ВЕРНУЛ перенос длинного описания: statusLeft и flexShrink/
+-// maxWidth снова на месте (владелец не просил их откатывать).
++// Патч 534 ВЕРНУЛ перенос длинного описания: flexShrink/maxWidth снова на
++// месте (владелец не просил их откатывать). Патч 536 разнёс строку статуса на
++// два вертикальных контейнера — «Правила» (rulesBlock) и «Сведения»
++// (infoBlock); перенос описания внутри rulesBlock сохранён.
+ import React, { act } from 'react';
+ import TestRenderer from 'react-test-renderer';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -175,17 +177,18 @@ describe('531: начертание стрелок до светлой темы'
+     expect(renderer.root.findAllByType('ScrollView').length).toBeGreaterThan(0);
+   });
+ 
+-  it('патч 534 вернул перенос описания: statusLeft и flexShrink/maxWidth на месте', async () => {
++  it('патч 534 вернул перенос описания (536: блок правил): flexShrink/maxWidth на месте', async () => {
+     const renderer = await render();
+     const hint = renderer.root.findAllByProps({ testID: 'lock-arrows-hint' })[0];
+     const style = flat(hint.props.style);
+     expect(style.flexShrink).toBe(1);
+     expect(style.maxWidth).toBe('100%');
+-    expect(lockLightStyles.statusLeft.flex).toBe(1);
+-    expect(lockLightStyles.statusLeft.flexShrink).toBe(1);
+-    expect(lockLightStyles.statusLeft.minWidth).toBe(0);
++    // Патч 536: описание живёт в отдельном блоке «Правила», который сжимается
++    // до ширины карточки (закон переноса 531/534 сохранён).
++    expect(lockLightStyles.rulesBlock.flexShrink).toBe(1);
++    expect(lockLightStyles.rulesBlock.minWidth).toBe(0);
+     const source = read('components/lootTrade/LockPickingModal.js');
+-    expect(source).toContain('<View style={styles.statusLeft}>');
++    expect(source).toContain('testID="lock-rules-block"');
+   });
+ 
+   it('все четыре кнопки на месте и нажимаемы', async () => {
+diff --git a/__tests__/lootTrade/lock-status-blocks-536.test.js b/__tests__/lootTrade/lock-status-blocks-536.test.js
+new file mode 100644
+index 0000000..dd6bf09
+--- /dev/null
++++ b/__tests__/lootTrade/lock-status-blocks-536.test.js
+@@ -0,0 +1,188 @@
++// Патч 536: строка статуса разнесена на ДВА вертикальных контейнера по слову
++// владельца («1-й Правила, 2-й сведения»). Сверху заметный счётчик заколок,
++// под ним блок «Правила» (описание мини-игры), затем блок «Сведения»
++// (сложность, LOCKPICK, навык/восприятие/удача). Перенос длинного описания
++// внутри блока правил сохранён (закон 531/534).
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: { Value: class { constructor(v) { this.value = v; } setValue() {} }, timing: () => ({ start() {} }) },
++    useWindowDimensions: () => ({ width: 390, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({
++  spendBobbyPins: vi.fn(async () => 1),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import { lockLightStyles } from '../../components/lootTrade/lockPickingStyles';
++import { setCurrentLocale } from '../../i18n/locale';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++const LOCK = { containerId: 'l1', name: 'Замок', description: '', difficulty: 2, kind: 'lock' };
++const playing = () => ({
++  status: 'playing', kind: 'lock', result: '',
++  cells: [
++    { arrow: null, state: 'red' },
++    { arrow: 'left', state: 'grey' },
++    { arrow: null, state: 'hidden' },
++    { arrow: null, state: 'hidden' },
++  ],
++  rows: [4], cellCount: 4, cursor: 0, per: 8, luck: 4, skill: 3, difficulty: 2,
++  pinsRemaining: 3, pinActive: true, brokenPins: 0, revision: 1,
++  operatorClientId: 'client-1', operatorCharacterId: 'ch1',
++});
++const roomWith = (game) => ({
++  joined: true,
++  capabilities: { terminalHacking: true, lockPicking: true },
++  terminalStates: {
++    l1: { containerId: 'l1', accessId: 'broadcast-1', config: LOCK, game, closed: false, locked: false, awaitingGm: false },
++  },
++});
++
++const renderers = [];
++const render = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} />,
++    );
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++const flat = (style) => (Array.isArray(style)
++  ? Object.assign({}, ...style.filter(Boolean))
++  : (style || {}));
++const byId = (node, id) => (node.root || node).findAllByProps({ testID: id })[0];
++const textsOf = (node) => node.findAllByType('Text')
++  .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  setCurrentLocale('ru-RU');
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1', characterName: 'Сталкер',
++    attributes: { PER: { base: 8 } }, skills: { LOCKPICK: { base: 3 } },
++    items: { p: { weaponId: 'item_bobby_pin', quantity: 4 } },
++  });
++  useRoomStore.setState({
++    clientId: 'client-1', rooms: { ROOM1: roomWith(playing()) },
++    actOnTerminal: vi.fn(async () => ({ game: null })),
++  });
++});
++afterEach(async () => {
++  for (const renderer of renderers.splice(0)) {
++    try { await act(async () => renderer.unmount()); } catch { /* уже снято */ }
++  }
++});
++
++describe('536: два вертикальных контейнера — Правила и Сведения', () => {
++  it('старая двухколоночная строка убрана, есть вертикальная колонка', () => {
++    const source = read('components/lootTrade/LockPickingModal.js');
++    expect(source).not.toContain('styles.statusRow');
++    expect(source).not.toContain('styles.statusLeft');
++    expect(source).toContain('<View style={styles.statusColumn}>');
++    expect(lockLightStyles.statusColumn.flexDirection).toBe('column');
++    expect(lockLightStyles.statusRow).toBeUndefined();
++    expect(lockLightStyles.statusLeft).toBeUndefined();
++  });
++
++  it('оба контейнера на месте: сначала Правила, потом Сведения', async () => {
++    const renderer = await render();
++    const rules = byId(renderer, 'lock-rules-block');
++    const info = byId(renderer, 'lock-info-block');
++    expect(rules).toBeTruthy();
++    expect(info).toBeTruthy();
++    // Оба блока живут в одной вертикальной колонке (statusColumn).
++    const column = renderer.root.findAllByProps({ style: lockLightStyles.statusColumn });
++    expect(column.length).toBeGreaterThan(0);
++    expect(column.some((c) => c.findAllByProps({ testID: 'lock-rules-block' }).length > 0)).toBe(true);
++    expect(column.some((c) => c.findAllByProps({ testID: 'lock-info-block' }).length > 0)).toBe(true);
++    // В разметке Правила идут раньше Сведений.
++    const source = read('components/lootTrade/LockPickingModal.js');
++    expect(source.indexOf('testID="lock-rules-block"')).toBeGreaterThan(-1);
++    expect(source.indexOf('testID="lock-rules-block"'))
++      .toBeLessThan(source.indexOf('testID="lock-info-block"'));
++  });
++
++  it('блок Правил содержит заголовок и описание мини-игры', async () => {
++    const renderer = await render();
++    const rules = byId(renderer, 'lock-rules-block');
++    const texts = textsOf(rules);
++    expect(texts.some((t) => t === json('i18n/ru-RU/screens/lootTrade/screen.json').lock.rulesTitle)).toBe(true);
++    expect(texts.some((t) => t === json('i18n/ru-RU/screens/lootTrade/screen.json').lock.arrowsHint)).toBe(true);
++    expect(byId(rules, 'lock-arrows-hint')).toBeTruthy();
++  });
++
++  it('блок Сведений содержит сложность, LOCKPICK и навык/восприятие/удачу', async () => {
++    const renderer = await render();
++    const info = byId(renderer, 'lock-info-block');
++    const texts = textsOf(info);
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
++    expect(texts.some((t) => t === ru.infoTitle)).toBe(true);
++    expect(texts.some((t) => t === 'Сложность 2 · 4 ячеек')).toBe(true);
++    expect(texts.some((t) => t === 'LOCKPICK')).toBe(true);
++    expect(texts.some((t) => t === 'Навык 3 · Восприятие 8 · Удача 4')).toBe(true);
++    // Описание правил НЕ попало в блок сведений.
++    expect(texts.some((t) => t === ru.arrowsHint)).toBe(false);
++  });
++
++  it('счётчик заколок остаётся сверху заметным, вне двух блоков', async () => {
++    const renderer = await render();
++    const counter = byId(renderer, 'lock-pins-count');
++    expect(counter).toBeTruthy();
++    expect(flat(counter.props.style).fontSize).toBe(17);
++    const rules = byId(renderer, 'lock-rules-block');
++    const info = byId(renderer, 'lock-info-block');
++    expect(rules.findAllByProps({ testID: 'lock-pins-count' }).length).toBe(0);
++    expect(info.findAllByProps({ testID: 'lock-pins-count' }).length).toBe(0);
++  });
++
++  it('перенос описания сохранён: rulesBlock сжимается, arrowsHint переносится', () => {
++    expect(lockLightStyles.rulesBlock.flexShrink).toBe(1);
++    expect(lockLightStyles.rulesBlock.minWidth).toBe(0);
++    expect(lockLightStyles.arrowsHint.flexShrink).toBe(1);
++    expect(lockLightStyles.arrowsHint.maxWidth).toBe('100%');
++  });
++
++  it('заголовки блоков парные в RU/EN', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json').lock;
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json').lock;
++    expect(ru.rulesTitle).toBe('Правила');
++    expect(ru.infoTitle).toBe('Сведения');
++    expect(en.rulesTitle).toBe('Rules');
++    expect(en.infoTitle).toBe('Details');
++    expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
++  });
++});
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 9fc9583..b045f47 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,17 +255,18 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('535');
++    expect(version.version).toBe('536');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(133);
+-    expect(version.notes['en-EN']).toHaveLength(133);
+-    expect(json('patchs/baseline.json').baseline).toBe('535');
++    expect(version.notes['ru-RU']).toHaveLength(135);
++    expect(version.notes['en-EN']).toHaveLength(135);
++    expect(json('patchs/baseline.json').baseline).toBe('536');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
++    expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **535**');
+-    expect(roadmap).toContain('| 26 |');
+-    expect(roadmap).toContain('Осталось после патча 535');
+-    expect(read('docs/patch-535-install.md')).toContain('535');
+-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
++    expect(roadmap).toContain('Текущая версия: **536**');
++    expect(roadmap).toContain('| 27 |');
++    expect(roadmap).toContain('Осталось после патча 536');
++    expect(read('docs/patch-536-install.md')).toContain('536');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 21.');
+   });
+ });
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index d963f45..379e996 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -414,10 +414,10 @@ describe('532/534: строки, документы и версия', () => {
+     expect(modal).toContain("tLootTrade('lock.progressSaved')");
+     expect(modal).toContain('saveLocalLockState');
+     expect(modal).toContain('initialLocalLockState(containerId)');
+-    // Перенос длинного описания тоже возвращён.
+-    expect(modal).toContain('<View style={styles.statusLeft}>');
++    // Перенос длинного описания тоже возвращён (патч 536: отдельный блок правил).
++    expect(modal).toContain('testID="lock-rules-block"');
+     const styles = read('components/lootTrade/lockPickingStyles.js');
+-    expect(styles).toContain('statusLeft:');
++    expect(styles).toContain('rulesBlock:');
+     expect(styles).toContain('flexShrink: 1');
+   });
+ 
+@@ -436,20 +436,21 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('535');
++    expect(version.version).toBe('536');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(133);
+-    expect(version.notes['en-EN']).toHaveLength(133);
+-    expect(json('patchs/baseline.json').baseline).toBe('535');
++    expect(version.notes['ru-RU']).toHaveLength(135);
++    expect(version.notes['en-EN']).toHaveLength(135);
++    expect(json('patchs/baseline.json').baseline).toBe('536');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
++    expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **535**');
+-    expect(roadmap).toContain('| 26 |');
+-    expect(roadmap).toContain('Осталось после патча 535');
+-    expect(read('docs/patch-535-install.md')).toContain('535');
+-    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 20.');
++    expect(roadmap).toContain('Текущая версия: **536**');
++    expect(roadmap).toContain('| 27 |');
++    expect(roadmap).toContain('Осталось после патча 536');
++    expect(read('docs/patch-536-install.md')).toContain('536');
++    expect(read('docs/lockpicking-mini-game-design.md')).toContain('## 21.');
+   });
+ });
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 6ec8182..5c39b3c 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -407,14 +407,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+             contentContainerStyle={styles.scrollContent}
+             showsVerticalScrollIndicator={false}
+           >
+-          <View style={styles.statusRow}>
+-            <View style={styles.statusLeft}>
+-              <Text testID="lock-pins-count" style={styles.pinCount}>
+-                {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+-              </Text>
++          {/* Патч 536: два контейнера один под другим — «Правила» и «Сведения». */}
++          <View style={styles.statusColumn}>
++            <Text testID="lock-pins-count" style={styles.pinCount}>
++              {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
++            </Text>
++            <View style={styles.rulesBlock} testID="lock-rules-block">
++              <Text style={styles.blockTitle}>{tLootTrade('lock.rulesTitle')}</Text>
+               <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
+                 {tLootTrade('lock.arrowsHint')}
+               </Text>
++            </View>
++            <View style={styles.infoBlock} testID="lock-info-block">
++              <Text style={styles.blockTitle}>{tLootTrade('lock.infoTitle')}</Text>
+               <Text style={styles.statText}>
+                 {game?.cellCount
+                   ? formatLootTrade(tLootTrade('lock.difficulty'), {
+@@ -423,9 +428,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+                     })
+                   : tLootTrade('lock.ready')}
+               </Text>
+-            </View>
+-            <View style={{ alignItems: 'flex-end', maxWidth: '48%' }}>
+-              <Text style={styles.statusLabel}>LOCKPICK</Text>
++              <Text style={[styles.statusLabel, styles.infoSkillLabel]}>LOCKPICK</Text>
+               {game ? (
+                 <Text style={styles.statText}>
+                   {formatLootTrade(tLootTrade('lock.skill'), {
+diff --git a/components/lootTrade/lockPickingStyles.js b/components/lootTrade/lockPickingStyles.js
+index c59489e..1e74c55 100644
+--- a/components/lootTrade/lockPickingStyles.js
++++ b/components/lootTrade/lockPickingStyles.js
+@@ -49,22 +49,50 @@ export const lockLightStyles = StyleSheet.create({
+   },
+   buttonDisabled: { opacity: 0.5 },
+ 
+-  statusRow: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    justifyContent: 'space-between',
+-    gap: 10,
++  // Патч 536: правила и сведения — ДВА отдельных контейнера один под другим
++  // (слово владельца: «1-й Правила, 2-й сведения»), а не одна строка с двумя
++  // колонками. Счётчик заколок остаётся сверху заметным, под ним блок правил,
++  // затем блок сведений. Каркас блоков — как у board/pointCard (рамка +
++  // surfaceRaised), заголовки — как statusLabel.
++  statusColumn: {
++    flexDirection: 'column',
++    gap: 8,
+     paddingVertical: 8,
+     borderBottomWidth: 1,
+     borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
+-  // Патч 531 / возвращено в 534: левая колонка строки статуса СЖИМАЕТСЯ
+-  // до ширины карточки, иначе длинное описание правил задаёт собственную
+-  // ширину, встаёт в одну строку и уходит за границы модалки.
+-  statusLeft: { flex: 1, flexShrink: 1, minWidth: 0, paddingRight: 4 },
++  // Блок правил сжимается до ширины карточки, чтобы длинное описание
++  // переносилось внутри модалки (закон 531/534 сохранён).
++  rulesBlock: {
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    paddingVertical: 8,
++    paddingHorizontal: 10,
++    flexShrink: 1,
++    minWidth: 0,
++  },
++  infoBlock: {
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    paddingVertical: 8,
++    paddingHorizontal: 10,
++  },
++  blockTitle: {
++    color: ADMIN_MODAL_PALETTE.mutedText,
++    fontSize: 10,
++    fontWeight: '700',
++    textTransform: 'uppercase',
++    letterSpacing: 0.4,
++    marginBottom: 2,
++  },
+   pinCount: { color: ADMIN_MODAL_PALETTE.text, fontSize: 17, fontWeight: '800' },
+   statText: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 11, marginTop: 4 },
+   statusLabel: { color: ADMIN_MODAL_PALETTE.mutedText, fontSize: 10, fontWeight: '700' },
++  infoSkillLabel: { marginTop: 6 },
+ 
+   board: {
+     marginTop: 12,
+@@ -105,10 +133,10 @@ export const lockLightStyles = StyleSheet.create({
+     color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     lineHeight: 18,
+-    marginTop: 8,
++    marginTop: 4,
+     marginBottom: 2,
+     textAlign: 'left',
+-    // Явно разрешаем перенос: ограничение ширины приходит от statusLeft.
++    // Явно разрешаем перенос: ограничение ширины приходит от rulesBlock.
+     flexShrink: 1,
+     maxWidth: '100%',
+   },
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 125d516..5375742 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,38 @@
+ # Changelog
+ ---
+ 
++## Lockpicking: "Rules" and "Details" as two stacked blocks (patch 536)
++
++Owner: "In the lockpicking modal… they take one row but two containers. Can we
++redo them as 2 different containers one under the other. 1st Rules, 2nd
++details."
++
++The status row in the lockpicking window used to be a single horizontal row of
++two columns: bobby-pin counter, rules description and difficulty on the left,
++LOCKPICK and stats on the right. It is now a vertical column of two separate
++containers:
++
++- **On top** — the prominent bobby-pin counter (`Pins: N`), as before.
++- **Container 1 "Rules"** — a heading and the mini-game description (the hint
++  about arrows, green/red and solved positions being kept when a pin breaks).
++  The long text still wraps inside the window.
++- **Container 2 "Details"** — a heading, the difficulty (`Difficulty N · M
++  cells`), LOCKPICK and the "Skill · Perception · Luck" line.
++
++The hint text itself did not change — only the layout. The description-wrap
++law (531/534) is preserved: the rules block shrinks to the card width
++(`flexShrink: 1`, `minWidth: 0`) and the hint wraps (`flexShrink: 1`,
++`maxWidth: '100%'`). The block frame follows the nearest modal sample
++(`docs/ui-modals-rules.md`): light surface, border and radius from
++`ADMIN_MODAL_PALETTE`, no literals. The hacking mechanics, the 532 position
++memory, the 535 "Game Master decides" flow and the blocked-point panel are
++untouched.
++
++Paired strings `lock.rulesTitle` ("Правила"/Rules) and `lock.infoTitle`
++("Сведения"/Details) were added to the RU/EN dictionaries. Acceptance test
++`__tests__/lootTrade/lock-status-blocks-536.test.js`; the historical wrap
++checks (531/532) were updated for the rules block.
++
+ ## "The Game Master decides" and a shared board for bound rooms (patch 535)
+ 
+ The owner accepted the proposal for a standard escape hatch: "the same Yes/No
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c77a420..d37baa3 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,37 @@
+ 
+ ---
+ 
++## Взлом замка: «Правила» и «Сведения» — два блока один под другим (патч 536)
++
++Владелец: «В модалке взлома замка… они занимают одну строку, но два
++контейнера. Можем переделать их под 2 разных контейнера один под другим.
++1-й Правила, 2-й сведения».
++
++Строка статуса в окне взлома замка раньше была одной горизонтальной строкой
++из двух колонок: слева счётчик заколок, описание правил и сложность, справа —
++LOCKPICK и характеристики. Теперь это вертикальная колонка из двух отдельных
++контейнеров:
++
++- **Сверху** — заметный счётчик заколок (`Заколки: N шт`), как и прежде.
++- **Контейнер 1 «Правила»** — заголовок и описание мини-игры (подсказка про
++  стрелки, зелёный/красный и сохранение угаданных позиций при поломке
++  заколки). Длинный текст по-прежнему переносится внутри окна.
++- **Контейнер 2 «Сведения»** — заголовок, сложность (`Сложность N · M
++  ячеек`), LOCKPICK и связка «Навык · Восприятие · Удача».
++
++Текст подсказки не менялся — только раскладка. Закон переноса описания
++(531/534) сохранён: блок правил сжимается до ширины карточки
++(`flexShrink: 1`, `minWidth: 0`), подсказка переносится (`flexShrink: 1`,
++`maxWidth: '100%'`). Рамка блоков повторяет ближайший образец модалок
++(`docs/ui-modals-rules.md`): светлая подложка, рамка и радиус из палитры
++`ADMIN_MODAL_PALETTE`, без литералов. Механика взлома, память позиций 532,
++«Мастер решает» 535 и панель заблокированной точки не тронуты.
++
++Добавлены парные строки `lock.rulesTitle` («Правила»/Rules) и `lock.infoTitle`
++(«Сведения»/Details) в RU/EN словари. Приёмочный тест
++`__tests__/lootTrade/lock-status-blocks-536.test.js`; исторические проверки
++переноса (531/532) обновлены под блок правил.
++
+ ## «Мастер решает» и общая доска привязанных комнат (патч 535)
+ 
+ Владелец принял предложение о штатном выходе «Мастер решает»: «тот же паттерн
+diff --git a/docs/lockpicking-mini-game-design.md b/docs/lockpicking-mini-game-design.md
+index 2e0f3fe..b0ff4b9 100644
+--- a/docs/lockpicking-mini-game-design.md
++++ b/docs/lockpicking-mini-game-design.md
+@@ -568,3 +568,44 @@ p = 0.05 + 0.025·(LCK − 4)      // 5% на Удаче 4 → 20% на Удач
+ описания, счётчик с зелёными и серыми, строка о сохранённых позициях,
+ подсказки под механику 532 — всё на месте. Серверные проверки роли/членства,
+ лимиты кадра и закон снимка не ослаблены.
++
++## 21. Уточнение 536: «Правила» и «Сведения» — два блока один под другим
++
++Владелец: «В модалке взлома замка… они занимают одну строку, но два
++контейнера. Можем переделать их под 2 разных контейнера один под другим.
++1-й Правила, 2-й сведения». Меняется только раскладка строки статуса, не
++текст подсказки и не механика.
++
++**Было.** `statusRow` — одна горизонтальная строка (`flexDirection: 'row'`)
++из двух колонок: `statusLeft` (счётчик заколок, подсказка правил, сложность)
++и правая колонка `maxWidth: '48%'` (LOCKPICK, навык/восприятие/удача).
++
++**Стало.** `statusColumn` — вертикальная колонка (`flexDirection: 'column'`,
++`gap: 8`), в ней сверху вниз:
++
++1. Счётчик заколок `lock-pins-count` (`pinCount`, 17) — заметный, вне блоков.
++2. Контейнер **«Правила»** `lock-rules-block` (`rulesBlock`): заголовок
++   `blockTitle` + подсказка `lock-arrows-hint` (`arrowsHint`).
++3. Контейнер **«Сведения»** `lock-info-block` (`infoBlock`): заголовок
++   `blockTitle`, сложность (`statText`), LOCKPICK (`statusLabel` +
++   `infoSkillLabel`), связка навык/восприятие/удача (`statText`).
++
++**Рамка блоков.** По закону `docs/ui-modals-rules.md` собственные стили
++заведены только для элементов, которых нет в образце: `rulesBlock`/`infoBlock`
++повторяют ближайший образец карточки модалки — `borderWidth: 1`,
++`borderColor: borderMuted`, `borderRadius: 5`, `backgroundColor:
++surfaceRaised`, паддинги 8/10, всё из `ADMIN_MODAL_PALETTE`, без литералов.
++`blockTitle` — приглушённый капс 10/700 (`mutedText`).
++
++**Перенос сохранён.** `rulesBlock.flexShrink: 1`, `rulesBlock.minWidth: 0`;
++`arrowsHint.flexShrink: 1`, `arrowsHint.maxWidth: '100%'` — закон 531/534 не
++нарушен, длинное описание переносится внутри окна. `statusRow`/`statusLeft`
++удалены из стилей замка (в терминале свой `statusRow`, он не тронут).
++
++**Строки.** Добавлены парные `lock.rulesTitle` («Правила»/Rules) и
++`lock.infoTitle` («Сведения»/Details). Текст `lock.arrowsHint` не менялся.
++
++**Не тронуто.** Механика взлома, память позиций 532, «Мастер решает» 535,
++панель заблокированной точки (`gmBlocked`/`accessPanel`), доска и стрелки.
++Приёмочный тест `__tests__/lootTrade/lock-status-blocks-536.test.js`;
++исторические проверки переноса 531/532 обновлены под `rulesBlock`.
+diff --git a/docs/patch-536-install.md b/docs/patch-536-install.md
+new file mode 100644
+index 0000000..b14bda8
+--- /dev/null
++++ b/docs/patch-536-install.md
+@@ -0,0 +1,41 @@
++# Установка патча 536: взлом замка — «Правила» и «Сведения» один под другим
++
++Патч подготовлен от состояния **версии 535** (коммит `4fba7f1`, ветка
++`arena/054e6676-fallout-2d20-companion`). Файл установки:
++`patchs/536-lock-status-blocks.patch`.
++
++> Владелец: «ветка ушла сильно вперед… В модалке взлома замка… Я так понял
++> они занимают одну строку, но два контейнера. Можем переделать их под 2
++> разных контейнера один под другим. 1й Правила, 2й сведения». Меняется
++> только раскладка строки статуса; текст подсказки и механика не тронуты.
++
++## Что меняется
++
++| Слой | Что сделано |
++| --- | --- |
++| `components/lootTrade/LockPickingModal.js` | строка статуса `statusRow` заменена вертикальной колонкой `statusColumn`: счётчик заколок сверху, блок «Правила» (`lock-rules-block`), блок «Сведения» (`lock-info-block`) |
++| `components/lootTrade/lockPickingStyles.js` | удалены `statusRow`/`statusLeft`; добавлены `statusColumn`, `rulesBlock`, `infoBlock`, `blockTitle`, `infoSkillLabel`; перенос описания сохранён |
++| RU/EN словари `screens/lootTrade/screen.json` | парные `lock.rulesTitle` («Правила»/Rules) и `lock.infoTitle` («Сведения»/Details) |
++| `__tests__/lootTrade/lock-status-blocks-536.test.js` | приёмочный тест двух вертикальных блоков |
++| `__tests__/lootTrade/lock-arrows-legacy-531.test.js`, `__tests__/room/lock-progress-532.test.js` | исторические проверки переноса обновлены под `rulesBlock` |
++
++Правила: счётчик заколок остаётся сверху заметным; контейнер 1 «Правила»
++содержит описание мини-игры, контейнер 2 «Сведения» — сложность, LOCKPICK и
++навык/восприятие/удачу. Рамка блоков повторяет ближайший образец модалок
++(`docs/ui-modals-rules.md`), палитра `ADMIN_MODAL_PALETTE`, без литералов.
++Закон переноса описания 531/534 сохранён. Механика взлома, память позиций 532,
++«Мастер решает» 535 и панель заблокированной точки не тронуты. Терминальный
++`statusRow` (другая модалка) не менялся.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: полный набор зелёный — 263 файла, 2383 теста; добавлен
++  `__tests__/lootTrade/lock-status-blocks-536.test.js` (7 тестов).
++- `git apply --check` вперёд от дерева 535 и в обратную сторону от 536.
++- Заметки «Что нового» парные (135/135), на языке игрока, релиз остаётся 4.
++
++## Откат
++
++`git apply -R patchs/536-lock-status-blocks.patch` вернёт строку статуса к
++виду 535 (одна горизонтальная строка из двух колонок).
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index f5a294c..f7deb5b 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **535**.
++Дата ревизии: 2026-11-05. Текущая версия: **536**.
+ 
+ ## Тезисы
+ 
+@@ -38,8 +38,9 @@
+ | 24 | Возврат по слову владельца: перенос длинного описания (statusLeft/flexShrink/maxWidth), счётчик «Отгадано N из M» с зелёными и серыми, строка о сохранённых позициях и progressSaved RU/EN, подсказки под механику сохранения прогресса. Стилевой откат 533 и механика 532 не тронуты | ✅ сделано | **534** |
+ | 25 | **«Мастер решает»:** единый штатный выход «Да/Нет» для спорных ситуаций; игрок просит решения, Мастер отвечает поверх любого экрана, плюс ручной переключатель «Заблокировать / Открыть» в карточке точки. «Открыть» = сразу ACCESS GRANTED без взлома. Каркас расширяемый, сейчас подключены только замки | ✅ сделано | **535** |
+ | 26 | **Общая доска и общий журнал для привязанных комнат:** `terminalStates` и `accessEvents` объединены по контуру `roomCodes`, точки видны во всех комнатах контура, доска терминала (а не только замка) и события доступа расходятся вместе; автоблокировка 526 не возвращалась | ✅ сделано | **535** |
++| 27 | **Взлом замка: два блока один под другим:** строка статуса разнесена на вертикальную колонку — сверху счётчик заколок, контейнер 1 «Правила» (описание мини-игры), контейнер 2 «Сведения» (сложность, LOCKPICK, навык/восприятие/удача). Текст подсказки не менялся, перенос описания сохранён; рамка блоков по образцу модалок | ✅ сделано | **536** |
+ 
+-## Осталось после патча 535
++## Осталось после патча 536
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -50,7 +51,10 @@
+ механику памяти и только четыре названных им удаления стилей; патч 534 вернул
+ перенос описания, счётчик, строку о прогрессе и подсказки — владелец их не
+ просил откатывать. Патч 535 закрыл первый оставшийся пункт тезиса 13 (общая
+-доска/журнал) и добавил штатный выход «Мастер решает». Порядок тринадцатого
++доска/журнал) и добавил штатный выход «Мастер решает». Патч 536 по слову
++владельца разнёс строку статуса окна взлома на два вертикальных контейнера —
++«Правила» и «Сведения» — сохранив счётчик заколок сверху и перенос описания.
++Порядок тринадцатого
+ тезиса не меняется: граф, граница видимости, адресный взлом,
+ общие ресурсы и одна сессия из 523 остаются регрессионными инвариантами. «Покинуть локацию» по-прежнему есть в настоящей
+ локации и работает с первого нажатия; в отдельно выданной точке её нет по
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 696eac2..a2b6947 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -404,6 +404,8 @@
+     "arrowRight": "Right",
+     "arrowDown": "Down",
+     "arrowsHint": "Press the arrows. The correct choice is highlighted green, a wrong one red. If you make a mistake, try another option. If a bobby pin breaks, solved positions are kept — continue from the first unsolved cell.",
++    "rulesTitle": "Rules",
++    "infoTitle": "Details",
+     "gmBlocked": "Lock blocked by the Game Master",
+     "gmBlockedHint": "The Game Master blocked this point. They can open it themselves or answer your request.",
+     "askGm": "Ask the Game Master",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 185a9fc..eae1022 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -405,6 +405,8 @@
+     "arrowRight": "Вправо",
+     "arrowDown": "Вниз",
+     "arrowsHint": "Нажимайте на стрелки. Верный вариант будет выделен зелёным цветом, ошибочный красным. Если вы ошиблись, попробуйте другой вариант. Если сломалась заколка, угаданные позиции сохраняются — продолжайте с первой неотгаданной ячейки.",
++    "rulesTitle": "Правила",
++    "infoTitle": "Сведения",
+     "gmBlocked": "Замок заблокирован Мастером",
+     "gmBlockedHint": "Мастер заблокировал эту точку. Он может открыть её сам или ответить на ваш запрос.",
+     "askGm": "Попросить Мастера",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 3ebfdb8..0fba53b 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "535"
++  "baseline": "536"
+ }
+diff --git a/public/version.json b/public/version.json
+index 2143e7e..b98217b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "535",
++  "version": "536",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
++      "Счётчик заколок остаётся сверху заметным, а длинное описание правил по-прежнему переносится внутри окна и не уходит за его границы.",
+       "Мастер может заблокировать замок и открыть его сам: «Открыть» сразу даёт доступ к точке, без мини-игры.",
+       "Если ситуация спорная, игрок может попросить решения Мастера — вопрос «Да/Нет» всплывёт поверх любого экрана. Мастер видит, кто именно просит.",
+       "Точки, доски мини-игр и журнал доступа теперь общие для всех привязанных комнат: игроки в разных комнатах видят один и тот же взлом.",
+@@ -138,6 +140,8 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",
++      "The bobby pin counter stays prominent at the top, and the long rules description still wraps inside the window instead of running past its edge.",
+       "The Game Master can block a lock and open it themselves: Open grants access to the point right away, without a mini-game.",
+       "When a situation is disputed, a player can ask for the Game Master decision — a Yes/No prompt appears above any screen, showing who asked.",
+       "Points, mini-game boards and the access log are now shared across all bound rooms: players in different rooms see the same hack.",

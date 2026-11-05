@@ -31,6 +31,11 @@ const MESSAGE = Object.freeze({
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',
+  // Патч 535: штатный выход «Мастер решает». Один каркас запроса/ответа,
+  // первое применение — замки. Состояние запросов принадлежит Мастеру.
+  GM_DECISION_REQUEST: 'gm.decisionRequest',
+  GM_DECISION_STATE: 'gm.decisionState',
+  GM_DECISION_RESOLVE: 'gm.decisionResolve',
   PEER_ASSIST: 'peer.assist',
   // Выдача контейнеров добычи и торговли Мастером (патч 468):
   SESSION_OPEN: 'session.open',
@@ -98,8 +103,13 @@ const ERROR_CODE = Object.freeze({
   LOCK_INVALID_ARROW: 'LOCK_INVALID_ARROW',
   LOCK_NO_PINS: 'LOCK_NO_PINS',
   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
-  // Патч 526: будущее условие блокировки замка (политика пока выключена).
+  // Патч 526: будущее условие блокировки замка (автоблокировка выключена).
+  // Патч 535: явная блокировка Мастером приходит как gmBlocked.
   LOCK_BLOCKED: 'LOCK_BLOCKED',
+  GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
+  GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
+  GM_DECISION_KIND: 'GM_DECISION_KIND',
+  GM_DECISION_CLOSED: 'GM_DECISION_CLOSED',
 });
 
 

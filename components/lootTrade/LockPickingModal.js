@@ -101,9 +101,15 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     && (game.operatorClientId !== myClientId || game.operatorCharacterId !== characterId),
   );
   const viewOnly = !localMode && Boolean(game && game.status === 'playing' && !isOperator);
+  // Патч 535: Мастер мог заблокировать точку по своему усмотрению. В локальном
+  // резерве (нет протокола комнаты) серверного решения нет — блокировки нет.
+  const gmBlocked = !localMode && Boolean(terminalState?.gmBlocked);
+  const gmDecision = (rooms?.[roomCode]?.gmDecisions || [])
+    .filter((entry) => entry?.containerId === containerId)
+    .slice(-1)[0] || null;
   const canPress = Boolean(
     characterId && (roomCode || localMode) && containerId
-    && game?.status === 'playing' && isOperator && !busy,
+    && game?.status === 'playing' && isOperator && !busy && !gmBlocked,
   );
   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
 
@@ -344,6 +350,21 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   );
 
   const hasBoard = Boolean(game && rows.length > 0);
+  // Патч 535: игрок просит Мастера решить спорную ситуацию. Пока единственный
+  // вид запроса — lock.open; каркас на сервере расширяемый.
+  const askGm = async () => {
+    if (!roomCode || !containerId) return;
+    try {
+      await useRoomStore.getState().requestGmDecision({
+        code: roomCode,
+        containerId,
+        kind: 'lock.open',
+        characterId,
+      });
+    } catch (error) {
+      showRawAlert({ title: tLootTrade('lock.actionFailed') });
+    }
+  };
   const newAttemptButton = (
     <TouchableOpacity
       testID="lock-new-attempt-button"
@@ -386,14 +407,19 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <Text testID="lock-pins-count" style={styles.pinCount}>
-                {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
-              </Text>
+          {/* Патч 536: два контейнера один под другим — «Правила» и «Сведения». */}
+          <View style={styles.statusColumn}>
+            <Text testID="lock-pins-count" style={styles.pinCount}>
+              {formatLootTrade(tLootTrade('lock.pins'), { count: pinsLeft })}
+            </Text>
+            <View style={styles.rulesBlock} testID="lock-rules-block">
+              <Text style={styles.blockTitle}>{tLootTrade('lock.rulesTitle')}</Text>
               <Text testID="lock-arrows-hint" style={styles.arrowsHint}>
                 {tLootTrade('lock.arrowsHint')}
               </Text>
+            </View>
+            <View style={styles.infoBlock} testID="lock-info-block">
+              <Text style={styles.blockTitle}>{tLootTrade('lock.infoTitle')}</Text>
               <Text style={styles.statText}>
                 {game?.cellCount
                   ? formatLootTrade(tLootTrade('lock.difficulty'), {
@@ -402,9 +428,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
                     })
                   : tLootTrade('lock.ready')}
               </Text>
-            </View>
-            <View style={{ alignItems: 'flex-end', maxWidth: '48%' }}>
-              <Text style={styles.statusLabel}>LOCKPICK</Text>
+              <Text style={[styles.statusLabel, styles.infoSkillLabel]}>LOCKPICK</Text>
               {game ? (
                 <Text style={styles.statText}>
                   {formatLootTrade(tLootTrade('lock.skill'), {
@@ -415,7 +439,30 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
             </View>
           </View>
 
-          {won ? (
+          {gmBlocked && !holdBoard ? (
+            <View style={styles.accessPanel} testID="lock-gm-blocked">
+              <Text style={styles.awaitingText}>{tLootTrade('lock.gmBlocked')}</Text>
+              <Text style={styles.hintText}>{tLootTrade('lock.gmBlockedHint')}</Text>
+              {gmDecision?.status === 'pending' ? (
+                <Text style={styles.hintText} testID="lock-gm-pending">
+                  {tLootTrade('lock.gmPending')}
+                </Text>
+              ) : null}
+              {gmDecision?.status === 'declined' ? (
+                <Text style={styles.hintText}>{tLootTrade('lock.gmDeclined')}</Text>
+              ) : null}
+              {!localMode && gmDecision?.status !== 'pending' ? (
+                <TouchableOpacity
+                  testID="lock-ask-gm"
+                  accessibilityRole="button"
+                  style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
+                  onPress={() => void askGm()}
+                >
+                  <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.askGm')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : won ? (
             <View style={styles.accessPanel}>
               <Text accessibilityRole="alert" style={styles.wonText}>
                 {tLootTrade('lock.won')}

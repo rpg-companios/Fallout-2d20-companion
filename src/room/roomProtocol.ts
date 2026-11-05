@@ -25,6 +25,10 @@ export const ROOM_MESSAGE = {
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',
+  // Патч 535: «Мастер решает» — запрос игрока / состояние / ответ Мастера.
+  GM_DECISION_REQUEST: 'gm.decisionRequest',
+  GM_DECISION_STATE: 'gm.decisionState',
+  GM_DECISION_RESOLVE: 'gm.decisionResolve',
   PEER_ASSIST: 'peer.assist',
   SESSION_OPEN: 'session.open',
   SESSION_STATE: 'session.state',
@@ -91,6 +95,10 @@ export const ROOM_ERROR = {
   LOCK_VIEW_ONLY: 'LOCK_VIEW_ONLY',
   // Патч 526: будущее условие блокировки замка (политика пока выключена).
   LOCK_BLOCKED: 'LOCK_BLOCKED',
+  GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
+  GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
+  GM_DECISION_KIND: 'GM_DECISION_KIND',
+  GM_DECISION_CLOSED: 'GM_DECISION_CLOSED',
 } as const;
 
 

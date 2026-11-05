@@ -84,18 +84,20 @@ describe('514: две строки настройки в форме точки',
   it('описание — последнее поле формы (патч 515)', () => {
     expect(form).toContain('testID="container-form-description"');
     const descAt = form.indexOf('container-form-description');
-    const checkAt = form.indexOf('container-form-check-search');
-    const hintAt = form.indexOf("tLootTrade('form.linkedCheckHint')");
+    // Патч 538: конструктор И/ИЛИ вместо строки проверок.
+    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
+    const hintAt = form.indexOf('<AccessExpressionBuilder');
     expect(checkAt).toBeGreaterThan(-1);
     expect(descAt).toBeGreaterThan(checkAt);
     expect(descAt).toBeGreaterThan(hintAt);
     expect(form.lastIndexOf('</ScrollView>')).toBeGreaterThan(descAt);
   });
 
-  it('вторая строка — поиск и список терминалов / замков', () => {
+  it('вторая строка — конструктор И/ИЛИ со списком терминалов / замков', () => {
     expect(form).toContain('availableCheckContainers');
-    expect(form).toContain('testID="container-form-check-search"');
-    expect(form).toContain("tLootTrade('form.linkedCheckLabel')");
+    // Патч 538: конструктор выражения с поиском и выбором точек-проверок.
+    expect(form).toContain('<AccessExpressionBuilder');
+    expect(form).toContain("tLootTrade('form.accessExprLabel')");
     // Патч 517: ворота ссылаются на любую точку, а не только терминал.
     expect(screen).toContain('availableCheckContainers={gateSources}');
   });
@@ -103,9 +105,10 @@ describe('514: две строки настройки в форме точки',
   it('поля уезжают в сохранение и показываются на карточке', () => {
     expect(form).toContain('requiredKeyItemId: canRequireKey ? requiredKeyItemId');
     expect(form).toContain('keyRequirement: canRequireKey && requiredKeyItemId');
-    // Патч 520: вторая строка стала списком до двух источников через «ИЛИ».
-    expect(form).toContain('linkedCheckIds: canRequireKey ? linkedCheckIds');
-    expect(form).toContain("linkedCheckId: canRequireKey ? (linkedCheckIds[0] || '')");
+    // Патч 538: выражение И/ИЛИ — источник истины, linkedCheckIds выводится из него.
+    expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
+    expect(form).toContain('linkedCheckIds: canRequireKey ? expressionCheckIds(accessTokens)');
+    expect(form).toContain("linkedCheckId: canRequireKey ? (expressionCheckIds(accessTokens)[0] || '')");
     expect(screen).toContain('card-requires-key-');
     expect(screen).toContain("'card.keyRequiredBadge'");
   });
