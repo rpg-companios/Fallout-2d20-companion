@@ -22,15 +22,22 @@ import {
  *
  * Дети узла = объединение (без дублей):
  *   - вложенные локации: containers с parentLocationId === node.id (матрёшка);
- *   - не-локационные узлы из node.links (контейнеры/торговцы/замки/терминалы).
+ *   - не-локационные узлы из node.links (контейнеры/торговцы/замки/терминалы);
+ *   - патч 541: ключевые записи узла (keyItemIds) — отдельными строками дерева.
  * Игровой путь (links) не трогаем — дерево только читает и то, и другое.
+ *
+ * Патч 541: название элемента больше не открывает настройки. У каждой строки
+ * (локация, сундук, торговец, терминал, замок, ключ) справа стоит кнопка
+ * «Параметры»; раскрытие вложенных локаций по-прежнему идёт стрелкой-шевроном.
  */
 const HubTreeView = ({
   hub,
   containers = [],
+  keyItems = [],
   keyItemNames = {},
   roomLabelOf,
   onOpenSettings,
+  onOpenKeySettings,
   onOpenChild,
   onToggleLock,
   onMoveOut,
@@ -48,7 +55,13 @@ const HubTreeView = ({
     return map;
   }, [list]);
 
-  const nameOf = (id) => byId.get(id)?.name || keyItemNames[id] || id;
+  const keyById = useMemo(() => {
+    const map = new Map();
+    for (const k of Array.isArray(keyItems) ? keyItems : []) if (k?.id) map.set(k.id, k);
+    return map;
+  }, [keyItems]);
+
+  const nameOf = (id) => byId.get(id)?.name || keyItemNames[id] || keyById.get(id)?.name || id;
 
   const blockedLabel = (container) => {
     const tokens = resolveAccessExpression(container || {});
@@ -102,6 +115,41 @@ const HubTreeView = ({
 
   const open = (container) => {
     if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
+  };
+
+  const openKey = (keyItem, parentNode) => {
+    if (typeof onOpenKeySettings === 'function' && keyItem) onOpenKeySettings(keyItem, parentNode);
+  };
+
+  // Патч 541: единая кнопка «Параметры» в правой части строки названия.
+  const renderParametersButton = (testID, onPress) => (
+    <TouchableOpacity
+      testID={testID}
+      style={styles.smallBtn}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Text style={styles.smallBtnText}>{tLootTrade('detail.editSettings')}</Text>
+    </TouchableOpacity>
+  );
+
+  // Патч 541: ключевые записи узла — такие же строки дерева с «Параметрами».
+  const renderKeyNode = (keyId, depth, parentNode) => {
+    const record = keyById.get(keyId);
+    const label = record?.name || keyItemNames[keyId] || keyId;
+    return (
+      <View key={`key-${keyId}`} style={[styles.node, { marginLeft: depth * 16 }]}>
+        <View style={styles.nodeHeader}>
+          <View style={styles.chevronBtn}>
+            <MaterialCommunityIcons name="key-variant" size={16} color={ADMIN_MODAL_PALETTE.gold} />
+          </View>
+          <View testID={`hub-tree-key-${keyId}`} style={styles.nodeNameBtn}>
+            <Text style={styles.nodeName} numberOfLines={1}>{label}</Text>
+          </View>
+          {renderParametersButton(`hub-tree-parameters-key-${keyId}`, () => openKey(record || { id: keyId, name: label }, parentNode))}
+        </View>
+      </View>
+    );
   };
 
   // Пунктирные строки зависимости: что блокирует, куда выход, какой ключ.
@@ -205,10 +253,11 @@ const HubTreeView = ({
             </View>
           )}
 
-          <TouchableOpacity
+          {/* Патч 541: название больше не открывает настройки — только кнопка
+              «Параметры» в правой части строки. */}
+          <View
             testID={`hub-tree-node-${container.id}`}
             style={styles.nodeNameBtn}
-            onPress={() => open(container)}
           >
             {isHub && (
               <MaterialCommunityIcons name={kindIcon(container.kind)} size={16} color={ADMIN_MODAL_PALETTE.text} />
@@ -224,7 +273,7 @@ const HubTreeView = ({
                 {formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}
               </Text>
             )}
-          </TouchableOpacity>
+          </View>
 
           {/* Патч 539/540: вложенную локацию можно открыть (перейти внутрь) и
               вынуть обратно на корень. */}
@@ -271,6 +320,10 @@ const HubTreeView = ({
               )}
             </View>
           )}
+
+          {/* Патч 541: «Параметры» в правой части строки названия — у каждого
+              элемента дерева, а не только у прямого ребёнка активного хаба. */}
+          {renderParametersButton(`hub-tree-parameters-${container.id}`, () => open(container))}
         </View>
 
         {isHub && renderHubMeta(container)}
@@ -290,9 +343,14 @@ const HubTreeView = ({
 
         {isHub && isOpen && (
           <View style={styles.childrenBlock}>
-            {kids.length === 0 ? (
+            {kids.length === 0 && (container.keyItemIds || []).length === 0 ? (
               <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmptyNode')}</Text>
-            ) : kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
+            ) : (
+              <>
+                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
+                {(container.keyItemIds || []).map((keyId) => renderKeyNode(keyId, depth + 1, container))}
+              </>
+            )}
           </View>
         )}
       </View>
@@ -301,13 +359,17 @@ const HubTreeView = ({
 
   if (!hub) return null;
   const directKids = childrenOf(hub);
+  const directKeyIds = Array.isArray(hub.keyItemIds) ? hub.keyItemIds : [];
 
   return (
     <ScrollView style={styles.scroll} nestedScrollEnabled>
-      {directKids.length === 0 ? (
+      {directKids.length === 0 && directKeyIds.length === 0 ? (
         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
       ) : (
-        directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))
+        <>
+          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))}
+          {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
+        </>
       )}
     </ScrollView>
   );

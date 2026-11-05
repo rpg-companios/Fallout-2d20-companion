@@ -73,7 +73,7 @@ describe('Патч 460: уборка неиспользуемых папок/ф�
       const subSha = git(subRepo, ['rev-parse', 'HEAD']).trim();
 
       fs.mkdirSync(upstream, { recursive: true });
-      git(upstream, ['init', '-b', 'arena/0fa5e3ce-fallout-2d20-companion']);
+      git(upstream, ['init', '-b', 'arena/aa289f1c-fallout-2d20-companion']);
       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
       fs.mkdirSync(path.join(upstream, '.kiro/specs/old'), { recursive: true });

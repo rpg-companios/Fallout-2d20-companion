@@ -1,6 +1,24 @@
 # Changelog
 ---
 
+## Element parameters in the hub tree row (patch 541)
+
+A targeted admin hub-tree change at the owner's word (thesis 32). Admin-only;
+the player window and gameplay mechanics are unchanged.
+
+- **The name no longer opens settings.** Tap/click on an element title in the
+  hub tree is removed. Settings open via a "Parameters" button on the right
+  side of the name row — for every element: location, chest, merchant,
+  terminal, lock, key. Nested elements get the button too once expanded.
+- **Keys are tree rows.** Key records attached to a location appear as rows in
+  the tree with their own "Parameters" button.
+- **The location screen is decluttered.** The separate "Keys and notes in this
+  location" and "Gates between points" areas and the "Add container / merchant"
+  button are removed. Gate dependencies remain as dashed lines in the tree;
+  creating cards on the main screen and moving them with the arrows still work.
+- **Patch delivery.** `apply-patch.sh` points at
+  `arena/aa289f1c-fallout-2d20-companion`, the branch carrying patch 541.
+
 ## A nested location lives only inside its parent + parameters in the tree (patch 540)
 
 A refinement of nesting at the owner's word (thesis 31). Still admin-only; the
