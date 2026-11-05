@@ -255,21 +255,23 @@ describe('535: протокол, клиент, строки и документ�
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('538');
+    expect(version.version).toBe('539');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(137);
-    expect(version.notes['en-EN']).toHaveLength(137);
-    expect(json('patchs/baseline.json').baseline).toBe('538');
+    expect(version.notes['ru-RU']).toHaveLength(138);
+    expect(version.notes['en-EN']).toHaveLength(138);
+    expect(json('patchs/baseline.json').baseline).toBe('539');
     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
     expect(read('patchs/538-location-structure-admin.patch')).toContain('accessExpression');
+    expect(read('patchs/539-hub-folder-tree.patch')).toContain('HubTreeView');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **538**');
+    expect(roadmap).toContain('Текущая версия: **539**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
-    expect(roadmap).toContain('Осталось после патча 538');
-    expect(read('docs/patch-538-install.md')).toContain('538');
+    expect(roadmap).toContain('| 30 |');
+    expect(roadmap).toContain('Осталось после патча 539');
+    expect(read('docs/patch-539-install.md')).toContain('539');
     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });

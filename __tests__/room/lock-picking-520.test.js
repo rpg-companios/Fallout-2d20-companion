@@ -343,7 +343,8 @@ describe('520: пятая карточка и документы', () => {
     const form = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
     // Патч 538: две строки ИЛИ заменены конструктором выражения (+ = И, / = ИЛИ).
     expect(form).toContain('<AccessExpressionBuilder');
-    expect(form).toContain("tLootTrade('form.accessExprLabel')");
+    // Патч 539: подпись тернарная (isHub ? locationGateLabel : accessExprLabel).
+    expect(form).toContain("'form.accessExprLabel'");
     expect(form).toContain('accessExpression: canRequireKey ? accessTokens');
     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
     expect(screen).toContain('createLock');

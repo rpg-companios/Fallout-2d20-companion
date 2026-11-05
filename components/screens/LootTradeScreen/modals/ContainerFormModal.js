@@ -33,6 +33,7 @@ import {
 } from '../../../../domain/lootTrade';
 import { showRawAlert } from '../../../alerts/alertService';
 import AccessExpressionBuilder from './AccessExpressionBuilder';
+import LocationSelect from './LocationSelect';
 import {
   resolveAccessExpression,
   expressionCheckIds,
@@ -399,61 +400,39 @@ const ContainerFormModal = ({
                   />
                   <Text style={styles.checkboxLabel}>{tLootTrade('form.hubCatalogLabel')}</Text>
                 </TouchableOpacity>
-                <Text style={styles.hintText}>{tLootTrade('form.hubCatalogHint')}</Text>
+                {/* Патч 539: чекбокс «Хаб» + одна подсказка. Отмечен — хаб-папка
+                    (сам родитель, родитель/выход не нужны); не отмечен — обычная
+                    локация с родителем и выходом. */}
+                <Text style={styles.hintText}>
+                  {tLootTrade(isCatalogHub ? 'form.hubFolderHint' : 'form.hubCatalogHint')}
+                </Text>
 
-                {/* Патч 538: строка 1 — родительская локация (вложенность/ветвление). */}
-                <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
-                <View style={styles.roomChips}>
-                  <TouchableOpacity
-                    testID="container-form-parent-none"
-                    style={[styles.roomChip, !parentLocationId && styles.roomChipActive]}
-                    onPress={() => setParentLocationId('')}
-                  >
-                    <Text style={[styles.roomChipName, !parentLocationId && styles.roomChipTextActive]}>
-                      {tLootTrade('form.locationNone')}
-                    </Text>
-                  </TouchableOpacity>
-                  {locationOptions.map((hub) => (
-                    <TouchableOpacity
-                      key={hub.id}
-                      testID={`container-form-parent-${hub.id}`}
-                      style={[styles.roomChip, parentLocationId === hub.id && styles.roomChipActive]}
-                      onPress={() => setParentLocationId(hub.id)}
-                    >
-                      <Text style={[styles.roomChipName, parentLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
-                        {hub.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
+                {/* Патч 539: обычной локации родитель и выход задаются выпадающими
+                    списками (не кнопками). У хаба-папки их нет — вложенность
+                    делается переносом стрелками, как папки в Windows. */}
+                {!isCatalogHub && (
+                  <>
+                    <Text style={styles.label}>{tLootTrade('form.parentLocationLabel')}</Text>
+                    <LocationSelect
+                      testID="container-form-parent"
+                      value={parentLocationId}
+                      onChange={setParentLocationId}
+                      options={locationOptions}
+                      placeholder={tLootTrade('form.locationNone')}
+                    />
+                    <Text style={styles.hintText}>{tLootTrade('form.parentLocationHint')}</Text>
 
-                {/* Патч 538: строка 2 — выход из локации (особый переход/телепорт). */}
-                <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
-                <View style={styles.roomChips}>
-                  <TouchableOpacity
-                    testID="container-form-exit-none"
-                    style={[styles.roomChip, !exitLocationId && styles.roomChipActive]}
-                    onPress={() => setExitLocationId('')}
-                  >
-                    <Text style={[styles.roomChipName, !exitLocationId && styles.roomChipTextActive]}>
-                      {tLootTrade('form.locationNone')}
-                    </Text>
-                  </TouchableOpacity>
-                  {locationOptions.map((hub) => (
-                    <TouchableOpacity
-                      key={hub.id}
-                      testID={`container-form-exit-${hub.id}`}
-                      style={[styles.roomChip, exitLocationId === hub.id && styles.roomChipActive]}
-                      onPress={() => setExitLocationId(hub.id)}
-                    >
-                      <Text style={[styles.roomChipName, exitLocationId === hub.id && styles.roomChipTextActive]} numberOfLines={1}>
-                        {hub.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
+                    <Text style={styles.label}>{tLootTrade('form.exitLocationLabel')}</Text>
+                    <LocationSelect
+                      testID="container-form-exit"
+                      value={exitLocationId}
+                      onChange={setExitLocationId}
+                      options={locationOptions}
+                      placeholder={tLootTrade('form.locationNone')}
+                    />
+                    <Text style={styles.hintText}>{tLootTrade('form.exitLocationHint')}</Text>
+                  </>
+                )}
 
                 <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
                 {availableRooms.length === 0 ? (
@@ -725,7 +704,11 @@ const ContainerFormModal = ({
 
             {canRequireKey && (
               <>
-                <Text style={styles.label}>{tLootTrade('form.keyRequirementLabel')}</Text>
+                {/* Патч 539: ключи — ключи, замки — замки. У локации поле ключа
+                    названо по-человечески, отдельным блоком от замка/терминала. */}
+                <Text style={styles.label}>
+                  {tLootTrade(isHub ? 'form.locationKeyLabel' : 'form.keyRequirementLabel')}
+                </Text>
                 <TextInput
                   testID="container-form-key-search"
                   style={styles.input}
@@ -782,13 +765,20 @@ const ContainerFormModal = ({
                   </TouchableOpacity>
                 )}
 
-                {/* Патч 538: требование доступа — конструктор И/ИЛИ (+ = И, / = ИЛИ). */}
-                <Text style={styles.label}>{tLootTrade('form.accessExprLabel')}</Text>
+                {/* Патч 539: замок/терминал — отдельный блок с понятной подписью.
+                    И/ИЛИ означает: войти можно, только пройдя обе преграды (И)
+                    или одну из них (ИЛИ). Конструктор тот же (+ = И, / = ИЛИ). */}
+                <Text style={styles.label}>
+                  {tLootTrade(isHub ? 'form.locationGateLabel' : 'form.accessExprLabel')}
+                </Text>
                 <AccessExpressionBuilder
                   tokens={accessTokens}
                   onChange={setAccessTokens}
                   availableChecks={availableCheckContainers}
                 />
+                {isHub && (
+                  <Text style={styles.hintText}>{tLootTrade('form.locationGateHint')}</Text>
+                )}
                 {(isTerminal || isLock) && (
                   <Text testID="container-form-lock-pin-estimate" style={styles.hintText}>
                     {formatLootTrade(tLootTrade('form.lockPinEstimate'), {

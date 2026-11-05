@@ -190,24 +190,21 @@ describe('538: форма и конструктор в админке', () => {
   });
 });
 
-describe('538: дерево структуры и матрёшка локация-в-локацию', () => {
-  const tree = read('components/screens/LootTradeScreen/modals/LocationTreeModal.js');
+describe('538: матрёшка локация-в-локацию (дерево переехало внутрь хаба в 539)', () => {
+  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
   const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
   it('дерево кликабельно и открывает настройки секции', () => {
     expect(tree).toContain('onOpenSettings');
-    expect(tree).toContain('testID={`location-tree-node-${hub.id}`}');
+    expect(tree).toContain('testID={`hub-tree-node-${container.id}`}');
     expect(tree).toContain('parentLocationId');
     expect(tree).toContain('exitLocationId');
-    expect(screen).toContain('<LocationTreeModal');
+    expect(screen).toContain('<HubTreeView');
     expect(screen).toContain('setFormModal({ kind: container.kind, initialContainer: container })');
   });
   it('локацию можно вложить в другую локацию, цикл запрещён', () => {
     expect(screen).toContain('wouldCreateParentCycle');
     expect(screen).toContain('parentLocationId: hubId');
     expect(screen).toContain("tLootTrade('form.locationCycle')");
-    // Плитка дерева на сетке.
-    expect(screen).toContain("type: 'locationTree'");
-    expect(screen).toContain("tLootTrade('actions.locationTree')");
   });
 });
 
@@ -219,13 +216,12 @@ describe('538: парные RU/EN строки', () => {
       'accessExprLabel', 'accessOpAnd', 'accessOpOr', 'accessExprHint',
       'accessExprIncomplete', 'hubCatalogLabel', 'parentLocationLabel',
       'exitLocationLabel', 'locationNone', 'locationSelfReference',
-      'locationCycle', 'locationTreeTitle',
+      'locationCycle', 'locationTreeBlockedBy', 'locationTreeExitTo',
+      'locationTreeCatalogBadge',
     ];
     for (const key of keys) {
       expect(ru.form[key], `ru.form.${key}`).toBeTruthy();
       expect(en.form[key], `en.form.${key}`).toBeTruthy();
     }
-    expect(ru.actions.locationTree).toBeTruthy();
-    expect(en.actions.locationTree).toBeTruthy();
   });
 });

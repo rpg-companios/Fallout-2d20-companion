@@ -90,7 +90,7 @@ import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
 import IssueContainerModal from './modals/IssueContainerModal';
 import HubChildPickerModal from './modals/HubChildPickerModal';
-import LocationTreeModal from './modals/LocationTreeModal';
+import HubTreeView from './modals/HubTreeView';
 
 const NUM_COLS = 3;
 const MENU_WIDTH = 220;
@@ -217,7 +217,9 @@ const ContainerCardCell = ({
       }}
       activeOpacity={0.82}
     >
-      {!isHub && onDragStart && (
+      {/* Патч 539: стрелки переноса есть и у локаций-хабов — их вкладывают
+          друг в друга, как папки в Windows. */}
+      {onDragStart && (
         <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
         </View>
@@ -415,7 +417,6 @@ export default function LootTradeScreen() {
   const [keyItemForm, setKeyItemForm] = useState(null); // { initialKeyItem }
   const [storageModalVisible, setStorageModalVisible] = useState(false); // патч 518: карточка склада Мастера
   const [catalogOpen, setCatalogOpen] = useState(false);
-  const [locationTreeOpen, setLocationTreeOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [hubPickerOpen, setHubPickerOpen] = useState(false);
@@ -945,6 +946,10 @@ export default function LootTradeScreen() {
     if (card.kind === CONTAINER_KIND.HUB) {
       if (wouldCreateParentCycle(cardId, hubId)) {
         showRawAlert({ title: tLootTrade('form.locationCycle') });
+        // Патч 539: отказ цикла не должен оставлять призрак переноса на экране.
+        setMovingContainerId(null);
+        setDrag(null);
+        hubDropBounds.current = {};
         return;
       }
       if (card.parentLocationId !== hubId) {
@@ -994,6 +999,16 @@ export default function LootTradeScreen() {
     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
   };
 
+  // Патч 539: вынуть вложенную локацию (parentLocationId) обратно на корень.
+  // У хаба-папки поле родителя скрыто, поэтому разворачиваем матрёшку кнопкой.
+  const handleMoveNestedLocationOut = async (childId) => {
+    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
+    const child = containers.find((c) => c.id === childId);
+    if (!child || child.kind !== CONTAINER_KIND.HUB) return;
+    if (String(child.parentLocationId || '') !== activeContainer.id) return;
+    await persistAndSyncContainer({ ...child, parentLocationId: '', inRoot: true });
+  };
+
   const measureHubDropTargets = useCallback(() => {
     const entries = Object.entries(hubRefs.current).map(([id, ref]) => new Promise((resolve) => {
       if (!ref?.measureInWindow) {
@@ -1009,7 +1024,9 @@ export default function LootTradeScreen() {
   }, []);
 
   const handleDragStart = async (point, card) => {
-    if (!card || card.kind === CONTAINER_KIND.HUB) return;
+    // Патч 539: локации-хабы тоже можно таскать стрелками и вкладывать друг в
+    // друга (как папки в Windows). Цикл матрёшки ловит wouldCreateParentCycle.
+    if (!card) return;
     hubDropBounds.current = {};
     const isKeyItem = card.type === 'keyItem';
     setMovingKeyItemId(isKeyItem ? card.id : null);
@@ -1024,8 +1041,10 @@ export default function LootTradeScreen() {
 
   const handleDragEnd = async (point) => {
     await measureHubDropTargets();
-    const hit = Object.entries(hubDropBounds.current).find(([, b]) => (
+    // Патч 539: локацию нельзя бросить на саму себя — исключаем её из целей.
+    const hit = Object.entries(hubDropBounds.current).find(([id, b]) => (
       b
+      && id !== movingContainerId
       && point.pageX >= b.x
       && point.pageX <= b.x + b.width
       && point.pageY >= b.y
@@ -1717,7 +1736,6 @@ export default function LootTradeScreen() {
 
   const gridItems = [
     { type: 'createHub', id: '__create_hub__' },
-    { type: 'locationTree', id: '__location_tree__' },
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
     { type: 'createTerminal', id: '__create_terminal__' },
@@ -1849,16 +1867,6 @@ export default function LootTradeScreen() {
                           iconName="map-marker-multiple"
                           label={tLootTrade('actions.createHub')}
                           onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
-                        />
-                      );
-                    }
-                    if (cell.type === 'locationTree') {
-                      return (
-                        <ActionCell
-                          key={cell.id}
-                          iconName="file-tree"
-                          label={tLootTrade('actions.locationTree')}
-                          onPress={() => setLocationTreeOpen(true)}
                         />
                       );
                     }
@@ -2471,126 +2479,24 @@ export default function LootTradeScreen() {
                 })()}
               </View>
 
-              <ScrollView style={styles.itemsListContainer}>
-                {(activeContainer.links || []).length === 0 ? (
-                  <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
-                ) : (
-                  [...(activeContainer.links || [])]
-                    .sort((linkA, linkB) => {
-                      const childA = containers.find((c) => c.id === linkA.containerId);
-                      const childB = containers.find((c) => c.id === linkB.containerId);
-                      const orderA = CONTAINER_KIND_SORT_ORDER[childA?.kind] ?? 99;
-                      const orderB = CONTAINER_KIND_SORT_ORDER[childB?.kind] ?? 99;
-                      if (orderA !== orderB) return orderA - orderB;
-                      return String(childA?.name || '').localeCompare(String(childB?.name || ''), 'ru');
-                    })
-                    .map((link) => {
-                      const child = containers.find((c) => c.id === link.containerId);
-                      if (!child) return null;
-                      const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
-                      const childPieces = (child.items || []).reduce(
-                        (sum, it) => sum + (Number(it.quantity) || 0),
-                        0,
-                      );
-                      const parentHubIds = getHubIdsContainingChild(child.id, containers);
-                      const sharedHubCount = parentHubIds.length;
-                      return (
-                        <View key={link.containerId} style={styles.hubChildRow}>
-                          <View style={styles.hubChildTopLine}>
-                            <View style={styles.itemRowMain}>
-                              <View style={styles.itemRowTitleLine}>
-                                <MaterialCommunityIcons
-                                  name={child.kind === CONTAINER_KIND.LOCK ? 'lock'
-                                    : (child.kind === CONTAINER_KIND.TERMINAL ? 'console'
-                                      : (childIsMerch ? 'sack' : 'treasure-chest'))}
-                                  size={18}
-                                  color="#2b2b2b"
-                                />
-                                <Text style={styles.itemRowName}>{child.name}</Text>
-                                {sharedHubCount > 1 && (
-                                  <Text style={styles.hubSharedBadgeText}>
-                                    {formatLootTrade(tLootTrade('detail.hubSharedBadge'), {
-                                      count: sharedHubCount,
-                                    })}
-                                  </Text>
-                                )}
-                              </View>
-                              <View style={styles.itemRowSub}>
-                                <Text style={styles.itemRowSubText}>
-                                  {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
-                                </Text>
-                                {childIsMerch && (
-                                  <IconText style={styles.itemRowSubText}>
-                                    {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
-                                  </IconText>
-                                )}
-                              </View>
-                            </View>
-
-                            <View style={styles.itemRowControls}>
-                              <TouchableOpacity
-                                style={[
-                                  styles.hubLockChip,
-                                  link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
-                                ]}
-                                onPress={() => handleToggleHubChildLock(child.id)}
-                              >
-                                <Text
-                                  style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
-                                >
-                                  {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
-                                </Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                style={styles.itemRowSmallBtn}
-                                onPress={() => {
-                                  setReturnHubId(activeContainer.id);
-                                  setActiveContainerId(child.id);
-                                }}
-                              >
-                                <Text style={styles.itemRowSmallBtnText}>
-                                  {tLootTrade('detail.hubOpenChildCard')}
-                                </Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                style={styles.itemRowSmallBtn}
-                                onPress={() => handleMoveChildOutToRoot(child.id)}
-                              >
-                                <Text style={styles.itemRowSmallBtnText}>
-                                  {tLootTrade('detail.hubMoveOutToRoot')}
-                                </Text>
-                              </TouchableOpacity>
-
-                              {(sharedHubCount > 1 || child.inRoot === true) && (
-                                <TouchableOpacity
-                                  style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
-                                  onPress={() => handleRemoveHubChild(child.id)}
-                                >
-                                  <Text style={styles.itemRowDeleteBtnText}>
-                                    {tLootTrade('detail.hubUnlinkChild')}
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          </View>
-
-                          {link.locked && (
-                            <TextInput
-                              style={styles.hubLockNoteInput}
-                              defaultValue={link.lockLabel || ''}
-                              placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
-                              placeholderTextColor="#888888"
-                              onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
-                              onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
-                            />
-                          )}
-                        </View>
-                      );
-                    })
-                )}
-              </ScrollView>
+              {/* Патч 539: хаб — сам папка-дерево. Локации-спойлеры, пунктирные
+                  линии зависимостей; узел открывает настройки секции. */}
+              <Text style={styles.hubKeysTitle}>{tLootTrade('detail.locationsInside')}</Text>
+              <HubTreeView
+                hub={activeContainer}
+                containers={containers}
+                keyItemNames={keyItemNames}
+                onOpenSettings={(container) => setFormModal({ kind: container.kind, initialContainer: container })}
+                onOpenChild={(child) => {
+                  setReturnHubId(activeContainer.id);
+                  setActiveContainerId(child.id);
+                }}
+                onToggleLock={handleToggleHubChildLock}
+                onMoveOut={handleMoveChildOutToRoot}
+                onUnlink={handleRemoveHubChild}
+                onUpdateLockLabel={handleUpdateHubChildLockLabel}
+                onMoveNestedOut={handleMoveNestedLocationOut}
+              />
             </>
           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
             || activeContainer.kind === CONTAINER_KIND.LOCK) ? null : (
@@ -2725,17 +2631,6 @@ export default function LootTradeScreen() {
         onQuickCreateHub={handleQuickCreateHub}
         onSave={handleSaveContainerForm}
         onClose={() => setFormModal(null)}
-      />
-
-      {/* Патч 538: дерево структуры локаций; узел открывает настройки секции. */}
-      <LocationTreeModal
-        visible={locationTreeOpen}
-        containers={containers}
-        onOpenSettings={(container) => {
-          setLocationTreeOpen(false);
-          setFormModal({ kind: container.kind, initialContainer: container });
-        }}
-        onClose={() => setLocationTreeOpen(false)}
       />
 
       <HubChildPickerModal

@@ -85,7 +85,8 @@ describe('514: две строки настройки в форме точки',
     expect(form).toContain('testID="container-form-description"');
     const descAt = form.indexOf('container-form-description');
     // Патч 538: конструктор И/ИЛИ вместо строки проверок.
-    const checkAt = form.indexOf("tLootTrade('form.accessExprLabel')");
+    // Патч 539: подпись стала тернарной (isHub ? locationGateLabel : accessExprLabel).
+    const checkAt = form.indexOf("'form.accessExprLabel'");
     const hintAt = form.indexOf('<AccessExpressionBuilder');
     expect(checkAt).toBeGreaterThan(-1);
     expect(descAt).toBeGreaterThan(checkAt);
@@ -97,7 +98,8 @@ describe('514: две строки настройки в форме точки',
     expect(form).toContain('availableCheckContainers');
     // Патч 538: конструктор выражения с поиском и выбором точек-проверок.
     expect(form).toContain('<AccessExpressionBuilder');
-    expect(form).toContain("tLootTrade('form.accessExprLabel')");
+    // Патч 539: подпись тернарная, но ключ accessExprLabel остаётся для не-хабов.
+    expect(form).toContain("'form.accessExprLabel'");
     // Патч 517: ворота ссылаются на любую точку, а не только терминал.
     expect(screen).toContain('availableCheckContainers={gateSources}');
   });

@@ -1,8 +1,9 @@
 {
-  "version": "538",
+  "version": "539",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
       "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
       "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
       "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
@@ -142,6 +143,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
       "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
       "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",
       "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",
