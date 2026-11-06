@@ -132,7 +132,11 @@ describe('514: вложенность и перетаскивание', () => {
   it('у всех четырёх карточек перетаскивание, ключ уходит в локацию', () => {
     expect(card).toContain('arrow-all');
     expect(card).toContain('cardStyles.cardDragHandle');
-    expect(card).toContain('PanResponder.create');
+    // Патч 549: жест вынесен в общий хук, копии больше не расходятся.
+    // Прежняя проверка требовала `PanResponder.create` в самой карточке —
+    // она запрещала переиспользование и не ловила мёртвые ручки.
+    expect(card).toContain('useDragResponder');
+    expect(read('src/ui/useDragResponder.js')).toContain('PanResponder.create');
     expect(screen).toContain('const handleMoveKeyItemIntoHub');
     expect(screen).toContain('setMovingKeyItemId');
     expect(screen).toContain('const attachedKeyItemIds');

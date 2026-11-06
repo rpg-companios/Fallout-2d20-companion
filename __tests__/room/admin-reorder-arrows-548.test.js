@@ -242,27 +242,34 @@ describe('548: стрелка дерева работает при настоя�
 
 describe('548: обе группы стрелок и защита от возврата бага', () => {
   it('контекст строки задаётся в capture-фазе, а не только в bubble', () => {
-    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
-    expect(tree).toContain('onStartShouldSetPanResponderCapture: claimDrag');
-    expect(tree).toContain('onMoveShouldSetPanResponderCapture: claimDrag');
-    expect(tree).toContain('onStartShouldSetPanResponder: claimDrag');
-    expect(tree).toContain('onMoveShouldSetPanResponder: claimDrag');
+    // Патч 549: жест вынесен в общий хук. Закон фазы проверяется там, где он
+    // теперь живёт, — иначе проверка запрещала бы переиспользование и снова
+    // разводила копии по файлам (именно так и появился баг 548).
+    const hook = read('src/ui/useDragResponder.js');
+    expect(hook).toContain('onStartShouldSetPanResponderCapture: () => claim(rowPayload)');
+    expect(hook).toContain('onMoveShouldSetPanResponderCapture: () => claim(rowPayload)');
+    expect(hook).toContain('onStartShouldSetPanResponder: () => claim(rowPayload)');
+    expect(hook).toContain('onMoveShouldSetPanResponder: () => claim(rowPayload)');
     // Причина бага зафиксирована в коде, чтобы её не вернули «упрощением».
-    expect(tree).toContain('Патч 548');
-    expect(tree).toContain('capture');
+    expect(hook).toContain('548');
+    expect(hook).toContain('capture');
+    // Дерево берёт жест из хука, а не держит свою копию.
+    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
+    expect(tree).toContain('useDragResponder');
+    expect(tree).not.toContain('PanResponder.create');
   });
 
-  it('стрелки карточек сетки не зависят от контекста и остаются рабочими', () => {
+  it('стрелки карточек сетки берут тот же механизм, что и остальное приложение', () => {
     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
     const start = screen.indexOf('const ContainerCardCell');
     const end = screen.indexOf('export default function LootTradeScreen');
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const cell = screen.slice(start, end);
-    // Grant карточки читает сам контейнер, а не ref-контекст строки дерева.
-    expect(cell).toContain('onStartShouldSetPanResponderCapture: () => true');
-    expect(cell).toContain('dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };');
-    expect(cell).toContain('dragCallbacks.current.onDragStart?.(');
+    // Патч 549: одна реализация жеста на четыре места.
+    expect(cell).toContain('useDragResponder');
+    expect(cell).toContain('payload: container');
+    expect(cell).not.toContain('PanResponder.create');
     expect(cell).not.toContain('dragContextRef');
     // Ручка есть у всех карточек, включая хабы (канон 539).
     expect(screen).toContain('{onDragStart && (');

@@ -1,0 +1,2378 @@
+diff --git a/__tests__/lootTrade/drag-responder-549.test.js b/__tests__/lootTrade/drag-responder-549.test.js
+new file mode 100644
+index 0000000..cfbf375
+--- /dev/null
++++ b/__tests__/lootTrade/drag-responder-549.test.js
+@@ -0,0 +1,195 @@
++// ПРИЁМОЧНЫЙ (патч 549): удалить при конверсии/приживании.
++//
++// Патч 549: единый механизм перетаскивания. До него жест был скопирован в
++// четырёх местах; три копии жили по рабочему шаблону, четвёртая (дерево
++// локаций) изобрела свой и сломалась — баг 548. Здесь проверяется контракт
++// общего хука, на который теперь опираются все экраны.
++import { describe, expect, it, vi } from 'vitest';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => ({
++  // Как настоящий PanResponder: конфиг становится набором обработчиков.
++  PanResponder: { create: (config) => ({ panHandlers: config }) },
++}));
++
++import useDragResponder from '../../src/ui/useDragResponder.js';
++
++/** Монтирует хук в пробнике и отдаёт его результат наружу. */
++const mountHook = (options) => {
++  const api = {};
++  const Probe = (props) => {
++    Object.assign(api, useDragResponder({ ...options, ...props }));
++    return null;
++  };
++  let renderer;
++  act(() => { renderer = create(React.createElement(Probe)); });
++  return { api, renderer, rerender: (props) => act(() => renderer.update(React.createElement(Probe, props))) };
++};
++
++/**
++ * Настоящий порядок опроса ответственности RN: capture сверху вниз и решение
++ * сразу при `true`; bubble зовётся ТОЛЬКО если capture отказался.
++ * (react-native-web: modules/useResponderEvents/ResponderSystem.js,
++ *  findWantsResponder — цикл `// capture` возвращает результат немедленно.)
++ */
++const negotiate = (handlers, kind = 'start') => {
++  const capture = kind === 'start'
++    ? 'onStartShouldSetPanResponderCapture'
++    : 'onMoveShouldSetPanResponderCapture';
++  const bubble = kind === 'start'
++    ? 'onStartShouldSetPanResponder'
++    : 'onMoveShouldSetPanResponder';
++  if (handlers[capture]?.() === true) return 'capture';
++  if (handlers[bubble]?.() === true) return 'bubble';
++  return null;
++};
++
++const grant = (handlers, x0 = 10, y0 = 20) => handlers.onPanResponderGrant({}, { x0, y0 });
++const move = (handlers, x, y) => handlers.onPanResponderMove({}, { moveX: x, moveY: y });
++
++describe('549: хук заявляет жест в обеих фазах опроса', () => {
++  it('capture принимает решение, и перенос всё равно начинается', () => {
++    const onStart = vi.fn();
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: { id: 'a' }, onStart, onEnd });
++    expect(negotiate(api.panHandlers)).toBe('capture');
++    act(() => {
++      grant(api.panHandlers);
++      move(api.panHandlers, 40, 60);
++      api.panHandlers.onPanResponderRelease({}, {});
++    });
++    expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, { id: 'a' });
++    expect(onEnd).toHaveBeenCalledWith({ pageX: 40, pageY: 60 }, { id: 'a' }, { cancelled: false, moved: true });
++  });
++
++  it('bubble-путь остаётся рабочим, если платформа опросила только его', () => {
++    const onStart = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart });
++    expect(api.panHandlers.onStartShouldSetPanResponder()).toBe(true);
++    act(() => grant(api.panHandlers));
++    expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, 'p');
++  });
++
++  it('захват по движению тоже начинает перенос', () => {
++    const onStart = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart });
++    expect(negotiate(api.panHandlers, 'move')).toBe('capture');
++    act(() => grant(api.panHandlers));
++    expect(onStart).toHaveBeenCalled();
++  });
++
++  it('нагрузка строки заявляется в capture и не течёт между строками', () => {
++    const onStart = vi.fn();
++    const { api } = mountHook({ onStart });
++    const rowA = api.handlersFor({ id: 'a' });
++    const rowB = api.handlersFor({ id: 'b' });
++    act(() => {
++      expect(negotiate(rowA)).toBe('capture');
++      grant(rowA);
++      rowA.onPanResponderRelease({}, {});
++    });
++    act(() => {
++      expect(negotiate(rowB)).toBe('capture');
++      grant(rowB);
++      rowB.onPanResponderRelease({}, {});
++    });
++    expect(onStart.mock.calls.map(([, payload]) => payload.id)).toEqual(['a', 'b']);
++  });
++
++  it('свежие колбэки видны без пересоздания жеста', () => {
++    const first = vi.fn();
++    const second = vi.fn();
++    const { api, rerender } = mountHook({ payload: 'p', onStart: first });
++    rerender({ payload: 'p2', onStart: second });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers);
++    });
++    expect(first).not.toHaveBeenCalled();
++    expect(second).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, 'p2');
++  });
++});
++
++describe('549: перенос засчитывает только настоящее движение', () => {
++  it('нажатие без движения отдаёт moved=false', () => {
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart: vi.fn(), onEnd });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers, 30, 40);
++      api.panHandlers.onPanResponderRelease({}, {});
++    });
++    expect(onEnd).toHaveBeenCalledWith({ pageX: 30, pageY: 40 }, 'p', { cancelled: false, moved: false });
++  });
++
++  it('нулевая точка от RN не считается движением', () => {
++    const onMove = vi.fn();
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart: vi.fn(), onMove, onEnd });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers);
++      move(api.panHandlers, 0, 0);
++      api.panHandlers.onPanResponderRelease({}, {});
++    });
++    expect(onMove).not.toHaveBeenCalled();
++    expect(onEnd.mock.calls[0][2].moved).toBe(false);
++  });
++
++  it('обрыв жеста помечается отменой', () => {
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart: vi.fn(), onEnd });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers);
++      move(api.panHandlers, 50, 70);
++      api.panHandlers.onPanResponderTerminate({}, {});
++    });
++    expect(onEnd).toHaveBeenCalledWith({ pageX: 50, pageY: 70 }, 'p', { cancelled: true, moved: true });
++  });
++
++  it('последняя точка сохраняется, если отпускание пришло без координат', () => {
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart: vi.fn(), onEnd });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers);
++      move(api.panHandlers, 77, 88);
++      api.panHandlers.onPanResponderRelease({}, { moveX: 0, moveY: 0 });
++    });
++    expect(onEnd.mock.calls[0][0]).toEqual({ pageX: 77, pageY: 88 });
++  });
++});
++
++describe('549: жест не отдаётся наружу и уважает запрет', () => {
++  it('ScrollView не получает жест обратно, нативный скролл заблокирован', () => {
++    const { api } = mountHook({});
++    expect(api.panHandlers.onPanResponderTerminationRequest()).toBe(false);
++    expect(api.panHandlers.onShouldBlockNativeResponder()).toBe(true);
++  });
++
++  it('при enabled=false жест не берётся вовсе', () => {
++    const onStart = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart, enabled: false });
++    expect(negotiate(api.panHandlers)).toBeNull();
++    act(() => grant(api.panHandlers));
++    expect(onStart).not.toHaveBeenCalled();
++    expect(api.handlersFor({ id: 'row' }).onStartShouldSetPanResponderCapture()).toBe(false);
++  });
++
++  it('отказ системы не оставляет призрак переноса', () => {
++    const onEnd = vi.fn();
++    const { api } = mountHook({ payload: 'p', onStart: vi.fn(), onEnd });
++    act(() => {
++      negotiate(api.panHandlers);
++      grant(api.panHandlers);
++      api.panHandlers.onPanResponderReject({}, {});
++    });
++    expect(api.draggingRef.current).toBe(false);
++    act(() => { api.panHandlers.onPanResponderRelease({}, {}); });
++    expect(onEnd).not.toHaveBeenCalled();
++  });
++});
+diff --git a/__tests__/lootTrade/gm-screen-behaviour-549.test.js b/__tests__/lootTrade/gm-screen-behaviour-549.test.js
+new file mode 100644
+index 0000000..9547ec0
+--- /dev/null
++++ b/__tests__/lootTrade/gm-screen-behaviour-549.test.js
+@@ -0,0 +1,352 @@
++// ПРИЁМОЧНЫЙ (патч 549): удалить при конверсии/приживании.
++//
++// Патч 549: мастерский экран проверяется ПОВЕДЕНИЕМ, а не наличием строк.
++//
++// Зачем. Аудит после бага 548 показал: ни один тест не монтировал
++// `LootTradeScreen` (2733 строки, 27 состояний). Двадцать файлов читали его как
++// ТЕКСТ (`expect(read(...)).toContain('{onDragStart && (')`). Такая проверка
++// проходит и на мёртвом коде — строка на месте, обработчик не работает. Окно
++// игрока при этом монтировали 10 тестов, отсюда и ощущение «в юзере отработано,
++// а в мастере лезет».
++//
++// Здесь экран монтируется по-настоящему, жест прогоняется в РЕАЛЬНОМ порядке
++// опроса ответственности RN (capture принимает решение до bubble) и проверяется
++// результат в БД, а не текст исходника.
++import { describe, expect, it, beforeEach, vi } from 'vitest';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const h = vi.hoisted(() => ({
++  cards: [],
++  keyItems: [],
++  saved: [],
++  bounds: {},
++}));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  // Мок умеет мерить границы по адресу элемента: и View (строки дерева),
++  // и TouchableOpacity (карточки сетки — цель сброса берётся с корня карточки).
++  const measurable = (name) => React.forwardRef(({ children, ...props }, ref) => {
++    React.useImperativeHandle(ref, () => ({
++      measureInWindow: (cb) => {
++        const b = h.bounds[props.testID] || { x: 0, y: 0, width: 200, height: 120 };
++        cb(b.x, b.y, b.width, b.height);
++      },
++    }));
++    return React.createElement(name, props, children);
++  });
++  const View = measurable('View');
++  const TouchableOpacity = measurable('TouchableOpacity');
++  return {
++    Platform: { OS: 'web', select: (o) => o.web ?? o.default },
++    StyleSheet: {
++      create: (s) => s,
++      flatten: (s) => (Array.isArray(s) ? Object.assign({}, ...s.filter(Boolean)) : s || {}),
++      hairlineWidth: 1,
++    },
++    Dimensions: { get: () => ({ width: 1200, height: 900 }) },
++    useWindowDimensions: () => ({ width: 1200, height: 900 }),
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View,
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity,
++    Pressable: host('Pressable'),
++    ScrollView: host('ScrollView'),
++    ActivityIndicator: host('ActivityIndicator'),
++    Image: host('Image'),
++    // Как настоящий PanResponder: конфиг превращается в набор обработчиков,
++    // а решение о захвате принимает система ответственности (capture первым).
++    PanResponder: { create: (config) => ({ panHandlers: config }) },
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: (props) => React.createElement('MaterialCommunityIcons', props),
++  FontAwesome5: (props) => React.createElement('FontAwesome5', props),
++}));
++vi.mock('@react-navigation/native', () => ({
++  useFocusEffect: (cb) => { React.useEffect(() => { cb(); }, [cb]); },
++}));
++
++vi.mock('../../db', () => ({
++  getGmContainersList: vi.fn(async () => h.cards),
++  getGmKeyItems: vi.fn(async () => h.keyItems),
++  getCharacterFolders: vi.fn(async () => [{ id: 'f1', name: 'Кампания' }]),
++  getFolderRooms: vi.fn(async () => [{ folder_id: 'f1', code: 'ROOM1', owner_token: 't1' }]),
++  getGmContainerById: vi.fn(async (id) => h.cards.find((c) => c.id === id) || null),
++  saveGmContainer: vi.fn(async (card) => {
++    h.saved.push(card);
++    const idx = h.cards.findIndex((c) => c.id === card.id);
++    if (idx >= 0) h.cards[idx] = card; else h.cards.push(card);
++    return card;
++  }),
++  saveGmKeyItem: vi.fn(async (item) => item),
++  deleteGmContainer: vi.fn(async () => {}),
++  duplicateGmContainer: vi.fn(async (id) => ({ ...h.cards.find((c) => c.id === id), id: `${id}-copy` })),
++}));
++
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => 'ru-RU', useModuleLocale: () => 'ru-RU' };
++});
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (key) => key,
++}));
++vi.mock('../../components/screens/HomeScreen/logic/homeScreenI18n', () => ({ tHomeScreen: (key) => key }));
++vi.mock('../../components/screens/HomeScreen/logic/localeLabel', () => ({ getLocaleLabel: () => 'Русский' }));
++
++vi.mock('../../src/store/appSettingsStore', () => {
++  const use = (sel) => sel({ setValue: vi.fn() });
++  use.getState = () => ({ setValue: vi.fn() });
++  return { default: use };
++});
++vi.mock('../../src/room/uiModeStore', () => {
++  const state = { tabUiMode: 'gm', gmInspectingCharacter: false, setTabUiMode: vi.fn(), setGmInspectingCharacter: vi.fn() };
++  const use = (sel) => sel(state);
++  use.getState = () => state;
++  return { default: use };
++});
++vi.mock('../../src/room/roomStore', () => {
++  const state = { rooms: {}, status: 'offline' };
++  const use = (sel) => sel(state);
++  use.getState = () => state;
++  return { default: use, roomSupportsTerminalProtocol: () => false };
++});
++vi.mock('../../src/room/roomCharacterSync', () => ({ buildGmRoomCharacterCards: () => [] }));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn(),
++  syncAllCharactersWithCloud: vi.fn(async () => {}),
++  deleteGmContainerFromCloudIfEnabled: vi.fn(async () => {}),
++  openCloudFolderInDrive: vi.fn(),
++}));
++vi.mock('../../components/alerts/alertService', () => ({
++  confirmAlert: vi.fn(async () => true),
++  showAlert: vi.fn(),
++  showRawAlert: vi.fn(),
++}));
++vi.mock('../../src/lootTrade/gmSessionPersistence', () => ({
++  flushPendingEmptyLootPrompts: vi.fn(async () => {}),
++  subscribeGmContainerUpdates: () => () => {},
++}));
++vi.mock('../../src/premium/adminAccessGate', async (importOriginal) => ({
++  ...(await importOriginal()),
++  guardAdminAction: () => true,
++  useAdminAccess: () => ({
++    adminLicensed: true, gmCampaignsLicensed: true, gmLootTradeLicensed: true, gmEnvCombatLicensed: true,
++  }),
++}));
++
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++
++// Тяжёлые модалки не участвуют в проверках жеста —глушим их, чтобы тест
++// проверял экран, а не формы. Карточки и дерево остаются НАСТОЯЩИМИ.
++vi.mock('../../components/screens/LootTradeScreen/modals/ContainerFormModal', () => ({
++  default: () => React.createElement('ContainerFormModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/KeyItemFormModal', () => ({
++  default: () => React.createElement('KeyItemFormModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/ContainerCatalogModal', () => ({
++  default: () => React.createElement('ContainerCatalogModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/ContainerItemConfigModal', () => ({
++  default: () => React.createElement('ContainerItemConfigModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/IssueContainerModal', () => ({
++  default: () => React.createElement('IssueContainerModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/HubChildPickerModal', () => ({
++  default: () => React.createElement('HubChildPickerModal'),
++}));
++vi.mock('../../components/lootTrade/PartyStorageModal', () => ({
++  default: () => React.createElement('PartyStorageModal'),
++}));
++
++import LootTradeScreen from '../../components/screens/LootTradeScreen/LootTradeScreen.js';
++import * as db from '../../db';
++import { CONTAINER_KIND, normalizeContainerEntity } from '../../domain/lootTrade.js';
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.HUB, name: id, inRoot: true, ...extra,
++});
++const loot = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.LOOT, name: id, inRoot: true, items: [], ...extra,
++});
++
++const findAll = (root, testID) => root.findAll((n) => n.props?.testID === testID);
++const one = (root, testID) => {
++  const [node] = findAll(root, testID);
++  expect(node, testID).toBeTruthy();
++  return node;
++};
++
++const mountScreen = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(LootTradeScreen));
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++/**
++ * Опрос ответственности как в RN: capture идёт первым и принимает решение
++ * сразу; bubble зовётся только если capture отказался. Тест 545 звал bubble
++ * руками и потому не увидел мёртвую ручку (баг 548).
++ */
++const negotiate = (handle) => {
++  if (handle.props.onStartShouldSetPanResponderCapture?.() === true) return 'capture';
++  if (handle.props.onStartShouldSetResponderCapture?.() === true) return 'capture';
++  if (handle.props.onStartShouldSetPanResponder?.() === true) return 'bubble';
++  return null;
++};
++
++const dragTo = async (renderer, handleTestID, target, { move = true } = {}) => {
++  const handle = one(renderer.root, handleTestID);
++  let phase = null;
++  await act(async () => {
++    phase = negotiate(handle);
++    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++    await Promise.resolve();
++  });
++  if (move) {
++    await act(async () => {
++      handle.props.onPanResponderMove({}, { moveX: target.x + 5, moveY: target.y + 5 });
++      await Promise.resolve();
++    });
++  }
++  await act(async () => {
++    handle.props.onPanResponderRelease({}, { moveX: target.x + 5, moveY: target.y + 5 });
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++  return phase;
++};
++
++beforeEach(() => {
++  h.cards = [];
++  h.keyItems = [];
++  h.saved = [];
++  h.bounds = {};
++  vi.clearAllMocks();
++});
++
++describe('549: мастерский экран монтируется и показывает карточки', () => {
++  it('экран впервые рендерится по-настоящему и рисует карточки из БД', async () => {
++    h.cards = [hub('town'), loot('chest'), loot('barrel')];
++    const renderer = await mountScreen();
++    // Ручки переноса есть у КАЖДОЙ карточки, включая локацию-хаб (канон 539).
++    expect(findAll(renderer.root, 'card-drag-town').length).toBeGreaterThan(0);
++    expect(findAll(renderer.root, 'card-drag-chest').length).toBeGreaterThan(0);
++    expect(findAll(renderer.root, 'card-drag-barrel').length).toBeGreaterThan(0);
++    expect(db.getGmContainersList).toHaveBeenCalled();
++    await act(async () => renderer.unmount());
++  });
++
++  it('пустая база не роняет экран', async () => {
++    const renderer = await mountScreen();
++    expect(renderer.root).toBeTruthy();
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('549: стрелки сетки работают в реальном порядке опроса', () => {
++  it('перенос сундука в локацию сохраняет ссылку в БД', async () => {
++    h.cards = [hub('town'), loot('chest')];
++    // Цель сброса измеряется по КОРНЮ карточки-локации.
++    h.bounds['card-town'] = { x: 400, y: 100, width: 200, height: 120 };
++    const renderer = await mountScreen();
++    expect(findAll(renderer.root, 'card-town').length).toBeGreaterThan(0);
++
++    const phase = await dragTo(renderer, 'card-drag-chest', { x: 400, y: 100 });
++    expect(phase).toBe('capture');
++
++    // Проверяется РЕЗУЛЬТАТ в БД, а не наличие строки в исходнике.
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave, 'локация должна получить ссылку на сундук').toBeTruthy();
++    expect(townSave.links.map((l) => l.containerId)).toContain('chest');
++    await act(async () => renderer.unmount());
++  });
++
++  it('нажатие на стрелку без движения ничего не переносит', async () => {
++    h.cards = [hub('town'), loot('chest')];
++    const renderer = await mountScreen();
++    await dragTo(renderer, 'card-drag-chest', { x: 400, y: 100 }, { move: false });
++    // Ни одна карточка не получила новых связей от простого нажатия.
++    const townSaves = h.saved.filter((c) => c.id === 'town');
++    expect(townSaves.every((c) => (c.links || []).length === 0)).toBe(true);
++    await act(async () => renderer.unmount());
++  });
++
++  it('ручка не отдаёт жест ScrollView и блокирует нативный скролл', async () => {
++    h.cards = [hub('town'), loot('chest')];
++    const renderer = await mountScreen();
++    const handle = one(renderer.root, 'card-drag-chest');
++    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
++    expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('549: порядок в дереве локации меняется через сам экран', () => {
++  const townWithChildren = () => [
++    hub('town', {
++      childOrder: ['shop', 'chest'],
++      links: [{ containerId: 'chest' }, { containerId: 'shop' }],
++    }),
++    loot('chest', { inRoot: false }),
++    normalizeContainerEntity({
++      id: 'shop', kind: CONTAINER_KIND.MERCHANT, name: 'shop', inRoot: false, caps: 100,
++    }),
++  ];
++
++  const openHub = async (renderer) => {
++    const card = one(renderer.root, 'card-town');
++    await act(async () => { card.props.onPress(); await Promise.resolve(); });
++  };
++
++  const rowIds = (renderer) => renderer.root
++    .findAll((n) => n.type === 'View'
++      && typeof n.props?.testID === 'string'
++      && n.props.testID.startsWith('hub-tree-row-'))
++    .map((n) => n.props.testID.replace('hub-tree-row-', ''));
++
++  it('дерево показывает порядок Мастера и перенос сохраняет новый childOrder', async () => {
++    h.cards = townWithChildren();
++    h.bounds['hub-tree-row-shop'] = { x: 0, y: 0, width: 300, height: 30 };
++    h.bounds['hub-tree-row-chest'] = { x: 0, y: 30, width: 300, height: 30 };
++    const renderer = await mountScreen();
++    await openHub(renderer);
++    expect(rowIds(renderer)).toEqual(['shop', 'chest']);
++
++    // Жест идёт в реальном порядке опроса: решение принимает capture.
++    const phase = await dragTo(renderer, 'hub-tree-reorder-chest', { x: 0, y: 0 });
++    expect(phase).toBe('capture');
++
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave, 'порядок должен дойти до БД').toBeTruthy();
++    expect(townSave.childOrder).toEqual(['chest', 'shop']);
++    await act(async () => renderer.unmount());
++  });
++
++  it('нажатие на стрелку дерева без движения порядок не меняет', async () => {
++    h.cards = townWithChildren();
++    h.bounds['hub-tree-row-shop'] = { x: 0, y: 0, width: 300, height: 30 };
++    h.bounds['hub-tree-row-chest'] = { x: 0, y: 30, width: 300, height: 30 };
++    const renderer = await mountScreen();
++    await openHub(renderer);
++    await dragTo(renderer, 'hub-tree-reorder-chest', { x: 0, y: 0 }, { move: false });
++    expect(h.saved.filter((c) => c.id === 'town' && c.childOrder)).toHaveLength(0);
++    expect(rowIds(renderer)).toEqual(['shop', 'chest']);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/admin-reorder-arrows-548.test.js b/__tests__/room/admin-reorder-arrows-548.test.js
+index 6767776..d00677f 100644
+--- a/__tests__/room/admin-reorder-arrows-548.test.js
++++ b/__tests__/room/admin-reorder-arrows-548.test.js
+@@ -242,27 +242,34 @@ describe('548: стрелка дерева работает при настоя
+ 
+ describe('548: обе группы стрелок и защита от возврата бага', () => {
+   it('контекст строки задаётся в capture-фазе, а не только в bubble', () => {
+-    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
+-    expect(tree).toContain('onStartShouldSetPanResponderCapture: claimDrag');
+-    expect(tree).toContain('onMoveShouldSetPanResponderCapture: claimDrag');
+-    expect(tree).toContain('onStartShouldSetPanResponder: claimDrag');
+-    expect(tree).toContain('onMoveShouldSetPanResponder: claimDrag');
++    // Патч 549: жест вынесен в общий хук. Закон фазы проверяется там, где он
++    // теперь живёт, — иначе проверка запрещала бы переиспользование и снова
++    // разводила копии по файлам (именно так и появился баг 548).
++    const hook = read('src/ui/useDragResponder.js');
++    expect(hook).toContain('onStartShouldSetPanResponderCapture: () => claim(rowPayload)');
++    expect(hook).toContain('onMoveShouldSetPanResponderCapture: () => claim(rowPayload)');
++    expect(hook).toContain('onStartShouldSetPanResponder: () => claim(rowPayload)');
++    expect(hook).toContain('onMoveShouldSetPanResponder: () => claim(rowPayload)');
+     // Причина бага зафиксирована в коде, чтобы её не вернули «упрощением».
+-    expect(tree).toContain('Патч 548');
+-    expect(tree).toContain('capture');
++    expect(hook).toContain('548');
++    expect(hook).toContain('capture');
++    // Дерево берёт жест из хука, а не держит свою копию.
++    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++    expect(tree).toContain('useDragResponder');
++    expect(tree).not.toContain('PanResponder.create');
+   });
+ 
+-  it('стрелки карточек сетки не зависят от контекста и остаются рабочими', () => {
++  it('стрелки карточек сетки берут тот же механизм, что и остальное приложение', () => {
+     const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
+     const start = screen.indexOf('const ContainerCardCell');
+     const end = screen.indexOf('export default function LootTradeScreen');
+     expect(start).toBeGreaterThan(0);
+     expect(end).toBeGreaterThan(start);
+     const cell = screen.slice(start, end);
+-    // Grant карточки читает сам контейнер, а не ref-контекст строки дерева.
+-    expect(cell).toContain('onStartShouldSetPanResponderCapture: () => true');
+-    expect(cell).toContain('dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };');
+-    expect(cell).toContain('dragCallbacks.current.onDragStart?.(');
++    // Патч 549: одна реализация жеста на четыре места.
++    expect(cell).toContain('useDragResponder');
++    expect(cell).toContain('payload: container');
++    expect(cell).not.toContain('PanResponder.create');
+     expect(cell).not.toContain('dragContextRef');
+     // Ручка есть у всех карточек, включая хабы (канон 539).
+     expect(screen).toContain('{onDragStart && (');
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 43d59c1..713ec14 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('548');
++    expect(version.version).toBe('549');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(147);
+-    expect(version.notes['en-EN']).toHaveLength(147);
+-    expect(json('patchs/baseline.json').baseline).toBe('548');
++    expect(version.notes['ru-RU']).toHaveLength(148);
++    expect(version.notes['en-EN']).toHaveLength(148);
++    expect(json('patchs/baseline.json').baseline).toBe('549');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -274,15 +274,16 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
++    expect(read('patchs/549-shared-drag-hook.patch')).toContain('useDragResponder');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **548**');
++    expect(roadmap).toContain('Текущая версия: **549**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 548');
++    expect(roadmap).toContain('Осталось после патча 549');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -292,6 +293,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/patch-548-install.md')).toContain('548');
++    expect(read('docs/patch-549-install.md')).toContain('549');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/gm-player-parity-549.test.js b/__tests__/room/gm-player-parity-549.test.js
+new file mode 100644
+index 0000000..725feb8
+--- /dev/null
++++ b/__tests__/room/gm-player-parity-549.test.js
+@@ -0,0 +1,149 @@
++// ПРИЁМОЧНЫЙ (патч 549): удалить при конверсии/приживании.
++//
++// ЗАКОН РАВЕНСТВА МАСТЕРА И ИГРОКА (слово владельца, патч 549):
++//   «Мастерский раздел должен максимально соответствовать механизмам юзера.
++//    А команды посылаемые мастером юзеру — это команды, которые мог бы сделать
++//    сам юзер или получить их в результате своих действий».
++//
++// Проверяется ПОВЕДЕНИЕМ на настоящем characterStore: одно и то же изменение,
++// сделанное рукой игрока и командой Мастера, обязано дать одинаковый лист.
++// Строковый guard здесь бесполезен: он видел бы вызов, но не заметил бы, что
++// команда Мастера идёт своей дорогой и даёт другой результат.
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++// Побочные эффекты (запись сейва и публикация в комнату) глушим: сравниваем
++// состояние листа, а не ввод-вывод. Сам стор — настоящий.
++vi.mock('../../src/saves/characterSaves', () => ({
++  saveCharacter: vi.fn(async () => true),
++}));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import useCharacterStore from '../../src/store/characterStore';
++import { spendBobbyPins, BOBBY_PIN_ITEM_ID } from '../../components/lootTrade/spendBobbyPins';
++import { applyCharacterCommand, CHAR_COMMAND_KIND } from '../../components/gm/charCommands';
++
++const state = () => useCharacterStore.getState();
++
++/** Заколки в инвентаре — канонической записью каталога. */
++const seedPins = (quantity) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, pins: { weaponId: BOBBY_PIN_ITEM_ID, quantity } },
++  }));
++};
++
++/** Сколько заколок осталось в листе (по всем записям каталога). */
++const pinsLeft = () => Object.values(state().items || {})
++  .filter((item) => item && item.weaponId === BOBBY_PIN_ITEM_ID)
++  .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
++
++/** Снимок состояния, значимого для сравнения двух путей. */
++const sheetOf = () => ({
++  pins: pinsLeft(),
++  usedMagazineEffects: [...(state().usedMagazineEffects || [])],
++});
++
++const gmCommand = (kind, payload) => ({ commandId: 'c1', characterId: 'ch1', kind, payload });
++
++beforeEach(() => {
++  state().resetCharacterStore();
++  useCharacterStore.setState({ characterName: 'Тест', currentCharacterId: 'ch1' });
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('549: команда Мастера = действие, доступное самому игроку', () => {
++  it('списание заколок: рука игрока и команда Мастера дают одинаковый лист', async () => {
++    // Путь игрока: он ломает заколку в мини-игре, клиент списывает её сам.
++    seedPins(5);
++    const playerSpent = await spendBobbyPins(2, { characterId: 'ch1', publish: false });
++    const byPlayer = sheetOf();
++
++    // Путь Мастера: то же изменение приходит командой и исполняется клиентом.
++    state().resetCharacterStore();
++    useCharacterStore.setState({ characterName: 'Тест', currentCharacterId: 'ch1' });
++    seedPins(5);
++    const result = await applyCharacterCommand(
++      gmCommand(CHAR_COMMAND_KIND.ITEM_SPEND, { itemId: BOBBY_PIN_ITEM_ID, count: 2 }),
++    );
++    const byMaster = sheetOf();
++
++    expect(result.ok).toBe(true);
++    expect(result.spent).toBe(playerSpent);
++    expect(byMaster, 'Мастер не имеет своей отдельной механики списания').toEqual(byPlayer);
++    expect(byPlayer.pins).toBe(3);
++  });
++
++  it('журнал: команда Мастера и кнопка игрока дают одинаковый лист', async () => {
++    // Игрок читает журнал сам — штатное действие стора.
++    state().markMagazineEffectUsed('mag_guns');
++    const byPlayer = sheetOf();
++
++    state().resetCharacterStore();
++    useCharacterStore.setState({ characterName: 'Тест', currentCharacterId: 'ch1' });
++    const result = await applyCharacterCommand(
++      gmCommand(CHAR_COMMAND_KIND.MAGAZINE_USE, { magazineId: 'mag_guns' }),
++    );
++    expect(result.ok).toBe(true);
++    expect(sheetOf()).toEqual(byPlayer);
++    expect(byPlayer.usedMagazineEffects).toEqual(['mag_guns']);
++  });
++
++  it('нехватка ведёт себя одинаково: Мастер не списывает больше, чем есть у игрока', async () => {
++    seedPins(1);
++    const playerSpent = await spendBobbyPins(3, { characterId: 'ch1', publish: false });
++    const byPlayer = sheetOf();
++
++    state().resetCharacterStore();
++    useCharacterStore.setState({ characterName: 'Тест', currentCharacterId: 'ch1' });
++    seedPins(1);
++    const result = await applyCharacterCommand(
++      gmCommand(CHAR_COMMAND_KIND.ITEM_SPEND, { itemId: BOBBY_PIN_ITEM_ID, count: 3 }),
++    );
++    // Закон равенства: результат команды совпадает с рукой игрока до единицы.
++    expect(sheetOf()).toEqual(byPlayer);
++    expect(result.spent).toBe(playerSpent);
++    // Списано не больше, чем лежало; баланс не ушёл в минус.
++    expect(playerSpent).toBeLessThanOrEqual(1);
++    expect(byPlayer.pins).toBeGreaterThanOrEqual(0);
++    // ТЕКУЩЕЕ ПОВЕДЕНИЕ (вопрос владельцу вынесен в отчёте 549): при нехватке
++    // списывается остаток — стор отказывает, но легаси-резерв расходует что есть.
++    // Оба пути делают это одинаково, поэтому закон равенства не нарушен.
++    expect(byPlayer.pins).toBe(0);
++  });
++
++  it('повтор команды журнала не даёт второго эффекта — как повторное нажатие игрока', async () => {
++    const payload = gmCommand(CHAR_COMMAND_KIND.MAGAZINE_USE, { magazineId: 'mag_guns' });
++    await applyCharacterCommand(payload);
++    await applyCharacterCommand(payload);
++    expect(state().usedMagazineEffects).toEqual(['mag_guns']);
++  });
++});
++
++describe('549: у Мастера нет власти вне механизмов игрока', () => {
++  it('неизвестная команда отвергается, лист не меняется', async () => {
++    seedPins(5);
++    const before = sheetOf();
++    const result = await applyCharacterCommand(gmCommand('inventory.wipe', {}));
++    expect(result).toEqual({ ok: false, reason: 'unknown-kind' });
++    expect(sheetOf()).toEqual(before);
++  });
++
++  it('чужой предмет не списывается: белый список один для обоих путей', async () => {
++    seedPins(5);
++    const before = sheetOf();
++    const result = await applyCharacterCommand(
++      gmCommand(CHAR_COMMAND_KIND.ITEM_SPEND, { itemId: 'caps', count: 100 }),
++    );
++    expect(result).toEqual({ ok: false, reason: 'unsupported-item' });
++    expect(sheetOf()).toEqual(before);
++  });
++
++  it('каталог команд — белый список, а не свободный ввод', () => {
++    expect(Object.values(CHAR_COMMAND_KIND)).toEqual(['item.spend', 'magazine.use']);
++  });
++});
+diff --git a/__tests__/room/key-items-fields-514.test.js b/__tests__/room/key-items-fields-514.test.js
+index 63c4db4..dc19fbd 100644
+--- a/__tests__/room/key-items-fields-514.test.js
++++ b/__tests__/room/key-items-fields-514.test.js
+@@ -132,7 +132,11 @@ describe('514: вложенность и перетаскивание', () => {
+   it('у всех четырёх карточек перетаскивание, ключ уходит в локацию', () => {
+     expect(card).toContain('arrow-all');
+     expect(card).toContain('cardStyles.cardDragHandle');
+-    expect(card).toContain('PanResponder.create');
++    // Патч 549: жест вынесен в общий хук, копии больше не расходятся.
++    // Прежняя проверка требовала `PanResponder.create` в самой карточке —
++    // она запрещала переиспользование и не ловила мёртвые ручки.
++    expect(card).toContain('useDragResponder');
++    expect(read('src/ui/useDragResponder.js')).toContain('PanResponder.create');
+     expect(screen).toContain('const handleMoveKeyItemIntoHub');
+     expect(screen).toContain('setMovingKeyItemId');
+     expect(screen).toContain('const attachedKeyItemIds');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 8c9c40e..51bb714 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('548');
++    expect(version.version).toBe('549');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(147);
+-    expect(version.notes['en-EN']).toHaveLength(147);
+-    expect(json('patchs/baseline.json').baseline).toBe('548');
++    expect(version.notes['ru-RU']).toHaveLength(148);
++    expect(version.notes['en-EN']).toHaveLength(148);
++    expect(json('patchs/baseline.json').baseline).toBe('549');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -458,15 +458,16 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
++    expect(read('patchs/549-shared-drag-hook.patch')).toContain('useDragResponder');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **548**');
++    expect(roadmap).toContain('Текущая версия: **549**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 548');
++    expect(roadmap).toContain('Осталось после патча 549');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -476,6 +477,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/patch-548-install.md')).toContain('548');
++    expect(read('docs/patch-549-install.md')).toContain('549');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/terminal-hacking-balance-496.test.js b/__tests__/room/terminal-hacking-balance-496.test.js
+index 39abdc2..793b547 100644
+--- a/__tests__/room/terminal-hacking-balance-496.test.js
++++ b/__tests__/room/terminal-hacking-balance-496.test.js
+@@ -1,14 +1,24 @@
+ // Патч 496: «Саммари v2» — скобочные пары как единственные подсказки.
+-//   N = max(Мин_N[d], База_N[d] - (ИНТ - 4))
+-//   T = 4 - floor(d / 3)
+-//   P = max(0, min(1 + floor(Наука/2) - floor(d/3), 3, N - 3))
+-//   d20 по УДЧ решает эффект: полный сброс / +1 попытка / удаление пустышки.
+-//   Сходство N/M узнаётся ТОЛЬКО тратой попытки.
++// Сходство N/M узнаётся ТОЛЬКО тратой попытки — этот закон жив.
++//
++// Патч 549: таблицы 496 приведены к ДЕЙСТВУЮЩЕМУ канону. Прежняя редакция
++// требовала законов, отменённых владельцем позже, и падала восемь раз подряд
++// (её ошибочно принимали за «известные падения»). Что именно отменено:
++//   497 — попыток снова 4 на всех сложностях (не `4 - floor(d/3)`);
++//         полный сброс ВОЗВРАЩАЕТ к 4, а не добавляет комплект;
++//   499 — число скобок задаёт только Наука: 0,1,1,2,3,3,4 на всех сложностях;
++//         одна скобка = один эффект; шанс полного возврата даёт Удача (5–20 %),
++//         таблицы d20 `LUCK_EFFECT_BOUNDS` больше нет;
++//   500 — доска `N = max(4, 15 + 2·D − ИНТ)`, предохранитель скобок `N−1`;
++//   503 — три группы с общими фрагментами (префиксы НАРОЧНО повторяются),
++//         подсказка может быть `L−1 из L`.
++// Владелец подтвердил 4 попытки на всех сложностях при постановке 549.
++// Держатели действующих законов: terminal-hacking-balance-500.test.js,
++// terminal-brackets-500.test.js, terminal-groups-503.test.js.
+ import { describe, expect, it } from 'vitest';
+ import { getWordsByLength } from '../../server/terminalWords/index.js';
+ import {
+   BASE_WORDS_BY_DIFFICULTY,
+-  LUCK_EFFECT_BOUNDS,
+   MAX_LIKENESS_BY_DIFFICULTY,
+   MIN_WORDS_BY_DIFFICULTY,
+   applyGameAction,
+@@ -17,6 +27,8 @@ import {
+   bracketEffectFor,
+   buildPasswordSet,
+   createGame,
++  luckRestoreChance,
++  recoveryChancePercent,
+   passwordWordCount,
+   positionalLikeness,
+   publicGameState,
+@@ -40,88 +52,106 @@ const gameFor = ({ difficulty = 5, int = 4, science = 0, luck = 4, seed = 0.42,
+ });
+ 
+ describe('патч 496: таблицы числа слов, попыток и скобочных пар', () => {
+-  it('N = max(Мин_N, База_N - (ИНТ-4)) для всех сложностей', () => {
+-    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([8, 10, 12, 14, 17, 20]);
+-    expect(MIN_WORDS_BY_DIFFICULTY).toEqual([4, 5, 6, 7, 9, 10]);
++  it('канон 500: N = max(4, 15 + 2·D − ИНТ), на D5 это «25 − ИНТ»', () => {
++    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([11, 13, 15, 17, 19, 21]);
++    expect(MIN_WORDS_BY_DIFFICULTY).toEqual([4, 4, 4, 4, 4, 4]);
+     for (let d = 0; d <= 5; d += 1) {
+-      expect(passwordWordCount(d, 4)).toBe(BASE_WORDS_BY_DIFFICULTY[d]);
+-      expect(passwordWordCount(d, 10)).toBe(Math.max(MIN_WORDS_BY_DIFFICULTY[d], BASE_WORDS_BY_DIFFICULTY[d] - 6));
+-      for (let int = 4; int < 10; int += 1) {
+-        expect(passwordWordCount(d, int + 1)).toBeLessThanOrEqual(passwordWordCount(d, int));
++      for (let int = 4; int <= 10; int += 1) {
++        expect(passwordWordCount(d, int)).toBe(Math.max(4, 15 + 2 * d - int));
++        if (int < 10) expect(passwordWordCount(d, int + 1)).toBeLessThanOrEqual(passwordWordCount(d, int));
+       }
+     }
+-    expect(passwordWordCount(5, 10)).toBe(14);
+-    expect(passwordWordCount(0, 10)).toBe(4);
++    expect(passwordWordCount(5, 4)).toBe(21);
++    expect(passwordWordCount(5, 10)).toBe(15);
++    expect(passwordWordCount(1, 10)).toBe(7);
++    expect(passwordWordCount(0, 10)).toBe(5);
+   });
+ 
+-  it('T = 4 - floor(d/3): 4 попытки на d0..d2 и 3 на d3..d5', () => {
+-    expect([0, 1, 2, 3, 4, 5].map(attemptsForDifficulty)).toEqual([4, 4, 4, 3, 3, 3]);
++  it('канон 497: 4 попытки на всех сложностях', () => {
++    expect([0, 1, 2, 3, 4, 5].map(attemptsForDifficulty)).toEqual([4, 4, 4, 4, 4, 4]);
+     for (let d = 0; d <= 5; d += 1) {
+       const game = gameFor({ difficulty: d });
+-      expect(game.attempts).toBe(attemptsForDifficulty(d));
+-      expect(game.maxAttempts).toBe(attemptsForDifficulty(d));
++      expect(game.attempts).toBe(4);
++      expect(game.maxAttempts).toBe(4);
+     }
+   });
+ 
+-  it('P = max(0, min(1 + floor(Наука/2) - floor(d/3), 3, N-3))', () => {
+-    expect(bracketCountFor(0, 0, 8)).toBe(1);
+-    expect(bracketCountFor(0, 3, 8)).toBe(2);
+-    expect(bracketCountFor(0, 6, 8)).toBe(3);
+-    expect(bracketCountFor(5, 0, 20)).toBe(0);
+-    expect(bracketCountFor(5, 3, 14)).toBe(1);
+-    expect(bracketCountFor(5, 4, 14)).toBe(2);
+-    expect(bracketCountFor(5, 6, 14)).toBe(3);
+-    expect(bracketCountFor(5, 6, 4)).toBe(1); // предохранитель N-3
+-    expect(bracketCountFor(5, 6, 5)).toBe(2);
++  it('канон 499/500: число скобок задаёт только Наука, предохранитель N−1', () => {
++    // 0,1,1,2,3,3,4 для Науки 0–6 — на любой сложности.
++    const byScience = [0, 1, 1, 2, 3, 3, 4];
++    for (let d = 0; d <= 5; d += 1) {
++      for (let sci = 0; sci <= 6; sci += 1) {
++        expect(bracketCountFor(d, sci, 20), `D${d} Наука ${sci}`).toBe(byScience[sci]);
++      }
++    }
++    expect(bracketCountFor(5, 6, 4)).toBe(3); // предохранитель N−1 (канон 500)
++    expect(bracketCountFor(0, 6, 20)).toBe(4); // сложность НЕ ограничивает
+     for (let d = 0; d <= 5; d += 1) {
+       const game = gameFor({ difficulty: d, int: 4, science: 6, luck: 10 });
+       expect(game.bracketRanges.length).toBe(bracketCountFor(d, 6, game.wordCount));
+-      expect(game.bracketRanges.length).toBeLessThanOrEqual(3);
++      expect(game.bracketRanges.length).toBeLessThanOrEqual(4);
+     }
+   });
+ 
+-  it('d20 по УДЧ 4..10: границы дают ровно 20 исходов', () => {
+-    const expected = {
+-      4: [1, 5], 5: [1, 6], 6: [2, 7], 7: [2, 9],
+-      8: [3, 10], 9: [3, 12], 10: [4, 15],
+-    };
+-    expect(LUCK_EFFECT_BOUNDS).toEqual(expected);
+-    for (const [luck, [full, plus]] of Object.entries(expected)) {
+-      const tally = { reset: 0, attempt: 0, dud: 0 };
+-      for (let roll = 1; roll <= 20; roll += 1) tally[bracketEffectFor(Number(luck), roll)] += 1;
+-      expect(tally.reset).toBe(full);
+-      expect(tally.attempt).toBe(plus - full);
+-      expect(tally.dud).toBe(20 - plus);
+-      expect(tally.reset + tally.attempt + tally.dud).toBe(20);
++  it('канон 499: полный возврат даёт Удача — 5–20 %, а не таблица d20', () => {
++    // Вместо `LUCK_EFFECT_BOUNDS` — вероятность на каждую скобку.
++    expect(recoveryChancePercent(4)).toBe(5);
++    expect(recoveryChancePercent(7)).toBe(13);
++    expect(recoveryChancePercent(10)).toBe(20);
++    for (let luck = 4; luck <= 10; luck += 1) {
++      expect(luckRestoreChance(luck)).toBeCloseTo(0.05 + 0.025 * (luck - 4), 10);
+     }
+-    // Повторный «сброс» считается как +1 попытка.
+-    expect(bracketEffectFor(10, 1, true)).toBe('attempt');
++    // Одна скобка = ровно один эффект (канон 499).
++    const dud = bracketEffectFor(6, 4, () => 0.99, 'word');
++    expect(dud).toEqual({ words: 1, attempts: 0, full: false, kind: 'word' });
++    const step = bracketEffectFor(6, 4, () => 0.99, 'attempt');
++    expect(step).toEqual({ words: 0, attempts: 1, full: false, kind: 'attempt' });
++    // Удачный бросок даёт полное восстановление и НЕ смешивает эффекты.
++    const full = bracketEffectFor(6, 10, () => 0.01, 'attempt');
++    expect(full.full).toBe(true);
++    expect(full.attempts).toBe(0);
++    // Наука 0 — скобок нет.
++    expect(bracketEffectFor(0, 10, () => 0).kind).toBe('none');
+   });
+ 
+-  it('полный сброс даёт ещё один комплект попыток и работает один раз', () => {
++  it('канон 497/503: полное восстановление ВОЗВРАЩАЕТ к 4 и работает один раз', () => {
+     const game = gameFor({ difficulty: 5, int: 10, science: 6, luck: 10 });
++    expect(game.bracketRanges.length).toBeGreaterThan(1);
++    // Эффект скобки — объект (канон 499), а не строка 'reset'/'dud'.
++    const full = { words: 0, attempts: 0, full: true, kind: 'attempt' };
++    const dud = { words: 1, attempts: 0, full: false, kind: 'word' };
+     const forced = {
+       ...game,
+       attempts: 1,
+-      bracketRanges: game.bracketRanges.map((entry, index) => ({ ...entry, effect: index === 0 ? 'reset' : 'dud' })),
++      // Две «полные» скобки подряд: вторая обязана выродиться в +1 попытку.
++      bracketRanges: game.bracketRanges.map((entry, index) => ({
++        ...entry,
++        effect: index < 2 ? full : dud,
++      })),
+     };
+-    let next = forced;
+-    for (const bracket of forced.bracketRanges) {
+-      next = applyGameAction({
+-        game: next,
+-        action: 'bracket',
+-        clientId: 'p',
+-        characterId: 'c',
+-        characterSnapshot: {},
+-        value: bracket.id,
+-        now: 101,
+-        rng: () => 0,
+-      }).game;
+-    }
++    const press = (state, bracket) => applyGameAction({
++      game: state,
++      action: 'bracket',
++      clientId: 'p',
++      characterId: 'c',
++      characterSnapshot: {},
++      value: bracket.id,
++      now: 101,
++      rng: () => 0,
++    }).game;
++
++    const afterFirst = press(forced, forced.bracketRanges[0]);
++    expect(afterFirst.resetUsed).toBe(true);
++    // Возврат К потолку, а не комплект сверху: было 1 → стало 4, не 5.
++    expect(afterFirst.attempts).toBe(forced.maxAttempts);
++    expect(afterFirst.attempts).toBe(4);
++    expect(afterFirst.result).toBe('ATTEMPTS RESET');
++
++    let next = afterFirst;
++    for (const bracket of forced.bracketRanges.slice(1)) next = press(next, bracket);
++    // Попытки НИКОГДА не выше 4, повторного полного возврата нет.
++    expect(next.attempts).toBeLessThanOrEqual(4);
+     expect(next.resetUsed).toBe(true);
+-    expect(next.bonusAttempts).toBe(forced.maxAttempts);
+-    expect(next.attempts).toBe(1 + forced.maxAttempts);
+-    expect(next.result).toBe('DUD REMOVED');
+   });
+ 
+   it('скобки не раскрывают свой эффект в публичном состоянии', () => {
+@@ -142,23 +172,28 @@ describe('патч 496: таблицы числа слов, попыток и с
+ });
+ 
+ describe('патч 496: структура доски', () => {
+-  it('на каждой сложности три буквенные группы и потолок подсказки из 495', () => {
++  it('канон 503: подсказка доходит до L−1 из L и даёт градиент', () => {
++    // Таблица 495 осталась только у запасного построителя доски.
+     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
+     for (let difficulty = 0; difficulty <= 5; difficulty += 1) {
+       const game = gameFor({ difficulty, seed: 0.37 });
+-      const cap = MAX_LIKENESS_BY_DIFFICULTY[difficulty];
+       const hints = game.wordRanges
+         .filter((entry) => entry.word !== game.password)
+         .map((entry) => positionalLikeness(entry.word, game.password));
+-      expect(game.likenessCap).toBe(cap);
+-      expect(Math.max(...hints)).toBeLessThanOrEqual(cap);
++      // 503: предел — длина слова минус буква, а не таблица сложности.
++      expect(game.likenessCap).toBe(game.wordLength - 1);
++      expect(Math.max(...hints)).toBeLessThanOrEqual(game.likenessCap);
++      // Градиент подсказок: не одно flat-значение на всю доску.
+       expect(new Set(hints).size).toBeGreaterThanOrEqual(2);
+       expect(game.wordCount).toBe(passwordWordCount(difficulty, 4));
+-      if (difficulty > 0) expect(game.groupKinds).toBe(3);
+     }
++    // Три группы и их варианты держит terminal-groups-503.test.js.
+   });
+ 
+-  it('ни один двухбуквенный префикс не повторяется больше двух раз', () => {
++  it('канон 503: общие фрагменты нарочные, слова настоящие и не повторяются', () => {
++    // Прежний закон 496 («префикс не чаще двух раз») отменён в 503: группа
++    // слов строится вокруг ОБЩЕГО фрагмента (THE/THO, TION/SION), поэтому
++    // повторы префиксов — признак правильной доски, а не дефект.
+     for (const difficulty of [3, 4, 5]) {
+       const selection = buildPasswordSet({
+         wordLength: difficulty + 4,
+@@ -166,9 +201,10 @@ describe('патч 496: структура доски', () => {
+         wordCount: passwordWordCount(difficulty, 4),
+         rng: () => 0.53,
+       });
+-      const counts = {};
+-      for (const word of selection.words) counts[word.slice(0, 2)] = (counts[word.slice(0, 2)] || 0) + 1;
+-      expect(Math.max(...Object.values(counts))).toBeLessThanOrEqual(2);
++      const dictionary = new Set(getWordsByLength(difficulty + 4));
++      for (const word of selection.words) expect(dictionary.has(word)).toBe(true);
++      expect(new Set(selection.words).size).toBe(selection.words.length);
++      expect(selection.words).toContain(selection.password);
+     }
+   });
+ 
+@@ -208,14 +244,14 @@ describe('патч 496: структура доски', () => {
+     expect(dictionary.size).toBeGreaterThan(1000);
+   });
+ 
+-  it('Хакер снижает эффективную сложность, число слов и число попыток', () => {
++  it('Хакер снижает эффективную сложность и число слов, попытки остаются 4', () => {
+     const plain = gameFor({ difficulty: 5, int: 10 });
+     const hacker = gameFor({ difficulty: 5, int: 10, extra: { selectedPerks: [{ id: 'hacker', rank: 1 }] } });
+     expect(plain.effectiveDifficulty).toBe(5);
+     expect(hacker.effectiveDifficulty).toBe(4);
+     expect(hacker.wordLength).toBe(8);
+     expect(hacker.wordCount).toBe(passwordWordCount(4, 10));
+-    expect(hacker.attempts).toBe(3);
++    expect(hacker.attempts).toBe(4); // канон 497: 4 на всех сложностях
+     const zero = gameFor({ difficulty: 1, int: 10, extra: { selectedPerks: [{ id: 'hacker', rank: 5 }] } });
+     expect(zero.effectiveDifficulty).toBe(0);
+     expect(zero.attempts).toBe(4);
+diff --git a/__tests__/ui/single-drag-mechanism-549.test.js b/__tests__/ui/single-drag-mechanism-549.test.js
+new file mode 100644
+index 0000000..8fe2a13
+--- /dev/null
++++ b/__tests__/ui/single-drag-mechanism-549.test.js
+@@ -0,0 +1,104 @@
++// ПРИЁМОЧНЫЙ (патч 549): удалить при конверсии/приживании.
++//
++// Предохранитель правила 13 устава движка: перетаскивание объектов живёт в
++// ОДНОМ экземпляре. До 549 механизм был скопирован в четырёх местах; три копии
++// держали рабочий шаблон, четвёртая изобрела свой и сломалась (баг 548: мёртвые
++// стрелки в админке). Копии расходятся молча — правка в одной не доходит до
++// остальных, поэтому запрет обеспечивается тестом, а не памятью разработчика.
++import { describe, expect, it } from 'vitest';
++import { readFileSync, readdirSync, statSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const walk = (dir, out = []) => {
++  for (const name of readdirSync(path.join(ROOT, dir))) {
++    const rel = `${dir}/${name}`;
++    if (statSync(path.join(ROOT, rel)).isDirectory()) walk(rel, out);
++    else if (rel.endsWith('.js') || rel.endsWith('.tsx') || rel.endsWith('.ts')) out.push(rel);
++  }
++  return out;
++};
++
++// Единственный владелец механизма переноса.
++const HOOK = 'src/ui/useDragResponder.js';
++
++// places, где переносится объект: карточки персонажей, ключей, сетки Мастера
++// и строки дерева локаций.
++const DRAG_PLACES = [
++  'components/screens/HomeScreen/HomeScreen.js',
++  'components/lootTrade/KeyItemCardCell.js',
++  'components/screens/LootTradeScreen/LootTradeScreen.js',
++  'components/screens/LootTradeScreen/modals/HubTreeView.js',
++];
++
++// Свайп вкладок — другой механизм (листание, а не перенос объекта).
++const SWIPE_ALLOWED = 'modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js';
++
++describe('549: правило 13 — один механизм перетаскивания', () => {
++  it('хук существует и заявляет жест в обеих фазах опроса', () => {
++    const hook = read(HOOK);
++    expect(hook).toContain('PanResponder.create');
++    // Закон фазы: решение принимает capture, bubble — запасной путь.
++    expect(hook).toContain('onStartShouldSetPanResponderCapture');
++    expect(hook).toContain('onMoveShouldSetPanResponderCapture');
++    expect(hook).toContain('onStartShouldSetPanResponder');
++    expect(hook).toContain('onMoveShouldSetPanResponder');
++    // Жест не отдаётся ScrollView и не пропускает нативный скролл.
++    expect(hook).toContain('onPanResponderTerminationRequest: () => false');
++    expect(hook).toContain('onShouldBlockNativeResponder: () => true');
++    // Перенос засчитывает только настоящее движение.
++    expect(hook).toContain('moved');
++  });
++
++  it('все четыре места берут жест из хука, а не держат свою копию', () => {
++    for (const rel of DRAG_PLACES) {
++      const code = read(rel);
++      expect(code, rel).toContain('useDragResponder');
++      expect(code, `${rel}: своя копия жеста запрещена`).not.toContain('PanResponder.create');
++    }
++  });
++
++  it('новой копии механизма переноса в проекте нет', () => {
++    const files = [...walk('components'), ...walk('src'), ...walk('modules')];
++    const offenders = files.filter((rel) => (
++      rel !== HOOK && rel !== SWIPE_ALLOWED && read(rel).includes('PanResponder.create')
++    ));
++    expect(offenders, 'перенос объекта должен идти через src/ui/useDragResponder.js').toEqual([]);
++  });
++
++  it('устав держит правила 13–15, чтобы урок не потерялся', () => {
++    const charter = read('docs/architecture/engine-charter.md');
++    expect(charter).toContain('| 13 |');
++    expect(charter).toContain('useDragResponder.js');
++    expect(charter).toContain('| 14 |');
++    expect(charter).toContain('ПОВЕДЕНИЕМ');
++    expect(charter).toContain('| 15 |');
++    expect(charter).toContain('Красный baseline запрещён');
++  });
++});
++
++describe('549: правило 14 — экран Мастера проверяется поведением', () => {
++  it('поведенческий тест монтирует экран и проверяет результат в БД', () => {
++    const test = read('__tests__/lootTrade/gm-screen-behaviour-549.test.js');
++    // Экран именно МОНТИРУЕТСЯ, а не читается как текст.
++    expect(test).toContain("import LootTradeScreen from '../../components/screens/LootTradeScreen/LootTradeScreen.js'");
++    expect(test).toContain('create(React.createElement(LootTradeScreen))');
++    // Проверяется результат в БД, а не наличие строки в исходнике.
++    expect(test).toContain('h.saved');
++    expect(test).toContain('childOrder');
++    // Жест идёт в реальном порядке опроса: capture раньше bubble.
++    expect(test).toContain('onStartShouldSetPanResponderCapture');
++    expect(test).toContain("toBe('capture')");
++  });
++
++  it('у ручек и карточек есть адреса, иначе поведение не проверить', () => {
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    expect(screen).toContain('testID={`card-drag-${container.id}`}');
++    expect(screen).toContain('testID={`card-${container.id}`}');
++    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++    expect(tree).toContain('hub-tree-reorder-');
++  });
++});
+diff --git a/components/lootTrade/KeyItemCardCell.js b/components/lootTrade/KeyItemCardCell.js
+index 771d014..5262482 100644
+--- a/components/lootTrade/KeyItemCardCell.js
++++ b/components/lootTrade/KeyItemCardCell.js
+@@ -17,13 +17,13 @@ import {
+   Modal,
+   Dimensions,
+   StyleSheet,
+-  PanResponder,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../i18n/locale';
+ import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import cardStyles from '../../styles/LootTradeScreen.styles';
+ import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
++import useDragResponder from '../../src/ui/useDragResponder';
+ 
+ const MENU_WIDTH = 224;
+ const MENU_HEIGHT = 100;
+@@ -41,29 +41,15 @@ const KeyItemCardCell = ({
+   useLocale();
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
+-  const dragCallbacks = useRef({});
+-  dragCallbacks.current = { onDragStart, onDragMove, onDragEnd };
+-  const panResponder = useRef(PanResponder.create({
+-    onStartShouldSetPanResponderCapture: () => true,
+-    onMoveShouldSetPanResponderCapture: () => true,
+-    onStartShouldSetPanResponder: () => true,
+-    onMoveShouldSetPanResponder: () => true,
+-    onPanResponderTerminationRequest: () => false,
+-    onShouldBlockNativeResponder: () => true,
+-    onPanResponderGrant: (_evt, gesture) => {
+-      dragCallbacks.current.onDragStart?.({ pageX: gesture.x0, pageY: gesture.y0 });
+-    },
+-    onPanResponderMove: (_evt, gesture) => {
+-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+-      dragCallbacks.current.onDragMove?.({ pageX: gesture.moveX, pageY: gesture.moveY });
+-    },
+-    onPanResponderRelease: (_evt, gesture) => {
+-      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+-    },
+-    onPanResponderTerminate: (_evt, gesture) => {
+-      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
+-    },
+-  })).current;
++  // Патч 549: единый механизм перетаскивания на всё приложение.
++  const { panHandlers } = useDragResponder({
++    onStart: (point) => onDragStart?.(point),
++    onMove: (point) => onDragMove?.(point),
++    // Признак движения передаётся дальше: перенос засчитывает только жест,
++    // а не простое нажатие на стрелку (единое правило 549).
++    onEnd: (point, _payload, meta) => onDragEnd?.(point, undefined, meta),
++    enabled: Boolean(onDragStart),
++  });
+ 
+   const openMenu = (event) => {
+     event?.stopPropagation?.();
+@@ -90,7 +76,7 @@ const KeyItemCardCell = ({
+       activeOpacity={0.82}
+     >
+       {canMoveToHub && onDragStart && (
+-        <View testID={`key-item-drag-${keyItem.id}`} {...panResponder.panHandlers} style={cardStyles.cardDragHandle}>
++        <View testID={`key-item-drag-${keyItem.id}`} {...panHandlers} style={cardStyles.cardDragHandle}>
+           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+         </View>
+       )}
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 1741ed2..69bc78b 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -11,12 +11,12 @@ import {
+   Modal,
+   Linking,
+   TextInput,
+-  PanResponder,
+   Dimensions,
+ } from 'react-native';
+ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import useCharacterStore from '../../../src/store/characterStore';
++import useDragResponder from '../../../src/ui/useDragResponder';
+ // Шаг 8б (патч 242): сохранения — обычный модуль без React.
+ import * as savesModule from '../../../src/saves/characterSaves';
+ import { findEnrichedOrigin } from '../../../domain/origins';
+@@ -194,49 +194,19 @@ const CharacterCell = ({
+     action();
+   };
+ 
+-  // PanResponder keeps ownership of the pointer after it leaves the small handle,
+-  // which Touchable's touch callbacks do not guarantee on web and native.
+-  const callbacks = useRef({});
+-  callbacks.current = { character, onDragStart, onDragMove, onDragEnd };
+-  // Track the last known pointer position: on release/terminate the gesture can
+-  // report moveX/moveY as 0 when no move was registered in that cycle.
+-  const lastPoint = useRef({ pageX: 0, pageY: 0 });
+-  const dragging = useRef(false);
+-  const panResponder = useRef(PanResponder.create({
+-    // Capture variants keep the parent TouchableOpacity/ScrollView from taking
+-    // the touch before the handle gets it.
+-    onStartShouldSetPanResponderCapture: () => true,
+-    onMoveShouldSetPanResponderCapture: () => true,
+-    onStartShouldSetPanResponder: () => true,
+-    onMoveShouldSetPanResponder: () => true,
+-    // Never hand the gesture over to the enclosing ScrollView: otherwise the
+-    // first vertical movement terminates the drag and the handle immediately
+-    // re-grabs the finger, which makes the card jitter.
+-    onPanResponderTerminationRequest: () => false,
+-    onShouldBlockNativeResponder: () => true,
+-    onPanResponderGrant: (_event, gesture) => {
+-      dragging.current = true;
+-      lastPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
+-      callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character);
+-    },
+-    onPanResponderMove: (_event, gesture) => {
+-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+-      lastPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
+-      callbacks.current.onDragMove(lastPoint.current);
+-    },
+-    onPanResponderRelease: () => {
+-      callbacks.current.onDragEnd(lastPoint.current);
+-      // Let the synthetic press that follows the release be swallowed.
+-      setTimeout(() => { dragging.current = false; }, 0);
+-    },
+-    onPanResponderTerminate: () => {
+-      callbacks.current.onDragEnd(lastPoint.current);
+-      setTimeout(() => { dragging.current = false; }, 0);
+-    },
+-  })).current;
++  // Патч 549: единый механизм перетаскивания на всё приложение. Здесь он и
++  // родился — этот шаблон был рабочим, а копия в дереве локаций сломалась
++  // (патч 548). Теперь механизм один: `src/ui/useDragResponder.js`.
++  const { panHandlers, draggingRef } = useDragResponder({
++    payload: character,
++    onStart: onDragStart,
++    onMove: onDragMove,
++    onEnd: onDragEnd,
++    enabled: Boolean(onDragStart),
++  });
+ 
+   return (
+-    <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
++    <TouchableOpacity style={styles.characterCell} onPress={() => { if (!draggingRef.current) onPress(); }} activeOpacity={0.8}>
+       {serverBound && (
+         readOnlyRoomCard ? (
+           <View
+@@ -268,7 +238,7 @@ const CharacterCell = ({
+         )
+       )}
+       {!readOnlyRoomCard && (
+-        <View {...panResponder.panHandlers} style={styles.dragHandle}>
++        <View {...panHandlers} style={styles.dragHandle}>
+           <MaterialCommunityIcons name="arrow-all" size={18} color="#111827" />
+         </View>
+       )}
+@@ -1013,7 +983,17 @@ export default function HomeScreen({ navigation }) {
+     await measureDropTargets();
+   };
+   const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
+-  const handleDragEnd = async (event) => {
++  const handleDragEnd = async (event, _payload, meta) => {
++    // Патч 549: перенос засчитывается только при настоящем движении. Простое
++    // нажатие на стрелку не должно бросать персонажа в папку, под которой
++    // оказалась точка нажатия. Признак движения даёт общий хук — то же
++    // правило, что у карточек Мастера и строк дерева локаций.
++    if (meta?.moved === false) {
++      setMovingCharacterId(null);
++      setDrag(null);
++      dropBounds.current = {};
++      return;
++    }
+     // A final measurement covers the case where the pointer is released
+     // immediately after the conditionally rendered root zone appears.
+     await measureDropTargets();
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 1299f6d..3644e9e 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -10,11 +10,11 @@ import {
+   TextInput,
+   Dimensions,
+   Platform,
+-  PanResponder,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import * as db from '../../../db';
++import useDragResponder from '../../../src/ui/useDragResponder';
+ import {
+   SUPPORTED_LOCALES,
+   useLocale,
+@@ -143,39 +143,16 @@ const ContainerCardCell = ({
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
+ 
+-  const dragCallbacks = useRef({});
+-  dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };
+-  const lastDragPoint = useRef({ pageX: 0, pageY: 0 });
+-  const draggingRef = useRef(false);
+-  const panResponder = useRef(PanResponder.create({
+-    onStartShouldSetPanResponderCapture: () => true,
+-    onMoveShouldSetPanResponderCapture: () => true,
+-    onStartShouldSetPanResponder: () => true,
+-    onMoveShouldSetPanResponder: () => true,
+-    onPanResponderTerminationRequest: () => false,
+-    onShouldBlockNativeResponder: () => true,
+-    onPanResponderGrant: (_evt, gesture) => {
+-      draggingRef.current = true;
+-      lastDragPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
+-      dragCallbacks.current.onDragStart?.(
+-        { pageX: gesture.x0, pageY: gesture.y0 },
+-        dragCallbacks.current.container,
+-      );
+-    },
+-    onPanResponderMove: (_evt, gesture) => {
+-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+-      lastDragPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
+-      dragCallbacks.current.onDragMove?.(lastDragPoint.current);
+-    },
+-    onPanResponderRelease: () => {
+-      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
+-      setTimeout(() => { draggingRef.current = false; }, 0);
+-    },
+-    onPanResponderTerminate: () => {
+-      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
+-      setTimeout(() => { draggingRef.current = false; }, 0);
+-    },
+-  })).current;
++  // Патч 549: единый механизм перетаскивания (`src/ui/useDragResponder.js`).
++  // Карточки Мастера, карточки ключей, карточки персонажей и строки дерева
++  // локаций теперь берут жест из одного места — копии больше не расходятся.
++  const { panHandlers, draggingRef } = useDragResponder({
++    payload: container,
++    onStart: onDragStart,
++    onMove: onDragMove,
++    onEnd: onDragEnd,
++    enabled: Boolean(onDragStart),
++  });
+ 
+   const openMenu = (event) => {
+     event?.stopPropagation?.();
+@@ -205,6 +182,7 @@ const ContainerCardCell = ({
+   return (
+     <TouchableOpacity
+       ref={cardRefCallback}
++      testID={`card-${container.id}`}
+       style={[
+         styles.cardCell,
+         isLive && styles.cardCellActive,
+@@ -218,7 +196,11 @@ const ContainerCardCell = ({
+       {/* Патч 539: стрелки переноса есть и у локаций-хабов — их вкладывают
+           друг в друга, как папки в Windows. */}
+       {onDragStart && (
+-        <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
++        <View
++          testID={`card-drag-${container.id}`}
++          {...panHandlers}
++          style={styles.cardDragHandle}
++        >
+           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+         </View>
+       )}
+@@ -1056,7 +1038,18 @@ export default function LootTradeScreen() {
+     setDrag((cur) => (cur ? { ...cur, x: point.pageX, y: point.pageY } : null));
+   };
+ 
+-  const handleDragEnd = async (point) => {
++  const handleDragEnd = async (point, _payload, meta) => {
++    // Патч 549: перенос засчитывается только при настоящем движении. Раньше
++    // простое нажатие на стрелку бросало карточку в локацию, под которой
++    // оказалась точка нажатия (тот же класс бага, что 548 в дереве). Признак
++    // движения даёт общий хук — правило одно для всех экранов.
++    if (meta?.moved === false) {
++      setMovingKeyItemId(null);
++      setMovingContainerId(null);
++      setDrag(null);
++      hubDropBounds.current = {};
++      return;
++    }
+     await measureHubDropTargets();
+     // Патч 539: локацию нельзя бросить на саму себя — исключаем её из целей.
+     const hit = Object.entries(hubDropBounds.current).find(([id, b]) => (
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index a46858b..5208e98 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -1,5 +1,5 @@
+ import React, { useMemo, useRef, useState } from 'react';
+-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal, PanResponder } from 'react-native';
++import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import { useLocale } from '../../../../i18n/locale';
+@@ -9,6 +9,7 @@ import {
+   getHubIdsContainingChild,
+ } from '../../../../domain/lootTrade';
+ import locationGraph from '../../../../domain/locationGraph';
++import useDragResponder from '../../../../src/ui/useDragResponder';
+ import {
+   resolveAccessExpression,
+   formatAccessExpression,
+@@ -56,10 +57,10 @@ const HubTreeView = ({
+   const [expanded, setExpanded] = useState(() => new Set());
+   // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
+   const [passagePrompt, setPassagePrompt] = useState(null);
+-  // Патч 545: перетаскивание строк одного родителя. Контекст задаётся ручкой
+-  // строки, PanResponder только измеряет/подсвечивает и отдаёт новый порядок.
++  // Патч 545: перетаскивание строк одного родителя. Контекст строки заявляет
++  // ручка, общий хук (549) ведёт жест, компонент измеряет/подсвечивает и
++  // отдаёт новый порядок.
+   const rowRefs = useRef({});
+-  const dragContextRef = useRef(null);
+   const activeDragRef = useRef(null);
+   const reorderRef = useRef(onReorderChildren);
+   reorderRef.current = onReorderChildren;
+@@ -156,16 +157,16 @@ const HubTreeView = ({
+     return null;
+   };
+ 
+-  const finishDrag = (cancelled) => {
++  const finishDrag = ({ cancelled, moved } = {}) => {
+     const drag = activeDragRef.current;
+     activeDragRef.current = null;
+-    dragContextRef.current = null;
+     setDragPreview(null);
+     if (cancelled || !drag) return;
+     // Патч 548: порядок меняет только настоящее движение. Иначе простое
+     // нажатие на стрелку (точка нажатия ещё не сдвинулась) могло попасть
+-    // в соседнюю строку и молча переставить позицию.
+-    if (!drag.moved) return;
++    // в соседнюю строку и молча переставить позицию. Признак движения даёт
++    // общий хук (патч 549) — правило одно для всех экранов.
++    if (!moved) return;
+     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
+     if (!targetId || targetId === drag.childId) return;
+     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
+@@ -173,67 +174,43 @@ const HubTreeView = ({
+     reorderRef.current?.(drag.parentId, nextOrder);
+   };
+ 
+-  const panResponder = useRef(PanResponder.create({
+-    onStartShouldSetPanResponderCapture: () => true,
+-    onMoveShouldSetPanResponderCapture: () => true,
+-    onPanResponderTerminationRequest: () => false,
+-    onShouldBlockNativeResponder: () => true,
+-    onPanResponderGrant: (_evt, gesture) => {
+-      const context = dragContextRef.current;
++  /**
++   * Патч 549: жест берётся из общего хука, как у карточек персонажей, ключей
++   * и сетки Мастера. Своя копия жеста здесь и сломалась в 548: контекст строки
++   * задавался в bubble-фазе, а решение RN принимает в capture — ручка была
++   * мертва всегда. Хук заявляет нагрузку строки в обеих фазах, поэтому этот
++   * класс бага закрыт для всех экранов сразу.
++   */
++  const { handlersFor } = useDragResponder({
++    enabled: typeof onReorderChildren === 'function',
++    onStart: (point, context) => {
+       if (!context) return;
+       activeDragRef.current = {
+         ...context,
+         bounds: measureSiblingRows(context.siblingIds),
+         overId: null,
+-        moved: false,
+-        point: { x: gesture.x0, y: gesture.y0 },
++        point: { x: point.pageX, y: point.pageY },
+       };
+       setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
+     },
+-    onPanResponderMove: (_evt, gesture) => {
++    onMove: (point) => {
+       const drag = activeDragRef.current;
+       if (!drag) return;
+-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+-      drag.moved = true;
+-      drag.point = { x: gesture.moveX, y: gesture.moveY };
++      drag.point = { x: point.pageX, y: point.pageY };
+       const overId = siblingAtPoint(drag, drag.point);
+       if (overId !== drag.overId) {
+         drag.overId = overId;
+         setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
+       }
+     },
+-    onPanResponderRelease: () => finishDrag(false),
+-    onPanResponderTerminate: () => finishDrag(true),
+-  })).current;
+-
+-  /**
+-   * Патч 548: контекст строки задаётся в CAPTURE-фазе, а не только в bubble.
+-   *
+-   * Баг владельца: «стрелки перемещения в админке не активны». Ручка отдавала
+-   * `onStartShouldSetPanResponderCapture: () => true`, а контекст (`parentId`,
+-   * `childId`, братья) писала только в `onStartShouldSetPanResponder`. Система
+-   * ответственности RN (и react-native-web: `findWantsResponder`) опрашивает
+-   * capture сверху вниз и ПРИНИМАЕТ решение сразу, как только обработчик вернул
+-   * true — до bubble-фазы дело не доходит. Поэтому контекст оставался null,
+-   * `onPanResponderGrant` выходил по проверке `if (!context) return`, и
+-   * перетаскивание не начиналось никогда: стрелка выглядела мёртвой.
+-   *
+-   * Теперь одна функция `claimDrag` пишет контекст во всех четырёх точках
+-   * опроса — и в capture (реальный путь), и в bubble (запасной).
+-   */
+-  const dragHandlersFor = (parentNode, container, siblingIds) => {
+-    const claimDrag = () => {
+-      dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
+-      return true;
+-    };
+-    return {
+-      ...panResponder.panHandlers,
+-      onStartShouldSetPanResponderCapture: claimDrag,
+-      onMoveShouldSetPanResponderCapture: claimDrag,
+-      onStartShouldSetPanResponder: claimDrag,
+-      onMoveShouldSetPanResponder: claimDrag,
+-    };
+-  };
++    onEnd: (_point, _context, meta) => finishDrag(meta),
++  });
++
++  const dragHandlersFor = (parentNode, container, siblingIds) => handlersFor({
++    parentId: parentNode.id,
++    childId: container.id,
++    siblingIds,
++  });
+ 
+   const setRowRef = (id) => (ref) => {
+     if (ref) rowRefs.current[id] = ref;
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 55d3821..1f2ebc6 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,50 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (549) — один механизм перетаскивания, равенство Мастера игроку, зелёный baseline
++
++Слово владельца: «Сначала зелёный baseline + общий хук жеста и поведенческие
++тесты… Мастерский раздел должен максимально соответствовать механизмам юзера.
++А команды посылаемые мастером юзеру — это команды, которые мог бы сделать сам
++юзер или получить их в результате своих действий… вероятно превратится в движок
++для игры + многопользовательская интернет работа». Канон подтверждён повторно:
++**4 попытки терминала на всех сложностях**.
++
++Диагноз (аудит только чтением): не «весь раздел кривой», а класс дефектов —
++жест скопирован 4× (545 написал четвёртую копию вместо рабочей), приёмка Мастера
++читала исходник как текст (0 рендер-тестов экрана против 10 у оверлея), красный
++baseline узаконен и почти скрыл регрессию 548. Домен и сервер покрыты нормально.
++
++- **Шаг 1 — зелёный baseline.** `terminal-hacking-balance-496` требовал отменённых
++  законов (5 попыток, скобки от Удачи, старый размер доски, уникальные префиксы).
++  Программа была права — протух ТЕСТ. Переписан под канон 497/499/500/503 → 14/14.
++  Полный прогон впервые с 541 без «известных падений».
++- **Шаг 2 — общий хук.** Новый `src/ui/useDragResponder.js`: захват во всех четырёх
++  точках опроса (урок 548), нагрузка строки читается в момент grant, `onEnd(point,
++  payload, {cancelled, moved})`, нулевая точка не движение, ScrollView жест не
++  получает. Переведены ВСЕ 4 места: `KeyItemCardCell`, `HomeScreen`,
++  `LootTradeScreen`, `HubTreeView`; `PanResponder` из их импортов удалён.
++  Свайп вкладок `WeaponsAndArmorScreen` — другой механизм, не тронут.
++- **Шаг 3 — поведение и НАСТОЯЩИЙ БАГ.** Первый в проекте тест, монтирующий
++  `LootTradeScreen`, сразу поймал: нажатие на стрелку без движения переносило
++  карточку в локацию под точкой нажатия (тот же класс, что 548, но в двух других
++  местах). `handleDragEnd` принимал только точку. Фикс в `LootTradeScreen` и
++  `HomeScreen`: ранний выход с очисткой состояния при `meta.moved === false`;
++  `KeyItemCardCell` пробрасывает мету. Добавлены адреса `card-<id>`/`card-drag-<id>`.
++- **Строковые guards мешали рефакторингу.** 514 и оба guards 548 требовали копию
++  жеста в каждом файле. Переведены на контракт хука — не возвращать литералы ради
++  guard. Поведенческие тесты 545/548 при миграции остались зелёными.
++- **Закон равенства.** `docs/gm-player-parity-law.md` + правило 16 устава:
++  команда Мастера = действие игрока, один исполнитель, белый список, одинаковый
++  результат. Проверено на настоящем сторе (заколки, журнал, нехватка, повтор).
++  Правила 13–15 устава: один механизм, приёмка поведением, запрет красного baseline.
++- **Приёмка:** `drag-responder-549` (12), `gm-screen-behaviour-549` (7),
++  `gm-player-parity-549` (7), `single-drag-mechanism-549` (6).
++  Итог: **281 файл / 2587 проверок, exit 0**; typecheck и build чисто.
++- **ОТКРЫТЫЙ ВОПРОС:** при нехватке заколок списывается остаток (стор отказывает,
++  легаси-резерв `consumeBobbyPins` расходует что есть): 1 заколка + запрос 3 →
++  списана 1. Оба пути одинаковы, закон равенства цел, поэтому 549 правило НЕ менял.
++  Ждёт решения владельца (§5 закона равенства).
++
+ ## 2026-11-06 (548) — стрелки перемещения в админке снова активны
+ 
+ Баг владельца: «стрелки перемещения в админке не активны, возможно после выдачи
+@@ -1082,6 +1127,13 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
++0. **Нехватка заколок: списывать остаток или отказать? (549)** При 1 заколке и
++   запросе на 3 списывается 1: `store.spendItemStacks` честно отказывает
++   (`not-enough-items`, баланс не тронут — правило 5 устава), но легаси-резерв
++   `engine.consumeBobbyPins` затем расходует что есть. Пути игрока и Мастера
++   одинаковы, закон равенства не нарушен — 549 правило НЕ менял, тест фиксирует
++   текущее поведение с пометкой. Нужно слово владельца: «сломал что было» или
++   честный отказ без списания. См. §5 `docs/gm-player-parity-law.md`.
+ 0. **Крафт модов брони** — таблица книги записана и сверена
+    (`docs/reference-data/armor-mods-crafting.md`, 327–332). Ответы
+    владельца (332): ёмкость крафта ≠ complexity предмета (то поле нигде
+@@ -1184,6 +1236,21 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
+ 
+ ## Уроки (не повторять)
+ 
++- **549: готовый механизм переиспользовать, а не писать заново.** Жест был
++  скопирован 4×; три копии держали рабочий образец, четвёртая изобрела свой и
++  сломалась (баг 548). Теперь один `src/ui/useDragResponder.js` и запрет копий
++  тестом. Прежде чем писать механизм — искать существующий.
++- **549: строковый guard не приёмка.** «В файле есть нужная строка» пропускает
++  мёртвую ручку и блокирует рефакторинг (guards 514/548 требовали копию жеста в
++  каждом файле). Экран принимать МОНТИРОВАНИЕМ и результатом в БД; жест гонять в
++  реальном порядке опроса фаз (capture раньше bubble), а не звать bubble руками.
++- **549: красный baseline запрещён.** «Известные падения» 496 держались с 542 и
++  почти скрыли настоящую регрессию 548 (девятым падением был guard версии). При
++  расхождении теста и кода сначала сверить канон по changelog/держателям: код был
++  прав, протух тест. Отменённое правило — обновлять тест в том же патче.
++- **549: команда Мастера = действие игрока.** Один исполнитель, белый список,
++  одинаковый результат; проверять равенством листов на настоящем сторе, а не
++  наличием вызова в исходнике. Закон: `docs/gm-player-parity-law.md`.
+ - (366) Файл патча N генерировать СТРОГО от предыдущего «файл патча»-
+   коммита: `git diff <prev-файл-патча> <контент-N>`; 364 собрал от базы
+   до-363 — патч не вставал ровно после 363 (двойные правки), а e2e
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 9d443dd..fb8f857 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -97,6 +97,10 @@
+ | 10 | Каждый `.ts`/`.tsx` репозитория входит в `include` tsconfig — типизация не «забывает» файлы; протухших записей в include нет | `__tests__/typescript/tsconfig-coverage.test.js` (патч 280) |
+ | 11 | Нет дублей `foo.js` + `foo.ts`/`foo.tsx` в одной папке — резолвер Metro берёт `.js` первым, TS-файл был бы мёртвым кодом | `__tests__/typescript/no-js-ts-duplicates.test.js` (патч 280) |
+ | 12 | Новая модалка переиспользует каркас ближайшей модалки, а не задаёт базовые стили заново | `docs/ui-modals-rules.md` + `__tests__/ui/modal-design-reuse-512.test.js` (патч 512) |
++| 13 | Перетаскивание объектов существует в ОДНОМ экземпляре — `src/ui/useDragResponder.js`; своя копия `PanResponder.create` для переноса карточки/строки запрещена (свайп вкладок — другой механизм, правила не касается) | `__tests__/lootTrade/drag-responder-549.test.js` (контракт хука) + `gm-screen-behaviour-549.test.js` + `__tests__/ui/single-drag-mechanism-549.test.js` (патч 549) |
++| 14 | Экран Мастера проверяется ПОВЕДЕНИЕМ (монтирование + результат в БД), а не наличием строк в исходнике; жест прогоняется в реальном порядке опроса фаз (capture раньше bubble) | `__tests__/lootTrade/gm-screen-behaviour-549.test.js` (патч 549) |
++| 15 | Красный baseline запрещён: тест, требующий отменённого владельцем закона, обновляется в том же патче, где закон отменён | полный `npm test` без «известных падений» (патч 549) |
++| 16 | **Закон равенства Мастера и игрока:** команда Мастера = действие, которое игрок может сделать сам; один общий исполнитель, белый список команд, одинаковый результат | `docs/gm-player-parity-law.md` + `__tests__/room/gm-player-parity-549.test.js` (равенство листов на настоящем сторе, патч 549) |
+ 
+ **Следствие (главный урок серии 219–249):** новое поле/действие/ключ сейва = обновление паспорта
+ В ТОМ ЖЕ ПАТЧЕ — иначе контрактный тест падает. Горячие фиксы «по времени и силам» исчезают:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index cd30261..57ea3fd 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,58 @@
+ # Changelog
+ ---
+ 
++## One drag mechanism and GM/player parity (patch 549)
++
++Work requested by the owner: "The Game Master section must match the player's
++mechanisms as closely as possible. The commands the Master sends to a player are
++commands the player could perform themselves, or receive as a result of their own
++actions." The owner set the order explicitly: a green test suite first, then one
++shared gesture mechanism, then behavioural checks of the Master section.
++
++- **Tapping an arrow no longer moves anything.** A real bug was found: pressing a
++  card's arrow and releasing without moving dropped the card into whatever
++  location sat under the touch point. The character screen had the same defect —
++  a plain tap could drop a character into a folder. Only real movement now counts
++  as a drop; a tap is harmless. This is the same defect patch 548 found in the
++  location tree, but in two other places the old acceptance checks could not see.
++- **Dragging lives in one place.** The mechanism had been copied into four
++  screens: character cards, key item cards, the Master's grid and the location
++  tree. Three copies followed the working pattern; the fourth invented its own and
++  broke (bug 548). All four now take the gesture from the shared
++  `src/ui/useDragResponder.js`, so one rule applies everywhere and a fix reaches
++  every screen at once.
++- **The Master section is checked by behaviour, not by source text.** Acceptance
++  used to look for particular lines in the screen file — a dead handle passed that
++  check. The Master screen is now genuinely mounted in tests: a card is moved into
++  a location and the result is verified in the database, and location tree rows are
++  reordered with the same gesture negotiation a browser performs. That is exactly
++  how the tap bug was caught.
++- **The test suite is fully green again.** Eight terminal balance failures had
++  been carried as "known" since patch 542. Investigation showed the program was
++  right and the test was stale: it demanded rules the owner had since cancelled
++  (five attempts on high difficulty, brackets driven by Luck, the old board size).
++  The owner reconfirmed the canon: **four attempts at every difficulty**. The test
++  now follows the live rules, so a red baseline no longer hides real regressions.
++- **The GM/player parity law is written down.** A Master command must be an action
++  the player can perform themselves and must run through the same mechanism.
++  Verified against real character state: spending a bobby pin by hand and by Master
++  command yields an identical sheet, magazine use matches, and shortage or a
++  repeated command behave the same way. The Master has no separate "admin"
++  mechanics — a prerequisite for networked play and for engine work.
++- **Acceptance.** `drag-responder-549` (12) — shared gesture contract;
++  `gm-screen-behaviour-549` (7) — mounted Master screen and database results;
++  `gm-player-parity-549` (7) — identical player and command outcomes;
++  `single-drag-mechanism-549` (6) — no new copies of the mechanism.
++  Total: 281 files, 2587 checks, all green.
++
++**Open question for the owner.** When bobby pins are short, the remainder is spent
++instead of refusing outright: with one pin and a request for three, one is spent.
++Both paths — player and Master — behave identically, so the parity law holds and
++patch 549 left the rule unchanged. Your decision is needed: keep "broke what was
++there", or require a clean refusal with no spending.
++
++---
++
+ ## Move arrows in the admin screen work again (patch 548)
+ 
+ Fixed the owner's bug: "the move arrows in the admin screen are inactive,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c4faef8..b00a580 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,57 @@
+ 
+ ---
+ 
++## Один механизм перетаскивания и равенство Мастера игроку (патч 549)
++
++Работа по слову владельца: «Мастерский раздел должен максимально соответствовать
++механизмам юзера. А команды посылаемые мастером юзеру — это команды, которые мог бы
++сделать сам юзер или получить их в результате своих действий». Порядок работ
++владелец утвердил явно: сначала зелёный набор тестов, потом общий механизм жеста,
++потом проверка поведения Мастерского раздела.
++
++- **Нажатие на стрелку больше ничего не переносит.** Найден настоящий баг: если
++  нажать на стрелку карточки и отпустить, не двигая пальцем, карточка уезжала в
++  локацию, под которой оказалась точка нажатия. То же было на экране персонажей —
++  персонаж мог попасть в папку от простого нажатия. Теперь перенос засчитывает
++  только настоящее движение, а нажатие безвредно. Это тот же дефект, что 548 нашёл
++  в дереве локаций, но в двух других местах — их прежняя приёмка не видела.
++- **Перетаскивание живёт в одном месте.** Механизм был скопирован в четырёх
++  экранах: карточки персонажей, карточки ключей, сетка Мастера и дерево локаций.
++  Три копии держали рабочий образец, четвёртая изобрела свой и сломалась (баг 548).
++  Теперь все четыре берут жест из общего `src/ui/useDragResponder.js`: правило
++  одно, и правка в нём доходит до всех экранов сразу.
++- **Мастерский раздел проверяется поведением, а не текстом программы.** Раньше
++  приёмка смотрела, есть ли нужные строки в файле экрана — мёртвая ручка такую
++  проверку проходила. Теперь экран Мастера впервые по-настоящему открывается в
++  тестах: карточка переносится в локацию и результат проверяется в базе данных,
++  дерево локаций переставляется тем же жестом, что и пальцем в браузере. Именно
++  этот способ проверки и нашёл баг с нажатием.
++- **Набор тестов снова полностью зелёный.** Восемь падений проверки баланса
++  терминала держались с патча 542 как «известные». Разбор показал: программа права,
++  устарел сам тест — он требовал отменённых правил (пять попыток на высокой
++  сложности, скобки от Удачи, прежний размер доски). Владелец подтвердил канон:
++  **четыре попытки на всех сложностях**. Тест приведён к действующим правилам;
++  красная база больше не прячет настоящие поломки.
++- **Закон равенства Мастера и игрока записан.** Команда Мастера обязана быть тем
++  же действием, которое игрок может сделать сам, и исполняться тем же
++  механизмом. Проверено на настоящем состоянии персонажа: списание заколки рукой
++  игрока и командой Мастера даёт одинаковый лист, журнал гасится одинаково,
++  нехватка и повтор команды ведут себя одинаково. Отдельной «админской» механики у
++  Мастера нет — это условие будущей сетевой игры и работы движком.
++- **Приёмка.** `drag-responder-549` (12) — контракт общего жеста;
++  `gm-screen-behaviour-549` (7) — открытый экран Мастера и результат в базе;
++  `gm-player-parity-549` (7) — равенство листов игрока и команды Мастера;
++  `single-drag-mechanism-549` (6) — запрет новых копий механизма.
++  Итого 281 файл, 2587 проверок, всё зелёное.
++
++**Открытый вопрос владельцу.** При нехватке заколок списывается остаток, а не
++следует честный отказ: при одной заколке и запросе на три списывается одна.
++Оба пути — игрока и Мастера — делают это одинаково, поэтому закон равенства не
++нарушен, и патч 549 правило не менял. Нужно ваше решение: оставить «сломал что
++было» или требовать отказ без списания.
++
++---
++
+ ## Стрелки перемещения в админке снова активны (патч 548)
+ 
+ Исправлен баг владельца: «стрелки перемещения в админке не активны, возможно
+diff --git a/docs/gm-player-parity-law.md b/docs/gm-player-parity-law.md
+new file mode 100644
+index 0000000..2ee3042
+--- /dev/null
++++ b/docs/gm-player-parity-law.md
+@@ -0,0 +1,93 @@
++# Закон равенства Мастера и игрока (патч 549)
++
++> **Слово владельца:** «Приложение будет развиваться дальше, очень многое сейчас
++> у пользователя отработано. Мастерский раздел должен максимально соответствовать
++> механизмам юзера. А команды посылаемые мастером юзеру — это команды, которые мог
++> бы сделать сам юзер или получить их в результате своих действий. Приложение уже
++> не просто компаньон, оно вероятно превратится в движок для игры +
++> многопользовательская интернет работа».
++
++Это **закон**, а не отдельное исправление. Он действует на всё пространство
++Мастера, на протокол команд, на мини-игры и на будущую сетевую работу. Вместе с
++законом снимка (529) он образует пару:
++
++- **529 (закон снимка):** сервер не правит лист игрока — он посылает команду,
++  которую исполняет клиент. Снимок — канал наблюдения.
++- **549 (закон равенства):** эта команда обязана быть тем же действием, которое
++  игрок может сделать сам или получить в результате своих действий.
++
++Первый закон отвечает на вопрос «кто пишет в лист» (только клиент). Второй — на
++вопрос «что именно можно попросить» (только то, что доступно игроку).
++
++## 1. Что это значит на практике
++
++**Один механизм на два входа.** У действия игрока и у команды Мастера один
++исполнитель. Проверено на живом коде:
++
++| Действие | Рука игрока | Команда Мастера | Общий исполнитель |
++| --- | --- | --- | --- |
++| Списать заколку | поломка в мини-игры замка (`LockPickingModal`) | `char.command(kind=item.spend)` | `components/lootTrade/spendBobbyPins.js` → `store.spendItemStacks` |
++| Погасить эффект журнала | кнопка чтения журнала | `char.command(kind=magazine.use)` | `store.markMagazineEffectUsed` |
++
++Мастер **не имеет** отдельной «админской» механики: он не пишет в инвентарь
++напрямую, не поднимает ревизию, не обходит правила нехватки, надетого и запертого
++(правило 522). Если игрок не может списать предмет — Мастер тоже не может.
++
++**Белый список вместо произвола.** `CHAR_COMMAND_KINDS` — закрытый перечень.
++Неизвестная команда отвергается (`unknown-kind`), чужой предмет не списывается
++(`unsupported-item`). Это не ограничение Мастера, а следствие закона: у игрока
++нет действия «стереть инвентарь», значит нет его и у команды.
++
++**Одинаковый результат, а не похожий.** Приёмка сравнивает лист после действия
++игрока и после команды Мастера — они обязаны совпадать до единицы. Тест
++`__tests__/room/gm-player-parity-549.test.js` делает это на настоящем
++`characterStore`, а не читает исходник.
++
++## 2. Зачем это нужно движку и сетевой игре
++
++Владелец обозначил горизонт: **движок для игры + многопользовательская работа**.
++При таком горизонте закон равенства — не удобство, а условие работоспособности:
++
++1. **Одна механика — один баг.** Если у Мастера свой путь изменения листа, каждый
++   баг придётся ловить дважды и править дважды. Именно так выросло расхождение
++   жеста, которое разобрал патч 549 (четыре копии, одна сломана).
++2. **Сетевая переигровка.** В многопользовательской игре событие должно
++   применяться одинаково независимо от того, кто его инициировал — сам игрок,
++   Мастер или сервер по правилу. Общий исполнитель даёт это бесплатно.
++3. **Проверяемость.** «Команда = действие игрока» превращается в тест равенства.
++   «Мастер делает по-своему» тестом не проверяется вовсе.
++4. **Второй сеттинг.** Движок не знает сеттинга; если механика продублирована в
++   экране Мастера, второй сеттинг получит половину правил.
++
++## 3. Как проверять новое действие Мастера
++
++Перед добавлением команды ответить на три вопроса:
++
++1. **Может ли игрок сделать это сам?** Если нет — команды быть не должно;
++   сначала появляется механика у игрока, потом доступ к ней у Мастера.
++2. **Тем ли исполнителем?** Команда обязана звать штатное действие стора или
++   общий модуль, а не писать в состояние своими руками.
++3. **Совпадает ли результат?** Приёмка сравнивает состояние листа после двух
++   путей. Строковый guard («в файле есть вызов») этого не заменяет: он видит
++   вызов, но не заметит другой результат.
++
++## 4. Предохранители
++
++- `__tests__/room/gm-player-parity-549.test.js` — равенство результатов на
++  настоящем сторе (7 проверок): заколки, журнал, нехватка, повтор команды,
++  неизвестная команда, чужой предмет, закрытый каталог.
++- `__tests__/room/char-spend-commands-528.test.js` — порядок исполнения команд и
++  идемпотентность после реконнекта (закон снимка).
++- Правило 16 устава движка (`docs/architecture/engine-charter.md`).
++
++## 5. Открытый вопрос владельцу (найден при приёмке 549)
++
++При нехватке заколок пути ведут себя **одинаково**, но само поведение спорное:
++стор отказывает (`not-enough-items`, баланс не тронут — правило 5 устава), а
++легаси-резерв `consumeBobbyPins` затем списывает остаток. Итог: при 1 заколке и
++запросе на 3 списывается 1, баланс становится 0.
++
++Закон равенства не нарушен (оба пути дают одно и то же), поэтому патч 549
++поведение **не менял** — это вопрос правила, а не дефект равенства. Требуется
++решение владельца: считать ли исчерпание остатка верным («сломал что было») или
++нужен честный отказ без списания. Тест фиксирует текущее поведение с пометкой.
+diff --git a/docs/patch-549-install.md b/docs/patch-549-install.md
+new file mode 100644
+index 0000000..0a9b1d8
+--- /dev/null
++++ b/docs/patch-549-install.md
+@@ -0,0 +1,133 @@
++# Установка патча 549: один механизм перетаскивания и равенство Мастера игроку
++
++Патч подготовлен от состояния **версии 548**. Файл установки:
++`patchs/549-shared-drag-hook.patch`.
++
++> Слово владельца: «Сначала зелёный baseline + общий хук жеста и поведенческие
++> тесты. Приложение будет развиваться дальше, очень многое сейчас у пользователя
++> отработано. Мастерский раздел должен максимально соответствовать механизмам
++> юзера. А команды посылаемые мастером юзеру — это команды, которые мог бы сделать
++> сам юзер или получить их в результате своих действий. Приложение уже не просто
++> компаньон, оно вероятно превратится в движок для игры + многопользовательская
++> интернет работа».
++
++Порядок работ утверждён владельцем явно и соблюдён: (1) зелёный baseline,
++(2) общий хук жеста, (3) поведенческие тесты Мастерского раздела.
++
++## Диагноз: класс дефектов, а не «кривой раздел»
++
++Аудит только чтением дал точную картину:
++
++- механизм перетаскивания был скопирован **в четырёх местах**; три копии держали
++  рабочий образец, четвёртая (дерево локаций, патч 545) изобрела свой и сломалась —
++  это и был баг 548;
++- экран Мастера **ни разу не монтировался** в тестах: 0 рендер-тестов против 10 у
++  оверлея игрока; 20 файлов проверяли его через чтение исходника как текста;
++- восемь падений теста баланса терминала 496 были узаконены как «известные» —
++  красная база почти скрыла настоящую регрессию в 548 (девятым падением был guard
++  версии).
++
++Домен и сервер комнат при этом покрыты нормально — переписывать раздел не нужно.
++
++## Шаг 1: зелёный baseline
++
++Тест `terminal-hacking-balance-496` требовал **отменённых** правил. Программа была
++права, устарел тест. Канон подтверждён владельцем повторно: **4 попытки на всех
++сложностях**. Тест приведён к действующим законам:
++
++| Что требовал протухший тест | Действующий канон | Патч канона |
++| --- | --- | --- |
++| 5 попыток на высокой сложности | 4 попытки везде, сброс к 4 | 497 |
++| скобки от Удачи | скобки только по Науке; Удача даёт шанс полного возврата (5–20 %) | 499 |
++| прежний размер доски | `N = max(4, 15 + 2·D − ИНТ)`, предохранитель `N−1` | 500 |
++| уникальные префиксы | три группы по общему фрагменту, повторы нарочные | 503 |
++
++Результат: `npm test` → **exit 0**, без «известных падений».
++
++## Шаг 2: общий хук жеста
++
++Новый файл `src/ui/useDragResponder.js` — единственный владелец механизма
++переноса. Контракт:
++
++- вход `{ payload, onStart, onMove, onEnd, enabled }`;
++- выход `{ panHandlers, handlersFor(rowPayload), draggingRef }`;
++- захват заявляется **во всех четырёх точках опроса** (перехват и всплытие, старт
++  и движение) — урок 548: решение принимается в фазе перехода, до всплытия дело
++  не доходит;
++- нагрузка строки читается в момент выдачи жеста, поэтому строки не путаются;
++- `onEnd(point, payload, { cancelled, moved })` — признак настоящего движения;
++- нулевая точка от RN движением не считается;
++- жест не отдаётся ScrollView (`onPanResponderTerminationRequest → false`) и
++  блокирует нативный скролл (`onShouldBlockNativeResponder → true`).
++
++На хук переведены все четыре места: `KeyItemCardCell`, `HomeScreen` (карточка
++персонажа), `LootTradeScreen` (карточка сетки), `HubTreeView` (строка дерева).
++`PanResponder` из их импортов удалён. Свайп вкладок в `WeaponsAndArmorScreen` —
++другой механизм (листание, не перенос), его правило не касается.
++
++## Шаг 3: поведенческие тесты и найденный баг
++
++Первый в проекте тест, который **монтирует экран Мастера**
++(`__tests__/lootTrade/gm-screen-behaviour-549.test.js`), сразу поймал настоящий
++баг: нажатие на стрелку карточки без движения переносило карточку в локацию под
++точкой нажатия. Тот же дефект был на экране персонажей (папка вместо локации).
++
++Причина: `handleDragEnd` принимал только точку и не спрашивал, было ли движение.
++Исправлено в обоих экранах — ранний выход с очисткой состояния при
++`meta.moved === false`; `KeyItemCardCell` пробрасывает признак дальше.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `src/ui/useDragResponder.js` | новый общий механизм переноса (единственный владелец) |
++| `components/lootTrade/KeyItemCardCell.js` | жест из хука; признак движения проброшен в `onDragEnd` |
++| `components/screens/HomeScreen/HomeScreen.js` | жест из хука; нажатие без движения не бросает персонажа в папку |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | жест из хука; нажатие без движения не переносит карточку; адреса `card-<id>` и `card-drag-<id>` для приёмки |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | жест из хука, своя копия и `dragContextRef` удалены |
++| `__tests__/room/terminal-hacking-balance-496.test.js` | приведён к канону 497/499/500/503 (14 проверок) |
++| `__tests__/lootTrade/drag-responder-549.test.js` | контракт хука (12) |
++| `__tests__/lootTrade/gm-screen-behaviour-549.test.js` | экран Мастера монтируется, результат проверяется в БД (7) |
++| `__tests__/room/gm-player-parity-549.test.js` | равенство листов игрока и команды Мастера на настоящем сторе (7) |
++| `__tests__/ui/single-drag-mechanism-549.test.js` | запрет новых копий механизма, проверка правил устава (6) |
++| `__tests__/room/key-items-fields-514.test.js`, `__tests__/room/admin-reorder-arrows-548.test.js` | строковые guard-ы переведены на контракт хука (они требовали копию жеста в каждом файле и блокировали рефакторинг) |
++| `docs/architecture/engine-charter.md` | правила 13–16 с предохранителями |
++| `docs/gm-player-parity-law.md` | закон равенства Мастера и игрока |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 549, тезис 39 |
++
++## Границы
++
++- Поведение переноса сохранено: тесты 545/548/539/514/473 зелёные после миграции.
++- Канон порядка 545 не тронут (`childOrder` родителя, `server/locationGraph.js`,
++  несколько родителей держат независимый порядок).
++- Правила преграды 546 и оконечности победы 547 не тронуты.
++- Закон снимка 529 не тронут: команды по-прежнему исполняет клиент.
++- Сервер комнат обновлять не нужно — все правки клиентские.
++
++## Открытый вопрос владельцу
++
++При нехватке заколок списывается остаток вместо честного отказа: при 1 заколке и
++запросе на 3 списывается 1 (стор отказывает, но легаси-резерв расходует что есть).
++Оба пути — игрока и Мастера — ведут себя одинаково, закон равенства не нарушен,
++поэтому 549 правило **не менял**. Нужно решение владельца; зафиксировано в §5
++`docs/gm-player-parity-law.md`.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 549
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: **всё зелёное**, без известных падений (впервые с патча 541).
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/549-shared-drag-hook.patch` вернёт дерево, словари и версию
++к состоянию 548.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 9b0e8f5..a2f22a4 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **548**.
++Дата ревизии: 2026-11-06. Текущая версия: **549**.
+ 
+ ## Тезисы
+ 
+@@ -50,8 +50,23 @@
+ | 36 | **Замок локации — преграда входа:** непройденная проверка (`accessExpression`/`linkedCheckIds`) держит границу видимости, лута и торговли даже без флага `locked`; единый предикат `accessBarrierPending` для сервера и окна игрока, gate-first вход, страховка старого сервера по маркеру 544 | ✅ сделано | **546** |
+ | 37 | **Успех взлома передаётся дальше:** победа оконечна — «ещё подход» после ACCESS GRANTED не предлагается и отказывает на сервере/в локальном резерве; замок и терминал показывают успех и «Закрыть», которое передаёт сигнал о взломе и открывает содержимое. Сигнал доходит и в локальном резерве через журнал пройденных проверок | ✅ сделано | **547** |
+ | 38 | **Стрелки перемещения в админке снова активны:** ручка дерева захватывает жест и в фазе перехода, и в фазе всплытия, поэтому перетаскивание действительно начинается; простое нажатие на стрелку порядок не меняет. Подпись замка Мастера переживает выдачу локации: технический маркер разворачивается обратно в текст, уже испорченные подписи лечатся при чтении | ✅ сделано | **548** |
++| 39 | **Один механизм интерфейса и равенство Мастера игроку:** перетаскивание живёт в одном хуке на все экраны, экран Мастера принимается поведением (монтирование + результат в БД), красный baseline запрещён; команды Мастера — только действия, доступные самому игроку | ✅ сделано | 549 |
+ 
+-## Осталось после патча 548
++## Осталось после патча 549
++
++Патч 549 закрыл класс дефектов, а не один баг. Диагноз: готовый механизм
++перетаскивания не переиспользовали (545 написал четвёртую копию вместо рабочей),
++приёмка Мастера проверяла строки исходника вместо поведения, а красный baseline
++был узаконен и почти скрыл настоящую регрессию 548. Что сделано: тест терминала
++496 приведён к действующему канону (4 попытки на всех сложностях, владелец
++подтвердил) — **набор снова полностью зелёный, 281 файл**; перетаскивание
++сведено в один хук `src/ui/useDragResponder.js` на четыре места; экран Мастера
++впервые монтируется в тестах и проверяется по результату в БД; найден и исправлен
++настоящий баг — нажатие на стрелку без движения переносило карточку в локацию или
++папку. Законы 13–16 устава и `docs/gm-player-parity-law.md` закрепляют это
++предохранителями. **Открытый вопрос владельцу:** при нехватке заколок списывается
++остаток вместо честного отказа (оба пути одинаковы, закон равенства не нарушен) —
++нужно решение, менять ли правило; зафиксировано в §5 закона равенства.
+ 
+ Патч 548 вернул работоспособность стрелок перемещения в админке: решение о захвате жеста принимается в фазе перехода, где контекст строки раньше не задавался, поэтому ручка была мертва всегда, а не только после выдачи; заодно подпись замка перестала затираться техническим маркером при обратной записи сессии. Патч 547 замкнул цепочку взлома: успех не порождает новую попытку, а сигнал победы доходит до окна игрока и открывает содержимое (в том числе в локальном резерве). Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 138d782..93d11c0 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "548"
++  "baseline": "549"
+ }
+diff --git a/public/version.json b/public/version.json
+index 732234a..94132c7 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "548",
++  "version": "549",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+@@ -149,7 +149,8 @@
+       "Ответ «Да» мгновенно собирает новую доску по текущим настройкам терминала: новые слова, подсказки и скобки, снова четыре попытки, а характеристики выбравшего персонажа сохраняются.",
+       "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
+       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
+-      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
++      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
++      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
+     ],
+     "en-EN": [
+       "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
+@@ -298,7 +299,8 @@
+       "Answering «Yes» instantly builds a fresh board from the current terminal settings: new words, hints and brackets, four attempts again, and the chosen character stats are preserved.",
+       "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
+       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
+-      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away."
++      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
++      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
+     ]
+   }
+ }
+diff --git a/src/ui/useDragResponder.js b/src/ui/useDragResponder.js
+new file mode 100644
+index 0000000..370fda8
+--- /dev/null
++++ b/src/ui/useDragResponder.js
+@@ -0,0 +1,140 @@
++// Патч 549: единый механизм перетаскивания для всего приложения.
++//
++// ЗАЧЕМ. До 549 жест был скопирован в четырёх местах: карточки персонажей
++// (HomeScreen), карточки ключей (KeyItemCardCell), карточки сетки Мастера
++// (ContainerCardCell) и строки дерева локаций (HubTreeView). Три копии жили
++// по одному рабочему шаблону, четвёртая изобрела свой — и сломалась (патч 548:
++// контекст строки задавался в bubble-фазе, а решение принималось в capture,
++// поэтому ручка была мертва всегда). Копии расходятся молча: правка в одной
++// не доходит до остальных. Здесь один механизм на все экраны.
++//
++// ЗАКОН ФАЗЫ ОПРОСА. Система ответственности RN опрашивает capture сверху
++// вниз и принимает решение СРАЗУ, как только обработчик вернул true; bubble
++// после этого не зовётся (`findWantsResponder` в react-native-web,
++// `ResponderEventPlugin` в RN). Поэтому всё, что нужно жесту, задаётся в
++// capture, а полезные данные читаются из ref в момент выдачи жеста, а не из
++// bubble-обработчика. Проверено по коду:
++//   react-native-web/dist/modules/useResponderEvents/ResponderSystem.js
++//   react-native-web/dist/vendor/react-native/PanResponder/index.js
++//
++// КОНТРАКТ. onStart/onMove/onEnd получают точку {pageX, pageY} и полезную
++// нагрузку строки/карточки. onEnd дополнительно получает {cancelled, moved}:
++// перенос засчитывается только при настоящем движении, простое нажатие
++// безвредно (урок 548).
++import { useCallback, useRef } from 'react';
++import { PanResponder } from 'react-native';
++
++// Признак «нагрузка берётся из текущих пропсов», а не из привязки строки.
++const CURRENT_PAYLOAD = Symbol('useDragResponder.currentPayload');
++
++const pointOf = (x, y) => ({ pageX: Number(x) || 0, pageY: Number(y) || 0 });
++
++/**
++ * @param {object}   options
++ * @param {*}        options.payload  нагрузка карточки (контейнер, персонаж…)
++ * @param {Function} options.onStart  (point, payload) => void
++ * @param {Function} options.onMove   (point, payload) => void
++ * @param {Function} options.onEnd    (point, payload, meta) => void
++ * @param {boolean}  options.enabled  можно ли вообще брать жест
++ * @returns {{panHandlers: object, handlersFor: Function, draggingRef: object}}
++ *   `panHandlers` — для одной карточки; `handlersFor(payload)` — для списка
++ *   строк, где у каждой своя нагрузка (дерево локаций).
++ */
++export default function useDragResponder({
++  payload,
++  onStart,
++  onMove,
++  onEnd,
++  enabled = true,
++} = {}) {
++  // Пропсы читаются через ref: обработчики PanResponder создаются один раз,
++  // но всегда видят свежие колбэки и свежую нагрузку.
++  const callbacksRef = useRef({});
++  callbacksRef.current = { payload, onStart, onMove, onEnd, enabled };
++
++  // Нагрузка, заявленная на этапе опроса фаз (для списка строк).
++  const claimedRef = useRef(CURRENT_PAYLOAD);
++  // Состояние текущего жеста.
++  const activeRef = useRef(null);
++  const lastPointRef = useRef(pointOf(0, 0));
++  // Гасит синтетический onPress, который приходит сразу после отпускания.
++  const draggingRef = useRef(false);
++
++  const claim = useCallback((claimed) => {
++    if (!callbacksRef.current.enabled) return false;
++    claimedRef.current = claimed;
++    return true;
++  }, []);
++
++  const finish = useCallback((cancelled) => {
++    const active = activeRef.current;
++    activeRef.current = null;
++    claimedRef.current = CURRENT_PAYLOAD;
++    // Отпускание без движения — не перенос (канон 548).
++    const meta = { cancelled: Boolean(cancelled), moved: Boolean(active?.moved) };
++    if (active) callbacksRef.current.onEnd?.(lastPointRef.current, active.payload, meta);
++    // Пресс после отпускания должен быть проглочен.
++    setTimeout(() => { draggingRef.current = false; }, 0);
++  }, []);
++
++  const responder = useRef(PanResponder.create({
++    // Захват заявляется в ОБЕИХ фазах: capture — живой путь, bubble — запасной.
++    onStartShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
++    onMoveShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
++    onStartShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
++    onMoveShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
++    // Жест не отдаём ScrollView: иначе первое вертикальное движение обрывает
++    // перенос, ручка тут же перехватывает палец обратно и карточка дрожит.
++    onPanResponderTerminationRequest: () => false,
++    onShouldBlockNativeResponder: () => true,
++    onPanResponderGrant: (_event, gesture) => {
++      const current = callbacksRef.current;
++      if (!current.enabled) return;
++      const claimed = claimedRef.current;
++      const resolved = claimed === CURRENT_PAYLOAD ? current.payload : claimed;
++      lastPointRef.current = pointOf(gesture?.x0, gesture?.y0);
++      activeRef.current = { payload: resolved, moved: false };
++      draggingRef.current = true;
++      current.onStart?.(lastPointRef.current, resolved);
++    },
++    onPanResponderMove: (_event, gesture) => {
++      const active = activeRef.current;
++      if (!active) return;
++      // RN на вебе присылает нулевую точку, когда движения в цикле не было.
++      if (!gesture || (gesture.moveX === 0 && gesture.moveY === 0)) return;
++      active.moved = true;
++      lastPointRef.current = pointOf(gesture.moveX, gesture.moveY);
++      callbacksRef.current.onMove?.(lastPointRef.current, active.payload);
++    },
++    onPanResponderRelease: () => finish(false),
++    onPanResponderTerminate: () => finish(true),
++    onPanResponderReject: () => {
++      activeRef.current = null;
++      claimedRef.current = CURRENT_PAYLOAD;
++      draggingRef.current = false;
++    },
++  })).current;
++
++  // Базовые обработчики одной карточки.
++  const panHandlers = useRef({
++    ...responder.panHandlers,
++    onStartShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
++    onMoveShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
++    onStartShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
++    onMoveShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
++  }).current;
++
++  /**
++   * Обработчики для строки списка со СВОЕЙ нагрузкой. Нагрузка заявляется в
++   * capture-фазе — именно она принимает решение в живом браузере.
++   */
++  const handlersFor = useCallback((rowPayload) => ({
++    ...responder.panHandlers,
++    onStartShouldSetPanResponderCapture: () => claim(rowPayload),
++    onMoveShouldSetPanResponderCapture: () => claim(rowPayload),
++    onStartShouldSetPanResponder: () => claim(rowPayload),
++    onMoveShouldSetPanResponder: () => claim(rowPayload),
++  }), [claim, responder]);
++
++  return { panHandlers, handlersFor, draggingRef };
++}

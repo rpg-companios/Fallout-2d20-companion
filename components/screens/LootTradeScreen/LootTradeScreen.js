@@ -10,11 +10,11 @@ import {
   TextInput,
   Dimensions,
   Platform,
-  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as db from '../../../db';
+import useDragResponder from '../../../src/ui/useDragResponder';
 import {
   SUPPORTED_LOCALES,
   useLocale,
@@ -143,39 +143,16 @@ const ContainerCardCell = ({
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
 
-  const dragCallbacks = useRef({});
-  dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };
-  const lastDragPoint = useRef({ pageX: 0, pageY: 0 });
-  const draggingRef = useRef(false);
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-    onPanResponderGrant: (_evt, gesture) => {
-      draggingRef.current = true;
-      lastDragPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
-      dragCallbacks.current.onDragStart?.(
-        { pageX: gesture.x0, pageY: gesture.y0 },
-        dragCallbacks.current.container,
-      );
-    },
-    onPanResponderMove: (_evt, gesture) => {
-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
-      lastDragPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
-      dragCallbacks.current.onDragMove?.(lastDragPoint.current);
-    },
-    onPanResponderRelease: () => {
-      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
-      setTimeout(() => { draggingRef.current = false; }, 0);
-    },
-    onPanResponderTerminate: () => {
-      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
-      setTimeout(() => { draggingRef.current = false; }, 0);
-    },
-  })).current;
+  // Патч 549: единый механизм перетаскивания (`src/ui/useDragResponder.js`).
+  // Карточки Мастера, карточки ключей, карточки персонажей и строки дерева
+  // локаций теперь берут жест из одного места — копии больше не расходятся.
+  const { panHandlers, draggingRef } = useDragResponder({
+    payload: container,
+    onStart: onDragStart,
+    onMove: onDragMove,
+    onEnd: onDragEnd,
+    enabled: Boolean(onDragStart),
+  });
 
   const openMenu = (event) => {
     event?.stopPropagation?.();
@@ -205,6 +182,7 @@ const ContainerCardCell = ({
   return (
     <TouchableOpacity
       ref={cardRefCallback}
+      testID={`card-${container.id}`}
       style={[
         styles.cardCell,
         isLive && styles.cardCellActive,
@@ -218,7 +196,11 @@ const ContainerCardCell = ({
       {/* Патч 539: стрелки переноса есть и у локаций-хабов — их вкладывают
           друг в друга, как папки в Windows. */}
       {onDragStart && (
-        <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
+        <View
+          testID={`card-drag-${container.id}`}
+          {...panHandlers}
+          style={styles.cardDragHandle}
+        >
           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
         </View>
       )}
@@ -1056,7 +1038,18 @@ export default function LootTradeScreen() {
     setDrag((cur) => (cur ? { ...cur, x: point.pageX, y: point.pageY } : null));
   };
 
-  const handleDragEnd = async (point) => {
+  const handleDragEnd = async (point, _payload, meta) => {
+    // Патч 549: перенос засчитывается только при настоящем движении. Раньше
+    // простое нажатие на стрелку бросало карточку в локацию, под которой
+    // оказалась точка нажатия (тот же класс бага, что 548 в дереве). Признак
+    // движения даёт общий хук — правило одно для всех экранов.
+    if (meta?.moved === false) {
+      setMovingKeyItemId(null);
+      setMovingContainerId(null);
+      setDrag(null);
+      hubDropBounds.current = {};
+      return;
+    }
     await measureHubDropTargets();
     // Патч 539: локацию нельзя бросить на саму себя — исключаем её из целей.
     const hit = Object.entries(hubDropBounds.current).find(([id, b]) => (

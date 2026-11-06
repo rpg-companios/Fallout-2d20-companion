@@ -17,13 +17,13 @@ import {
   Modal,
   Dimensions,
   StyleSheet,
-  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
 import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import cardStyles from '../../styles/LootTradeScreen.styles';
 import { formatRoomCodeForDisplay } from '../../src/room/roomCode';
+import useDragResponder from '../../src/ui/useDragResponder';
 
 const MENU_WIDTH = 224;
 const MENU_HEIGHT = 100;
@@ -41,29 +41,15 @@ const KeyItemCardCell = ({
   useLocale();
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
-  const dragCallbacks = useRef({});
-  dragCallbacks.current = { onDragStart, onDragMove, onDragEnd };
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-    onPanResponderGrant: (_evt, gesture) => {
-      dragCallbacks.current.onDragStart?.({ pageX: gesture.x0, pageY: gesture.y0 });
-    },
-    onPanResponderMove: (_evt, gesture) => {
-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
-      dragCallbacks.current.onDragMove?.({ pageX: gesture.moveX, pageY: gesture.moveY });
-    },
-    onPanResponderRelease: (_evt, gesture) => {
-      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
-    },
-    onPanResponderTerminate: (_evt, gesture) => {
-      dragCallbacks.current.onDragEnd?.({ pageX: gesture.moveX || gesture.x0, pageY: gesture.moveY || gesture.y0 });
-    },
-  })).current;
+  // Патч 549: единый механизм перетаскивания на всё приложение.
+  const { panHandlers } = useDragResponder({
+    onStart: (point) => onDragStart?.(point),
+    onMove: (point) => onDragMove?.(point),
+    // Признак движения передаётся дальше: перенос засчитывает только жест,
+    // а не простое нажатие на стрелку (единое правило 549).
+    onEnd: (point, _payload, meta) => onDragEnd?.(point, undefined, meta),
+    enabled: Boolean(onDragStart),
+  });
 
   const openMenu = (event) => {
     event?.stopPropagation?.();
@@ -90,7 +76,7 @@ const KeyItemCardCell = ({
       activeOpacity={0.82}
     >
       {canMoveToHub && onDragStart && (
-        <View testID={`key-item-drag-${keyItem.id}`} {...panResponder.panHandlers} style={cardStyles.cardDragHandle}>
+        <View testID={`key-item-drag-${keyItem.id}`} {...panHandlers} style={cardStyles.cardDragHandle}>
           <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
         </View>
       )}
