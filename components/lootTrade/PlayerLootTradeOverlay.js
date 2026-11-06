@@ -15,7 +15,7 @@ import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
 import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
-import useRoomStore from '../../src/room/roomStore';
+import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
 import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
 import { useLocale, useModuleLocale } from '../../i18n/locale';
@@ -43,6 +43,7 @@ import {
 import { describeItemBasics } from '../../domain/itemBasics';
 import itemStacking from '../../domain/itemStacking.js';
 import { restoreLocationSessionNodes } from '../../domain/locationNodeMarker.js';
+import { hasLocalCheckAccess, recordLocalCheckAccess } from './localCheckAccess';
 import {
   applyCommittedMerchantTradeToCharacter,
   getSellablePlayerInventoryItems,
@@ -74,15 +75,17 @@ import {
  * терминала клиент видит в `terminalStates`/`accessEvents`. Обновлённый сервер
  * остаётся источником истины — его явное `open`/`denied` важнее этой оценки.
  */
-const roomCheckPassed = (room, checkId) => {
+const roomCheckPassed = (room, checkId, roomCode = '') => {
   const id = String(checkId || '').trim();
-  if (!id || !room) return false;
-  const state = room.terminalStates?.[id];
-  return Boolean(
-    state?.game?.status === 'won'
-    || state?.keyUnlocked
-    || room.accessEvents?.[id],
-  );
+  if (!id) return false;
+  const state = room?.terminalStates?.[id];
+  if (state?.game?.status === 'won' || state?.keyUnlocked || room?.accessEvents?.[id]) return true;
+  // Патч 547: локальный резерв мини-игр. Если у комнаты нет протокола, доска
+  // живёт в памяти клиента и в реестр комнаты победа не приходит — сигнал
+  // приносит сама модалка. При наличии протокола журнал НЕ спрашиваем:
+  // источником истины остаётся сервер (урок 506).
+  if (roomHasTerminalProtocol(room)) return false;
+  return hasLocalCheckAccess({ roomCode, containerId: id });
 };
 
 const getItemIcon = (itemType) => {
@@ -295,19 +298,42 @@ export default function PlayerLootTradeOverlay() {
     });
   }, []);
 
+  /**
+   * Патч 547: приём сигнала об успешном взломе от модалки.
+   *
+   * Слово владельца: «показан, успех, кнопка закрыть — передача сигнала об
+   * успешном взломе — доступ к содержимому». Сигнал приходит и в сетевом
+   * режиме, и в локальном резерве; в последнем он ещё и снимает преграду
+   * локации (журнал `localCheckAccess`), иначе пройти дальше было нельзя.
+   * Адресный исход применяет закрытие окна мини-игры («Закрыть» на панели
+   * успеха). Сетевой автопереход 530 остаётся как был — по реестру комнаты.
+   */
+  const [localAccessTick, setLocalAccessTick] = useState(0);
+  const hackSignalRef = useRef(null);
+  const handleCheckHacked = useCallback(({ containerId, kind, local } = {}) => {
+    const id = String(containerId || '').trim();
+    if (!id) return;
+    const code = matchedContext?.roomCode || '';
+    hackSignalRef.current = { containerId: id, kind: String(kind || '') };
+    if (local && recordLocalCheckAccess({ roomCode: code, containerId: id, kind })) {
+      // Журнал живёт в памяти модуля — поднимаем перерисовку явно.
+      setLocalAccessTick((tick) => tick + 1);
+    }
+  }, [matchedContext?.roomCode]);
+
   const selectedHubNode = useMemo(() => {
     if (!isHubSession || !selectedHubNodeId) return null;
     const room = rooms?.[matchedContext?.roomCode];
     const found = sessionNodes.find(
       // Патч 546: содержимое нельзя открыть и мимо непройденной проверки.
       (n) => n.containerId === selectedHubNodeId
-        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id) }),
+        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id, matchedContext?.roomCode) }),
     );
     // Локация и точки проверки никогда не попадают в сценарий «открыть сундук»:
     // локация требует входа, терминал/замок — мини-игры.
     if (found && (nodeHasChildren(found) || resolveCheckSessionNode(found).checkKind)) return null;
     return found || null;
-  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode]);
+  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode, localAccessTick]);
 
   // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
   const viewTarget = isHubSession ? selectedHubNode : activeSession;
@@ -343,6 +369,30 @@ export default function PlayerLootTradeOverlay() {
    */
   const handledWinRef = useRef('');
   const winTimerRef = useRef(null);
+
+  /**
+   * Патч 547: закрытие окна взлома ПОСЛЕ победы применяет адресный исход:
+   * взлом локации = вход, взлом контейнера = содержимое. Без победы закрытие
+   * просто гасит окно. Преграда текущей локации (gateOnly) снимается самим
+   * сигналом — игрок остаётся на месте и видит открывшееся содержимое.
+   */
+  const handleCheckModalClose = useCallback(() => {
+    const selection = terminalSelection;
+    const signal = hackSignalRef.current;
+    const checkId = String(selection?.node?.containerId || '').trim();
+    const hacked = Boolean(signal && checkId && signal.containerId === checkId);
+    if (winTimerRef.current) {
+      clearTimeout(winTimerRef.current);
+      winTimerRef.current = null;
+    }
+    hackSignalRef.current = null;
+    setTerminalSelection(null);
+    if (!hacked) return;
+    const targetId = selection?.targetNodeId;
+    if (!targetId) return;
+    const target = sessionNodes.find((n) => n.containerId === targetId) || { containerId: targetId };
+    navigateHackOutcome(target);
+  }, [terminalSelection, sessionNodes, navigateHackOutcome]);
   useEffect(() => {
     if (!isHubSession || !terminalSelection?.autoStart
       || (!terminalSelection?.targetNodeId && !terminalSelection?.gateOnly)) {
@@ -360,6 +410,7 @@ export default function PlayerLootTradeOverlay() {
     const nodes = sessionNodes;
     winTimerRef.current = setTimeout(() => {
       winTimerRef.current = null;
+      hackSignalRef.current = null;
       setTerminalSelection(null);
       // Патч 542: преграда текущей локации уже пройдена изнутри — остаёмся
       // на месте, сервер раскроет содержимое. Каскада нет.
@@ -368,7 +419,7 @@ export default function PlayerLootTradeOverlay() {
       navigateHackOutcome(target);
     }, HACK_OUTCOME_DELAY_MS);
   }, [
-    rooms, isHubSession, terminalSelection,
+    rooms, isHubSession, terminalSelection, localAccessTick,
     sessionNodes, matchedContext?.roomCode, navigateHackOutcome,
   ]);
   useEffect(() => () => {
@@ -544,6 +595,7 @@ export default function PlayerLootTradeOverlay() {
             roomCode={directTerminalContext.roomCode}
             autoStart={Boolean(directSelection.autoStart)}
             freshAttempt={Boolean(directSelection.freshAttempt)}
+            onHacked={handleCheckHacked}
             onClose={() => setTerminalSelection(null)}
           />
         ) : (
@@ -552,6 +604,7 @@ export default function PlayerLootTradeOverlay() {
             terminal={config}
             roomCode={directTerminalContext.roomCode}
             autoStart={Boolean(directSelection.autoStart)}
+            onHacked={handleCheckHacked}
             onClose={() => setTerminalSelection(null)}
           />
         )) : null}
@@ -682,6 +735,7 @@ export default function PlayerLootTradeOverlay() {
             roomCode={roomCode}
             autoStart={Boolean(selection.autoStart)}
             freshAttempt={Boolean(selection.freshAttempt)}
+            onHacked={handleCheckHacked}
             onClose={() => setTerminalSelection(null)}
           />
         ) : (
@@ -690,6 +744,7 @@ export default function PlayerLootTradeOverlay() {
             terminal={config}
             roomCode={roomCode}
             autoStart={Boolean(selection.autoStart)}
+            onHacked={handleCheckHacked}
             onClose={() => setTerminalSelection(null)}
           />
         )) : null}
@@ -714,7 +769,7 @@ export default function PlayerLootTradeOverlay() {
     // Патч 546: единый предикат преграды. Локация с настроенным замком не
     // пропускает внутрь, даже если старый сервер не прислал флаг `locked`.
     const currentRoom = rooms?.[matchedContext.roomCode];
-    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id);
+    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id, matchedContext.roomCode);
     const currentGatePending = accessBarrierPending(currentTarget, { isPassed: currentIsPassed });
     const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
       const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
@@ -1315,7 +1370,8 @@ export default function PlayerLootTradeOverlay() {
               roomCode={matchedContext.roomCode}
               autoStart={Boolean(terminalSelection.autoStart)}
               freshAttempt={Boolean(terminalSelection.freshAttempt)}
-              onClose={() => setTerminalSelection(null)}
+              onHacked={handleCheckHacked}
+              onClose={handleCheckModalClose}
             />
           ) : (
             <TerminalHackingModal
@@ -1323,7 +1379,8 @@ export default function PlayerLootTradeOverlay() {
               terminal={terminalSelection.node}
               roomCode={matchedContext.roomCode}
               autoStart={Boolean(terminalSelection.autoStart)}
-              onClose={() => setTerminalSelection(null)}
+              onHacked={handleCheckHacked}
+              onClose={handleCheckModalClose}
             />
           )
         ) : null}

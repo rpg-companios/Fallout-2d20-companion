@@ -125,6 +125,8 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
   // навык и удачу, но угаданные позиции и комбинация остаются (закон 532).
   // Сломанные заколки не возвращаются, блокировки пока нет.
   if (action === 'newAttempt') {
+    // Патч 547: успешный взлом не порождает ещё попытку и в локальном резерве.
+    if (game?.status === 'won') return finish(game, carried, 'LOCK_ALREADY_WON');
     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
     if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
     const fresh = engine.resumeLockGame({

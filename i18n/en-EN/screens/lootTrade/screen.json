@@ -402,7 +402,9 @@
     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
     "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
     "keyUnlockedBadge": "OPENED BY KEY",
-    "keyRequiredError": "A key or the linked check is required"
+    "keyRequiredError": "A key or the linked check is required",
+    "wonAccessHint": "The terminal is hacked. Close this window to reach the contents.",
+    "wonClose": "Close"
   },
   "lock": {
     "title": "Lockpicking",
@@ -448,7 +450,9 @@
     "gmBlockedHint": "The Game Master blocked this point. They can open it themselves or answer your request.",
     "askGm": "Ask the Game Master",
     "gmPending": "Request sent. Waiting for the Game Master decision.",
-    "gmDeclined": "The Game Master declined. The point stays blocked."
+    "gmDeclined": "The Game Master declined. The point stays blocked.",
+    "wonAccessHint": "The lock is picked. Close this window to reach the contents.",
+    "wonClose": "Close"
   },
   "gmDecision": {
     "lockOpenTitle": "Open the lock?",

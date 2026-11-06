@@ -112,32 +112,44 @@ describe('526: «билет» убран, автоматический рест�
 });
 
 describe('526: новый подход игрока (купил отмычки / прокачался)', () => {
-  it('newAttempt собирает свежую доску по ТЕКУЩЕМУ листу, событие доступа не теряется', () => {
+  // Патч 547 (слово владельца): «"успешные попытки" не должны вызывать ещё
+  // попытку». Правило 526 про свежий лист сохранено для НЕвыигранной доски;
+  // после ACCESS GRANTED новый подход отказывает, а новую партию даёт только
+  // Мастер повторной выдачей. Прежняя редакция теста требовала пересборки
+  // доски после победы — именно она снова запирала уже открытую точку.
+  it('newAttempt после победы отказывает: победа и событие доступа не теряются', () => {
     const { registry, code, state, act, publish } = setup();
     act('start');
     const first = state().game;
     expect(first.per).toBe(4);
     expect(first.pinsTotal).toBe(5);
     winLock(state, act);
+    const wonRevision = state().game.revision;
     const accessIdBefore = state().accessId;
     expect(registry.getState(code).accessEvents.l1).toMatchObject({ containerId: 'l1', kind: 'hacked' });
 
-    // Игрок купил отмычки и прокачал восприятие →发表了 свежий лист.
+    // Игрок купил заколки и прокачал восприятие, опубликовав свежий лист.
     publish(10, 12, 2);
-    const result = act('newAttempt');
-    expect(result.error).toBeUndefined();
-    const next = state().game;
-    expect(next.status).toBe('playing');
-    expect(next.per).toBe(10);
-    expect(next.pinsTotal).toBe(12);
-    expect(next.cellCount).toBeLessThan(first.cellCount);
-    expect(next.revision).toBe(1);
-    expect(next).not.toHaveProperty('secret');
+    expect(act('newAttempt').error).toBe(ERROR_CODE.LOCK_ALREADY_WON);
+    expect(state().game.status).toBe('won');
+    expect(state().game.revision).toBe(wonRevision);
     // accessId не меняется: это не новая трансляция Мастера.
     expect(state().accessId).toBe(accessIdBefore);
     expect(state().closed).toBe(false);
     // Открытая точка остаётся открытой: доступ не отзывается.
     expect(registry.getState(code).accessEvents.l1).toMatchObject({ kind: 'hacked' });
+
+    // Новую партию начинает только Мастер: повторная выдача снимает доску,
+    // и следующий подход собирается по ТЕКУЩЕМУ листу игрока.
+    expect(act('reissue', undefined, 'gm').error).toBeUndefined();
+    expect(state().game).toBeNull();
+    expect(act('newAttempt').error).toBeUndefined();
+    const next = state().game;
+    expect(next.status).toBe('playing');
+    expect(next.per).toBe(10);
+    expect(next.pinsTotal).toBe(12);
+    expect(next.cellCount).toBeLessThan(first.cellCount);
+    expect(next).not.toHaveProperty('secret');
   });
 
   it('сколько угодно подходов подряд, без Мастера и без повторной трансляции', () => {

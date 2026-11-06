@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -26,6 +26,7 @@ import {
 } from './localLockGame';
 import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
 import { spendBobbyPins } from './spendBobbyPins';
+import { hackSuccessKey, isHackWon } from './hackOutcome';
 
 const styles = lockLightStyles;
 
@@ -62,12 +63,16 @@ const SILENT_ERRORS = new Set([
   'TERMINAL_ALREADY_ACTIVE',
   'TERMINAL_AWAITING_RETRY',
   'TERMINAL_INVALID_GUESS',
+  // Патч 547: победа оконечна, отказ на устаревший «Ещё подход» — не ошибка.
+  'LOCK_ALREADY_WON',
 ]);
 
 // Патч 526: новый подход — штатное действие игрока, а не ошибка.
 const isNewAttempt = (action) => action === 'newAttempt';
 
-const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
+const LockPickingModal = ({
+  visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose, onHacked,
+}) => {
   useLocale();
   const containerId = String(lock?.containerId || '').trim();
   const characterId = useCharacterStore((state) => state.currentCharacterId);
@@ -112,6 +117,31 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     && game?.status === 'playing' && isOperator && !busy && !gmBlocked,
   );
   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+
+  /**
+   * Патч 547: модалка САМА передаёт сигнал об успешном взломе. Раньше победа
+   * читалась только из реестра комнаты, и в локальном резерве (сервер без
+   * протокола мини-игр) сигнал не рождался вовсе: игрок видел ACCESS GRANTED,
+   * но пройти дальше не мог. Сигнал идемпотентен — ключ победы не даёт
+   * сообщить один и тот же успех дважды.
+   */
+  const reportedWinRef = useRef('');
+  const onHackedRef = useRef(onHacked);
+  onHackedRef.current = onHacked;
+  const reportWin = useCallback(() => {
+    if (!isHackWon(game)) return;
+    const key = hackSuccessKey(containerId, game, terminalState?.accessId);
+    if (reportedWinRef.current === key) return;
+    reportedWinRef.current = key;
+    onHackedRef.current?.({ containerId, kind: 'lock', local: localMode });
+  }, [game, containerId, terminalState?.accessId, localMode]);
+
+  useEffect(() => {
+    if (!visible) return;
+    reportWin();
+  // Статус и ревизия доски определяют момент победы; сам reportWin идемпотентен.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, won, containerId, game?.revision, terminalState?.accessId, localMode]);
 
   // Патч 527: каждая сломанная заколка уходит из РЕАЛЬНОГО инвентаря.
   // Первое наблюдение за доской лишь запоминает базу (иначе перезагрузка
@@ -349,6 +379,12 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
     </TouchableOpacity>
   );
 
+  // Патч 547: любое закрытие окна после победы передаёт сигнал о взломе.
+  const closeModal = () => {
+    reportWin();
+    onClose?.();
+  };
+
   const hasBoard = Boolean(game && rows.length > 0);
   // Патч 535: игрок просит Мастера решить спорную ситуацию. Пока единственный
   // вид запроса — lock.open; каркас на сервере расширяемый.
@@ -377,7 +413,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
   );
 
   return (
-    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={closeModal}>
       <View style={modalStyles.overlay}>
         <View style={modalStyles.card}>
           <View style={styles.headerRow}>
@@ -390,7 +426,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               accessibilityLabel={tLootTrade('lock.close')}
               testID="lock-close-button"
               style={styles.closeButton}
-              onPress={onClose}
+              onPress={closeModal}
             >
               <MaterialCommunityIcons name="close" size={20} color={LOCK_PALETTE.mutedText} />
             </TouchableOpacity>
@@ -463,12 +499,22 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
               ) : null}
             </View>
           ) : won ? (
-            <View style={styles.accessPanel}>
+            // Патч 547 (слово владельца): «успешные попытки не должны вызывать
+            // ещё попытку». После ACCESS GRANTED — только успех и «Закрыть»,
+            // которое передаёт сигнал о взломе и открывает доступ к содержимому.
+            <View style={styles.accessPanel} testID="lock-won-panel">
               <Text accessibilityRole="alert" style={styles.wonText}>
                 {tLootTrade('lock.won')}
               </Text>
-              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
-              {newAttemptButton}
+              <Text style={styles.statusHint}>{tLootTrade('lock.wonAccessHint')}</Text>
+              <TouchableOpacity
+                testID="lock-success-close"
+                accessibilityRole="button"
+                style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
+                onPress={closeModal}
+              >
+                <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.wonClose')}</Text>
+              </TouchableOpacity>
             </View>
           ) : (isClosed && !holdBoard) ? (
             <View style={styles.accessPanel}>
