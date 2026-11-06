@@ -1,0 +1,782 @@
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 713ec14..78e1df7 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('549');
++    expect(version.version).toBe('550');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(148);
+-    expect(version.notes['en-EN']).toHaveLength(148);
+-    expect(json('patchs/baseline.json').baseline).toBe('549');
++    expect(version.notes['ru-RU']).toHaveLength(149);
++    expect(version.notes['en-EN']).toHaveLength(149);
++    expect(json('patchs/baseline.json').baseline).toBe('550');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -275,15 +275,16 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
+     expect(read('patchs/549-shared-drag-hook.patch')).toContain('useDragResponder');
++    expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **549**');
++    expect(roadmap).toContain('Текущая версия: **550**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 549');
++    expect(roadmap).toContain('Осталось после патча 550');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -294,6 +295,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/patch-548-install.md')).toContain('548');
+     expect(read('docs/patch-549-install.md')).toContain('549');
++    expect(read('docs/patch-550-install.md')).toContain('550');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/gm-player-parity-549.test.js b/__tests__/room/gm-player-parity-549.test.js
+index 725feb8..42a4261 100644
+--- a/__tests__/room/gm-player-parity-549.test.js
++++ b/__tests__/room/gm-player-parity-549.test.js
+@@ -107,13 +107,10 @@ describe('549: команда Мастера = действие, доступн
+     // Закон равенства: результат команды совпадает с рукой игрока до единицы.
+     expect(sheetOf()).toEqual(byPlayer);
+     expect(result.spent).toBe(playerSpent);
+-    // Списано не больше, чем лежало; баланс не ушёл в минус.
+-    expect(playerSpent).toBeLessThanOrEqual(1);
+-    expect(byPlayer.pins).toBeGreaterThanOrEqual(0);
+-    // ТЕКУЩЕЕ ПОВЕДЕНИЕ (вопрос владельцу вынесен в отчёте 549): при нехватке
+-    // списывается остаток — стор отказывает, но легаси-резерв расходует что есть.
+-    // Оба пути делают это одинаково, поэтому закон равенства не нарушен.
+-    expect(byPlayer.pins).toBe(0);
++    // Патч 550, слово владельца: «при нехватке заколок — стоп. Одна заколка =
++    // одна заколка». Отказ не трогает баланс (правило 5 устава): заколка цела.
++    expect(playerSpent).toBe(0);
++    expect(byPlayer.pins).toBe(1);
+   });
+ 
+   it('повтор команды журнала не даёт второго эффекта — как повторное нажатие игрока', async () => {
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 51bb714..b6cf488 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('549');
++    expect(version.version).toBe('550');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(148);
+-    expect(version.notes['en-EN']).toHaveLength(148);
+-    expect(json('patchs/baseline.json').baseline).toBe('549');
++    expect(version.notes['ru-RU']).toHaveLength(149);
++    expect(version.notes['en-EN']).toHaveLength(149);
++    expect(json('patchs/baseline.json').baseline).toBe('550');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -459,15 +459,16 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
+     expect(read('patchs/549-shared-drag-hook.patch')).toContain('useDragResponder');
++    expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **549**');
++    expect(roadmap).toContain('Текущая версия: **550**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 549');
++    expect(roadmap).toContain('Осталось после патча 550');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -478,6 +479,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/patch-548-install.md')).toContain('548');
+     expect(read('docs/patch-549-install.md')).toContain('549');
++    expect(read('docs/patch-550-install.md')).toContain('550');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/pin-spend-all-or-nothing-550.test.js b/__tests__/room/pin-spend-all-or-nothing-550.test.js
+new file mode 100644
+index 0000000..e4ea818
+--- /dev/null
++++ b/__tests__/room/pin-spend-all-or-nothing-550.test.js
+@@ -0,0 +1,231 @@
++// ПРИЁМОЧНЫЙ (патч 550): удалить при конверсии/приживании.
++//
++// Слово владельца: «при нехватке заколок — стоп. Одна заколка = одна заколка».
++//
++// До 550 при нехватке списывался остаток: стор отказывал честно
++// (`not-enough-items`), но легаси-резерв `consumeBobbyPins` затем расходовал что
++// было — при 1 заколке и запросе на 3 исчезала одна. Теперь правило общее для
++// обеих дорог и для сервера, и для клиента: списываем всё запрошенное или ничего.
++// Это правило 5 устава: отказ не трогает баланс.
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../src/saves/characterSaves', () => ({
++  saveCharacter: vi.fn(async () => 'ch1'),
++}));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import { createRequire } from 'node:module';
++import { spendBobbyPins, BOBBY_PIN_ITEM_ID } from '../../components/lootTrade/spendBobbyPins';
++import { applyCharacterCommand, CHAR_COMMAND_KIND } from '../../components/gm/charCommands';
++import { saveCharacter } from '../../src/saves/characterSaves';
++import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
++import useCharacterStore from '../../src/store/characterStore';
++
++// Серверный канон — CommonJS.
++const require = createRequire(import.meta.url);
++const engine = require('../../server/lockPicking.js');
++
++const state = () => useCharacterStore.getState();
++const pinsLeft = () => engine.countBobbyPins({
++  items: state().items || {},
++  equipment: state().equipment || {},
++  inventory: state().inventory || [],
++  bag: state().bag || [],
++});
++
++/** Каноническая запись каталога — путь стора. */
++const seedCanonical = (quantity) => {
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1',
++    characterName: 'Сталкер',
++    items: {
++      p1: { id: 'p1', weaponId: BOBBY_PIN_ITEM_ID, name: 'Заколка', quantity, condition: 90 },
++      gun: { id: 'gun', weaponId: 'weapon_10mm', name: 'Пистолет', quantity: 1 },
++    },
++    equipment: {}, inventory: [], bag: [],
++  });
++};
++
++/** Легаси-форма: стор её не узнаёт, работает резервный канон сервера. */
++const seedLegacy = (count) => {
++  useCharacterStore.setState({
++    currentCharacterId: 'ch1',
++    characterName: 'Сталкер',
++    items: { p1: { id: 'p1', catalogId: BOBBY_PIN_ITEM_ID, count: String(count), name: 'Заколка' } },
++    equipment: {}, inventory: [], bag: [],
++  });
++};
++
++const gmSpend = (count) => applyCharacterCommand({
++  commandId: 'c1', characterId: 'ch1',
++  kind: CHAR_COMMAND_KIND.ITEM_SPEND,
++  payload: { itemId: BOBBY_PIN_ITEM_ID, count },
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  state().resetCharacterStore();
++});
++
++describe('550: канон сервера — всё или ничего', () => {
++  it('запрос больше запаса не списывает НИЧЕГО и возвращает нетронутый снимок', () => {
++    const snapshot = { items: { p: { weaponId: BOBBY_PIN_ITEM_ID, quantity: 1 } } };
++    const result = engine.consumeBobbyPins(snapshot, 3);
++    expect(result.consumed).toBe(0);
++    expect(result.refused).toBe('not-enough-pins');
++    expect(engine.countBobbyPins(result.snapshot)).toBe(1);
++    // Исходник не мутирован.
++    expect(snapshot.items.p.quantity).toBe(1);
++  });
++
++  it('ровно по запасу — списывается полностью (одна заколка = одна заколка)', () => {
++    const snapshot = { items: { p: { weaponId: BOBBY_PIN_ITEM_ID, quantity: 3 } } };
++    const result = engine.consumeBobbyPins(snapshot, 3);
++    expect(result.consumed).toBe(3);
++    expect(result.refused).toBeUndefined();
++    expect(engine.countBobbyPins(result.snapshot)).toBe(0);
++  });
++
++  it('запас из нескольких стопок считается целиком, нехватка в сумме — стоп', () => {
++    const spread = {
++      items: { a: { weaponId: BOBBY_PIN_ITEM_ID, quantity: 1 } },
++      inventory: [{ snapshot: { catalogId: BOBBY_PIN_ITEM_ID, count: '2' } }],
++    };
++    expect(engine.countBobbyPins(spread)).toBe(3);
++    expect(engine.consumeBobbyPins(spread, 4).consumed).toBe(0);
++    expect(engine.countBobbyPins(engine.consumeBobbyPins(spread, 4).snapshot)).toBe(3);
++    expect(engine.consumeBobbyPins(spread, 3).consumed).toBe(3);
++  });
++
++  it('нулевой запрос остаётся пустым вызовом без отказа', () => {
++    const snapshot = { items: { p: { weaponId: BOBBY_PIN_ITEM_ID, quantity: 1 } } };
++    const result = engine.consumeBobbyPins(snapshot, 0);
++    expect(result.consumed).toBe(0);
++    expect(result.refused).toBeUndefined();
++    expect(engine.countBobbyPins(result.snapshot)).toBe(1);
++  });
++
++  it('совсем без заколок — отказ, а не частичный успех', () => {
++    const result = engine.consumeBobbyPins({ items: { cap: { itemId: 'caps', quantity: 12 } } }, 1);
++    expect(result.consumed).toBe(0);
++    expect(result.refused).toBe('not-enough-pins');
++    expect(result.snapshot.items.cap.quantity).toBe(12);
++  });
++});
++
++describe('550: клиент — стоп до мутации, лист не сохраняется и не публикуется', () => {
++  it('канонический сейв: 1 заколка и запрос 3 — заколка цела', async () => {
++    seedCanonical(1);
++    expect(await spendBobbyPins(3, { characterId: 'ch1' })).toBe(0);
++    expect(pinsLeft()).toBe(1);
++    expect(state().items.p1).toMatchObject({ quantity: 1, name: 'Заколка', condition: 90 });
++    expect(state().items.gun).toMatchObject({ name: 'Пистолет', quantity: 1 });
++    expect(saveCharacter).not.toHaveBeenCalled();
++    expect(pushSavedCharacterToBoundRoomIfAny).not.toHaveBeenCalled();
++  });
++
++  it('легаси-сейв: тот же стоп, остаток не доедается', async () => {
++    seedLegacy(2);
++    expect(await spendBobbyPins(3, { characterId: 'ch1' })).toBe(0);
++    expect(pinsLeft()).toBe(2);
++    expect(state().items.p1).toMatchObject({ catalogId: BOBBY_PIN_ITEM_ID, count: '2', name: 'Заколка' });
++    expect(saveCharacter).not.toHaveBeenCalled();
++    expect(pushSavedCharacterToBoundRoomIfAny).not.toHaveBeenCalled();
++  });
++
++  it('хватает — списание обычное, лист сохраняется и публикуется', async () => {
++    seedCanonical(5);
++    expect(await spendBobbyPins(2, { characterId: 'ch1' })).toBe(2);
++    expect(pinsLeft()).toBe(3);
++    expect(saveCharacter).toHaveBeenCalledWith('Сталкер');
++    expect(pushSavedCharacterToBoundRoomIfAny).toHaveBeenCalledWith('ch1');
++  });
++
++  it('последняя заколка ровно по запросу исчезает полностью', async () => {
++    seedCanonical(1);
++    expect(await spendBobbyPins(1, { characterId: 'ch1' })).toBe(1);
++    expect(pinsLeft()).toBe(0);
++    expect(state().items.p1).toBeUndefined();
++    expect(saveCharacter).toHaveBeenCalledTimes(1);
++  });
++
++  it('легаси-сейв по запасу списывается резервным каноном', async () => {
++    seedLegacy(2);
++    expect(await spendBobbyPins(2, { characterId: 'ch1' })).toBe(2);
++    expect(pinsLeft()).toBe(0);
++    expect(saveCharacter).toHaveBeenCalledTimes(1);
++  });
++
++  it('повторный отказ ничего не портит: сколько бы раз ни просили', async () => {
++    seedCanonical(1);
++    for (let i = 0; i < 3; i += 1) {
++      expect(await spendBobbyPins(5, { characterId: 'ch1' })).toBe(0);
++    }
++    expect(pinsLeft()).toBe(1);
++    expect(saveCharacter).not.toHaveBeenCalled();
++  });
++});
++
++describe('550: равенство Мастера и игрока сохранено (закон 549)', () => {
++  it('команда Мастера при нехватке тоже стоп — лист совпадает с рукой игрока', async () => {
++    seedCanonical(1);
++    const byPlayerSpent = await spendBobbyPins(3, { characterId: 'ch1', publish: false });
++    const byPlayer = { pins: pinsLeft(), items: JSON.stringify(state().items) };
++
++    state().resetCharacterStore();
++    seedCanonical(1);
++    const result = await gmSpend(3);
++    expect(result.ok).toBe(true);
++    expect(result.spent).toBe(byPlayerSpent);
++    expect({ pins: pinsLeft(), items: JSON.stringify(state().items) }).toEqual(byPlayer);
++    expect(byPlayerSpent).toBe(0);
++    expect(byPlayer.pins).toBe(1);
++  });
++
++  it('команда Мастера по запасу списывает ровно столько же, сколько игрок', async () => {
++    seedCanonical(4);
++    await spendBobbyPins(2, { characterId: 'ch1', publish: false });
++    const byPlayer = pinsLeft();
++
++    state().resetCharacterStore();
++    seedCanonical(4);
++    const result = await gmSpend(2);
++    expect(result.spent).toBe(2);
++    expect(pinsLeft()).toBe(byPlayer);
++    expect(byPlayer).toBe(2);
++  });
++});
++
++describe('550: доска тоже останавливается — заколок нет, нажатий нет', () => {
++  const snapshotWithPins = (quantity) => ({
++    attributes: { PER: 5, LCK: 5 },
++    skills: { Lockpick: 0 },
++    items: quantity > 0 ? { p: { weaponId: BOBBY_PIN_ITEM_ID, quantity } } : {},
++  });
++
++  it('без заколок доска не играет: OUT OF PINS и нажатие отвергнуто', () => {
++    const game = engine.createLockGame({
++      config: { difficulty: 1 },
++      characterSnapshot: snapshotWithPins(0),
++      rng: () => 0.5,
++    });
++    expect(game.status).toBe('awaitingRetry');
++    expect(game.result).toBe('OUT OF PINS');
++    expect(game.pinActive).toBe(false);
++    const press = engine.applyLockAction({ game, action: 'press', value: 'left', clientId: null });
++    expect(press.error).toBeTruthy();
++    expect(press.game).toBeUndefined();
++  });
++
++  it('с заколками доска играет — стоп не мешает обычной попытке', () => {
++    const game = engine.createLockGame({
++      config: { difficulty: 1 },
++      characterSnapshot: snapshotWithPins(2),
++      rng: () => 0.5,
++    });
++    expect(game.status).toBe('playing');
++    expect(game.pinActive).toBe(true);
++  });
++});
+diff --git a/components/lootTrade/spendBobbyPins.js b/components/lootTrade/spendBobbyPins.js
+index fda8b25..ca3bf54 100644
+--- a/components/lootTrade/spendBobbyPins.js
++++ b/components/lootTrade/spendBobbyPins.js
+@@ -22,6 +22,21 @@ export const spendBobbyPins = async (count, { characterId, publish = true } = {}
+   const delta = Math.max(0, Math.floor(Number(count) || 0));
+   if (delta <= 0) return 0;
+   const store = useCharacterStore.getState();
++  // Патч 550 — слово владельца: «при нехватке заколок — стоп. Одна заколка =
++  // одна заколка». Проверяем запас ДО любой мутации общим каноном сервера
++  // (он понимает и каноническую форму, и легаси catalogId/itemId/code).
++  // Не хватает — отказ без списания, без сохранения и без публикации листа.
++  const inventoryScope = {
++    items: store.items || {},
++    equipment: store.equipment || {},
++    inventory: store.inventory || [],
++    bag: store.bag || [],
++  };
++  const available = engine.countBobbyPins?.(inventoryScope) ?? 0;
++  if (available < delta) {
++    debugLog('lock.spendBobbyPins:notEnoughPins', { need: delta, available });
++    return 0;
++  }
+   let spent = 0;
+   const action = typeof store.spendItemStacks === 'function'
+     ? store.spendItemStacks({ spend: [{ itemId: BOBBY_PIN_ITEM_ID, count: delta }] })
+@@ -31,12 +46,9 @@ export const spendBobbyPins = async (count, { characterId, publish = true } = {}
+   } else {
+     // Легаси-сейв: getItemId() стора не узнал запись по catalogId/itemId/code.
+     // Списываем через общий с сервером канон (он понимает все эти формы).
+-    const mini = {
+-      items: store.items || {},
+-      equipment: store.equipment || {},
+-      inventory: store.inventory || [],
+-      bag: store.bag || [],
+-    };
++    // Патч 550: канон тоже «всё или ничего» — при нехватке он вернёт 0 и
++    // нетронутый снимок, остаток не доедается.
++    const mini = inventoryScope;
+     const result = engine.consumeBobbyPins?.(mini, delta) || { consumed: 0, snapshot: mini };
+     if (result.consumed > 0) {
+       useCharacterStore.setState({
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1f2ebc6..014c06c 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,31 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (550) — нехватка заколок: стоп, одна заколка = одна заколка
++
++Слово владельца (ответ на открытый вопрос 549): **«при нехватке заколок — стоп.
++Одна заколка = одна заколка»**. Правило 5 устава: отказ не трогает баланс.
++
++- **Что было:** стор отказывал честно (`not-enough-items`), но легаси-резерв
++  `engine.consumeBobbyPins` затем расходовал остаток: 1 заколка + запрос 3 →
++  списана 1. Оба пути (игрок и Мастер) вели себя одинаково, поэтому закон
++  равенства 549 был цел — дефект был в самом правиле расхода.
++- **Канон сервера атомарен:** `consumeBobbyPins` при нехватке возвращает
++  `consumed: 0`, `refused: 'not-enough-pins'` и НЕтронутую копию снимка (исходник
++  не мутируется). Ровно по запасу — списывает полностью.
++- **Клиент проверяет ДО мутации:** `spendBobbyPins` сверяет запас общим каноном
++  `countBobbyPins` (понимает каноническую форму и легаси catalogId/itemId/code).
++  При нехватке — возврат 0 без изменения стора, без `saveCharacter` и без
++  публикации в комнату. Легаси-путь использует тот же атомарный канон.
++- **Доска уже была права:** без заколок `createLockGame` → `awaitingRetry` /
++  `OUT OF PINS`, `pinActive: false`, нажатие отвергается. Закреплено тестом.
++- **Равенство 549 сохранено:** рука игрока и команда Мастера дают ноль списаний
++  и целую заколку; тест 549 обновлён под новое правило (ожидал прежнее поведение).
++- **Приёмка:** `pin-spend-all-or-nothing-550` (15): канон сервера (нехватка,
++  ровно по запасу, несколько стопок, нулевой запрос, пустой инвентарь), клиент
++  (канонический и легаси-сейв, успех, последняя заколка, повторный отказ),
++  равенство Мастера и игрока, остановка доски.
++  Итог: **282 файла / 2602 проверки, exit 0**; typecheck и build чисто.
++
+ ## 2026-11-06 (549) — один механизм перетаскивания, равенство Мастера игроку, зелёный baseline
+ 
+ Слово владельца: «Сначала зелёный baseline + общий хук жеста и поведенческие
+@@ -40,10 +66,8 @@ baseline узаконен и почти скрыл регрессию 548. До
+ - **Приёмка:** `drag-responder-549` (12), `gm-screen-behaviour-549` (7),
+   `gm-player-parity-549` (7), `single-drag-mechanism-549` (6).
+   Итог: **281 файл / 2587 проверок, exit 0**; typecheck и build чисто.
+-- **ОТКРЫТЫЙ ВОПРОС:** при нехватке заколок списывается остаток (стор отказывает,
+-  легаси-резерв `consumeBobbyPins` расходует что есть): 1 заколка + запрос 3 →
+-  списана 1. Оба пути одинаковы, закон равенства цел, поэтому 549 правило НЕ менял.
+-  Ждёт решения владельца (§5 закона равенства).
++- **Вопрос закрыт в 550:** при нехватке заколок списывался остаток; владелец
++  решил «стоп, одна заколка = одна заколка» — исправлено в 550 (см. запись выше).
+ 
+ ## 2026-11-06 (548) — стрелки перемещения в админке снова активны
+ 
+@@ -1127,13 +1151,6 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+-0. **Нехватка заколок: списывать остаток или отказать? (549)** При 1 заколке и
+-   запросе на 3 списывается 1: `store.spendItemStacks` честно отказывает
+-   (`not-enough-items`, баланс не тронут — правило 5 устава), но легаси-резерв
+-   `engine.consumeBobbyPins` затем расходует что есть. Пути игрока и Мастера
+-   одинаковы, закон равенства не нарушен — 549 правило НЕ менял, тест фиксирует
+-   текущее поведение с пометкой. Нужно слово владельца: «сломал что было» или
+-   честный отказ без списания. См. §5 `docs/gm-player-parity-law.md`.
+ 0. **Крафт модов брони** — таблица книги записана и сверена
+    (`docs/reference-data/armor-mods-crafting.md`, 327–332). Ответы
+    владельца (332): ёмкость крафта ≠ complexity предмета (то поле нигде
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 57ea3fd..42739ca 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,32 @@
+ # Changelog
+ ---
+ 
++## Not enough bobby pins — stop (patch 550)
++
++The owner's ruling on the question surfaced by patch 549 acceptance: **"when bobby
++pins are short — stop. One pin equals one pin."**
++
++- **The remainder is no longer consumed.** Previously a pin still disappeared when
++  stock was short: storage refused correctly, but the legacy fallback for older
++  save formats spent what was there — with one pin and a request for three, one was
++  spent. Now exactly the requested number is spent, or nothing at all.
++- **A refusal leaves the sheet untouched.** Stock is checked before any change: if
++  pins are short, the inventory stays as it was, the sheet is neither saved nor
++  published to the Game Master. No matter how often such a command arrives, the pin
++  survives.
++- **One rule for everyone.** It applies when the player breaks a pin, when the
++  change arrives as a Game Master command, and for both current and older character
++  save formats. GM/player parity (patch 549) holds: both paths give the same result.
++- **Picking stops.** With no pins the board does not play: "Out of pins", and presses
++  are rejected. That behaviour was already correct and is now locked in by a check
++  so it cannot be lost.
++- **Acceptance.** `pin-spend-all-or-nothing-550` (15): shortage and exact stock,
++  several stacks, empty inventory, legacy save formats, the last pin, repeated
++  refusal, parity between a Master command and the player's own action, and the
++  board stopping. Total: 282 files, 2602 checks, all green.
++
++---
++
+ ## One drag mechanism and GM/player parity (patch 549)
+ 
+ Work requested by the owner: "The Game Master section must match the player's
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index b00a580..5226932 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,32 @@
+ 
+ ---
+ 
++## Нехватка заколок — стоп (патч 550)
++
++Решение владельца на вопрос, найденный приёмкой 549: **«при нехватке заколок —
++стоп. Одна заколка = одна заколка»**.
++
++- **Остаток больше не доедается.** Раньше при нехватке заколка всё-таки исчезала:
++  хранилище отказывало честно, но старый резервный путь для прежних форм
++  сохранения расходовал что было — при одной заколке и запросе на три списывалась
++  одна. Теперь списывается ровно запрошенное число либо ничего.
++- **Отказ не трогает лист.** Запас проверяется до всякого изменения: если заколок
++  не хватает, инвентарь остаётся как был, лист не сохраняется и не отправляется
++  ведущему. Сколько бы раз ни пришла такая команда — заколка цела.
++- **Правило одно для всех.** Действует и когда заколку ломает сам игрок, и когда
++  изменение приходит командой ведущего, и на новых, и на прежних формах
++  сохранения персонажа. Равенство Мастера и игрока (патч 549) сохранено: оба пути
++  дают одинаковый результат.
++- **Взлом останавливается.** Без заколок доска не играет: «Заколки закончились»,
++  нажатие не принимается. Это поведение уже было верным и теперь закреплено
++  проверкой, чтобы не потерялось.
++- **Приёмка.** `pin-spend-all-or-nothing-550` (15): нехватка и точный запас,
++  несколько стопок, пустой инвентарь, прежние формы сохранения, последняя
++  заколка, повторный отказ, равенство команды ведущего и руки игрока, остановка
++  доски. Итого 282 файла, 2602 проверки, всё зелёное.
++
++---
++
+ ## Один механизм перетаскивания и равенство Мастера игроку (патч 549)
+ 
+ Работа по слову владельца: «Мастерский раздел должен максимально соответствовать
+diff --git a/docs/gm-player-parity-law.md b/docs/gm-player-parity-law.md
+index 2ee3042..b9a8d86 100644
+--- a/docs/gm-player-parity-law.md
++++ b/docs/gm-player-parity-law.md
+@@ -80,14 +80,30 @@
+   идемпотентность после реконнекта (закон снимка).
+ - Правило 16 устава движка (`docs/architecture/engine-charter.md`).
+ 
+-## 5. Открытый вопрос владельцу (найден при приёмке 549)
+-
+-При нехватке заколок пути ведут себя **одинаково**, но само поведение спорное:
+-стор отказывает (`not-enough-items`, баланс не тронут — правило 5 устава), а
+-легаси-резерв `consumeBobbyPins` затем списывает остаток. Итог: при 1 заколке и
+-запросе на 3 списывается 1, баланс становится 0.
+-
+-Закон равенства не нарушен (оба пути дают одно и то же), поэтому патч 549
+-поведение **не менял** — это вопрос правила, а не дефект равенства. Требуется
+-решение владельца: считать ли исчерпание остатка верным («сломал что было») или
+-нужен честный отказ без списания. Тест фиксирует текущее поведение с пометкой.
++## 5. Нехватка заколок — стоп (решение владельца, патч 550)
++
++> **Слово владельца:** «при нехватке заколок — стоп. Одна заколка = одна заколка».
++
++Вопрос, найденный приёмкой 549, закрыт в 550. Раньше при нехватке списывался
++остаток: хранилище отказывало честно (`not-enough-items`, баланс не тронут), но
++легаси-резерв `consumeBobbyPins` затем расходовал что было — при 1 заколке и
++запросе на 3 исчезала одна.
++
++Теперь правило общее для обоих путей и для обеих форм сейва:
++
++- **Всё или ничего.** Списывается ровно запрошенное число либо ноль. Остаток не
++  доедается никогда.
++- **Проверка до мутации.** Клиент сверяет запас общим каноном сервера
++  (`countBobbyPins`) ДО изменения состояния; при нехватке лист не меняется, не
++  сохраняется и не публикуется в комнату.
++- **Канон сервера тоже атомарен.** `consumeBobbyPins` при нехватке возвращает
++  `consumed: 0`, признак `refused: 'not-enough-pins'` и нетронутую копию снимка.
++- **Равенство сохранено.** Рука игрока и команда Мастера дают один результат:
++  ноль списаний и целую заколку.
++- **Доска останавливается.** Без заколок мини-игра идёт в `awaitingRetry` с
++  `OUT OF PINS`, нажатие отвергается — это поведение уже было верным и закреплено
++  тестом.
++
++Это правило 5 устава («отказ не трогает баланс») в приложении к расходникам
++мини-игры замка. Предохранитель: `__tests__/room/pin-spend-all-or-nothing-550.test.js`
++(15 проверок).
+diff --git a/docs/patch-550-install.md b/docs/patch-550-install.md
+new file mode 100644
+index 0000000..cbe4bda
+--- /dev/null
++++ b/docs/patch-550-install.md
+@@ -0,0 +1,86 @@
++# Установка патча 550: нехватка заколок — стоп
++
++Патч подготовлен от состояния **версии 549**. Файл установки:
++`patchs/550-pin-spend-stop.patch`.
++
++> **Слово владельца:** «при нехватке заколок — стоп. Одна заколка = одна заколка».
++
++Это ответ на открытый вопрос, который нашла поведенческая приёмка патча 549.
++Правило 5 устава движка: **отказ не трогает баланс**.
++
++## Что было не так
++
++Приёмка 549 сравнила два пути изменения листа и обнаружила спорное поведение:
++
++1. `store.spendItemStacks` отказывал честно — `{ ok: false, reason: 'not-enough-items' }`,
++   баланс не тронут;
++2. но `spendBobbyPins` после отказа шёл в легаси-резерв
++   `engine.consumeBobbyPins`, а тот списывал **сколько было**: при 1 заколке и
++   запросе на 3 исчезала одна, баланс становился 0.
++
++Оба пути — рука игрока и команда Мастера — вели себя одинаково, поэтому закон
++равенства 549 не был нарушен. Дефект был в самом правиле расхода, и патч 549 его
++не менял, вынеся вопрос владельцу. Владелец решил: **стоп**.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `server/lockPicking.js` | `consumeBobbyPins` стал атомарным: если запрошено больше, чем есть, возвращается `consumed: 0`, признак `refused: 'not-enough-pins'` и **нетронутая копия** снимка; исходник по-прежнему не мутируется |
++| `components/lootTrade/spendBobbyPins.js` | запас проверяется общим каноном `countBobbyPins` **до любой мутации**; при нехватке — возврат 0 без изменения стора, без `saveCharacter` и без публикации в комнату; легаси-путь использует тот же атомарный канон |
++| `__tests__/room/pin-spend-all-or-nothing-550.test.js` | приёмка (15) |
++| `__tests__/room/gm-player-parity-549.test.js` | проверка нехватки обновлена под новое правило: ноль списаний, заколка цела |
++| `docs/gm-player-parity-law.md` | §5 переписан: открытый вопрос снят, зафиксировано правило владельца |
++| `docs/agents/state.md` | запись 550, вопрос убран из «Открытых вопросов» |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 550, тезис 40 |
++
++## Поведение после патча
++
++| Ситуация | Было | Стало |
++| --- | --- | --- |
++| 1 заколка, запрос 3 | списана 1, осталось 0 | списано 0, осталась 1 |
++| 3 заколки, запрос 3 | списано 3 | списано 3 (без изменений) |
++| 2 заколки в легаси-форме, запрос 3 | списано 2 | списано 0 |
++| 5 заколок, запрос 2 | списано 2 | списано 2 (без изменений) |
++| 0 заколок, запрос 1 | отказ | отказ (без изменений) |
++| запрос 0 или отрицательный | пустой вызов | пустой вызов (без изменений) |
++
++При отказе лист **не сохраняется и не публикуется** — комната не получает ложного
++обновления, повтор команды ничего не портит.
++
++## Границы
++
++- Мини-игра замка не менялась: без заколок доска уже уходила в `awaitingRetry`
++  с `OUT OF PINS`, `pinActive: false`, а нажатие отвергалось. Это закреплено тестом.
++- Правило 522 сохранено: надетое и запертое не расходуется, поля предметов не
++  обрезаются (`name`, `condition` остаются).
++- Закон снимка 529 не тронут: сервер по-прежнему не правит лист, а шлёт команду.
++- Закон равенства 549 сохранён и проверен: рука игрока и команда Мастера дают
++  одинаковый результат и при отказе, и при успехе.
++- Канон поиска заколок общий (`countBobbyPins`): поддержаны каноническая форма
++  `weaponId` и легаси `catalogId`/`itemId`/`code`, словари и массивы, дубликаты
++  одного экземпляра в `items` и `equipment.items`.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 550
++```
++
++**Сервер комнат обновлять нужно**, если он крутит `server/lockPicking.js`: канон
++`consumeBobbyPins` изменился. Клиент самодостаточен — ранняя проверка запаса
++работает и со старым сервером, потому что списание всегда исполняет клиент.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: **282 файла / 2602 проверки, всё зелёное**.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/550-pin-spend-stop.patch` вернёт дерево, словари и версию
++к состоянию 549.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index a2f22a4..38860cf 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **549**.
++Дата ревизии: 2026-11-06. Текущая версия: **550**.
+ 
+ ## Тезисы
+ 
+@@ -51,8 +51,17 @@
+ | 37 | **Успех взлома передаётся дальше:** победа оконечна — «ещё подход» после ACCESS GRANTED не предлагается и отказывает на сервере/в локальном резерве; замок и терминал показывают успех и «Закрыть», которое передаёт сигнал о взломе и открывает содержимое. Сигнал доходит и в локальном резерве через журнал пройденных проверок | ✅ сделано | **547** |
+ | 38 | **Стрелки перемещения в админке снова активны:** ручка дерева захватывает жест и в фазе перехода, и в фазе всплытия, поэтому перетаскивание действительно начинается; простое нажатие на стрелку порядок не меняет. Подпись замка Мастера переживает выдачу локации: технический маркер разворачивается обратно в текст, уже испорченные подписи лечатся при чтении | ✅ сделано | **548** |
+ | 39 | **Один механизм интерфейса и равенство Мастера игроку:** перетаскивание живёт в одном хуке на все экраны, экран Мастера принимается поведением (монтирование + результат в БД), красный baseline запрещён; команды Мастера — только действия, доступные самому игроку | ✅ сделано | 549 |
++| 40 | **Нехватка заколок — стоп:** одна заколка = одна заколка; при нехватке отказ без списания (правило 5 устава), одинаково для руки игрока и команды Мастера, на канонических и легаси-сейвах | ✅ сделано | 550 |
+ 
+-## Осталось после патча 549
++## Осталось после патча 550
++
++Патч 550 закрыл открытый вопрос 549 словом владельца: **«при нехватке заколок —
++стоп. Одна заколка = одна заколка»**. Раньше при нехватке списывался остаток
++(хранилище отказывало, но легаси-резерв доедал что было). Теперь списание атомарно
++и на сервере, и на клиенте: ровно запрошенное число либо ноль, лист при отказе не
++меняется, не сохраняется и не публикуется. Равенство Мастера и игрока (закон 549)
++сохранено — оба пути дают ноль и целую заколку. Вопрос из §5 закона равенства
++снят, тест 549 обновлён под новое правило.
+ 
+ Патч 549 закрыл класс дефектов, а не один баг. Диагноз: готовый механизм
+ перетаскивания не переиспользовали (545 написал четвёртую копию вместо рабочей),
+@@ -64,9 +73,8 @@
+ впервые монтируется в тестах и проверяется по результату в БД; найден и исправлен
+ настоящий баг — нажатие на стрелку без движения переносило карточку в локацию или
+ папку. Законы 13–16 устава и `docs/gm-player-parity-law.md` закрепляют это
+-предохранителями. **Открытый вопрос владельцу:** при нехватке заколок списывается
+-остаток вместо честного отказа (оба пути одинаковы, закон равенства не нарушен) —
+-нужно решение, менять ли правило; зафиксировано в §5 закона равенства.
++предохранителями. Вопрос о нехватке заколок, найденный этой приёмкой, закрыт в 550 по слову
++владельца: «стоп, одна заколка = одна заколка».
+ 
+ Патч 548 вернул работоспособность стрелок перемещения в админке: решение о захвате жеста принимается в фазе перехода, где контекст строки раньше не задавался, поэтому ручка была мертва всегда, а не только после выдачи; заодно подпись замка перестала затираться техническим маркером при обратной записи сессии. Патч 547 замкнул цепочку взлома: успех не порождает новую попытку, а сигнал победы доходит до окна игрока и открывает содержимое (в том числе в локальном резерве). Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 93d11c0..98a4878 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "549"
++  "baseline": "550"
+ }
+diff --git a/public/version.json b/public/version.json
+index 94132c7..a5ee0e8 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "549",
++  "version": "550",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+@@ -150,7 +150,8 @@
+       "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
+       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
+-      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
++      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку.",
++      "Если заколок не хватает, взлом останавливается без расхода: одна заколка списывается ровно как одна, остаток больше не доедается — правило действует и по команде ведущего."
+     ],
+     "en-EN": [
+       "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
+@@ -300,7 +301,8 @@
+       "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
+       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
+       "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
+-      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
++      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder.",
++      "When there are not enough bobby pins, picking stops without spending anything: one pin is spent exactly as one, the remainder is no longer partially consumed — the rule also applies to Game Master commands."
+     ]
+   }
+ }
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index 60284d4..2e4a040 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -339,7 +339,22 @@ const consumeBobbyPins = (snapshot, count = 1) => {
+       parent[key] = isArray ? nextArray : nextObject;
+     }
+   }
+-  return { snapshot: clone, consumed: need - remaining };
++  const consumed = need - remaining;
++  // Патч 550 — слово владельца: «при нехватке заколок — стоп. Одна заколка =
++  // одна заколка». Списываем всё запрошенное или не списываем ничего: доедать
++  // остаток нельзя. Раньше при 1 заколке и запросе на 3 списывалась одна —
++  // стор отказывал честно, а этот резервный путь расходовал что было.
++  // Правило 5 устава: отказ не трогает баланс. Возвращаем нетронутую копию.
++  if (consumed < need) {
++    let pristine;
++    try {
++      pristine = JSON.parse(JSON.stringify(snapshot || {}));
++    } catch {
++      pristine = snapshot;
++    }
++    return { snapshot: pristine, consumed: 0, refused: 'not-enough-pins' };
++  }
++  return { snapshot: clone, consumed };
+ };
+ 
+ const effectiveDifficulty = (config, stats) => Math.max(

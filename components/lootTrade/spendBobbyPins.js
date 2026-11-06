@@ -22,6 +22,21 @@ export const spendBobbyPins = async (count, { characterId, publish = true } = {}
   const delta = Math.max(0, Math.floor(Number(count) || 0));
   if (delta <= 0) return 0;
   const store = useCharacterStore.getState();
+  // Патч 550 — слово владельца: «при нехватке заколок — стоп. Одна заколка =
+  // одна заколка». Проверяем запас ДО любой мутации общим каноном сервера
+  // (он понимает и каноническую форму, и легаси catalogId/itemId/code).
+  // Не хватает — отказ без списания, без сохранения и без публикации листа.
+  const inventoryScope = {
+    items: store.items || {},
+    equipment: store.equipment || {},
+    inventory: store.inventory || [],
+    bag: store.bag || [],
+  };
+  const available = engine.countBobbyPins?.(inventoryScope) ?? 0;
+  if (available < delta) {
+    debugLog('lock.spendBobbyPins:notEnoughPins', { need: delta, available });
+    return 0;
+  }
   let spent = 0;
   const action = typeof store.spendItemStacks === 'function'
     ? store.spendItemStacks({ spend: [{ itemId: BOBBY_PIN_ITEM_ID, count: delta }] })
@@ -31,12 +46,9 @@ export const spendBobbyPins = async (count, { characterId, publish = true } = {}
   } else {
     // Легаси-сейв: getItemId() стора не узнал запись по catalogId/itemId/code.
     // Списываем через общий с сервером канон (он понимает все эти формы).
-    const mini = {
-      items: store.items || {},
-      equipment: store.equipment || {},
-      inventory: store.inventory || [],
-      bag: store.bag || [],
-    };
+    // Патч 550: канон тоже «всё или ничего» — при нехватке он вернёт 0 и
+    // нетронутый снимок, остаток не доедается.
+    const mini = inventoryScope;
     const result = engine.consumeBobbyPins?.(mini, delta) || { consumed: 0, snapshot: mini };
     if (result.consumed > 0) {
       useCharacterStore.setState({

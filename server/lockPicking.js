@@ -339,7 +339,22 @@ const consumeBobbyPins = (snapshot, count = 1) => {
       parent[key] = isArray ? nextArray : nextObject;
     }
   }
-  return { snapshot: clone, consumed: need - remaining };
+  const consumed = need - remaining;
+  // Патч 550 — слово владельца: «при нехватке заколок — стоп. Одна заколка =
+  // одна заколка». Списываем всё запрошенное или не списываем ничего: доедать
+  // остаток нельзя. Раньше при 1 заколке и запросе на 3 списывалась одна —
+  // стор отказывал честно, а этот резервный путь расходовал что было.
+  // Правило 5 устава: отказ не трогает баланс. Возвращаем нетронутую копию.
+  if (consumed < need) {
+    let pristine;
+    try {
+      pristine = JSON.parse(JSON.stringify(snapshot || {}));
+    } catch {
+      pristine = snapshot;
+    }
+    return { snapshot: pristine, consumed: 0, refused: 'not-enough-pins' };
+  }
+  return { snapshot: clone, consumed };
 };
 
 const effectiveDifficulty = (config, stats) => Math.max(
