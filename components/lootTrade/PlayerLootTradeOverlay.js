@@ -24,9 +24,12 @@ import {
   formatLootTrade,
 } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import {
+  ACCESS_OP,
+  accessBarrierPending,
   expressionCheckIds,
   resolveAccessExpression,
 } from '../../domain/accessExpression';
+import locationGraph from '../../domain/locationGraph.js';
 import {
   CONTAINER_KIND,
   computeBarterSummary,
@@ -39,6 +42,7 @@ import {
 } from '../../domain/lootTrade';
 import { describeItemBasics } from '../../domain/itemBasics';
 import itemStacking from '../../domain/itemStacking.js';
+import { restoreLocationSessionNodes } from '../../domain/locationNodeMarker.js';
 import {
   applyCommittedMerchantTradeToCharacter,
   getSellablePlayerInventoryItems,
@@ -62,6 +66,24 @@ import {
   hackWinKey,
   applyHackOutcome,
 } from './hackOutcome';
+
+/**
+ * Патч 546: проверка считается пройденной по общему реестру комнаты. Нужно
+ * только как страховка для старого сервера, который мог потерять `locked` /
+ * `keyAccessState`: маркер 544 возвращает само требование, а победу замка или
+ * терминала клиент видит в `terminalStates`/`accessEvents`. Обновлённый сервер
+ * остаётся источником истины — его явное `open`/`denied` важнее этой оценки.
+ */
+const roomCheckPassed = (room, checkId) => {
+  const id = String(checkId || '').trim();
+  if (!id || !room) return false;
+  const state = room.terminalStates?.[id];
+  return Boolean(
+    state?.game?.status === 'won'
+    || state?.keyUnlocked
+    || room.accessEvents?.[id],
+  );
+};
 
 const getItemIcon = (itemType) => {
   if (itemType === 'caps') return '💰';
@@ -206,6 +228,12 @@ export default function PlayerLootTradeOverlay() {
   }, [isGmMode, bindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
+  // Патч 544: восстанавливаем тип/рёбра локаций после старого сервера комнат.
+  // Дальше окно работает только с этим списком, а не с сырым activeSession.nodes.
+  const sessionNodes = useMemo(
+    () => restoreLocationSessionNodes(activeSession?.nodes, activeSession?.containerId),
+    [activeSession?.nodes, activeSession?.containerId],
+  );
 
   /**
    * Патч 524: одиночная проверка (терминал/замок), выданная как локация на
@@ -215,14 +243,14 @@ export default function PlayerLootTradeOverlay() {
    */
   const standaloneCheckSession = useMemo(() => {
     if (!activeSession || activeSession.kind !== CONTAINER_KIND.HUB) return null;
-    const nodes = Array.isArray(activeSession.nodes) ? activeSession.nodes : [];
+    const nodes = sessionNodes;
     if (nodes.length !== 1) return null;
     const only = nodes[0];
     if (!only || only.containerId !== activeSession.containerId) return null;
     const resolved = resolveCheckSessionNode(only);
     if (!resolved.checkKind) return null;
     return { node: resolved.node, kind: resolved.checkKind };
-  }, [activeSession]);
+  }, [sessionNodes, activeSession]);
 
   /**
    * Патч 506: «Покинуть локацию». Игрок отключается сам, сессия Мастера
@@ -269,14 +297,17 @@ export default function PlayerLootTradeOverlay() {
 
   const selectedHubNode = useMemo(() => {
     if (!isHubSession || !selectedHubNodeId) return null;
-    const found = (activeSession?.nodes || []).find(
-      (n) => n.containerId === selectedHubNodeId && !n.locked,
+    const room = rooms?.[matchedContext?.roomCode];
+    const found = sessionNodes.find(
+      // Патч 546: содержимое нельзя открыть и мимо непройденной проверки.
+      (n) => n.containerId === selectedHubNodeId
+        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id) }),
     );
-    // Терминал никогда не должен попадать в сценарий «открыть сундук»:
-    // возвращаем игрока к списку локации, где он откроет мини-игру.
-    if (found && resolveTerminalSessionNode(found).isTerminal) return null;
+    // Локация и точки проверки никогда не попадают в сценарий «открыть сундук»:
+    // локация требует входа, терминал/замок — мини-игры.
+    if (found && (nodeHasChildren(found) || resolveCheckSessionNode(found).checkKind)) return null;
     return found || null;
-  }, [isHubSession, activeSession?.nodes, selectedHubNodeId]);
+  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode]);
 
   // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
   const viewTarget = isHubSession ? selectedHubNode : activeSession;
@@ -326,7 +357,7 @@ export default function PlayerLootTradeOverlay() {
     handledWinRef.current = key;
     if (winTimerRef.current) clearTimeout(winTimerRef.current);
     const targetId = terminalSelection.targetNodeId;
-    const nodes = activeSession?.nodes || [];
+    const nodes = sessionNodes;
     winTimerRef.current = setTimeout(() => {
       winTimerRef.current = null;
       setTerminalSelection(null);
@@ -338,7 +369,7 @@ export default function PlayerLootTradeOverlay() {
     }, HACK_OUTCOME_DELAY_MS);
   }, [
     rooms, isHubSession, terminalSelection,
-    activeSession?.nodes, matchedContext?.roomCode, navigateHackOutcome,
+    sessionNodes, matchedContext?.roomCode, navigateHackOutcome,
   ]);
   useEffect(() => () => {
     if (winTimerRef.current) clearTimeout(winTimerRef.current);
@@ -672,7 +703,7 @@ export default function PlayerLootTradeOverlay() {
     const currentParentId = parentStack.length ? parentStack[parentStack.length - 1] : rootId;
     const currentNode = currentParentId === rootId
       ? null
-      : (activeSession.nodes || []).find((node) => node.containerId === currentParentId) || null;
+      : sessionNodes.find((node) => node.containerId === currentParentId) || null;
     const currentTarget = currentNode || { ...activeSession, containerId: rootId };
     const currentTitle = currentNode?.name || activeSession.name;
     const currentDescription = currentNode?.description ?? activeSession.description;
@@ -680,27 +711,38 @@ export default function PlayerLootTradeOverlay() {
     // Патч 543: глухая преграда сильнее замка — при перекрытом проходе
     // взлом не предлагается вообще; снимает только Мастер.
     const currentPassageBlocked = Boolean(currentNode?.passageBlocked);
-    const currentGatePending = currentPassageBlocked
-      || currentTarget.keyAccessState === 'needs-check'
-      || currentTarget.keyAccessState === 'denied'
-      || (Boolean(currentTarget.locked)
-        && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
+    // Патч 546: единый предикат преграды. Локация с настроенным замком не
+    // пропускает внутрь, даже если старый сервер не прислал флаг `locked`.
+    const currentRoom = rooms?.[matchedContext.roomCode];
+    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id);
+    const currentGatePending = accessBarrierPending(currentTarget, { isPassed: currentIsPassed });
     const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
       const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
-      if (!state) return null;
-      const kind = state.config?.kind === 'lock'
-        ? CONTAINER_KIND.LOCK
-        : CONTAINER_KIND.TERMINAL;
+      const sourceNode = sessionNodes.find((node) => node.containerId === id);
+      const resolved = resolveCheckSessionNode(state?.config || sourceNode);
+      // Патч 544: замок не должен становиться терминалом только потому, что
+      // лежит в общем реестре terminalStates. Тип берём из маркера/узла.
+      if (!state && !resolved.checkKind) return null;
+      const kind = resolved.checkKind
+        || (sourceNode?.kind === CONTAINER_KIND.LOCK ? CONTAINER_KIND.LOCK : CONTAINER_KIND.TERMINAL);
+      const selection = {
+        ...(sourceNode || {}),
+        ...(state?.config || {}),
+        containerId: id,
+        kind,
+        name: state?.config?.name || sourceNode?.name || tLootTrade('player.gateTerminal'),
+        difficulty: state?.config?.difficulty ?? sourceNode?.difficulty ?? 1,
+      };
       const accessKey = terminalAccessKey({
         roomCode: matchedContext.roomCode,
         containerId: id,
         accessId: state?.accessId,
       });
       const closed = Boolean(
-        state.closed || state.locked || state.game?.status === 'closed',
+        state?.closed || state?.locked || state?.game?.status === 'closed',
       );
       const awaiting = Boolean(
-        state.awaitingGm || state.game?.status === 'awaitingRetry',
+        state?.awaitingGm || state?.game?.status === 'awaitingRetry',
       );
       const hackAllowed = canHackTerminal({
         key: accessKey,
@@ -709,7 +751,6 @@ export default function PlayerLootTradeOverlay() {
         terminalAwaiting: awaiting,
         isLock: kind === CONTAINER_KIND.LOCK,
       });
-      const difficulty = state.config?.difficulty ?? 1;
       return {
         id,
         kind,
@@ -719,15 +760,9 @@ export default function PlayerLootTradeOverlay() {
           tLootTrade(kind === CONTAINER_KIND.LOCK
             ? 'player.gateLockLabel'
             : 'player.gateTerminalLabel'),
-          { difficulty },
+          { difficulty: selection.difficulty },
         ),
-        selection: {
-          ...(state.config || {}),
-          containerId: id,
-          kind,
-          name: state.config?.name || tLootTrade('player.gateTerminal'),
-          difficulty,
-        },
+        selection,
       };
     }).filter(Boolean);
     const gateIdsFor = (node) => (node.keyAccessState !== 'denied'
@@ -737,7 +772,7 @@ export default function PlayerLootTradeOverlay() {
       ])]
       : []);
     const gateSeparatorKeyFor = (node) => (
-      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === 'and')
+      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === ACCESS_OP.AND)
         ? 'player.gateAnd'
         : 'player.gateOr'
     );
@@ -748,16 +783,41 @@ export default function PlayerLootTradeOverlay() {
     // считаются детьми корня. Запертые потомки уже скрыты сервером.
     // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
     // никогда не самостоятельная строка игрока.
-    const hubNodes = currentGatePending ? [] : (activeSession.nodes || []).filter((node) => {
+    // Патч 546: клиентская страховка границы видимости для старого сервера.
+    // Потомки узла с непройденной проверкой не показываются, даже если флаг
+    // `locked` потерялся по дороге; обновлённый сервер уже скрыл их сам.
+    const barrierIds = sessionNodes
+      .filter((node) => accessBarrierPending(node, { isPassed: currentIsPassed }))
+      .map((node) => node.containerId);
+    const barrierGraph = locationGraph.buildGraphFromSession(rootId, sessionNodes);
+    const hiddenBehindBarrier = new Set(locationGraph.hiddenBehindLock(barrierGraph, {
+      lockedIds: barrierIds,
+      isGm: false,
+      rootId,
+    }));
+    const visibleHubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
       if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
+      if (hiddenBehindBarrier.has(node.containerId)) return false;
       const parents = Array.isArray(node.parentIds) && node.parentIds.length
         ? node.parentIds
         : [rootId];
       return parents.includes(currentParentId);
     });
+    // Патч 545: порядок мест у игрока = порядок дерева Мастера. Внутри
+    // вложенной локации сортируем по `childIds` родителя (канон графа), а не
+    // по плоскому BFS-списку: общий ребёнок нескольких родителей не «всплывает»
+    // раньше братьев. Корень идёт в порядке сессии, собранной тем же графом.
+    const parentChildOrder = Array.isArray(currentNode?.childIds) ? currentNode.childIds : [];
+    const hubNodes = parentChildOrder.length
+      ? [...visibleHubNodes].sort((a, b) => {
+        const ia = parentChildOrder.indexOf(a.containerId);
+        const ib = parentChildOrder.indexOf(b.containerId);
+        return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
+      })
+      : visibleHubNodes;
     const exitLocationId = String(currentTarget.exitLocationId || '').trim();
     const exitNode = exitLocationId && !currentGatePending
-      ? (activeSession.nodes || []).find((node) => node.containerId === exitLocationId)
+      ? sessionNodes.find((node) => node.containerId === exitLocationId)
       : null;
     return (
       <>
@@ -900,19 +960,22 @@ export default function PlayerLootTradeOverlay() {
                     const { node, isTerminal: markedTerminal, isLock: markedLock } = resolveCheckSessionNode(rawNode);
                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
-                    const nodeIsTerminal = markedTerminal || Boolean(terminalState)
-                      || node.kind === CONTAINER_KIND.LOCK;
-                    // Патч 520: видимый (не привязанный как ворота) замок —
-                    // самостоятельная точка локации со своей мини-игрой.
-                    const nodeIsLock = markedLock || node.kind === CONTAINER_KIND.LOCK
-                      || terminalState?.config?.kind === 'lock';
+                    // Патч 544: общий реестр проверок хранит и замки, и терминалы.
+                    // Наличие terminalState больше не делает узел терминалом.
+                    const stateCheck = resolveCheckSessionNode(terminalState?.config);
+                    const nodeIsLock = markedLock || node.kind === CONTAINER_KIND.LOCK || stateCheck.isLock;
+                    const nodeIsTerminal = !nodeIsLock && (markedTerminal || stateCheck.isTerminal
+                      // Совсем старый сервер мог не положить kind в config terminalStates.
+                      || (Boolean(terminalState) && !nodeHasChildren(node)));
                     const nodeCheckKind = nodeIsLock ? CONTAINER_KIND.LOCK : CONTAINER_KIND.TERMINAL;
                     const terminalForSelection = {
                       ...node,
                       ...(terminalState?.config || {}),
                       kind: nodeCheckKind,
                     };
-                    const nodeLocked = Boolean(node.locked);
+                    // Патч 546: строка заперта не только по флагу, но и по
+                    // непройденной проверке входа/содержимого.
+                    const nodeLocked = accessBarrierPending(node, { isPassed: currentIsPassed });
                     // Патч 530: выигранная проверка = доступ к содержимому
                     // (или вход в локацию), а не только надпись «взломано».
                     const nodeCheckPassed = Boolean(
@@ -987,9 +1050,12 @@ export default function PlayerLootTradeOverlay() {
                         <View style={styles.lootRowInfo}>
                           <View style={styles.hubNodeTitleRow}>
                             <MaterialCommunityIcons
-                              name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
+                              name={nodeIsLocation ? 'map-marker-multiple'
+                                : (nodeIsLock ? 'lock'
+                                  : (nodeIsTerminal ? 'console'
+                                    : (nodeLocked ? 'lock' : (nodeIsMerch ? 'sack' : 'treasure-chest'))))}
                               size={19}
-                              color={nodeLocked ? '#e57373' : '#f0e68c'}
+                              color={nodeLocked && !nodeIsLocation ? '#e57373' : '#f0e68c'}
                             />
                             <Text style={[
                               styles.lootRowTitle,
@@ -1032,6 +1098,10 @@ export default function PlayerLootTradeOverlay() {
                             // не показывается — блок сильнее, взлома не будет.
                             <Text style={styles.hubLockedHintText}>
                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                            </Text>
+                          ) : nodeIsLocation ? (
+                            <Text style={styles.hubUnlockedMetaText}>
+                              {tLootTrade('card.hubKind')}
                             </Text>
                           ) : nodeIsTerminal ? (
                             <Text style={[styles.hubUnlockedMetaText, (terminalClosed || terminalAwaiting) && styles.terminalDeniedMeta]}>

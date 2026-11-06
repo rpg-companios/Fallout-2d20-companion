@@ -10,7 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(__dirname, '../..');
-const BRANCH = 'arena/aa289f1c-fallout-2d20-companion';
+const BRANCH = 'arena/f90c80d8-fallout-2d20-companion';
 
 const git = (cwd, args) =>
   execFileSync('git', args, {

@@ -1508,6 +1508,20 @@ export default function LootTradeScreen() {
     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
   };
 
+  // Патч 545: перестановка строк дерева перетаскиванием. Порядок хранится на
+  // родителе (`childOrder`), а не на ребёнке: у узла с несколькими родителями
+  // каждый родитель держит свой порядок. persistAndSyncContainer уже пересылает
+  // живым сессиям пересобранные узлы графа — игрок получает тот же порядок.
+  const handleReorderHubChildren = async (parentId, orderedChildIds) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const parent = containers.find((c) => c?.id === parentId && c.kind === CONTAINER_KIND.HUB);
+    if (!parent || !Array.isArray(orderedChildIds)) return;
+    const childOrder = [...new Set(orderedChildIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    if (!childOrder.length) return;
+    if (childOrder.join('\u0000') === (parent.childOrder || []).join('\u0000')) return;
+    await persistAndSyncContainer({ ...parent, childOrder });
+  };
+
   // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
   // «Блокировать» спрашивает причину (пусто = «Проход заблокирован»),
   // «Открыть» снимает блок и чистит причину.
@@ -2493,6 +2507,7 @@ export default function LootTradeScreen() {
                 onUpdateLockLabel={handleUpdateHubChildLockLabel}
                 onMoveNestedOut={handleMoveNestedLocationOut}
                 onTogglePassage={handleTogglePassage}
+                onReorderChildren={handleReorderHubChildren}
               />
             </>
           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL

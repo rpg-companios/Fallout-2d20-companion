@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ARENA_BRANCH="arena/aa289f1c-fallout-2d20-companion"
+ARENA_BRANCH="arena/f90c80d8-fallout-2d20-companion"
 REMOTE="origin"
 
 ROOT_DIR="$(

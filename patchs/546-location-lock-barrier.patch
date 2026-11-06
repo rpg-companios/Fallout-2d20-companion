@@ -1,0 +1,1104 @@
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index b819ce6..17823cd 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('545');
++    expect(version.version).toBe('546');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(144);
+-    expect(version.notes['en-EN']).toHaveLength(144);
+-    expect(json('patchs/baseline.json').baseline).toBe('545');
++    expect(version.notes['ru-RU']).toHaveLength(145);
++    expect(version.notes['en-EN']).toHaveLength(145);
++    expect(json('patchs/baseline.json').baseline).toBe('546');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -271,21 +271,23 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
++    expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **545**');
++    expect(roadmap).toContain('Текущая версия: **546**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 545');
++    expect(roadmap).toContain('Осталось после патча 546');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/patch-544-install.md')).toContain('544');
+     expect(read('docs/patch-545-install.md')).toContain('545');
++    expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hub-location-lock-546.test.js b/__tests__/room/hub-location-lock-546.test.js
+new file mode 100644
+index 0000000..963e4d8
+--- /dev/null
++++ b/__tests__/room/hub-location-lock-546.test.js
+@@ -0,0 +1,367 @@
++// Патч 546: замок на локации — преграда входа, а не просто бейдж Мастера.
++// Сценарий владельца: «Подвал доктора» заперт «Запертым люком», внутри
++// торговец «Безумный доктор»; «Тапхаус» заперт «Запертой дверью». Игрок не
++// должен входить, видеть содержимое, лутать или торговать до взлома — ни в
++// окне, ни прямым WS-запросом. Страховка работает и со старым сервером,
++// который потерял флаг locked, но сохранил маркер требования.
++import { describe, expect, it, vi } from 'vitest';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++import {
++  CONTAINER_KIND,
++  buildLocationSessionNodes,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade.js';
++import {
++  accessBarrierPending,
++  hasAccessChecks,
++  isAccessStateOpen,
++  makeCheckToken,
++  makeOpToken,
++} from '../../server/accessExpression.js';
++import {
++  normalizeActiveSession,
++  applyKeyAccessToSession,
++  sanitizeSessionForMember,
++  applyAtomicLootTake,
++  applyAtomicTradeCommit,
++} from '../../server/lootTradeSession.js';
++import { resolveKeyAccess } from '../../server/keyAccess.js';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible, autoStart }) => React.createElement('LockPickingModal', {
++    containerId: lock?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible }) => React.createElement('StandaloneCheckModal', { visible }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay.js';
++import useCharacterStore from '../../src/store/characterStore.js';
++import useRoomStore from '../../src/room/roomStore.js';
++import useUiModeStore from '../../src/room/uiModeStore.js';
++
++describe('546: единый предикат преграды', () => {
++  it('нет проверки — нет преграды; есть непройденная проверка — преграда', () => {
++    expect(accessBarrierPending({ kind: 'hub' })).toBe(false);
++    expect(accessBarrierPending({ kind: 'hub', linkedCheckIds: ['hatch'] })).toBe(true);
++    expect(accessBarrierPending({ kind: 'hub', accessExpression: [makeCheckToken('hatch')] })).toBe(true);
++    expect(hasAccessChecks({ linkedCheckIds: ['hatch'] })).toBe(true);
++    expect(isAccessStateOpen('open')).toBe(true);
++    expect(isAccessStateOpen('none')).toBe(false);
++  });
++
++  it('явное решение сервера важнее голого требования', () => {
++    const gate = { linkedCheckIds: ['hatch'] };
++    expect(accessBarrierPending({ ...gate, keyAccessState: 'open' })).toBe(false);
++    expect(accessBarrierPending({ ...gate, keyAccessState: 'open-by-key' })).toBe(false);
++    expect(accessBarrierPending({ ...gate, keyAccessState: 'needs-check' })).toBe(true);
++    expect(accessBarrierPending({ ...gate, keyAccessState: 'denied' })).toBe(true);
++    expect(accessBarrierPending({ ...gate, keyUnlocked: true })).toBe(false);
++    expect(accessBarrierPending({ ...gate, locked: true })).toBe(true);
++    expect(accessBarrierPending({ ...gate, passageBlocked: true })).toBe(true);
++  });
++
++  it('И/ИЛИ вычисляется по пройденным источникам', () => {
++    const expr = [makeCheckToken('a'), makeOpToken('+'), makeCheckToken('b'), makeOpToken('/'), makeCheckToken('c')];
++    const node = { accessExpression: expr };
++    expect(accessBarrierPending(node, { isPassed: (id) => id === 'a' })).toBe(true);
++    expect(accessBarrierPending(node, { isPassed: (id) => id === 'a' || id === 'b' })).toBe(false);
++    expect(accessBarrierPending(node, { isPassed: (id) => id === 'c' })).toBe(false);
++    expect(accessBarrierPending(node, { isPassed: () => false })).toBe(true);
++  });
++});
++
++const cards = () => [
++  normalizeContainerEntity({
++    id: 'diamond', kind: CONTAINER_KIND.HUB, name: 'Даймонд-сити',
++    links: [
++      { containerId: 'basement', locked: false },
++      { containerId: 'piper', locked: false },
++      { containerId: 'tap', locked: false },
++    ],
++  }),
++  normalizeContainerEntity({
++    id: 'basement', kind: CONTAINER_KIND.HUB, name: 'Подвал доктора',
++    parentLocationId: 'diamond',
++    accessExpression: [makeCheckToken('hatch')],
++    linkedCheckIds: ['hatch'],
++    links: [
++      { containerId: 'doctor', locked: false },
++      { containerId: 'basement-chest', locked: false },
++      { containerId: 'hatch', locked: false },
++    ],
++  }),
++  normalizeContainerEntity({
++    id: 'doctor', kind: CONTAINER_KIND.MERCHANT, name: 'Безумный доктор',
++    caps: 500,
++    items: [{ entryId: 'med1', itemType: 'chem', name: 'Стимулятор', quantity: 5, cost: 10 }],
++  }),
++  normalizeContainerEntity({
++    id: 'basement-chest', kind: CONTAINER_KIND.LOOT, name: 'Ящик подвала',
++    items: [{ entryId: 'loot1', itemType: 'misc', name: 'Крышки', quantity: 3 }],
++  }),
++  normalizeContainerEntity({ id: 'hatch', kind: CONTAINER_KIND.LOCK, name: 'Запертый люк', difficulty: 2 }),
++  normalizeContainerEntity({
++    id: 'piper', kind: CONTAINER_KIND.HUB, name: 'Дом Пайпер', parentLocationId: 'diamond',
++    links: [{ containerId: 'piper-chest', locked: false }],
++  }),
++  normalizeContainerEntity({
++    id: 'piper-chest', kind: CONTAINER_KIND.LOOT, name: 'Сундук Пайпер',
++    items: [{ entryId: 'loot2', itemType: 'misc', name: 'Записка', quantity: 1 }],
++  }),
++  normalizeContainerEntity({
++    id: 'tap', kind: CONTAINER_KIND.HUB, name: 'Тапхаус',
++    parentLocationId: 'diamond',
++    accessExpression: [makeCheckToken('door')],
++    linkedCheckIds: ['door'],
++    links: [
++      { containerId: 'tap-chest', locked: false },
++      { containerId: 'door', locked: false },
++    ],
++  }),
++  normalizeContainerEntity({
++    id: 'tap-chest', kind: CONTAINER_KIND.LOOT, name: 'Касса тапхауса',
++    items: [{ entryId: 'loot3', itemType: 'misc', name: 'Крышки', quantity: 7 }],
++  }),
++  normalizeContainerEntity({ id: 'door', kind: CONTAINER_KIND.LOCK, name: 'Запертая дверь', difficulty: 3 }),
++];
++
++const ownerSession = () => {
++  const all = cards();
++  const root = all.find((c) => c.id === 'diamond');
++  return normalizeActiveSession({
++    sessionId: 's546', containerId: 'diamond', kind: 'hub', name: 'Даймонд-сити',
++    targetType: 'room', nodes: buildLocationSessionNodes(root, all),
++  }, 1000);
++};
++const resolveWith = (passed = {}) => (requirement) => resolveKeyAccess(requirement, {
++  storage: { entries: [] }, terminalStates: {}, accessEvents: passed,
++});
++
++describe('546: сервер держит границу локации с замком', () => {
++  it('без взлома игрок не видит содержимое запертых локаций', () => {
++    const keyed = applyKeyAccessToSession(ownerSession(), resolveWith());
++    expect(keyed.nodes.find((n) => n.containerId === 'basement').locked).toBe(true);
++    expect(keyed.nodes.find((n) => n.containerId === 'basement').keyAccessState).toBe('needs-check');
++    expect(keyed.nodes.find((n) => n.containerId === 'tap').locked).toBe(true);
++    const member = sanitizeSessionForMember(keyed, { isGm: false });
++    const ids = member.nodes.map((n) => n.containerId);
++    expect(ids).toContain('basement');
++    expect(ids).toContain('piper');
++    expect(ids).toContain('tap');
++    expect(ids).not.toContain('doctor');
++    expect(ids).not.toContain('basement-chest');
++    expect(ids).not.toContain('tap-chest');
++  });
++
++  it('прямой WS-лут и торговля за замком отклоняются', () => {
++    const keyed = applyKeyAccessToSession(ownerSession(), resolveWith());
++    const loot = applyAtomicLootTake(keyed, {
++      sessionId: 's546', characterId: 'p1', nodeContainerId: 'basement-chest',
++      takes: [{ entryId: 'loot1', quantity: 1 }],
++    }, 2000);
++    expect(loot.error).toBe('CONTAINER_LOCKED');
++    const trade = applyAtomicTradeCommit(keyed, {
++      sessionId: 's546', characterId: 'p1', nodeContainerId: 'doctor',
++      buyItems: [{ entryId: 'med1', quantity: 1 }], playerCapsAvailable: 1000,
++    }, 2000);
++    expect(trade.error).toBe('CONTAINER_LOCKED');
++  });
++
++  it('взлом люка открывает подвал: содержимое, лут и торговля доступны', () => {
++    const keyed = applyKeyAccessToSession(ownerSession(), resolveWith({ hatch: { containerId: 'hatch' } }));
++    expect(keyed.nodes.find((n) => n.containerId === 'basement').locked).toBe(false);
++    expect(keyed.nodes.find((n) => n.containerId === 'basement').keyAccessState).toBe('open');
++    // Тапхаус всё ещё заперт своей дверью — адресность сохраняется.
++    expect(keyed.nodes.find((n) => n.containerId === 'tap').locked).toBe(true);
++    const member = sanitizeSessionForMember(keyed, { isGm: false });
++    expect(member.nodes.map((n) => n.containerId)).toContain('doctor');
++    const loot = applyAtomicLootTake(keyed, {
++      sessionId: 's546', characterId: 'p1', nodeContainerId: 'basement-chest',
++      takes: [{ entryId: 'loot1', quantity: 1 }],
++    }, 2000);
++    expect(loot.error).toBeUndefined();
++    expect(loot.granted).toHaveLength(1);
++    const trade = applyAtomicTradeCommit(keyed, {
++      sessionId: 's546', characterId: 'p1', nodeContainerId: 'doctor',
++      buyItems: [{ entryId: 'med1', quantity: 1 }], playerCapsAvailable: 1000,
++    }, 2000);
++    expect(trade.error).toBeUndefined();
++    expect(trade.committed.boughtEntries).toHaveLength(1);
++  });
++
++  it('непройденная проверка держит границу даже без флага locked', () => {
++    // Сессия не пересчитана (старый путь/ручной снимок): флаг потерян,
++    // требование на месте — содержимое всё равно не уходит игроку.
++    const raw = ownerSession();
++    const stripped = {
++      ...raw,
++      nodes: raw.nodes.map((n) => ({ ...n, locked: false, keyAccessState: 'none' })),
++    };
++    const member = sanitizeSessionForMember(stripped, { isGm: false });
++    expect(member.nodes.map((n) => n.containerId)).not.toContain('doctor');
++    const loot = applyAtomicLootTake(stripped, {
++      sessionId: 's546', characterId: 'p1', nodeContainerId: 'basement-chest',
++      takes: [{ entryId: 'loot1', quantity: 1 }],
++    }, 2000);
++    expect(loot.error).toBe('CONTAINER_LOCKED');
++  });
++});
++
++/** Старый сервер: kind понижён, locked/keyAccessState потеряны, маркер жив. */
++const legacyServerNode = (node) => ({
++  containerId: node.containerId,
++  kind: 'loot',
++  name: node.name,
++  description: node.description,
++  locked: false,
++  lockLabel: String(node.lockLabel || '').trim(),
++  caps: node.caps || 0,
++  saleMarkupPercent: 0,
++  buyDepreciationPercent: 50,
++  characterOverrides: {},
++  items: node.items || [],
++});
++
++const legacySession = () => {
++  const all = cards();
++  const root = all.find((c) => c.id === 'diamond');
++  const nodes = buildLocationSessionNodes(root, all).map(legacyServerNode);
++  return {
++    sessionId: 'ui-546', containerId: 'diamond', kind: 'hub', name: 'Даймонд-сити',
++    targetType: 'room', nodes,
++  };
++};
++
++const mount = async (activeSession) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({ currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0 });
++  useRoomStore.setState({
++    clientId: 'player-client', status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession,
++        accessEvents: {},
++        terminalStates: {
++          hatch: {
++            containerId: 'hatch',
++            config: { containerId: 'hatch', kind: 'lock', name: 'Запертый люк', difficulty: 2 },
++            game: null, closed: false, locked: false,
++          },
++          door: {
++            containerId: 'door',
++            config: { containerId: 'door', kind: 'lock', name: 'Запертая дверь', difficulty: 3 },
++            game: null, closed: false, locked: false,
++          },
++        },
++      },
++    },
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await Promise.resolve();
++  });
++  return renderer;
++};
++const tap = async (renderer, testID) => {
++  const [button] = renderer.root.findAllByType('TouchableOpacity').filter((n) => n.props.testID === testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++};
++const allText = (renderer) => renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? '')).join(' | ');
++
++describe('546: окно игрока со старым сервером — замок не обходится', () => {
++  it('вход в Подвал доктора показывает люк, а не торговца и не ящик', async () => {
++    const renderer = await mount(legacySession());
++    expect(allText(renderer)).toContain('Подвал доктора');
++    expect(allText(renderer)).not.toContain('Безумный доктор');
++    await tap(renderer, 'hub-node-enter-basement');
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-hatch' }).length).toBeGreaterThan(0);
++    expect(allText(renderer)).not.toContain('Безумный доктор');
++    expect(allText(renderer)).not.toContain('Ящик подвала');
++    await tap(renderer, 'current-gate-hack-hatch');
++    expect(renderer.root.findByType('LockPickingModal').props.containerId).toBe('hatch');
++    await act(async () => renderer.unmount());
++  });
++
++  it('после победы люка торговец и ящик становятся доступны', async () => {
++    const renderer = await mount(legacySession());
++    await tap(renderer, 'hub-node-enter-basement');
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            terminalStates: {
++              ...state.rooms.ROOM1.terminalStates,
++              hatch: { ...state.rooms.ROOM1.terminalStates.hatch, game: { status: 'won' } },
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++    expect(allText(renderer)).toContain('Безумный доктор');
++    expect(allText(renderer)).toContain('Ящик подвала');
++    await tap(renderer, 'hub-node-enter-basement-chest');
++    expect(allText(renderer)).toMatch(/Take 1|Взять 1/);
++    await act(async () => renderer.unmount());
++  });
++
++  it('Тапхаус заперт своей дверью независимо от подвала', async () => {
++    const renderer = await mount(legacySession());
++    await tap(renderer, 'hub-node-enter-tap');
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-door' }).length).toBeGreaterThan(0);
++    expect(allText(renderer)).not.toContain('Касса тапхауса');
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/hub-player-window-542.test.js b/__tests__/room/hub-player-window-542.test.js
+index 572bd18..2be3f58 100644
+--- a/__tests__/room/hub-player-window-542.test.js
++++ b/__tests__/room/hub-player-window-542.test.js
+@@ -256,7 +256,9 @@ describe('542: контракт по файлам', () => {
+   });
+ 
+   it('сервер скрывает замки/привязанные терминалы и закрывает корень-преграду пустым списком', () => {
+-    expect(sessionSrc).toContain("session.keyAccessState === 'needs-check'");
++    // Патч 546: корень-преграда определяется единым предикатом, а не только
++    // состоянием ключа — непройденная проверка тоже закрывает выдачу.
++    expect(sessionSrc).toContain('accessBarrierPending(session)');
+     expect(sessionSrc).toContain('return { ...session, nodes: [] }');
+     expect(sessionSrc).toContain('exitOnly');
+     expect(sessionSrc).toContain('next.accessExpression = normalizeAccessExpression');
+diff --git a/__tests__/room/location-graph-523.test.js b/__tests__/room/location-graph-523.test.js
+index 25e3d5f..f099c43 100644
+--- a/__tests__/room/location-graph-523.test.js
++++ b/__tests__/room/location-graph-523.test.js
+@@ -117,6 +117,9 @@ describe('523: серверная сессия и доступ', () => {
+     sessionId: 's1', containerId: 'factory', kind: 'hub', name: 'Завод',
+     targetType: 'room', roomCodes: ['R1', 'R2'],
+     linkedCheckIds: ['t1', 'k1'], linkedCheckId: 't1',
++    // Патч 546: требование корня уже пересчитано сервером и пройдено;
++    // непройденная проверка корня теперь скрывает всё содержимое (см. 546).
++    keyAccessState: 'open',
+     nodes,
+   }, 1000);
+ 
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 63940a7..2458009 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('545');
++    expect(version.version).toBe('546');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(144);
+-    expect(version.notes['en-EN']).toHaveLength(144);
+-    expect(json('patchs/baseline.json').baseline).toBe('545');
++    expect(version.notes['ru-RU']).toHaveLength(145);
++    expect(version.notes['en-EN']).toHaveLength(145);
++    expect(json('patchs/baseline.json').baseline).toBe('546');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -455,21 +455,23 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
++    expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **545**');
++    expect(roadmap).toContain('Текущая версия: **546**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 545');
++    expect(roadmap).toContain('Осталось после патча 546');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/patch-544-install.md')).toContain('544');
+     expect(read('docs/patch-545-install.md')).toContain('545');
++    expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/passage-block-543.test.js b/__tests__/room/passage-block-543.test.js
+index 4142b8e..188338a 100644
+--- a/__tests__/room/passage-block-543.test.js
++++ b/__tests__/room/passage-block-543.test.js
+@@ -408,7 +408,8 @@ describe('543: контракт по файлам', () => {
+     expect(domain).toContain('passageReason: kind === CONTAINER_KIND.HUB');
+     expect(domain).toContain('passageBlocked: Boolean(child.passageBlocked)');
+     expect(sessionSrc).toContain('passageBlocked: Boolean(source.passageBlocked)');
+-    expect(sessionSrc).toContain('node.locked || node.passageBlocked');
++    // Патч 546: перекрытый проход входит в единый предикат преграды.
++    expect(sessionSrc).toContain('accessBarrierPending(node)');
+     expect(graph).toContain('passageBlocked: Boolean(raw.passageBlocked)');
+     expect(graph).toContain('Boolean(node.passageBlocked) && id !== root');
+   });
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 43f0f3a..aecade3 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -24,9 +24,12 @@ import {
+   formatLootTrade,
+ } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+ import {
++  ACCESS_OP,
++  accessBarrierPending,
+   expressionCheckIds,
+   resolveAccessExpression,
+ } from '../../domain/accessExpression';
++import locationGraph from '../../domain/locationGraph.js';
+ import {
+   CONTAINER_KIND,
+   computeBarterSummary,
+@@ -64,6 +67,24 @@ import {
+   applyHackOutcome,
+ } from './hackOutcome';
+ 
++/**
++ * Патч 546: проверка считается пройденной по общему реестру комнаты. Нужно
++ * только как страховка для старого сервера, который мог потерять `locked` /
++ * `keyAccessState`: маркер 544 возвращает само требование, а победу замка или
++ * терминала клиент видит в `terminalStates`/`accessEvents`. Обновлённый сервер
++ * остаётся источником истины — его явное `open`/`denied` важнее этой оценки.
++ */
++const roomCheckPassed = (room, checkId) => {
++  const id = String(checkId || '').trim();
++  if (!id || !room) return false;
++  const state = room.terminalStates?.[id];
++  return Boolean(
++    state?.game?.status === 'won'
++    || state?.keyUnlocked
++    || room.accessEvents?.[id],
++  );
++};
++
+ const getItemIcon = (itemType) => {
+   if (itemType === 'caps') return '💰';
+   if (itemType === 'weapon') return '🔫';
+@@ -276,14 +297,17 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const selectedHubNode = useMemo(() => {
+     if (!isHubSession || !selectedHubNodeId) return null;
++    const room = rooms?.[matchedContext?.roomCode];
+     const found = sessionNodes.find(
+-      (n) => n.containerId === selectedHubNodeId && !n.locked,
++      // Патч 546: содержимое нельзя открыть и мимо непройденной проверки.
++      (n) => n.containerId === selectedHubNodeId
++        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id) }),
+     );
+     // Локация и точки проверки никогда не попадают в сценарий «открыть сундук»:
+     // локация требует входа, терминал/замок — мини-игры.
+     if (found && (nodeHasChildren(found) || resolveCheckSessionNode(found).checkKind)) return null;
+     return found || null;
+-  }, [isHubSession, sessionNodes, selectedHubNodeId]);
++  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode]);
+ 
+   // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
+   const viewTarget = isHubSession ? selectedHubNode : activeSession;
+@@ -687,11 +711,11 @@ export default function PlayerLootTradeOverlay() {
+     // Патч 543: глухая преграда сильнее замка — при перекрытом проходе
+     // взлом не предлагается вообще; снимает только Мастер.
+     const currentPassageBlocked = Boolean(currentNode?.passageBlocked);
+-    const currentGatePending = currentPassageBlocked
+-      || currentTarget.keyAccessState === 'needs-check'
+-      || currentTarget.keyAccessState === 'denied'
+-      || (Boolean(currentTarget.locked)
+-        && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
++    // Патч 546: единый предикат преграды. Локация с настроенным замком не
++    // пропускает внутрь, даже если старый сервер не прислал флаг `locked`.
++    const currentRoom = rooms?.[matchedContext.roomCode];
++    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id);
++    const currentGatePending = accessBarrierPending(currentTarget, { isPassed: currentIsPassed });
+     const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
+       const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+       const sourceNode = sessionNodes.find((node) => node.containerId === id);
+@@ -748,7 +772,7 @@ export default function PlayerLootTradeOverlay() {
+       ])]
+       : []);
+     const gateSeparatorKeyFor = (node) => (
+-      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === 'and')
++      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === ACCESS_OP.AND)
+         ? 'player.gateAnd'
+         : 'player.gateOr'
+     );
+@@ -759,8 +783,21 @@ export default function PlayerLootTradeOverlay() {
+     // считаются детьми корня. Запертые потомки уже скрыты сервером.
+     // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
+     // никогда не самостоятельная строка игрока.
++    // Патч 546: клиентская страховка границы видимости для старого сервера.
++    // Потомки узла с непройденной проверкой не показываются, даже если флаг
++    // `locked` потерялся по дороге; обновлённый сервер уже скрыл их сам.
++    const barrierIds = sessionNodes
++      .filter((node) => accessBarrierPending(node, { isPassed: currentIsPassed }))
++      .map((node) => node.containerId);
++    const barrierGraph = locationGraph.buildGraphFromSession(rootId, sessionNodes);
++    const hiddenBehindBarrier = new Set(locationGraph.hiddenBehindLock(barrierGraph, {
++      lockedIds: barrierIds,
++      isGm: false,
++      rootId,
++    }));
+     const visibleHubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
+       if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
++      if (hiddenBehindBarrier.has(node.containerId)) return false;
+       const parents = Array.isArray(node.parentIds) && node.parentIds.length
+         ? node.parentIds
+         : [rootId];
+@@ -936,7 +973,9 @@ export default function PlayerLootTradeOverlay() {
+                       ...(terminalState?.config || {}),
+                       kind: nodeCheckKind,
+                     };
+-                    const nodeLocked = Boolean(node.locked);
++                    // Патч 546: строка заперта не только по флагу, но и по
++                    // непройденной проверке входа/содержимого.
++                    const nodeLocked = accessBarrierPending(node, { isPassed: currentIsPassed });
+                     // Патч 530: выигранная проверка = доступ к содержимому
+                     // (или вход в локацию), а не только надпись «взломано».
+                     const nodeCheckPassed = Boolean(
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4ba9dfe..0483537 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,25 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (546) — замок локации = преграда входа
++
++Баг владельца: «Подвал доктора» с «Запертым люком» и «Тапхаус» с «Запертой
++дверью» открывались игроком свободно, содержимое и торговец «Безумный доктор»
++лутались без взлома.
++
++- Единый предикат `accessBarrierPending` в `server/accessExpression.js`
++  (клиентский фасад `domain/accessExpression.js`): непройденная проверка,
++  отказ сервера, ручной `locked` или перекрытый проход = преграда; явное
++  открытие снимает её.
++- `server/lootTradeSession.js`: видимость, очистка items/caps, guards
++  лута/торговли и граница потомков используют предикат; `applyKeyAccessToSession`
++  держит `locked` согласованным.
++- `PlayerLootTradeOverlay`: gate-first вход, скрытие потомков за преградой,
++  страховка старого сервера по маркеру 544 и реестру комнаты; разделитель
++  И/ИЛИ исправлен на `ACCESS_OP.AND`.
++- Приёмка: `__tests__/room/hub-location-lock-546.test.js` (10 тестов).
++  Контракты 523/542/543 обновлены под единый предикат. Версия/отсечка 546,
++  тезис 36, `docs/patch-546-install.md`.
++
+ ## 2026-11-06 (545) — порядок мест в хабе/локации: перетаскивание Мастера = порядок игрока
+ 
+ Слово владельца: «в интерфейсе мастера, при работе с хабом/локацией, нужна
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index f5e2691..8dcbfdf 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,35 @@
+ # Changelog
+ ---
+ 
++## A location lock is an entry barrier (patch 546)
++
++Fixed the owner's bug: "Doctor's Basement" locked by "Locked Hatch" and the
++"Tap House" locked by "Locked Door" could be entered freely — contents, the
++"Mad Doctor" merchant and loot were available without hacking.
++
++- **One barrier rule.** The new `accessBarrierPending` predicate
++  (`server/accessExpression.js`, client facade `domain/accessExpression.js`)
++  treats a node as closed when it has an unpassed check
++  (`accessExpression`/`linkedCheckIds`), an explicit server refusal
++  (`needs-check`/`denied`), a manual `locked` flag, or a blocked passage.
++  An explicit open state (`open`/`open-by-key`/`keyUnlocked`) removes the barrier.
++- **The server holds the boundary.** Node visibility, item/caps stripping,
++  direct WS looting and trading all use the same predicate. A location with a
++  configured lock no longer lets players inside even if the `locked` flag was lost.
++- **Player window.** Entering a locked location again shows only the barrier
++  (lock/terminal, AND/OR options); contents and loot/trade buttons stay hidden
++  until the check passes. The AND/OR separator uses the canonical `+` operator
++  instead of the string `and`.
++- **Legacy-server safety net.** The patch 544 marker restores the access
++  requirement; the client evaluates passed checks from the shared room registry
++  (`terminalStates`/`accessEvents`) and hides descendants behind a barrier even
++  if a legacy server dropped `locked`/`keyAccessState`. The updated server remains
++  the source of truth.
++- **Acceptance.** `__tests__/room/hub-location-lock-546.test.js`: the owner's
++  scenario (Doctor's Basement / Locked Hatch / Mad Doctor, Tap House / Locked
++  Door), server-side loot/trade denial, opening after a hack, and a legacy
++  server without the `locked` flag.
++
+ ## Place order in a location: Master drag order = player order (patch 545)
+ 
+ In the Master interface, while working with a hub/location, positions can be
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e615c5c..46f3f1e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Замок на локации — преграда входа (патч 546)
++
++Исправлен баг владельца: «Подвал доктора» с замком «Запертый люк» и «Тапхаус»
++с «Запертой дверью» открывались игроком свободно — содержимое, торговец
++«Безумный доктор» и лут были доступны без взлома.
++
++- **Единое правило преграды.** Новый предикат `accessBarrierPending`
++  (`server/accessExpression.js`, клиентский фасад `domain/accessExpression.js`)
++  считает узел закрытым, если есть непройденная проверка
++  (`accessExpression`/`linkedCheckIds`), явный отказ сервера
++  (`needs-check`/`denied`), ручной флаг `locked` или перекрытый проход.
++  Явное открытие (`open`/`open-by-key`/`keyUnlocked`) снимает преграду.
++- **Сервер держит границу.** Видимость узлов, очистка предметов/кассы,
++  прямой WS-лут и торговля используют один предикат. Локация с настроенным
++  замком больше не пропускает внутрь даже если флаг `locked` не доехал.
++- **Окно игрока.** Вход в запертую локацию снова показывает только преграду
++  (замок/терминал, варианты И/ИЛИ); содержимое и кнопки добычи/торговли
++  скрыты до прохождения. Разделитель И/ИЛИ использует канонический оператор
++  `+`, а не строку `and`.
++- **Страховка старого сервера.** Маркер 544 возвращает требование доступа;
++  клиент оценивает пройденные проверки по общему реестру комнаты
++  (`terminalStates`/`accessEvents`) и не показывает потомков за преградой,
++  даже если старый сервер потерял `locked`/`keyAccessState`. Обновлённый
++  сервер остаётся источником истины.
++- **Приёмка.** `__tests__/room/hub-location-lock-546.test.js`: сценарий
++  владельца (Подвал доктора / Запертый люк / Безумный доктор, Тапхаус /
++  Запертая дверь), серверный запрет лута/торговли, открытие после взлома,
++  старый сервер без флага `locked`.
++
+ ## Порядок мест в локации: перетаскивание у Мастера = порядок у игрока (патч 545)
+ 
+ В интерфейсе Мастера при работе с хабом/локацией позиции можно менять
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 4d63e49..3c4f8b5 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -351,7 +351,10 @@ requires: [
+   терминал / замок как альтернативу. Новой модели не появляется — это флаг и
+   ссылка внутри уже описанного списка условий. Подробная логика в 7.3–7.4.
+ - Для узла локации используется уже существующий `locked` и ошибка
+-  `CONTAINER_LOCKED`; новую ошибку изобретать не надо.
++  `CONTAINER_LOCKED`; новую ошибку изобретать не надо. **Патч 546:** границей
++  считается не только флаг `locked`, но и непройденная проверка — единый
++  предикат `accessBarrierPending` (`server/accessExpression.js`) для видимости,
++  лута, торговли и окна игрока.
+ 
+ ### 3.4 Событие «пройдено»
+ 
+@@ -616,6 +619,9 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+    стрелками; все четыре переносятся внутрь локации. В дереве хаба та же
+    иконка у строк одного родителя меняет порядок мест (патч 545): порядок
+    Мастера = порядок игрока; ключи в дереве порядок мест не задают.
++   Замок на локации — преграда входа (патч 546): непройденная проверка
++   закрывает содержимое, лут и торговлю до взлома, даже если флаг `locked`
++   потерялся по дороге.
+ 4. Контейнер, торговец, терминал и будущий «замок» могут требовать ключ;
+    требование бывает **обязательным** и **необязательным**.
+ 5. Есть ключ на общем складе — мини-игра не запускается, точка открыта сразу.
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index c869a3b..99fa8cd 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -189,3 +189,36 @@
+ 
+ Границы: перестановка не меняет `links`, `parentLocationId`, замки, преграды,
+ видимость и закон снимка; перенос внутрь/наружу остаётся прежним.
++
++## 546. Замок локации — преграда входа
++
++Баг владельца: локация с настроенным замком («Подвал доктора» / «Запертый
++люк», «Тапхаус» / «Запертая дверь») открывалась игроком свободно; содержимое,
++торговец и лут были доступны без взлома. Причина: границей видимости и
++запрета лута/торговли считался только флаг `locked`, а требование проверки
++(`accessExpression`/`linkedCheckIds`) могло доехать без него — особенно через
++старый сервер комнат.
++
++**Канон:** `server/accessExpression.js` → `accessBarrierPending(target, { isPassed })`.
++Преграда есть, если:
++1. `passageBlocked` (глухая дверь 543);
++2. `keyAccessState` = `denied` / `needs-check`;
++3. нет явного открытия (`open` / `open-by-key` / `keyUnlocked`) и есть
++   ручной `locked`;
++4. есть операнды проверки и они не пройдены (без `isPassed` — консервативно
++   считаем непройденными; с `isPassed` вычисляем И/ИЛИ).
++
++**Сервер:** `sanitizeSessionForMember`, `isNodeBehindSessionBarrier`,
++`applyAtomicLootTake`, `applyAtomicTradeCommit` и `applyKeyAccessToSession`
++используют один предикат. Потомки запертой/непройденной локации не уходят
++игроку, предметы и касса за преградой очищаются, прямой WS-запрос отклоняется.
++
++**Игрок:** `PlayerLootTradeOverlay` показывает gate-first экран при входе в
++локацию с преградой, скрывает потомков за преградой и не даёт открыть
++содержимое мимо проверки. Для старого сервера маркер 544 восстанавливает
++требование, а пройденные проверки берутся из `terminalStates`/`accessEvents`
++комнаты; явное решение обновлённого сервера важнее клиентской оценки.
++
++Границы: адресный взлом 523, закон снимка 529, порядок 545, маркер 544,
++gate-first 542 и перекрытие 543 сохранены. Замок не становится самостоятельной
++точкой игрока.
+diff --git a/docs/patch-546-install.md b/docs/patch-546-install.md
+new file mode 100644
+index 0000000..6f43d5d
+--- /dev/null
++++ b/docs/patch-546-install.md
+@@ -0,0 +1,53 @@
++# Установка патча 546: замок локации — преграда входа
++
++Патч подготовлен от состояния **версии 545**. Файл установки:
++`patchs/546-location-lock-barrier.patch`.
++
++> Баг владельца: «Подвал доктора» помечен «заблокировано: Запертый люк»,
++> «Тапхаус» — «заблокировано: Запертая дверь», но игрок свободно входит,
++> выходит и лутает содержимое (включая торговца «Безумный доктор») без взлома.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `server/accessExpression.js` | единый предикат `accessBarrierPending`: непройденная проверка, отказ сервера, ручной `locked` или перекрытый проход = преграда; явное открытие снимает её |
++| `server/lootTradeSession.js` | видимость узлов, очистка предметов/кассы, guards лута/торговли и граница потомков используют `accessBarrierPending`; `applyKeyAccessToSession` держит `locked` согласованным с проверкой |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | gate-first вход и скрытие потомков за преградой даже без флага `locked`; страховка старого сервера по маркеру 544 и реестру комнаты; разделитель И/ИЛИ исправлен на `+` |
++| `__tests__/room/hub-location-lock-546.test.js` | приёмка: сценарий владельца, серверный запрет лута/торговли, открытие после взлома, старый сервер без `locked` |
++| `__tests__/room/location-graph-523.test.js`, `__tests__/room/hub-player-window-542.test.js`, `__tests__/room/passage-block-543.test.js` | контракты обновлены под единый предикат 546 |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 546, тезис 36, «Осталось после патча 546» |
++
++## Границы
++
++- Замок по-прежнему не самостоятельная точка игрока: он преграда цели.
++- Взлом адресный: открытие «Запертого люка» открывает Подвал доктора, но не
++  Тапхаус; каскада по детям и воротам нет.
++- Закон снимка 529 сохранён: сервер не правит лист игрока.
++- Порядок мест 545, маркер пространственного узла 544, gate-first 542 и
++  перекрытие проходов 543 не менялись.
++- Для полной серверной защиты обновите лёгкий сервер комнат (`server/` + `ws`)
++  через `deploy-netangels.sh`; клиентская страховка закрывает окно игрока и на
++  старом сервере, но прямой WS-запрос к старому серверу он заменить не может.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 546
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 545, патч 546 их не трогает.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/546-location-lock-barrier.patch` вернёт дерево,
++словари и версию к состоянию 545.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index bef8d84..e2b6b44 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **545**.
++Дата ревизии: 2026-11-06. Текущая версия: **546**.
+ 
+ ## Тезисы
+ 
+@@ -47,10 +47,11 @@
+ | 33 | **Выдача хаба целиком и окно игрока (542):** граф сессии собирается по `links` + `parentLocationId`, поэтому выдача Ниптона с вложенными локациями/терминалом/замком больше не падает пустым экраном. Верхний уровень окна игрока — только прямые элементы (локации, сундуки, торговцы); вложенные точки скрыты до входа. Вход в запертую локацию сначала показывает экран преграды (замок/терминал, варианты И/ИЛИ), после прохождения — содержимое; особый выход вынесен в кнопку «Выход → …». Замок никогда не бывает самостоятельной точкой игрока: отдельная выдача убрана из интерфейса, строки замков скрыты, `lock_never_standalone`. «Назад» возвращает только в локацию, через которую пришёл (история входа), `exitLocationId` даёт вход в другую локацию, возврат — по истории, а не по административному дереву | ✅ сделано | **542** |
+ | 34 | **Окно локаций у игрока: локация ≠ сундук, замок ≠ терминал:** вложенная локация сохраняет тип и рёбра графа даже через старый сервер комнат (маркер пространственного узла), рисуется иконкой карты и входом, а не пустым сундуком. Вход в запертую локацию показывает только преграду; после взлома видны прямые дети, сундук открывает содержимое отдельным шагом. Сервер запрещает добычу/торговлю за запертым родителем прямым запросом | ✅ сделано | **544** |
+ | 35 | **Порядок позиций в хабе/локации:** в дереве Мастера строки одного родителя меняются местами перетаскиванием за ручку-стрелки; порядок хранится на родителе (`childOrder`) и один-в-один воспроизводится в окне игрока (список мест текущей локации). Несколько родителей держат независимый порядок; новые дети попадают в конец fallback-порядка, ключи не перетаскиваются | ✅ сделано | **545** |
++| 36 | **Замок локации — преграда входа:** непройденная проверка (`accessExpression`/`linkedCheckIds`) держит границу видимости, лута и торговли даже без флага `locked`; единый предикат `accessBarrierPending` для сервера и окна игрока, gate-first вход, страховка старого сервера по маркеру 544 | ✅ сделано | **546** |
+ 
+-## Осталось после патча 545
++## Осталось после патча 546
+ 
+-Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
++Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -270,6 +271,7 @@
+ - `docs/patch-531-install.md` — установка исправления 531 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/patch-545-install.md` — порядок позиций перетаскиванием (545).
++- `docs/patch-546-install.md` — замок локации как преграда входа (546).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 843f63c..86eb10d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "545"
++  "baseline": "546"
+ }
+diff --git a/public/version.json b/public/version.json
+index 8552997..a1d6171 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "545",
++  "version": "546",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
+       "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
+       "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
+       "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
+@@ -149,6 +150,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
+       "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
+       "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
+       "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",
+diff --git a/server/accessExpression.js b/server/accessExpression.js
+index 8849d7a..3bdfe63 100644
+--- a/server/accessExpression.js
++++ b/server/accessExpression.js
+@@ -171,6 +171,40 @@ const formatAccessExpression = (tokens, getName) => {
+   )).join('');
+ };
+ 
++/**
++ * Патч 546: единое правило преграды. «Есть непройденная проверка ⇒ преграда»
++ * одинаково для серверной видимости/лута/торговли, экрана игрока и бейджа
++ * Мастера. Раньше границей считался только флаг `locked`, а локация с
++ * настроенным замком (`accessExpression`/`linkedCheckIds`) могла приехать без
++ * него — и игрок входил мимо проверки.
++ *
++ * Порядок решений:
++ * 1) перекрытый проход — глухая преграда;
++ * 2) явный отказ сервера (`denied`/`needs-check`) — преграда;
++ * 3) явное открытие (`open`/`open-by-key`/`keyUnlocked`) — не преграда;
++ * 4) ручной флаг `locked` — преграда;
++ * 5) есть операнды проверки: без внешнего решения считаем преградой
++ *    (консервативно), с `isPassed` вычисляем И/ИЛИ-выражение.
++ */
++const ACCESS_STATE_OPEN = Object.freeze({ OPEN: 'open', OPEN_BY_KEY: 'open-by-key' });
++const isAccessStateOpen = (state) => {
++  const value = String(state || 'none');
++  return value === ACCESS_STATE_OPEN.OPEN || value === ACCESS_STATE_OPEN.OPEN_BY_KEY;
++};
++const hasAccessChecks = (raw) => resolveAccessExpression(raw).length > 0;
++const accessBarrierPending = (target, { isPassed } = {}) => {
++  if (!target || typeof target !== 'object') return false;
++  if (target.passageBlocked) return true;
++  const state = String(target.keyAccessState || 'none');
++  if (state === 'denied' || state === 'needs-check') return true;
++  if (target.keyUnlocked || isAccessStateOpen(state)) return false;
++  if (target.locked) return true;
++  const expression = resolveAccessExpression(target);
++  if (expression.length === 0) return false;
++  if (typeof isPassed === 'function') return !evaluateAccessExpression(expression, isPassed);
++  return true;
++};
++
+ /** Legacy linkedCheckIds (ИЛИ) → выражение. */
+ const linkedCheckIdsToExpression = (ids) => {
+   const list = (Array.isArray(ids) ? ids : []).filter(isNonEmptyId);
+@@ -214,4 +248,9 @@ module.exports = {
+   formatAccessExpression,
+   linkedCheckIdsToExpression,
+   resolveAccessExpression,
++  // Патч 546: единый предикат преграды для сервера и игрока.
++  ACCESS_STATE_OPEN,
++  isAccessStateOpen,
++  hasAccessChecks,
++  accessBarrierPending,
+ };
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 587bd8b..783bcad 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -13,7 +13,12 @@ const {
+ } = require('./itemStacking.js');
+ const locationGraph = require('./locationGraph.js');
+ const { resolveLocationNodeMarker, restoreLocationSessionNodes } = require('./locationNodeMarker.js');
+-const { expressionCheckIds, normalizeAccessExpression, resolveAccessExpression } = require('./accessExpression.js');
++const {
++  expressionCheckIds,
++  normalizeAccessExpression,
++  resolveAccessExpression,
++  accessBarrierPending,
++} = require('./accessExpression.js');
+ const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
+ 
+@@ -253,7 +258,9 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   if (!session || isGm || session.kind !== 'hub') return session;
+   // Патч 542: преграда на самой выданной локации скрывает всё её содержимое
+   // до прохождения. Игрок видит только проверку входа (узел сессии-корня).
+-  if (session.keyAccessState === 'needs-check' || session.keyAccessState === 'denied') {
++  // Патч 546: преграда — не только флаг `locked`, но и непройденная проверка
++  // (`accessExpression`/`linkedCheckIds`), даже если флаг не доехал.
++  if (accessBarrierPending(session)) {
+     return { ...session, nodes: [] };
+   }
+   const nodes = session.nodes || [];
+@@ -262,11 +269,12 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
+   // Патч 543: перекрытая локация — граница видимости как замок: её потомки
+   // не уходят игроку, хотя сама «дверь» с причиной остаётся в списке.
++  // Патч 546: единый предикат — запертый ИЛИ с непройденной проверкой.
+   const lockedIds = nodes
+-    .filter((node) => node.locked || node.passageBlocked)
++    .filter((node) => accessBarrierPending(node))
+     .map((node) => node.containerId);
+   // Патч 544: запертый корень выдачи тоже граница видимости для своих детей.
+-  if (session.locked) lockedIds.push(session.containerId);
++  if (accessBarrierPending(session)) lockedIds.push(session.containerId);
+   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
+     lockedIds,
+     isGm,
+@@ -277,7 +285,8 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+     nodes: nodes
+       .filter((node) => !node.hiddenForPlayers && !hidden.has(node.containerId))
+       .map((node) => {
+-      if (!node.locked) return node;
++      // Патч 546: содержимое и касса прячутся за любой непройденной преградой.
++      if (!accessBarrierPending(node)) return node;
+       return {
+         ...node,
+         items: [],
+@@ -312,7 +321,9 @@ const applyKeyAccessToSession = (session, resolve) => {
+       ...target,
+       keyAccessState: state,
+       keyUnlocked: state === 'open-by-key',
+-      locked: state === 'none' ? Boolean(target.locked) : restricted,
++      // Патч 546: флаг `locked` больше не единственный признак преграды —
++      // непройденная проверка держит границу даже без ручного флага.
++      locked: restricted || (state === 'none' && accessBarrierPending(target)),
+     };
+   };
+   const next = decorate(session);
+@@ -725,10 +736,11 @@ const isNodeBehindSessionBarrier = (session, nodeId) => {
+   if (!session || session.kind !== 'hub') return false;
+   const nodes = Array.isArray(session.nodes) ? session.nodes : [];
+   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
++  // Патч 546: граница — запертый узел ИЛИ узел с непройденной проверкой.
+   const lockedIds = nodes
+-    .filter((node) => node.locked || node.passageBlocked)
++    .filter((node) => accessBarrierPending(node))
+     .map((node) => node.containerId);
+-  if (session.locked) lockedIds.push(session.containerId);
++  if (accessBarrierPending(session)) lockedIds.push(session.containerId);
+   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
+     lockedIds,
+     isGm: false,
+@@ -745,7 +757,8 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
+   // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
+-  if (session.locked) {
++  // Патч 546: непройденная проверка входа — такая же преграда, как locked.
++  if (accessBarrierPending(session)) {
+     return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
+   }
+   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+@@ -767,7 +780,7 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+     }
+     const targetNode = session.nodes[nodeIdx];
+-    if (targetNode.locked || isNodeBehindSessionBarrier(session, targetNode.containerId)) {
++    if (accessBarrierPending(targetNode) || isNodeBehindSessionBarrier(session, targetNode.containerId)) {
+       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
+     }
+ 
+@@ -824,7 +837,8 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+   }
+   // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
+   // пройдена привязанная проверка.
+-  if (session.locked) {
++  // Патч 546: единый предикат преграды вместо одного флага locked.
++  if (accessBarrierPending(session)) {
+     return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
+   }
+   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+@@ -846,7 +860,7 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+     }
+     merchantTarget = session.nodes[hubNodeIdx];
+-    if (merchantTarget.locked || isNodeBehindSessionBarrier(session, merchantTarget.containerId)) {
++    if (accessBarrierPending(merchantTarget) || isNodeBehindSessionBarrier(session, merchantTarget.containerId)) {
+       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
+     }
+   }

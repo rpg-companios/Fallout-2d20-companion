@@ -36,6 +36,7 @@ vi.mock('react-native', () => {
     ScrollView: host('ScrollView'),
     Image: host('Image'),
     useWindowDimensions: () => ({ width: 420, height: 800 }),
+    PanResponder: { create: (config) => ({ panHandlers: config }) },
   };
 });
 
@@ -406,8 +407,9 @@ describe('543: контракт по файлам', () => {
     expect(domain).toContain('passageBlocked: kind === CONTAINER_KIND.HUB');
     expect(domain).toContain('passageReason: kind === CONTAINER_KIND.HUB');
     expect(domain).toContain('passageBlocked: Boolean(child.passageBlocked)');
-    expect(sessionSrc).toContain('passageBlocked: Boolean(raw.passageBlocked)');
-    expect(sessionSrc).toContain('node.locked || node.passageBlocked');
+    expect(sessionSrc).toContain('passageBlocked: Boolean(source.passageBlocked)');
+    // Патч 546: перекрытый проход входит в единый предикат преграды.
+    expect(sessionSrc).toContain('accessBarrierPending(node)');
     expect(graph).toContain('passageBlocked: Boolean(raw.passageBlocked)');
     expect(graph).toContain('Boolean(node.passageBlocked) && id !== root');
   });

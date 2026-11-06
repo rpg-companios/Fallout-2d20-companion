@@ -1,6 +1,79 @@
 # Changelog
 ---
 
+## A location lock is an entry barrier (patch 546)
+
+Fixed the owner's bug: "Doctor's Basement" locked by "Locked Hatch" and the
+"Tap House" locked by "Locked Door" could be entered freely — contents, the
+"Mad Doctor" merchant and loot were available without hacking.
+
+- **One barrier rule.** The new `accessBarrierPending` predicate
+  (`server/accessExpression.js`, client facade `domain/accessExpression.js`)
+  treats a node as closed when it has an unpassed check
+  (`accessExpression`/`linkedCheckIds`), an explicit server refusal
+  (`needs-check`/`denied`), a manual `locked` flag, or a blocked passage.
+  An explicit open state (`open`/`open-by-key`/`keyUnlocked`) removes the barrier.
+- **The server holds the boundary.** Node visibility, item/caps stripping,
+  direct WS looting and trading all use the same predicate. A location with a
+  configured lock no longer lets players inside even if the `locked` flag was lost.
+- **Player window.** Entering a locked location again shows only the barrier
+  (lock/terminal, AND/OR options); contents and loot/trade buttons stay hidden
+  until the check passes. The AND/OR separator uses the canonical `+` operator
+  instead of the string `and`.
+- **Legacy-server safety net.** The patch 544 marker restores the access
+  requirement; the client evaluates passed checks from the shared room registry
+  (`terminalStates`/`accessEvents`) and hides descendants behind a barrier even
+  if a legacy server dropped `locked`/`keyAccessState`. The updated server remains
+  the source of truth.
+- **Acceptance.** `__tests__/room/hub-location-lock-546.test.js`: the owner's
+  scenario (Doctor's Basement / Locked Hatch / Mad Doctor, Tap House / Locked
+  Door), server-side loot/trade denial, opening after a hack, and a legacy
+  server without the `locked` flag.
+
+## Place order in a location: Master drag order = player order (patch 545)
+
+In the Master interface, while working with a hub/location, positions can be
+reordered by dragging. The key rule: the Master's order of locations/objects
+matches the player's order of places.
+
+- **An arrow handle on tree rows.** Rows sharing the same parent (locations,
+  chests, merchants, terminals, locks) now have a drag icon. Drag a row onto
+  another row at the same level and it takes that position; the target is
+  highlighted and a hint reminds you that players will see the same order.
+  It also works inside an expanded nested location.
+- **Order is stored on the parent.** A new `childOrder` on the location/node
+  defines the sequence of direct children. A child shared by several parents
+  keeps an independent order for each parent. New/unmentioned children append
+  using the previous "kind → name" fallback, and removed ids do not break the
+  list.
+- **Players see the same thing.** The session graph sorts children by
+  `childOrder`; the flat session list and `childIds` carry that order, and the
+  player window inside a nested location additionally sorts places by the
+  parent's `childIds`. The patch 544 marker preserves the order even through a
+  legacy room server.
+- **Live issues keep up.** Saving the order uses the regular
+  `persistAndSyncContainer`: live sessions receive rebuilt graph nodes, so
+  players see the new order without re-issuing. Keys remain rows after objects
+  and are not draggable; game links/locks/barriers are unchanged.
+
+## Player location window: location, lock, chest (patch 544)
+
+Fixed the nested-location viewing regression: players again see
+"location → lock → chest → contents" instead of a flat pile of chests and
+terminals.
+
+- **A location is not a chest.** Nested locations use the map icon and an
+  entry button; an empty or not-yet-revealed location never shows "all taken".
+  Kind and graph edges survive a legacy room server via a spatial node marker
+  in `lockLabel`.
+- **A lock is not a terminal.** A door barrier opens the lockpicking mini-game;
+  the shared check registry no longer rewrites the node kind to terminal.
+- **Hierarchy and barrier.** A child location's contents stay hidden until
+  entry and passing the barrier; after success only direct children appear.
+  A chest reveals its contents as a separate step.
+- **Server guard.** Direct WS loot/trade requests behind a locked or blocked
+  parent location are rejected even if the client tries to bypass the list.
+
 ## Passage blocking (patch 543)
 
 Thesis 28 implemented per the owner's approved model: the Master blocks a

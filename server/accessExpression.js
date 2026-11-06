@@ -171,6 +171,40 @@ const formatAccessExpression = (tokens, getName) => {
   )).join('');
 };
 
+/**
+ * Патч 546: единое правило преграды. «Есть непройденная проверка ⇒ преграда»
+ * одинаково для серверной видимости/лута/торговли, экрана игрока и бейджа
+ * Мастера. Раньше границей считался только флаг `locked`, а локация с
+ * настроенным замком (`accessExpression`/`linkedCheckIds`) могла приехать без
+ * него — и игрок входил мимо проверки.
+ *
+ * Порядок решений:
+ * 1) перекрытый проход — глухая преграда;
+ * 2) явный отказ сервера (`denied`/`needs-check`) — преграда;
+ * 3) явное открытие (`open`/`open-by-key`/`keyUnlocked`) — не преграда;
+ * 4) ручной флаг `locked` — преграда;
+ * 5) есть операнды проверки: без внешнего решения считаем преградой
+ *    (консервативно), с `isPassed` вычисляем И/ИЛИ-выражение.
+ */
+const ACCESS_STATE_OPEN = Object.freeze({ OPEN: 'open', OPEN_BY_KEY: 'open-by-key' });
+const isAccessStateOpen = (state) => {
+  const value = String(state || 'none');
+  return value === ACCESS_STATE_OPEN.OPEN || value === ACCESS_STATE_OPEN.OPEN_BY_KEY;
+};
+const hasAccessChecks = (raw) => resolveAccessExpression(raw).length > 0;
+const accessBarrierPending = (target, { isPassed } = {}) => {
+  if (!target || typeof target !== 'object') return false;
+  if (target.passageBlocked) return true;
+  const state = String(target.keyAccessState || 'none');
+  if (state === 'denied' || state === 'needs-check') return true;
+  if (target.keyUnlocked || isAccessStateOpen(state)) return false;
+  if (target.locked) return true;
+  const expression = resolveAccessExpression(target);
+  if (expression.length === 0) return false;
+  if (typeof isPassed === 'function') return !evaluateAccessExpression(expression, isPassed);
+  return true;
+};
+
 /** Legacy linkedCheckIds (ИЛИ) → выражение. */
 const linkedCheckIdsToExpression = (ids) => {
   const list = (Array.isArray(ids) ? ids : []).filter(isNonEmptyId);
@@ -214,4 +248,9 @@ module.exports = {
   formatAccessExpression,
   linkedCheckIdsToExpression,
   resolveAccessExpression,
+  // Патч 546: единый предикат преграды для сервера и игрока.
+  ACCESS_STATE_OPEN,
+  isAccessStateOpen,
+  hasAccessChecks,
+  accessBarrierPending,
 };

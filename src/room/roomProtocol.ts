@@ -116,7 +116,7 @@ export interface ActiveLootTradeItem {
 
 export interface ActiveHubChildNode {
   containerId: string;
-  kind: 'loot' | 'merchant';
+  kind: 'loot' | 'merchant' | 'hub' | 'terminal' | 'lock';
   name: string;
   description: string;
   locked: boolean;
@@ -130,6 +130,24 @@ export interface ActiveHubChildNode {
     buyDepreciationPercent?: number;
   }>;
   items: ActiveLootTradeItem[];
+  // Патч 544: граф пространств и преграды переживают WS-нормализацию.
+  parentIds?: string[];
+  childIds?: string[];
+  depth?: number;
+  roomCodes?: string[];
+  exitLocationId?: string;
+  exitOnly?: boolean;
+  hiddenForPlayers?: boolean;
+  passageBlocked?: boolean;
+  passageReason?: string;
+  requiredKeyItemId?: string;
+  keyRequirement?: string;
+  linkedCheckId?: string;
+  linkedCheckIds?: string[];
+  accessExpression?: unknown[];
+  keyAccessState?: string;
+  keyUnlocked?: boolean;
+  difficulty?: number;
 }
 
 export interface ActiveLootTradeSession {
