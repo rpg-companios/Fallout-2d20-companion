@@ -1096,6 +1096,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     // только Мастер («Да» или reissue) — для него новый подход недоступен.
     if (action === 'newAttempt') {
       if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
+      // Патч 547: победа оконечна — «Ещё подход» не пересобирает выигранную
+      // доску (иначе открытый замок снова становился запертым). Новую партию
+      // даёт только Мастер: «Открыть» или повторная выдача (game = null).
+      const sharedBoard = entry.game || adoptSharedLockGame(room, id);
+      if (sharedBoard?.status === 'won') return { error: ERROR_CODE.LOCK_ALREADY_WON };
       if (shouldBlockLock({ game: entry.game, config: entry.config, gmBlocked: entry.gmBlocked })) {
         return { error: ERROR_CODE.LOCK_BLOCKED };
       }

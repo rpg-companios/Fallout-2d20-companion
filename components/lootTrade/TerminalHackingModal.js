@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
@@ -22,6 +22,7 @@ import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lo
 import { showRawAlert } from '../alerts/alertService';
 import { shouldAutoStart, autoStartKey } from './terminalAutoStart';
 import { terminalHackingStyles } from './terminalHackingStyles';
+import { hackSuccessKey, isHackWon } from './hackOutcome';
 
 const COLUMN_WIDTH = 12;
 const ATTEMPTS_MAX = 4;
@@ -33,6 +34,7 @@ const TerminalHackingModal = ({
   autoStart = false,
   ownerToken,
   onClose,
+  onHacked,
 }) => {
   useLocale();
   const characterId = useCharacterStore((state) => state.currentCharacterId);
@@ -67,6 +69,36 @@ const TerminalHackingModal = ({
   const isClosed = Boolean(terminalState?.closed || terminalState?.locked || game?.status === 'closed');
   const awaitingGm = !isClosed && (game?.status === 'awaitingRetry' || Boolean(terminalState?.awaitingGm));
   const canHack = Boolean(characterId && (localMode || roomCode) && !isClosed && !awaitingGm);
+
+  /**
+   * Патч 547: терминал, как и замок, сам передаёт сигнал об успешном взломе.
+   * Наблюдение за реестром комнаты не работало в локальном резерве, поэтому
+   * успех не доходил до окна локации и игрок не мог пройти дальше.
+   */
+  const reportedWinRef = useRef('');
+  const onHackedRef = useRef(onHacked);
+  onHackedRef.current = onHacked;
+  const reportWin = useCallback(() => {
+    if (!isHackWon(game)) return;
+    const key = hackSuccessKey(terminal?.containerId, game, terminalState?.accessId);
+    if (reportedWinRef.current === key) return;
+    reportedWinRef.current = key;
+    onHackedRef.current?.({
+      containerId: String(terminal?.containerId || '').trim(), kind: 'terminal', local: localMode,
+    });
+  }, [game, terminal?.containerId, terminalState?.accessId, localMode]);
+
+  useEffect(() => {
+    if (!visible) return;
+    reportWin();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, game?.status, terminal?.containerId, game?.revision, terminalState?.accessId, localMode]);
+
+  // Патч 547: закрытие окна после ACCESS GRANTED передаёт сигнал о взломе.
+  const closeModal = () => {
+    reportWin();
+    onClose?.();
+  };
 
   // В локальной партии (сервер комнат недоступен) Мастер сидит за этим же
   // устройством: показываем тот же вопрос «Да/Нет» здесь. В сетевой партии
@@ -293,7 +325,7 @@ ${tLootTrade('terminal.retryMessage')}`,
   ) : null;
 
   return (
-    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={closeModal}>
       <View style={styles.backdrop}>
         <View style={styles.window}>
           <View style={styles.header}>
@@ -301,7 +333,7 @@ ${tLootTrade('terminal.retryMessage')}`,
               <MaterialCommunityIcons name="console" size={22} color="#93d17a" />
               <Text numberOfLines={1} style={styles.title}>{terminal?.name || terminalState?.config?.name || tLootTrade('terminal.title')}</Text>
             </View>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={tLootTrade('player.close')} style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={tLootTrade('player.close')} style={styles.closeButton} onPress={closeModal}>
               <MaterialCommunityIcons name="close" size={20} color="#bdc8b7" />
             </TouchableOpacity>
           </View>
@@ -332,8 +364,17 @@ ${tLootTrade('terminal.retryMessage')}`,
                 </View>
               </Animated.View>
               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
-              <Text style={styles.statusHint}>{tLootTrade('terminal.wonHint')}</Text>
+              <Text style={styles.statusHint}>{tLootTrade('terminal.wonAccessHint')}</Text>
               {guessesPanel}
+              {/* Патч 547: успех → «Закрыть» → сигнал о взломе → доступ. */}
+              <TouchableOpacity
+                testID="terminal-success-close"
+                accessibilityRole="button"
+                style={styles.primaryButton}
+                onPress={closeModal}
+              >
+                <Text style={styles.primaryButtonText}>{tLootTrade('terminal.wonClose')}</Text>
+              </TouchableOpacity>
             </View>
           ) : !game ? (
             <View style={styles.idlePanel}>

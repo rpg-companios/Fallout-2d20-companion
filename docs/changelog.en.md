@@ -1,6 +1,36 @@
 # Changelog
 ---
 
+## A successful hack carries through (patch 547)
+
+Fixed the owner's bug: "I picked the lock, the hacking modal offered another
+attempt… because the modal did not pass on the hack data, I cannot proceed."
+The same rule now applies to terminals.
+
+- **Success no longer spawns another attempt.** After ACCESS GRANTED the lock
+  panel no longer shows "Another attempt" — only success and a Close button.
+  The patch 526 rule for a new attempt still covers failure and "out of pins".
+- **Victory is final on the server too.** `newAttempt` on a won board is refused
+  (`LOCK_ALREADY_WON`) and leaves it untouched; it used to build a new secret and
+  re-lock an already opened point. Only the Master starts a new round, via
+  "Open" or a re-issue. The local fallback behaves the same way.
+- **The modal reports the signal itself.** Locks and terminals gained `onHacked`:
+  success is reported once per victory, and closing the window after a win also
+  transmits the signal. The terminal success panel got the same Close button.
+- **Access to the contents.** The player window accepts the signal and applies
+  the addressed outcome: hacking a location = entering, hacking a container =
+  contents; the current location's barrier is lifted by the signal itself.
+  Closing without a victory opens nothing.
+- **The local fallback is no longer a dead end.** When the room server does not
+  know the mini-game protocol, the board lives in client memory and the victory
+  never reached the room registry, so no signal existed at all. The new
+  `localCheckAccess` journal keeps passed checks for such rooms; whenever the
+  protocol is present, the server remains the source of truth (lesson 506).
+- **Acceptance.** `__tests__/room/hack-success-signal-547.test.js` (12) and
+  `__tests__/lootTrade/hack-success-modal-547.test.js` (8). The 526 test was
+  updated: its previous version required rebuilding the board after a victory,
+  which is exactly what re-locked an opened point.
+
 ## A location lock is an entry barrier (patch 546)
 
 Fixed the owner's bug: "Doctor's Basement" locked by "Locked Hatch" and the

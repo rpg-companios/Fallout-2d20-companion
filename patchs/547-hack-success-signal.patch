@@ -1,0 +1,1685 @@
+diff --git a/__tests__/lootTrade/hack-success-modal-547.test.js b/__tests__/lootTrade/hack-success-modal-547.test.js
+new file mode 100644
+index 0000000..8baf462
+--- /dev/null
++++ b/__tests__/lootTrade/hack-success-modal-547.test.js
+@@ -0,0 +1,199 @@
++// Патч 547: НАСТОЯЩИЕ модалки взлома передают сигнал об успехе.
++// Слово владельца: «показан, успех, кнопка закрыть — передача сигнала об
++// успешном взломе — доступ к содержимому». Здесь проверяются сами модалки
++// (замок и терминал), а приём сигнала окном игрока — в
++// __tests__/room/hack-success-signal-547.test.js.
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'), Text: mk('Text'), TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'), Pressable: mk('Pressable'),
++    ScrollView: mk('ScrollView'), Image: mk('Image'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Animated: {
++      View: mk('AnimatedView'),
++      Value: class { constructor(v) { this.value = v; } setValue() {} interpolate() { return 0; } },
++      timing: () => ({ start() {} }),
++    },
++    useWindowDimensions: () => ({ width: 390, height: 700 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn(async () => 0) }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({
++  spendBobbyPins: vi.fn(async () => 1),
++}));
++
++import LockPickingModal from '../../components/lootTrade/LockPickingModal';
++import TerminalHackingModal from '../../components/lootTrade/TerminalHackingModal';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++
++const LOCK = { containerId: 'l1', name: 'Запертый люк', description: '', difficulty: 2, kind: 'lock' };
++const TERMINAL = { containerId: 't1', name: 'Терминал подвала', description: '', difficulty: 2, kind: 'terminal' };
++
++const wonLockGame = () => ({
++  status: 'won', kind: 'lock', result: 'ACCESS GRANTED',
++  cells: [{ arrow: 'left', state: 'green' }, { arrow: 'up', state: 'green' }],
++  rows: [2], cellCount: 2, cursor: 2, per: 8, luck: 4, skill: 3, difficulty: 2,
++  pinsRemaining: 2, pinActive: true, brokenPins: 0, revision: 5,
++  operatorClientId: 'client-1', operatorCharacterId: 'ch1',
++});
++const wonTerminalGame = () => ({
++  status: 'won', result: 'ACCESS GRANTED', board: 'X'.repeat(408),
++  wordRanges: [], bracketRanges: [], guesses: [{ word: 'SECRET', likeness: 6 }],
++  wordLength: 6, attempts: 2, maxAttempts: 4, difficulty: 2, effectiveDifficulty: 2,
++  revision: 7, operatorClientId: 'client-1', operatorCharacterId: 'ch1', scrollUp: true,
++});
++
++const seedRoom = (id, config, game) => {
++  useCharacterStore.setState({ currentCharacterId: 'ch1', characterName: 'Сталкер', items: {} });
++  useRoomStore.setState({
++    clientId: 'client-1',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        capabilities: { terminalHacking: true, lockPicking: true },
++        terminalStates: {
++          [id]: { containerId: id, accessId: 'broadcast-1', config, game, closed: false, locked: false, awaitingGm: false },
++        },
++      },
++    },
++  });
++};
++
++const renderers = [];
++const render = async (element) => {
++  let renderer;
++  await act(async () => {
++    renderer = TestRenderer.create(element);
++    await Promise.resolve();
++  });
++  renderers.push(renderer);
++  return renderer;
++};
++const byTestId = (renderer, testID) => renderer.root
++  .findAllByType('TouchableOpacity').filter((n) => n.props.testID === testID);
++const tap = async (renderer, testID) => {
++  const [button] = byTestId(renderer, testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++};
++
++beforeEach(() => {
++  while (renderers.length) {
++    const renderer = renderers.pop();
++    try { renderer.unmount(); } catch { /* уже размонтирован */ }
++  }
++});
++
++describe('547: модалка замка после ACCESS GRANTED', () => {
++  it('не предлагает «Ещё подход», показывает успех и «Закрыть»', async () => {
++    seedRoom('l1', LOCK, wonLockGame());
++    const renderer = await render(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} onHacked={() => {}} />,
++    );
++    expect(renderer.root.findAllByProps({ testID: 'lock-won-panel' }).length).toBeGreaterThan(0);
++    expect(byTestId(renderer, 'lock-success-close').length).toBeGreaterThan(0);
++    expect(byTestId(renderer, 'lock-new-attempt-button')).toHaveLength(0);
++  });
++
++  it('передаёт сигнал о взломе ровно один раз', async () => {
++    seedRoom('l1', LOCK, wonLockGame());
++    const onHacked = vi.fn();
++    await render(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={() => {}} onHacked={onHacked} />,
++    );
++    expect(onHacked).toHaveBeenCalledTimes(1);
++    expect(onHacked).toHaveBeenCalledWith({ containerId: 'l1', kind: 'lock', local: false });
++  });
++
++  it('кнопка «Закрыть» закрывает окно и не теряет сигнал', async () => {
++    seedRoom('l1', LOCK, wonLockGame());
++    const onHacked = vi.fn();
++    const onClose = vi.fn();
++    const renderer = await render(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={onClose} onHacked={onHacked} />,
++    );
++    await tap(renderer, 'lock-success-close');
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onHacked).toHaveBeenCalledTimes(1);
++  });
++
++  it('крестик окна тоже передаёт сигнал победы', async () => {
++    seedRoom('l1', LOCK, wonLockGame());
++    const onHacked = vi.fn();
++    const onClose = vi.fn();
++    const renderer = await render(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={onClose} onHacked={onHacked} />,
++    );
++    await tap(renderer, 'lock-close-button');
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onHacked).toHaveBeenCalledWith({ containerId: 'l1', kind: 'lock', local: false });
++  });
++
++  it('без победы сигнал не уходит, «Ещё подход» остаётся на провале', async () => {
++    seedRoom('l1', LOCK, { ...wonLockGame(), status: 'awaitingRetry', result: 'OUT OF PINS' });
++    const onHacked = vi.fn();
++    const onClose = vi.fn();
++    const renderer = await render(
++      <LockPickingModal visible lock={LOCK} roomCode="ROOM1" onClose={onClose} onHacked={onHacked} />,
++    );
++    expect(byTestId(renderer, 'lock-new-attempt-button').length).toBeGreaterThan(0);
++    expect(byTestId(renderer, 'lock-success-close')).toHaveLength(0);
++    await tap(renderer, 'lock-close-button');
++    expect(onHacked).not.toHaveBeenCalled();
++  });
++});
++
++describe('547: модалка терминала после ACCESS GRANTED', () => {
++  it('показывает успех и кнопку «Закрыть», передавая сигнал', async () => {
++    seedRoom('t1', TERMINAL, wonTerminalGame());
++    const onHacked = vi.fn();
++    const renderer = await render(
++      <TerminalHackingModal visible terminal={TERMINAL} roomCode="ROOM1" onClose={() => {}} onHacked={onHacked} />,
++    );
++    expect(byTestId(renderer, 'terminal-success-close').length).toBeGreaterThan(0);
++    expect(onHacked).toHaveBeenCalledTimes(1);
++    expect(onHacked).toHaveBeenCalledWith({ containerId: 't1', kind: 'terminal', local: false });
++  });
++
++  it('«Закрыть» закрывает окно, сигнал идемпотентен', async () => {
++    seedRoom('t1', TERMINAL, wonTerminalGame());
++    const onHacked = vi.fn();
++    const onClose = vi.fn();
++    const renderer = await render(
++      <TerminalHackingModal visible terminal={TERMINAL} roomCode="ROOM1" onClose={onClose} onHacked={onHacked} />,
++    );
++    await tap(renderer, 'terminal-success-close');
++    expect(onClose).toHaveBeenCalledTimes(1);
++    expect(onHacked).toHaveBeenCalledTimes(1);
++  });
++
++  it('невзломанный терминал сигнал не передаёт', async () => {
++    seedRoom('t1', TERMINAL, null);
++    const onHacked = vi.fn();
++    const renderer = await render(
++      <TerminalHackingModal visible terminal={TERMINAL} roomCode="ROOM1" onClose={() => {}} onHacked={onHacked} />,
++    );
++    expect(byTestId(renderer, 'terminal-success-close')).toHaveLength(0);
++    expect(onHacked).not.toHaveBeenCalled();
++  });
++});
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 17823cd..92a91dc 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('546');
++    expect(version.version).toBe('547');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(145);
+-    expect(version.notes['en-EN']).toHaveLength(145);
+-    expect(json('patchs/baseline.json').baseline).toBe('546');
++    expect(version.notes['ru-RU']).toHaveLength(146);
++    expect(version.notes['en-EN']).toHaveLength(146);
++    expect(json('patchs/baseline.json').baseline).toBe('547');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -272,15 +272,16 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
++    expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **546**');
++    expect(roadmap).toContain('Текущая версия: **547**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 546');
++    expect(roadmap).toContain('Осталось после патча 547');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -288,6 +289,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('docs/patch-544-install.md')).toContain('544');
+     expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/patch-546-install.md')).toContain('546');
++    expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hack-success-signal-547.test.js b/__tests__/room/hack-success-signal-547.test.js
+new file mode 100644
+index 0000000..ff153c4
+--- /dev/null
++++ b/__tests__/room/hack-success-signal-547.test.js
+@@ -0,0 +1,392 @@
++// Патч 547: успешный взлом передаётся дальше и не порождает ещё попытку.
++//
++// Слово владельца: «я взломал замок, модалка взлома предложила ещё попытку —
++// "успешные попытки" не должны вызывать ещё попытку. Из-за того, что модалка
++// взлома не передала данные о взломе, я не могу пройти дальше. Тоже самое с
++// терминалом должно быть — показан, успех, кнопка закрыть — передача сигнала
++// об успешном взломе — доступ к содержимому».
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++import {
++  CONTAINER_KIND,
++  buildLocationSessionNodes,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade.js';
++import { applyLockAction, createLockGame } from '../../server/lockPicking.js';
++import { ERROR_CODE } from '../../server/protocol.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  initialLocalLockState,
++  applyLocalLockAction,
++  clearLocalLockState,
++} from '../../components/lootTrade/localLockGame.js';
++import {
++  recordLocalCheckAccess,
++  hasLocalCheckAccess,
++  clearLocalCheckAccess,
++  localCheckAccessSnapshot,
++} from '../../components/lootTrade/localCheckAccess.js';
++import { hackSuccessKey, isHackWon } from '../../components/lootTrade/hackOutcome.js';
++import { makeCheckToken } from '../../server/accessExpression.js';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    Pressable: host('Pressable'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    Animated: {
++      View: host('AnimatedView'),
++      Value: class { constructor() { this.value = 0; } setValue(v) { this.value = v; } interpolate() { return 0; } },
++      timing: () => ({ start: () => {} }),
++    },
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn(async () => 0) }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/room/roomCharacterSync', () => ({ pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true) }));
++vi.mock('../../components/lootTrade/spendBobbyPins', () => ({ spendBobbyPins: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible }) => React.createElement('StandaloneCheckModal', { visible }),
++}));
++// Модалки-двойники передают ТОТ ЖЕ контракт (onHacked + onClose), что и
++// настоящие: настоящие проверяются отдельными наборами ниже, а здесь важен
++// приём сигнала окном игрока. Проводка реальных модалок страхуется тестом
++// «окно игрока передаёт сигнал обоим видам проверки» по исходникам.
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, onHacked, onClose }) => React.createElement('View', null,
++    React.createElement('TouchableOpacity', {
++      testID: 'stub-lock-win',
++      onPress: () => onHacked?.({ containerId: lock?.containerId, kind: 'lock', local: true }),
++    }),
++    React.createElement('TouchableOpacity', { testID: 'stub-lock-close', onPress: () => onClose?.() })),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, onHacked, onClose }) => React.createElement('View', null,
++    React.createElement('TouchableOpacity', {
++      testID: 'stub-terminal-win',
++      onPress: () => onHacked?.({ containerId: terminal?.containerId, kind: 'terminal', local: true }),
++    }),
++    React.createElement('TouchableOpacity', { testID: 'stub-terminal-close', onPress: () => onClose?.() })),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay.js';
++import useCharacterStore from '../../src/store/characterStore.js';
++import useRoomStore from '../../src/room/roomStore.js';
++import useUiModeStore from '../../src/room/uiModeStore.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const LOCK = { containerId: 'hatch', name: 'Запертый люк', difficulty: 1, kind: 'lock' };
++const SNAPSHOT = {
++  characterName: 'Сталкер',
++  attributes: [{ name: 'PER', value: 10 }, { name: 'LCK', value: 4 }],
++  skills: [{ name: 'LOCKPICK', value: 4 }],
++  items: { pin: { id: 'pin', weaponId: 'item_bobby_pin', quantity: 30 } },
++};
++
++const winLocalBoard = (containerId) => {
++  clearLocalLockState(containerId);
++  const ctx = { lock: { ...LOCK, containerId }, characterId: 'ch1', characterSnapshot: SNAPSHOT, rng: () => 0 };
++  let state = applyLocalLockAction(initialLocalLockState(containerId), 'start', undefined, ctx);
++  for (let i = 0; i < 24 && state.game?.status === 'playing'; i += 1) {
++    state = applyLocalLockAction(state, 'press', 'left', ctx);
++  }
++  return { state, ctx };
++};
++
++describe('547: успешный взлом не порождает ещё попытку', () => {
++  it('движок: newAttempt после победы отказывает и не меняет доску', () => {
++    let game = createLockGame({
++      config: LOCK, operatorClientId: 'p1', operatorCharacterId: 'ch1',
++      characterSnapshot: SNAPSHOT, rng: () => 0,
++    });
++    for (let i = 0; i < 24 && game.status === 'playing'; i += 1) {
++      game = applyLockAction({
++        game, config: LOCK, action: 'press', value: 'left',
++        clientId: 'p1', characterId: 'ch1', characterSnapshot: SNAPSHOT, rng: () => 0,
++      }).game;
++    }
++    expect(game.status).toBe('won');
++    const revision = game.revision;
++    const secret = [...game.secret];
++    const refused = applyLockAction({
++      game, config: LOCK, action: 'newAttempt',
++      clientId: 'p1', characterId: 'ch1', characterSnapshot: SNAPSHOT, rng: () => 0,
++    });
++    expect(refused.error).toBe('LOCK_ALREADY_WON');
++    expect(refused.game.status).toBe('won');
++    expect(refused.game.revision).toBe(revision);
++    expect(refused.game.secret).toEqual(secret);
++    expect(ERROR_CODE.LOCK_ALREADY_WON).toBe('LOCK_ALREADY_WON');
++  });
++
++  it('сервер комнат: победа оконечна, новую партию даёт только Мастер', () => {
++    const registry = createRoomRegistry({ now: () => 1000, rng: () => 0 });
++    const { room } = registry.createRoom({ clientId: 'gm', name: 'Стол' });
++    const code = room.code;
++    registry.joinRoom({ code, clientId: 'gm', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code, clientId: 'p1', name: 'Игрок', role: 'player' });
++    registry.putSnapshot({
++      code, characterId: 'ch1', revision: 1, fromClientId: 'p1', fromName: 'Игрок',
++      snapshot: { name: 'Сталкер', data: { ...SNAPSHOT, equipment: { items: [{ id: 'pin', weaponId: 'item_bobby_pin', quantity: 30 }] } } },
++    });
++    registry.issueTerminal({ code, clientId: 'gm', config: LOCK });
++    const act = (action, value, clientId = 'p1') => registry.terminalAction({
++      code, clientId, characterId: 'ch1', containerId: 'hatch', action, value,
++    });
++    const entry = () => registry.getState(code).terminalStates.hatch;
++    expect(act('start').error).toBeUndefined();
++    for (let i = 0; i < 24 && entry().game.status === 'playing'; i += 1) act('press', 'left');
++    expect(entry().game.status).toBe('won');
++    expect(act('newAttempt').error).toBe(ERROR_CODE.LOCK_ALREADY_WON);
++    expect(entry().game.status).toBe('won');
++    expect(registry.getState(code).accessEvents.hatch).toMatchObject({ kind: 'hacked' });
++    expect(act('reissue', undefined, 'gm').error).toBeUndefined();
++    expect(entry().game).toBeNull();
++    expect(act('newAttempt').error).toBeUndefined();
++    expect(entry().game.status).toBe('playing');
++  });
++
++  it('локальный резерв: победа не пересобирается новым подходом', () => {
++    const { state, ctx } = winLocalBoard('local-547');
++    expect(state.game.status).toBe('won');
++    const next = applyLocalLockAction(state, 'newAttempt', undefined, ctx);
++    expect(next.error).toBe('LOCK_ALREADY_WON');
++    expect(next.game.status).toBe('won');
++    expect(next.game.secret).toEqual(state.game.secret);
++    clearLocalLockState('local-547');
++  });
++});
++
++describe('547: журнал локально пройденных проверок', () => {
++  beforeEach(() => clearLocalCheckAccess({}));
++
++  it('запись идемпотентна и различает комнаты', () => {
++    expect(hasLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch' })).toBe(false);
++    expect(recordLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch', kind: 'lock' })).toBe(true);
++    expect(recordLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch', kind: 'lock' })).toBe(false);
++    expect(hasLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch' })).toBe(true);
++    expect(hasLocalCheckAccess({ roomCode: 'R2', containerId: 'hatch' })).toBe(false);
++    expect(localCheckAccessSnapshot()).toHaveLength(1);
++    clearLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch' });
++    expect(hasLocalCheckAccess({ roomCode: 'R1', containerId: 'hatch' })).toBe(false);
++  });
++
++  it('пустая точка не записывается, сброс комнаты не задевает соседнюю', () => {
++    expect(recordLocalCheckAccess({ roomCode: 'R1', containerId: '  ' })).toBe(false);
++    recordLocalCheckAccess({ roomCode: 'R1', containerId: 'a' });
++    recordLocalCheckAccess({ roomCode: 'R2', containerId: 'b' });
++    clearLocalCheckAccess({ roomCode: 'R1' });
++    expect(hasLocalCheckAccess({ roomCode: 'R1', containerId: 'a' })).toBe(false);
++    expect(hasLocalCheckAccess({ roomCode: 'R2', containerId: 'b' })).toBe(true);
++  });
++
++  it('ключ победы отличает одну трансляцию от другой', () => {
++    expect(isHackWon({ status: 'won' })).toBe(true);
++    expect(isHackWon({ status: 'playing' })).toBe(false);
++    expect(isHackWon(null)).toBe(false);
++    expect(hackSuccessKey('hatch', { revision: 2 }, 'b1')).toBe('hatch|b1|2');
++    expect(hackSuccessKey('hatch', { revision: 3 }, 'b1')).not.toBe(hackSuccessKey('hatch', { revision: 2 }, 'b1'));
++  });
++});
++
++// ── Окно игрока: локальный резерв, сервер без протокола мини-игр ────────────
++const cards = () => [
++  normalizeContainerEntity({
++    id: 'diamond', kind: CONTAINER_KIND.HUB, name: 'Даймонд-сити',
++    links: [{ containerId: 'basement', locked: false }],
++  }),
++  normalizeContainerEntity({
++    id: 'basement', kind: CONTAINER_KIND.HUB, name: 'Подвал доктора',
++    parentLocationId: 'diamond',
++    accessExpression: [makeCheckToken('hatch')], linkedCheckIds: ['hatch'],
++    links: [{ containerId: 'doctor', locked: false }, { containerId: 'hatch', locked: false }],
++  }),
++  normalizeContainerEntity({
++    id: 'doctor', kind: CONTAINER_KIND.MERCHANT, name: 'Безумный доктор', caps: 100,
++    items: [{ entryId: 'med1', itemType: 'chem', name: 'Стимулятор', quantity: 5, cost: 10 }],
++  }),
++  normalizeContainerEntity({ id: 'hatch', kind: CONTAINER_KIND.LOCK, name: 'Запертый люк', difficulty: 1 }),
++];
++
++/** Старый сервер: kind понижен, locked потерян, протокола мини-игр нет. */
++const legacySession = () => {
++  const all = cards();
++  const root = all.find((c) => c.id === 'diamond');
++  return {
++    sessionId: 'ui-547', containerId: 'diamond', kind: 'hub', name: 'Даймонд-сити', targetType: 'room',
++    nodes: buildLocationSessionNodes(root, all).map((node) => ({
++      containerId: node.containerId,
++      kind: 'loot',
++      name: node.name,
++      description: node.description,
++      locked: false,
++      lockLabel: String(node.lockLabel || '').trim(),
++      caps: node.caps || 0,
++      items: node.items || [],
++    })),
++  };
++};
++
++const mountOverlay = async () => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({ currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0 });
++  useRoomStore.setState({
++    clientId: 'player-client', status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        // Ни capabilities.terminalHacking, ни terminalStates: локальный резерв.
++        capabilities: {},
++        activeSession: legacySession(),
++        terminalStates: {},
++        accessEvents: {},
++      },
++    },
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await Promise.resolve();
++  });
++  return renderer;
++};
++const tap = async (renderer, testID) => {
++  const [button] = renderer.root.findAllByType('TouchableOpacity').filter((n) => n.props.testID === testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++};
++const allText = (renderer) => renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? '')).join(' | ');
++
++describe('547: сигнал о взломе открывает путь дальше (локальный резерв)', () => {
++  beforeEach(() => clearLocalCheckAccess({}));
++
++  it('до сигнала содержимое запертой локации скрыто', async () => {
++    const renderer = await mountOverlay();
++    await tap(renderer, 'hub-node-enter-basement');
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-hatch' }).length).toBeGreaterThan(0);
++    expect(allText(renderer)).not.toContain('Безумный доктор');
++    await act(async () => renderer.unmount());
++  });
++
++  it('успех → «Закрыть» → содержимое локации доступно', async () => {
++    const renderer = await mountOverlay();
++    await tap(renderer, 'hub-node-enter-basement');
++    await tap(renderer, 'current-gate-hack-hatch');
++    await tap(renderer, 'stub-lock-win');
++    expect(hasLocalCheckAccess({ roomCode: 'ROOM1', containerId: 'hatch' })).toBe(true);
++    await tap(renderer, 'stub-lock-close');
++    expect(allText(renderer)).toContain('Безумный доктор');
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-hatch' })).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++
++  it('закрытие БЕЗ победы не открывает локацию', async () => {
++    const renderer = await mountOverlay();
++    await tap(renderer, 'hub-node-enter-basement');
++    await tap(renderer, 'current-gate-hack-hatch');
++    await tap(renderer, 'stub-lock-close');
++    expect(allText(renderer)).not.toContain('Безумный доктор');
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-hack-hatch' }).length).toBeGreaterThan(0);
++    await act(async () => renderer.unmount());
++  });
++
++  it('сигнал терминала работает так же, как сигнал замка', async () => {
++    const all = cards();
++    all[1] = normalizeContainerEntity({
++      ...all[1], accessExpression: [makeCheckToken('term-1')], linkedCheckIds: ['term-1'],
++      links: [{ containerId: 'doctor', locked: false }, { containerId: 'term-1', locked: false }],
++    });
++    all.push(normalizeContainerEntity({ id: 'term-1', kind: CONTAINER_KIND.TERMINAL, name: 'Терминал подвала', difficulty: 1 }));
++    const root = all.find((c) => c.id === 'diamond');
++    const session = {
++      ...legacySession(),
++      nodes: buildLocationSessionNodes(root, all).map((node) => ({
++        containerId: node.containerId, kind: 'loot', name: node.name, description: node.description,
++        locked: false, lockLabel: String(node.lockLabel || '').trim(), caps: node.caps || 0, items: node.items || [],
++      })),
++    };
++    const renderer = await mountOverlay();
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: { ...state.rooms, ROOM1: { ...state.rooms.ROOM1, activeSession: session } },
++      }));
++      await Promise.resolve();
++    });
++    await tap(renderer, 'hub-node-enter-basement');
++    await tap(renderer, 'current-gate-hack-term-1');
++    await tap(renderer, 'stub-terminal-win');
++    await tap(renderer, 'stub-terminal-close');
++    expect(allText(renderer)).toContain('Безумный доктор');
++    await act(async () => renderer.unmount());
++  });
++
++  it('окно игрока передаёт сигнал обоим видам проверки', () => {
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlay).toContain('onHacked={handleCheckHacked}');
++    expect(overlay).toContain('onClose={handleCheckModalClose}');
++    expect(overlay).toContain('recordLocalCheckAccess');
++    expect(overlay).toContain('hasLocalCheckAccess');
++    // Журнал локального резерва не подменяет серверное решение.
++    expect(overlay).toContain('if (roomHasTerminalProtocol(room)) return false;');
++  });
++
++  it('парные строки успеха и закрытия на месте', () => {
++    const ru = json('i18n/ru-RU/screens/lootTrade/screen.json');
++    const en = json('i18n/en-EN/screens/lootTrade/screen.json');
++    expect(ru.lock.wonClose).toBe('Закрыть');
++    expect(en.lock.wonClose).toBe('Close');
++    expect(ru.terminal.wonClose).toBe('Закрыть');
++    expect(en.terminal.wonClose).toBe('Close');
++    expect(ru.lock.wonAccessHint).toContain('Закройте окно');
++    expect(en.terminal.wonAccessHint).toContain('Close this window');
++    const lockModal = read('components/lootTrade/LockPickingModal.js');
++    const termModal = read('components/lootTrade/TerminalHackingModal.js');
++    expect(lockModal).toContain('lock-success-close');
++    expect(termModal).toContain('terminal-success-close');
++    // Панель успеха замка больше не предлагает «Ещё подход».
++    const wonPanel = lockModal.slice(
++      lockModal.indexOf('testID="lock-won-panel"'),
++      lockModal.indexOf(') : (isClosed && !holdBoard) ? ('),
++    );
++    expect(wonPanel.length).toBeGreaterThan(0);
++    expect(wonPanel).toContain('lock-success-close');
++    expect(wonPanel).not.toContain('newAttemptButton');
++  });
++});
+diff --git a/__tests__/room/lock-attempts-526.test.js b/__tests__/room/lock-attempts-526.test.js
+index 6449f62..492e3dd 100644
+--- a/__tests__/room/lock-attempts-526.test.js
++++ b/__tests__/room/lock-attempts-526.test.js
+@@ -112,32 +112,44 @@ describe('526: «билет» убран, автоматический рест
+ });
+ 
+ describe('526: новый подход игрока (купил отмычки / прокачался)', () => {
+-  it('newAttempt собирает свежую доску по ТЕКУЩЕМУ листу, событие доступа не теряется', () => {
++  // Патч 547 (слово владельца): «"успешные попытки" не должны вызывать ещё
++  // попытку». Правило 526 про свежий лист сохранено для НЕвыигранной доски;
++  // после ACCESS GRANTED новый подход отказывает, а новую партию даёт только
++  // Мастер повторной выдачей. Прежняя редакция теста требовала пересборки
++  // доски после победы — именно она снова запирала уже открытую точку.
++  it('newAttempt после победы отказывает: победа и событие доступа не теряются', () => {
+     const { registry, code, state, act, publish } = setup();
+     act('start');
+     const first = state().game;
+     expect(first.per).toBe(4);
+     expect(first.pinsTotal).toBe(5);
+     winLock(state, act);
++    const wonRevision = state().game.revision;
+     const accessIdBefore = state().accessId;
+     expect(registry.getState(code).accessEvents.l1).toMatchObject({ containerId: 'l1', kind: 'hacked' });
+ 
+-    // Игрок купил отмычки и прокачал восприятие →发表了 свежий лист.
++    // Игрок купил заколки и прокачал восприятие, опубликовав свежий лист.
+     publish(10, 12, 2);
+-    const result = act('newAttempt');
+-    expect(result.error).toBeUndefined();
++    expect(act('newAttempt').error).toBe(ERROR_CODE.LOCK_ALREADY_WON);
++    expect(state().game.status).toBe('won');
++    expect(state().game.revision).toBe(wonRevision);
++    // accessId не меняется: это не новая трансляция Мастера.
++    expect(state().accessId).toBe(accessIdBefore);
++    expect(state().closed).toBe(false);
++    // Открытая точка остаётся открытой: доступ не отзывается.
++    expect(registry.getState(code).accessEvents.l1).toMatchObject({ kind: 'hacked' });
++
++    // Новую партию начинает только Мастер: повторная выдача снимает доску,
++    // и следующий подход собирается по ТЕКУЩЕМУ листу игрока.
++    expect(act('reissue', undefined, 'gm').error).toBeUndefined();
++    expect(state().game).toBeNull();
++    expect(act('newAttempt').error).toBeUndefined();
+     const next = state().game;
+     expect(next.status).toBe('playing');
+     expect(next.per).toBe(10);
+     expect(next.pinsTotal).toBe(12);
+     expect(next.cellCount).toBeLessThan(first.cellCount);
+-    expect(next.revision).toBe(1);
+     expect(next).not.toHaveProperty('secret');
+-    // accessId не меняется: это не новая трансляция Мастера.
+-    expect(state().accessId).toBe(accessIdBefore);
+-    expect(state().closed).toBe(false);
+-    // Открытая точка остаётся открытой: доступ не отзывается.
+-    expect(registry.getState(code).accessEvents.l1).toMatchObject({ kind: 'hacked' });
+   });
+ 
+   it('сколько угодно подходов подряд, без Мастера и без повторной трансляции', () => {
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 2458009..600f3d1 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('546');
++    expect(version.version).toBe('547');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(145);
+-    expect(version.notes['en-EN']).toHaveLength(145);
+-    expect(json('patchs/baseline.json').baseline).toBe('546');
++    expect(version.notes['ru-RU']).toHaveLength(146);
++    expect(version.notes['en-EN']).toHaveLength(146);
++    expect(json('patchs/baseline.json').baseline).toBe('547');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -456,15 +456,16 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
++    expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **546**');
++    expect(roadmap).toContain('Текущая версия: **547**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 546');
++    expect(roadmap).toContain('Осталось после патча 547');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -472,6 +473,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('docs/patch-544-install.md')).toContain('544');
+     expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/patch-546-install.md')).toContain('546');
++    expect(read('docs/patch-547-install.md')).toContain('547');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/components/lootTrade/LockPickingModal.js b/components/lootTrade/LockPickingModal.js
+index 5c39b3c..ce9adfe 100644
+--- a/components/lootTrade/LockPickingModal.js
++++ b/components/lootTrade/LockPickingModal.js
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useMemo, useRef, useState } from 'react';
++import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import {
+   Modal,
+   ScrollView,
+@@ -26,6 +26,7 @@ import {
+ } from './localLockGame';
+ import { shouldAutoStartLock, autoStartLockKey } from './lockAutoStart';
+ import { spendBobbyPins } from './spendBobbyPins';
++import { hackSuccessKey, isHackWon } from './hackOutcome';
+ 
+ const styles = lockLightStyles;
+ 
+@@ -62,12 +63,16 @@ const SILENT_ERRORS = new Set([
+   'TERMINAL_ALREADY_ACTIVE',
+   'TERMINAL_AWAITING_RETRY',
+   'TERMINAL_INVALID_GUESS',
++  // Патч 547: победа оконечна, отказ на устаревший «Ещё подход» — не ошибка.
++  'LOCK_ALREADY_WON',
+ ]);
+ 
+ // Патч 526: новый подход — штатное действие игрока, а не ошибка.
+ const isNewAttempt = (action) => action === 'newAttempt';
+ 
+-const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose }) => {
++const LockPickingModal = ({
++  visible, lock, roomCode, autoStart = false, freshAttempt = false, ownerToken, onClose, onHacked,
++}) => {
+   useLocale();
+   const containerId = String(lock?.containerId || '').trim();
+   const characterId = useCharacterStore((state) => state.currentCharacterId);
+@@ -113,6 +118,31 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   );
+   const pinsLeft = game ? (game.pinsRemaining || 0) + (game.pinActive ? 1 : 0) : 0;
+ 
++  /**
++   * Патч 547: модалка САМА передаёт сигнал об успешном взломе. Раньше победа
++   * читалась только из реестра комнаты, и в локальном резерве (сервер без
++   * протокола мини-игр) сигнал не рождался вовсе: игрок видел ACCESS GRANTED,
++   * но пройти дальше не мог. Сигнал идемпотентен — ключ победы не даёт
++   * сообщить один и тот же успех дважды.
++   */
++  const reportedWinRef = useRef('');
++  const onHackedRef = useRef(onHacked);
++  onHackedRef.current = onHacked;
++  const reportWin = useCallback(() => {
++    if (!isHackWon(game)) return;
++    const key = hackSuccessKey(containerId, game, terminalState?.accessId);
++    if (reportedWinRef.current === key) return;
++    reportedWinRef.current = key;
++    onHackedRef.current?.({ containerId, kind: 'lock', local: localMode });
++  }, [game, containerId, terminalState?.accessId, localMode]);
++
++  useEffect(() => {
++    if (!visible) return;
++    reportWin();
++  // Статус и ревизия доски определяют момент победы; сам reportWin идемпотентен.
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [visible, won, containerId, game?.revision, terminalState?.accessId, localMode]);
++
+   // Патч 527: каждая сломанная заколка уходит из РЕАЛЬНОГО инвентаря.
+   // Первое наблюдение за доской лишь запоминает базу (иначе перезагрузка
+   // страницы с уже сломанными заколками списала бы их повторно). Спектаторы
+@@ -349,6 +379,12 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+     </TouchableOpacity>
+   );
+ 
++  // Патч 547: любое закрытие окна после победы передаёт сигнал о взломе.
++  const closeModal = () => {
++    reportWin();
++    onClose?.();
++  };
++
+   const hasBoard = Boolean(game && rows.length > 0);
+   // Патч 535: игрок просит Мастера решить спорную ситуацию. Пока единственный
+   // вид запроса — lock.open; каркас на сервере расширяемый.
+@@ -377,7 +413,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+   );
+ 
+   return (
+-    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
++    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={closeModal}>
+       <View style={modalStyles.overlay}>
+         <View style={modalStyles.card}>
+           <View style={styles.headerRow}>
+@@ -390,7 +426,7 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               accessibilityLabel={tLootTrade('lock.close')}
+               testID="lock-close-button"
+               style={styles.closeButton}
+-              onPress={onClose}
++              onPress={closeModal}
+             >
+               <MaterialCommunityIcons name="close" size={20} color={LOCK_PALETTE.mutedText} />
+             </TouchableOpacity>
+@@ -463,12 +499,22 @@ const LockPickingModal = ({ visible, lock, roomCode, autoStart = false, freshAtt
+               ) : null}
+             </View>
+           ) : won ? (
+-            <View style={styles.accessPanel}>
++            // Патч 547 (слово владельца): «успешные попытки не должны вызывать
++            // ещё попытку». После ACCESS GRANTED — только успех и «Закрыть»,
++            // которое передаёт сигнал о взломе и открывает доступ к содержимому.
++            <View style={styles.accessPanel} testID="lock-won-panel">
+               <Text accessibilityRole="alert" style={styles.wonText}>
+                 {tLootTrade('lock.won')}
+               </Text>
+-              <Text style={styles.statusHint}>{tLootTrade('lock.newAttemptHint')}</Text>
+-              {newAttemptButton}
++              <Text style={styles.statusHint}>{tLootTrade('lock.wonAccessHint')}</Text>
++              <TouchableOpacity
++                testID="lock-success-close"
++                accessibilityRole="button"
++                style={[modalStyles.btn, modalStyles.saveBtn, { marginTop: 14 }]}
++                onPress={closeModal}
++              >
++                <Text style={modalStyles.saveBtnText}>{tLootTrade('lock.wonClose')}</Text>
++              </TouchableOpacity>
+             </View>
+           ) : (isClosed && !holdBoard) ? (
+             <View style={styles.accessPanel}>
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index aecade3..4a77c36 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -15,7 +15,7 @@ import * as db from '../../db';
+ import * as savesModule from '../../src/saves/characterSaves';
+ import useCharacterStore from '../../src/store/characterStore';
+ import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
+-import useRoomStore from '../../src/room/roomStore';
++import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
+ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
+ import { useLocale, useModuleLocale } from '../../i18n/locale';
+@@ -43,6 +43,7 @@ import {
+ import { describeItemBasics } from '../../domain/itemBasics';
+ import itemStacking from '../../domain/itemStacking.js';
+ import { restoreLocationSessionNodes } from '../../domain/locationNodeMarker.js';
++import { hasLocalCheckAccess, recordLocalCheckAccess } from './localCheckAccess';
+ import {
+   applyCommittedMerchantTradeToCharacter,
+   getSellablePlayerInventoryItems,
+@@ -74,15 +75,17 @@ import {
+  * терминала клиент видит в `terminalStates`/`accessEvents`. Обновлённый сервер
+  * остаётся источником истины — его явное `open`/`denied` важнее этой оценки.
+  */
+-const roomCheckPassed = (room, checkId) => {
++const roomCheckPassed = (room, checkId, roomCode = '') => {
+   const id = String(checkId || '').trim();
+-  if (!id || !room) return false;
+-  const state = room.terminalStates?.[id];
+-  return Boolean(
+-    state?.game?.status === 'won'
+-    || state?.keyUnlocked
+-    || room.accessEvents?.[id],
+-  );
++  if (!id) return false;
++  const state = room?.terminalStates?.[id];
++  if (state?.game?.status === 'won' || state?.keyUnlocked || room?.accessEvents?.[id]) return true;
++  // Патч 547: локальный резерв мини-игр. Если у комнаты нет протокола, доска
++  // живёт в памяти клиента и в реестр комнаты победа не приходит — сигнал
++  // приносит сама модалка. При наличии протокола журнал НЕ спрашиваем:
++  // источником истины остаётся сервер (урок 506).
++  if (roomHasTerminalProtocol(room)) return false;
++  return hasLocalCheckAccess({ roomCode, containerId: id });
+ };
+ 
+ const getItemIcon = (itemType) => {
+@@ -295,19 +298,42 @@ export default function PlayerLootTradeOverlay() {
+     });
+   }, []);
+ 
++  /**
++   * Патч 547: приём сигнала об успешном взломе от модалки.
++   *
++   * Слово владельца: «показан, успех, кнопка закрыть — передача сигнала об
++   * успешном взломе — доступ к содержимому». Сигнал приходит и в сетевом
++   * режиме, и в локальном резерве; в последнем он ещё и снимает преграду
++   * локации (журнал `localCheckAccess`), иначе пройти дальше было нельзя.
++   * Адресный исход применяет закрытие окна мини-игры («Закрыть» на панели
++   * успеха). Сетевой автопереход 530 остаётся как был — по реестру комнаты.
++   */
++  const [localAccessTick, setLocalAccessTick] = useState(0);
++  const hackSignalRef = useRef(null);
++  const handleCheckHacked = useCallback(({ containerId, kind, local } = {}) => {
++    const id = String(containerId || '').trim();
++    if (!id) return;
++    const code = matchedContext?.roomCode || '';
++    hackSignalRef.current = { containerId: id, kind: String(kind || '') };
++    if (local && recordLocalCheckAccess({ roomCode: code, containerId: id, kind })) {
++      // Журнал живёт в памяти модуля — поднимаем перерисовку явно.
++      setLocalAccessTick((tick) => tick + 1);
++    }
++  }, [matchedContext?.roomCode]);
++
+   const selectedHubNode = useMemo(() => {
+     if (!isHubSession || !selectedHubNodeId) return null;
+     const room = rooms?.[matchedContext?.roomCode];
+     const found = sessionNodes.find(
+       // Патч 546: содержимое нельзя открыть и мимо непройденной проверки.
+       (n) => n.containerId === selectedHubNodeId
+-        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id) }),
++        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id, matchedContext?.roomCode) }),
+     );
+     // Локация и точки проверки никогда не попадают в сценарий «открыть сундук»:
+     // локация требует входа, терминал/замок — мини-игры.
+     if (found && (nodeHasChildren(found) || resolveCheckSessionNode(found).checkKind)) return null;
+     return found || null;
+-  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode]);
++  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode, localAccessTick]);
+ 
+   // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
+   const viewTarget = isHubSession ? selectedHubNode : activeSession;
+@@ -343,6 +369,30 @@ export default function PlayerLootTradeOverlay() {
+    */
+   const handledWinRef = useRef('');
+   const winTimerRef = useRef(null);
++
++  /**
++   * Патч 547: закрытие окна взлома ПОСЛЕ победы применяет адресный исход:
++   * взлом локации = вход, взлом контейнера = содержимое. Без победы закрытие
++   * просто гасит окно. Преграда текущей локации (gateOnly) снимается самим
++   * сигналом — игрок остаётся на месте и видит открывшееся содержимое.
++   */
++  const handleCheckModalClose = useCallback(() => {
++    const selection = terminalSelection;
++    const signal = hackSignalRef.current;
++    const checkId = String(selection?.node?.containerId || '').trim();
++    const hacked = Boolean(signal && checkId && signal.containerId === checkId);
++    if (winTimerRef.current) {
++      clearTimeout(winTimerRef.current);
++      winTimerRef.current = null;
++    }
++    hackSignalRef.current = null;
++    setTerminalSelection(null);
++    if (!hacked) return;
++    const targetId = selection?.targetNodeId;
++    if (!targetId) return;
++    const target = sessionNodes.find((n) => n.containerId === targetId) || { containerId: targetId };
++    navigateHackOutcome(target);
++  }, [terminalSelection, sessionNodes, navigateHackOutcome]);
+   useEffect(() => {
+     if (!isHubSession || !terminalSelection?.autoStart
+       || (!terminalSelection?.targetNodeId && !terminalSelection?.gateOnly)) {
+@@ -360,6 +410,7 @@ export default function PlayerLootTradeOverlay() {
+     const nodes = sessionNodes;
+     winTimerRef.current = setTimeout(() => {
+       winTimerRef.current = null;
++      hackSignalRef.current = null;
+       setTerminalSelection(null);
+       // Патч 542: преграда текущей локации уже пройдена изнутри — остаёмся
+       // на месте, сервер раскроет содержимое. Каскада нет.
+@@ -368,7 +419,7 @@ export default function PlayerLootTradeOverlay() {
+       navigateHackOutcome(target);
+     }, HACK_OUTCOME_DELAY_MS);
+   }, [
+-    rooms, isHubSession, terminalSelection,
++    rooms, isHubSession, terminalSelection, localAccessTick,
+     sessionNodes, matchedContext?.roomCode, navigateHackOutcome,
+   ]);
+   useEffect(() => () => {
+@@ -544,6 +595,7 @@ export default function PlayerLootTradeOverlay() {
+             roomCode={directTerminalContext.roomCode}
+             autoStart={Boolean(directSelection.autoStart)}
+             freshAttempt={Boolean(directSelection.freshAttempt)}
++            onHacked={handleCheckHacked}
+             onClose={() => setTerminalSelection(null)}
+           />
+         ) : (
+@@ -552,6 +604,7 @@ export default function PlayerLootTradeOverlay() {
+             terminal={config}
+             roomCode={directTerminalContext.roomCode}
+             autoStart={Boolean(directSelection.autoStart)}
++            onHacked={handleCheckHacked}
+             onClose={() => setTerminalSelection(null)}
+           />
+         )) : null}
+@@ -682,6 +735,7 @@ export default function PlayerLootTradeOverlay() {
+             roomCode={roomCode}
+             autoStart={Boolean(selection.autoStart)}
+             freshAttempt={Boolean(selection.freshAttempt)}
++            onHacked={handleCheckHacked}
+             onClose={() => setTerminalSelection(null)}
+           />
+         ) : (
+@@ -690,6 +744,7 @@ export default function PlayerLootTradeOverlay() {
+             terminal={config}
+             roomCode={roomCode}
+             autoStart={Boolean(selection.autoStart)}
++            onHacked={handleCheckHacked}
+             onClose={() => setTerminalSelection(null)}
+           />
+         )) : null}
+@@ -714,7 +769,7 @@ export default function PlayerLootTradeOverlay() {
+     // Патч 546: единый предикат преграды. Локация с настроенным замком не
+     // пропускает внутрь, даже если старый сервер не прислал флаг `locked`.
+     const currentRoom = rooms?.[matchedContext.roomCode];
+-    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id);
++    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id, matchedContext.roomCode);
+     const currentGatePending = accessBarrierPending(currentTarget, { isPassed: currentIsPassed });
+     const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
+       const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
+@@ -1315,7 +1370,8 @@ export default function PlayerLootTradeOverlay() {
+               roomCode={matchedContext.roomCode}
+               autoStart={Boolean(terminalSelection.autoStart)}
+               freshAttempt={Boolean(terminalSelection.freshAttempt)}
+-              onClose={() => setTerminalSelection(null)}
++              onHacked={handleCheckHacked}
++              onClose={handleCheckModalClose}
+             />
+           ) : (
+             <TerminalHackingModal
+@@ -1323,7 +1379,8 @@ export default function PlayerLootTradeOverlay() {
+               terminal={terminalSelection.node}
+               roomCode={matchedContext.roomCode}
+               autoStart={Boolean(terminalSelection.autoStart)}
+-              onClose={() => setTerminalSelection(null)}
++              onHacked={handleCheckHacked}
++              onClose={handleCheckModalClose}
+             />
+           )
+         ) : null}
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index 0df027d..a272df2 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useMemo, useRef, useState } from 'react';
++import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import {
+   Animated,
+   Modal,
+@@ -22,6 +22,7 @@ import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lo
+ import { showRawAlert } from '../alerts/alertService';
+ import { shouldAutoStart, autoStartKey } from './terminalAutoStart';
+ import { terminalHackingStyles } from './terminalHackingStyles';
++import { hackSuccessKey, isHackWon } from './hackOutcome';
+ 
+ const COLUMN_WIDTH = 12;
+ const ATTEMPTS_MAX = 4;
+@@ -33,6 +34,7 @@ const TerminalHackingModal = ({
+   autoStart = false,
+   ownerToken,
+   onClose,
++  onHacked,
+ }) => {
+   useLocale();
+   const characterId = useCharacterStore((state) => state.currentCharacterId);
+@@ -68,6 +70,36 @@ const TerminalHackingModal = ({
+   const awaitingGm = !isClosed && (game?.status === 'awaitingRetry' || Boolean(terminalState?.awaitingGm));
+   const canHack = Boolean(characterId && (localMode || roomCode) && !isClosed && !awaitingGm);
+ 
++  /**
++   * Патч 547: терминал, как и замок, сам передаёт сигнал об успешном взломе.
++   * Наблюдение за реестром комнаты не работало в локальном резерве, поэтому
++   * успех не доходил до окна локации и игрок не мог пройти дальше.
++   */
++  const reportedWinRef = useRef('');
++  const onHackedRef = useRef(onHacked);
++  onHackedRef.current = onHacked;
++  const reportWin = useCallback(() => {
++    if (!isHackWon(game)) return;
++    const key = hackSuccessKey(terminal?.containerId, game, terminalState?.accessId);
++    if (reportedWinRef.current === key) return;
++    reportedWinRef.current = key;
++    onHackedRef.current?.({
++      containerId: String(terminal?.containerId || '').trim(), kind: 'terminal', local: localMode,
++    });
++  }, [game, terminal?.containerId, terminalState?.accessId, localMode]);
++
++  useEffect(() => {
++    if (!visible) return;
++    reportWin();
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [visible, game?.status, terminal?.containerId, game?.revision, terminalState?.accessId, localMode]);
++
++  // Патч 547: закрытие окна после ACCESS GRANTED передаёт сигнал о взломе.
++  const closeModal = () => {
++    reportWin();
++    onClose?.();
++  };
++
+   // В локальной партии (сервер комнат недоступен) Мастер сидит за этим же
+   // устройством: показываем тот же вопрос «Да/Нет» здесь. В сетевой партии
+   // решение принимает глобальный TerminalRetryPromptHost на устройстве Мастера.
+@@ -293,7 +325,7 @@ ${tLootTrade('terminal.retryMessage')}`,
+   ) : null;
+ 
+   return (
+-    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
++    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={closeModal}>
+       <View style={styles.backdrop}>
+         <View style={styles.window}>
+           <View style={styles.header}>
+@@ -301,7 +333,7 @@ ${tLootTrade('terminal.retryMessage')}`,
+               <MaterialCommunityIcons name="console" size={22} color="#93d17a" />
+               <Text numberOfLines={1} style={styles.title}>{terminal?.name || terminalState?.config?.name || tLootTrade('terminal.title')}</Text>
+             </View>
+-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={tLootTrade('player.close')} style={styles.closeButton} onPress={onClose}>
++            <TouchableOpacity accessibilityRole="button" accessibilityLabel={tLootTrade('player.close')} style={styles.closeButton} onPress={closeModal}>
+               <MaterialCommunityIcons name="close" size={20} color="#bdc8b7" />
+             </TouchableOpacity>
+           </View>
+@@ -332,8 +364,17 @@ ${tLootTrade('terminal.retryMessage')}`,
+                 </View>
+               </Animated.View>
+               <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
+-              <Text style={styles.statusHint}>{tLootTrade('terminal.wonHint')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.wonAccessHint')}</Text>
+               {guessesPanel}
++              {/* Патч 547: успех → «Закрыть» → сигнал о взломе → доступ. */}
++              <TouchableOpacity
++                testID="terminal-success-close"
++                accessibilityRole="button"
++                style={styles.primaryButton}
++                onPress={closeModal}
++              >
++                <Text style={styles.primaryButtonText}>{tLootTrade('terminal.wonClose')}</Text>
++              </TouchableOpacity>
+             </View>
+           ) : !game ? (
+             <View style={styles.idlePanel}>
+diff --git a/components/lootTrade/hackOutcome.js b/components/lootTrade/hackOutcome.js
+index 1d9c5b1..5b7d5cb 100644
+--- a/components/lootTrade/hackOutcome.js
++++ b/components/lootTrade/hackOutcome.js
+@@ -38,6 +38,19 @@ export const hackWinKey = (containerId, state) => (
+   `${containerId}|${state?.accessId || ''}|${state?.game?.revision || 0}`
+ );
+ 
++/**
++ * Патч 547: сигнал победы из самой модалки. Раньше исход взлома узнавался
++ * только наблюдением за реестром комнаты, поэтому в локальном резерве (сервер
++ * без протокола мини-игр) победа никуда не уходила и игрок не мог пройти
++ * дальше. Модалка сообщает успех сама, а ключ дедупликации не даёт применить
++ * его дважды.
++ */
++export const isHackWon = (game) => game?.status === 'won';
++
++export const hackSuccessKey = (containerId, game, accessId = '') => (
++  `${String(containerId || '').trim()}|${accessId || ''}|${game?.revision || 0}`
++);
++
+ /**
+  * Применить исход взлома к навигации игрока. enter — вложенная локация,
+  * contents — открытый контейнер. Никаких каскадов: только адресный узел.
+diff --git a/components/lootTrade/localCheckAccess.js b/components/lootTrade/localCheckAccess.js
+new file mode 100644
+index 0000000..e7c9a1f
+--- /dev/null
++++ b/components/lootTrade/localCheckAccess.js
+@@ -0,0 +1,71 @@
++/**
++ * Патч 547: сигнал об успешном взломе в локальном резерве.
++ *
++ * Баг владельца: «я взломал замок… из-за того, что модалка взлома не передала
++ * данные о взломе, я не могу пройти дальше».
++ *
++ * Причина: единственным каналом победы был реестр комнаты
++ * (`rooms[code].terminalStates[id].game.status === 'won'`). Когда сервер комнат
++ * ещё не знает протокол мини-игр, доска живёт в памяти клиента
++ * (`localLockGame` / `localTerminalGame`), в реестр комнаты она не попадает —
++ * сигнал не приходил никуда, преграда локации оставалась непройденной.
++ *
++ * Этот модуль — журнал пройденных проверок ДЛЯ ЛОКАЛЬНОГО РЕЗЕРВА. Он не
++ * подменяет серверное решение: вызывающая сторона обязана спрашивать его только
++ * когда у комнаты нет протокола мини-игр (`roomHasTerminalProtocol === false`).
++ * При наличии протокола источником истины остаётся сервер (урок 506), а его
++ * журнал `accessEvents` — общим на контур привязанных комнат.
++ *
++ * Модуль чистый (без React и без сети), поэтому правила проверяются тестами.
++ */
++
++const passedChecks = new Map();
++
++export const localCheckAccessKey = ({ roomCode, containerId } = {}) => (
++  `${String(roomCode || '').trim()}|${String(containerId || '').trim()}`
++);
++
++/**
++ * Записать пройденную проверку. Возвращает true, если запись новая —
++ * по этому флагу интерфейс понимает, что нужно перерисоваться.
++ */
++export const recordLocalCheckAccess = ({
++  roomCode,
++  containerId,
++  kind = 'lock',
++  now = Date.now(),
++} = {}) => {
++  const id = String(containerId || '').trim();
++  if (!id) return false;
++  const key = localCheckAccessKey({ roomCode, containerId: id });
++  if (passedChecks.has(key)) return false;
++  passedChecks.set(key, {
++    containerId: id,
++    roomCode: String(roomCode || '').trim(),
++    kind: String(kind || 'lock'),
++    at: now,
++  });
++  return true;
++};
++
++export const hasLocalCheckAccess = ({ roomCode, containerId } = {}) => (
++  passedChecks.has(localCheckAccessKey({ roomCode, containerId }))
++);
++
++/** Снять запись точки; без containerId — весь локальный журнал комнаты. */
++export const clearLocalCheckAccess = ({ roomCode, containerId } = {}) => {
++  const id = String(containerId || '').trim();
++  if (id) {
++    passedChecks.delete(localCheckAccessKey({ roomCode, containerId: id }));
++    return;
++  }
++  const code = String(roomCode || '').trim();
++  for (const [key, entry] of passedChecks.entries()) {
++    if (!code || entry.roomCode === code) passedChecks.delete(key);
++  }
++};
++
++/** Снимок журнала — для отладки и тестов. */
++export const localCheckAccessSnapshot = () => [...passedChecks.values()].map((entry) => ({ ...entry }));
++
++export default recordLocalCheckAccess;
+diff --git a/components/lootTrade/localLockGame.js b/components/lootTrade/localLockGame.js
+index 3473b76..0645665 100644
+--- a/components/lootTrade/localLockGame.js
++++ b/components/lootTrade/localLockGame.js
+@@ -125,6 +125,8 @@ export const applyLocalLockAction = (state, action, value, ctx = {}) => {
+   // навык и удачу, но угаданные позиции и комбинация остаются (закон 532).
+   // Сломанные заколки не возвращаются, блокировки пока нет.
+   if (action === 'newAttempt') {
++    // Патч 547: успешный взлом не порождает ещё попытку и в локальном резерве.
++    if (game?.status === 'won') return finish(game, carried, 'LOCK_ALREADY_WON');
+     // Metro не гарантирует именованный импорт из CJS — берём с объекта.
+     if (engine.shouldBlockLock({ game, config })) return finish(game, carried, 'LOCK_BLOCKED');
+     const fresh = engine.resumeLockGame({
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 0483537..1c59b94 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,29 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (547) — успех взлома передаётся дальше, победа оконечна
++
++Баг владельца: «я взломал замок, модалка взлома предложила ещё попытку…
++из-за того, что модалка взлома не передала данные о взломе, я не могу пройти
++дальше. Тоже самое с терминалом — показан, успех, кнопка закрыть — передача
++сигнала об успешном взломе — доступ к содержимому».
++
++- Причина №1: панель `won` у замка показывала «Ещё подход», а `newAttempt`
++  по выигранной доске собирал НОВЫЙ секрет (`resumeLockGame` → `createLockGame`)
++  и снова запирал точку. Теперь отказ `LOCK_ALREADY_WON` в движке, реестре
++  и локальном резерве; новую партию даёт только Мастер («Открыть»/reissue).
++- Причина №2: победа читалась только из `rooms[code].terminalStates`. В
++  локальном резерве (сервер без протокола мини-игр) доска живёт в памяти
++  клиента, сигнала не было вовсе. Модалки получили `onHacked`, окно игрока —
++  `handleCheckHacked`/`handleCheckModalClose` и журнал `localCheckAccess`.
++- Панель успеха: ACCESS GRANTED + «Закрыть» (`lock-success-close`,
++  `terminal-success-close`). Закрытие без победы ничего не открывает.
++- Журнал локального резерва НЕ подменяет сервер: спрашивается только при
++  `roomHasTerminalProtocol(room) === false` (урок 506).
++- Приёмка: `__tests__/room/hack-success-signal-547.test.js` (12),
++  `__tests__/lootTrade/hack-success-modal-547.test.js` (8). Тест 526 обновлён
++  по слову владельца (после победы новый подход отказывает). Версия/отсечка
++  547, тезис 37, `docs/patch-547-install.md`.
++
+ ## 2026-11-06 (546) — замок локации = преграда входа
+ 
+ Баг владельца: «Подвал доктора» с «Запертым люком» и «Тапхаус» с «Запертой
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 8dcbfdf..191b111 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,36 @@
+ # Changelog
+ ---
+ 
++## A successful hack carries through (patch 547)
++
++Fixed the owner's bug: "I picked the lock, the hacking modal offered another
++attempt… because the modal did not pass on the hack data, I cannot proceed."
++The same rule now applies to terminals.
++
++- **Success no longer spawns another attempt.** After ACCESS GRANTED the lock
++  panel no longer shows "Another attempt" — only success and a Close button.
++  The patch 526 rule for a new attempt still covers failure and "out of pins".
++- **Victory is final on the server too.** `newAttempt` on a won board is refused
++  (`LOCK_ALREADY_WON`) and leaves it untouched; it used to build a new secret and
++  re-lock an already opened point. Only the Master starts a new round, via
++  "Open" or a re-issue. The local fallback behaves the same way.
++- **The modal reports the signal itself.** Locks and terminals gained `onHacked`:
++  success is reported once per victory, and closing the window after a win also
++  transmits the signal. The terminal success panel got the same Close button.
++- **Access to the contents.** The player window accepts the signal and applies
++  the addressed outcome: hacking a location = entering, hacking a container =
++  contents; the current location's barrier is lifted by the signal itself.
++  Closing without a victory opens nothing.
++- **The local fallback is no longer a dead end.** When the room server does not
++  know the mini-game protocol, the board lives in client memory and the victory
++  never reached the room registry, so no signal existed at all. The new
++  `localCheckAccess` journal keeps passed checks for such rooms; whenever the
++  protocol is present, the server remains the source of truth (lesson 506).
++- **Acceptance.** `__tests__/room/hack-success-signal-547.test.js` (12) and
++  `__tests__/lootTrade/hack-success-modal-547.test.js` (8). The 526 test was
++  updated: its previous version required rebuilding the board after a victory,
++  which is exactly what re-locked an opened point.
++
+ ## A location lock is an entry barrier (patch 546)
+ 
+ Fixed the owner's bug: "Doctor's Basement" locked by "Locked Hatch" and the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 46f3f1e..32b15ee 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Успех взлома передаётся дальше (патч 547)
++
++Исправлен баг владельца: «я взломал замок, модалка взлома предложила ещё
++попытку… из-за того, что модалка взлома не передала данные о взломе, я не могу
++пройти дальше». То же правило распространено на терминал.
++
++- **Успех не порождает ещё попытку.** После ACCESS GRANTED панель замка
++  больше не показывает «Ещё подход»: только успех и кнопка «Закрыть».
++  Правило 526 про новый подход сохранено для провала и «кончились заколки».
++- **Победа оконечна и на сервере.** Действие `newAttempt` по выигранной доске
++  отказывает (`LOCK_ALREADY_WON`) и не меняет её — раньше оно собирало новый
++  секрет и снова запирало уже открытую точку. Новую партию даёт только Мастер:
++  «Открыть» или повторная выдача. Так же ведёт себя локальный резерв.
++- **Модалка сама передаёт сигнал.** У замка и терминала появился `onHacked`:
++  успех сообщается один раз на победу, а любое закрытие окна после победы
++  передаёт сигнал. Терминал получил такую же кнопку «Закрыть» на панели успеха.
++- **Доступ к содержимому.** Окно игрока принимает сигнал и применяет адресный
++  исход: взлом локации = вход, взлом контейнера = содержимое; преграда текущей
++  локации снимается самим сигналом. Закрытие без победы ничего не открывает.
++- **Локальный резерв больше не тупик.** Когда сервер комнат не знает протокол
++  мини-игр, доска живёт в памяти клиента и в реестр комнаты победа не попадала —
++  сигнал не рождался вовсе. Новый журнал `localCheckAccess` хранит пройденные
++  проверки для таких комнат; при наличии протокола источником истины остаётся
++  сервер (урок 506).
++- **Приёмка.** `__tests__/room/hack-success-signal-547.test.js` (12) и
++  `__tests__/lootTrade/hack-success-modal-547.test.js` (8). Тест 526 обновлён:
++  прежняя редакция требовала пересборки доски после победы — именно она снова
++  запирала открытую точку.
++
+ ## Замок на локации — преграда входа (патч 546)
+ 
+ Исправлен баг владельца: «Подвал доктора» с замком «Запертый люк» и «Тапхаус»
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index 99fa8cd..928fd21 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -222,3 +222,33 @@
+ Границы: адресный взлом 523, закон снимка 529, порядок 545, маркер 544,
+ gate-first 542 и перекрытие 543 сохранены. Замок не становится самостоятельной
+ точкой игрока.
++
++## 547. Сигнал об успешном взломе и оконечность победы
++
++Слово владельца: «"успешные попытки" не должны вызывать ещё попытку… показан,
++успех, кнопка закрыть — передача сигнала об успешном взломе — доступ к
++содержимому».
++
++**Победа оконечна.** `newAttempt` по доске со статусом `won` отказывает
++(`LOCK_ALREADY_WON`) и не мутирует её — ни на сервере (`applyLockAction`,
++`roomRegistry.terminalAction`), ни в локальном резерве (`applyLocalLockAction`).
++Раньше победа не была «продолжаемой», поэтому `resumeLockGame` собирал новый
++секрет и открытая точка снова становилась запертой. Новую партию начинает
++только Мастер: «Открыть» (`grantGmAccess`) или повторная выдача (`game = null`).
++Правило 526 про подходы игрока сохранено для провала и нехватки заколок.
++
++**Сигнал победы.** Модалки замка и терминала принимают `onHacked` и сообщают
++успех один раз на победу (`hackSuccessKey`); любое закрытие окна после победы
++передаёт сигнал повторно, но идемпотентно. Панель успеха показывает ACCESS
++GRANTED и кнопку «Закрыть» вместо «Ещё подход».
++
++**Приём сигнала.** `PlayerLootTradeOverlay.handleCheckHacked` запоминает сигнал
++и, если комната без протокола мини-игр, пишет его в `localCheckAccess`;
++`handleCheckModalClose` применяет адресный исход (локация = вход, контейнер =
++содержимое), а преграда текущей локации (`gateOnly`) снимается самим сигналом.
++Сетевой автопереход 530 по реестру комнаты сохранён.
++
++**Граница доверия.** `localCheckAccess` — журнал ЛОКАЛЬНОГО резерва. Он
++спрашивается только когда `roomHasTerminalProtocol(room) === false`; при
++наличии протокола источником истины остаётся сервер и общий `accessEvents`
++(урок 506). Закон снимка 529 и адресность 523 не менялись.
+diff --git a/docs/patch-547-install.md b/docs/patch-547-install.md
+new file mode 100644
+index 0000000..7c87eda
+--- /dev/null
++++ b/docs/patch-547-install.md
+@@ -0,0 +1,65 @@
++# Установка патча 547: сигнал об успешном взломе
++
++Патч подготовлен от состояния **версии 546**. Файл установки:
++`patchs/547-hack-success-signal.patch`.
++
++> Баг владельца: «я взломал замок, модалка взлома предложила ещё попытку —
++> "успешные попытки" не должны вызывать ещё попытку. Из-за того, что модалка
++> взлома не передала данные о взломе, я не могу пройти дальше. Тоже самое с
++> терминалом должно быть — показан, успех, кнопка закрыть — передача сигнала
++> об успешном взломе — доступ к содержимому».
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/lootTrade/LockPickingModal.js` | панель успеха без «Ещё подход»: ACCESS GRANTED + «Закрыть»; сигнал `onHacked` один раз на победу, любое закрытие после победы передаёт сигнал |
++| `components/lootTrade/TerminalHackingModal.js` | тот же контракт: `onHacked` и кнопка «Закрыть» на панели успеха |
++| `components/lootTrade/localCheckAccess.js` | журнал пройденных проверок для локального резерва (сервер без протокола мини-игр); при наличии протокола не используется |
++| `components/lootTrade/hackOutcome.js` | чистые `isHackWon` и `hackSuccessKey` — ключ дедупликации сигнала победы |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | приём сигнала, снятие преграды в локальном резерве, адресный исход при закрытии окна мини-игры |
++| `server/lockPicking.js`, `server/roomRegistry.js`, `server/protocol.js` | `newAttempt` по выигранной доске отказывает `LOCK_ALREADY_WON` и не меняет её |
++| `components/lootTrade/localLockGame.js` | то же правило в локальном резерве |
++| `i18n/ru-RU/...`, `i18n/en-EN/...` | парные строки `lock.wonAccessHint`/`wonClose`, `terminal.wonAccessHint`/`wonClose` |
++| `__tests__/room/hack-success-signal-547.test.js`, `__tests__/lootTrade/hack-success-modal-547.test.js` | приёмка: движок, сервер, журнал, настоящие модалки, окно игрока в локальном резерве |
++| `__tests__/room/lock-attempts-526.test.js` | правило 526 обновлено по слову владельца: после победы новый подход отказывает |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 547, тезис 37 |
++
++## Границы
++
++- Победа оконечна. Новую партию начинает только Мастер: «Открыть» или повторная
++  выдача точки (доска снимается, следующий подход собирается по свежему листу).
++- «Ещё подход» сохранён там, где он нужен: провал, «кончились заколки»,
++  закрытая доска — правило 526 не отменено.
++- Закон снимка 529 не тронут: сервер не правит лист игрока.
++- Адресный взлом 523 сохранён: сигнал открывает ровно свою цель, каскада нет.
++- Сетевой автопереход 530 (пауза перед входом по реестру комнаты) сохранён;
++  в локальном резерве исход применяет кнопка «Закрыть».
++- Журнал `localCheckAccess` — только резерв. У комнаты с протоколом мини-игр
++  источником истины остаётся сервер и его общий журнал `accessEvents`.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 547
++```
++
++После установки обновите лёгкий сервер комнат (`deploy-netangels.sh`): отказ
++`LOCK_ALREADY_WON` живёт в `server/`. Клиентская часть работает и со старым
++сервером — сигнал победы и журнал локального резерва полностью клиентские.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 546, патч 547 их не трогает.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/547-hack-success-signal.patch` вернёт дерево, словари
++и версию к состоянию 546.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index e2b6b44..865af2b 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **546**.
++Дата ревизии: 2026-11-06. Текущая версия: **547**.
+ 
+ ## Тезисы
+ 
+@@ -48,10 +48,11 @@
+ | 34 | **Окно локаций у игрока: локация ≠ сундук, замок ≠ терминал:** вложенная локация сохраняет тип и рёбра графа даже через старый сервер комнат (маркер пространственного узла), рисуется иконкой карты и входом, а не пустым сундуком. Вход в запертую локацию показывает только преграду; после взлома видны прямые дети, сундук открывает содержимое отдельным шагом. Сервер запрещает добычу/торговлю за запертым родителем прямым запросом | ✅ сделано | **544** |
+ | 35 | **Порядок позиций в хабе/локации:** в дереве Мастера строки одного родителя меняются местами перетаскиванием за ручку-стрелки; порядок хранится на родителе (`childOrder`) и один-в-один воспроизводится в окне игрока (список мест текущей локации). Несколько родителей держат независимый порядок; новые дети попадают в конец fallback-порядка, ключи не перетаскиваются | ✅ сделано | **545** |
+ | 36 | **Замок локации — преграда входа:** непройденная проверка (`accessExpression`/`linkedCheckIds`) держит границу видимости, лута и торговли даже без флага `locked`; единый предикат `accessBarrierPending` для сервера и окна игрока, gate-first вход, страховка старого сервера по маркеру 544 | ✅ сделано | **546** |
++| 37 | **Успех взлома передаётся дальше:** победа оконечна — «ещё подход» после ACCESS GRANTED не предлагается и отказывает на сервере/в локальном резерве; замок и терминал показывают успех и «Закрыть», которое передаёт сигнал о взломе и открывает содержимое. Сигнал доходит и в локальном резерве через журнал пройденных проверок | ✅ сделано | **547** |
+ 
+-## Осталось после патча 546
++## Осталось после патча 547
+ 
+-Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
++Патч 547 замкнул цепочку взлома: успех не порождает новую попытку, а сигнал победы доходит до окна игрока и открывает содержимое (в том числе в локальном резерве). Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -272,6 +273,7 @@
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
+ - `docs/patch-545-install.md` — порядок позиций перетаскиванием (545).
+ - `docs/patch-546-install.md` — замок локации как преграда входа (546).
++- `docs/patch-547-install.md` — сигнал об успешном взломе (547).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index d369b8f..35d47e6 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -402,7 +402,9 @@
+     "hackedMessage": "{name}: access granted. Operator — {operator}. A fresh board requires a new broadcast by the Game Master.",
+     "wonHint": "Terminal hacked. Only a new broadcast by the Game Master starts another run.",
+     "keyUnlockedBadge": "OPENED BY KEY",
+-    "keyRequiredError": "A key or the linked check is required"
++    "keyRequiredError": "A key or the linked check is required",
++    "wonAccessHint": "The terminal is hacked. Close this window to reach the contents.",
++    "wonClose": "Close"
+   },
+   "lock": {
+     "title": "Lockpicking",
+@@ -448,7 +450,9 @@
+     "gmBlockedHint": "The Game Master blocked this point. They can open it themselves or answer your request.",
+     "askGm": "Ask the Game Master",
+     "gmPending": "Request sent. Waiting for the Game Master decision.",
+-    "gmDeclined": "The Game Master declined. The point stays blocked."
++    "gmDeclined": "The Game Master declined. The point stays blocked.",
++    "wonAccessHint": "The lock is picked. Close this window to reach the contents.",
++    "wonClose": "Close"
+   },
+   "gmDecision": {
+     "lockOpenTitle": "Open the lock?",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 77a2d13..ef1db7f 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -403,7 +403,9 @@
+     "hackedMessage": "{name}: доступ разрешён. Оператор — {operator}. Новую доску создаст только повторная трансляция.",
+     "wonHint": "Терминал взломан. Новую партию начнёт только повторная трансляция Мастера.",
+     "keyUnlockedBadge": "ОТКРЫТ КЛЮЧОМ",
+-    "keyRequiredError": "Нужен ключ или привязанная проверка"
++    "keyRequiredError": "Нужен ключ или привязанная проверка",
++    "wonAccessHint": "Терминал взломан. Закройте окно — доступ к содержимому открыт.",
++    "wonClose": "Закрыть"
+   },
+   "lock": {
+     "title": "Взлом замка",
+@@ -449,7 +451,9 @@
+     "gmBlockedHint": "Мастер заблокировал эту точку. Он может открыть её сам или ответить на ваш запрос.",
+     "askGm": "Попросить Мастера",
+     "gmPending": "Запрос отправлен. Ждём решения Мастера.",
+-    "gmDeclined": "Мастер отказал. Точка остаётся заблокированной."
++    "gmDeclined": "Мастер отказал. Точка остаётся заблокированной.",
++    "wonAccessHint": "Замок взломан. Закройте окно — доступ к содержимому открыт.",
++    "wonClose": "Закрыть"
+   },
+   "gmDecision": {
+     "lockOpenTitle": "Открыть замок?",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 86eb10d..100dbda 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "546"
++  "baseline": "547"
+ }
+diff --git a/public/version.json b/public/version.json
+index a1d6171..ed4be37 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "546",
++  "version": "547",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
+       "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
+       "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
+       "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
+@@ -150,6 +151,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
+       "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
+       "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
+       "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
+diff --git a/server/lockPicking.js b/server/lockPicking.js
+index 1946655..60284d4 100644
+--- a/server/lockPicking.js
++++ b/server/lockPicking.js
+@@ -608,6 +608,11 @@ const applyLockAction = ({
+   // ACCESS GRANTED по-прежнему невозможен: это действие шлётся только по
+   // нажатию кнопки, а start запрещён при won/playing.
+   if (action === 'newAttempt') {
++    // Патч 547 (слово владельца): «успешные попытки не должны вызывать ещё
++    // попытку». Победа оконечна: новый секрет после ACCESS GRANTED снова
++    // запирал уже открытую точку. Новую партию даёт только Мастер («Открыть»
++    // или повторная выдача снимает доску), поэтому здесь отказ без мутации.
++    if (game?.status === 'won') return { game, error: 'LOCK_ALREADY_WON' };
+     if (shouldBlockLock({ game, config })) return { error: 'LOCK_BLOCKED' };
+     // Патч 532: явный подход ПРОДОЛЖАЕТ тот же взлом, а не собирает новую
+     // комбинацию. Свежий лист меняет заколки/навык/удачу, угаданные позиции
+diff --git a/server/protocol.js b/server/protocol.js
+index f59e74b..485ee6e 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -106,6 +106,9 @@ const ERROR_CODE = Object.freeze({
+   // Патч 526: будущее условие блокировки замка (автоблокировка выключена).
+   // Патч 535: явная блокировка Мастером приходит как gmBlocked.
+   LOCK_BLOCKED: 'LOCK_BLOCKED',
++  // Патч 547: успешный взлом окончателен. Новый подход после ACCESS GRANTED
++  // не собирает доску заново — сбросить победу может только Мастер.
++  LOCK_ALREADY_WON: 'LOCK_ALREADY_WON',
+   GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
+   GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
+   GM_DECISION_KIND: 'GM_DECISION_KIND',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 44a055d..083b523 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -1096,6 +1096,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     // только Мастер («Да» или reissue) — для него новый подход недоступен.
+     if (action === 'newAttempt') {
+       if (entry.config?.kind !== 'lock') return { error: ERROR_CODE.TERMINAL_NOT_ACTIVE };
++      // Патч 547: победа оконечна — «Ещё подход» не пересобирает выигранную
++      // доску (иначе открытый замок снова становился запертым). Новую партию
++      // даёт только Мастер: «Открыть» или повторная выдача (game = null).
++      const sharedBoard = entry.game || adoptSharedLockGame(room, id);
++      if (sharedBoard?.status === 'won') return { error: ERROR_CODE.LOCK_ALREADY_WON };
+       if (shouldBlockLock({ game: entry.game, config: entry.config, gmBlocked: entry.gmBlocked })) {
+         return { error: ERROR_CODE.LOCK_BLOCKED };
+       }

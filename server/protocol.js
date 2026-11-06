@@ -106,6 +106,9 @@ const ERROR_CODE = Object.freeze({
   // Патч 526: будущее условие блокировки замка (автоблокировка выключена).
   // Патч 535: явная блокировка Мастером приходит как gmBlocked.
   LOCK_BLOCKED: 'LOCK_BLOCKED',
+  // Патч 547: успешный взлом окончателен. Новый подход после ACCESS GRANTED
+  // не собирает доску заново — сбросить победу может только Мастер.
+  LOCK_ALREADY_WON: 'LOCK_ALREADY_WON',
   GM_DECISION_GM_ONLY: 'GM_DECISION_GM_ONLY',
   GM_DECISION_NOT_FOUND: 'GM_DECISION_NOT_FOUND',
   GM_DECISION_KIND: 'GM_DECISION_KIND',
