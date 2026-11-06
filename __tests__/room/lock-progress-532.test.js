@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('547');
+    expect(version.version).toBe('548');
     expect(version.release).toBe(4);
-    expect(version.notes['ru-RU']).toHaveLength(146);
-    expect(version.notes['en-EN']).toHaveLength(146);
-    expect(json('patchs/baseline.json').baseline).toBe('547');
+    expect(version.notes['ru-RU']).toHaveLength(147);
+    expect(version.notes['en-EN']).toHaveLength(147);
+    expect(json('patchs/baseline.json').baseline).toBe('548');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
@@ -457,15 +457,16 @@ describe('532/534: строки, документы и версия', () => {
     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
+    expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **547**');
+    expect(roadmap).toContain('Текущая версия: **548**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');
     expect(roadmap).toContain('| 31 |');
     expect(roadmap).toContain('| 32 |');
     expect(roadmap).toContain('| 33 |');
-    expect(roadmap).toContain('Осталось после патча 547');
+    expect(roadmap).toContain('Осталось после патча 548');
     expect(read('docs/patch-540-install.md')).toContain('540');
     expect(read('docs/patch-541-install.md')).toContain('541');
     expect(read('docs/patch-542-install.md')).toContain('542');
@@ -474,6 +475,7 @@ describe('532/534: строки, документы и версия', () => {
     expect(read('docs/patch-545-install.md')).toContain('545');
     expect(read('docs/patch-546-install.md')).toContain('546');
     expect(read('docs/patch-547-install.md')).toContain('547');
+    expect(read('docs/patch-548-install.md')).toContain('548');
     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });

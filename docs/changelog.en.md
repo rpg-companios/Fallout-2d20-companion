@@ -1,6 +1,42 @@
 # Changelog
 ---
 
+## Move arrows in the admin screen work again (patch 548)
+
+Fixed the owner's bug: "the move arrows in the admin screen are inactive,
+possibly after issuing and picking a lock on a location". The cause was neither
+issuing nor hacking: the drag handle in the location tree was always dead.
+
+- **Claiming the gesture in the right phase.** The handle returned
+  `onStartShouldSetPanResponderCapture: () => true`, but wrote the row context
+  (`parentId`, `childId`, sibling list) only in `onStartShouldSetPanResponder`.
+  The RN responder system walks the capture phase top-down and decides as soon
+  as a handler returns `true` — the bubble phase is never reached. The context
+  stayed empty, `onPanResponderGrant` bailed out, and dragging never started.
+  A single `claimDrag` now sets the context at all four negotiation points:
+  capture (the real browser path) and bubble (the fallback).
+- **A tap no longer reorders.** Releasing without movement used to take the
+  press point and could land on a neighbouring row, silently changing the
+  order. A `moved` flag now requires real movement before the order changes.
+- **The lock note survives issuing.** The live-session write-back took the
+  node's `lockLabel` verbatim, while the node carries a technical marker
+  (`F2D20-LOC:`/`F2D20-LOCK:`/`F2D20-TERM:`) for legacy room servers.
+  "Rusty door" became `F2D20-LOC:{"v":1,...}` and ruined the GM card. The new
+  `readableSessionLockLabel` unwraps the marker chain (markers can nest) and
+  returns the human text; it is also applied when normalizing links, so already
+  corrupted notes are restored on read. The lock flag syncs as before.
+- **Grid card arrows were unaffected.** Their grant handler reads the container
+  itself rather than the tree row context and was correct — a test now pins
+  this so both arrow groups are covered together.
+- **Acceptance.** `__tests__/room/admin-reorder-arrows-548.test.js` (10) drives
+  the gesture in the real negotiation order: capture first, bubble only if
+  capture declines. The 545 test missed this because it called the bubble
+  handler by hand, which a real browser never does.
+  `__tests__/lootTrade/lock-label-writeback-548.test.js` (9) pushes a session
+  envelope through the real persistence listener.
+
+---
+
 ## A successful hack carries through (patch 547)
 
 Fixed the owner's bug: "I picked the lock, the hacking modal offered another

@@ -21,6 +21,7 @@ import {
 } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
 import { debugLog } from '../debug/falloutDebug';
 import { isGmLootTradeLicensed } from '../../domain/premium';
+import { readableSessionLockLabel } from '../../domain/lootTrade';
 
 const gmContainerSyncListeners = new Set();
 const promptedEmptySessionIds = new Set();
@@ -193,14 +194,22 @@ const handleRoomSessionEnvelope = async (envelope) => {
         const nodes = Array.isArray(session.nodes) ? session.nodes : [];
         const nodeById = new Map(nodes.map((n) => [n.containerId, n]));
 
-        // Синхронизируем флаги замков/подписей локации
+        // Синхронизируем флаги замков/подписей локации.
+        // Патч 548: подпись Мастера — человеческий текст. Узел сессии несёт в
+        // `lockLabel` технический маркер (иначе старый сервер комнат теряет тип
+        // точки и рёбра), поэтому маркер разворачиваем, а не пишем в БД как есть.
         const updatedLinks = (existing.links || []).map((lnk) => {
+          const storedLabel = readableSessionLockLabel(lnk.lockLabel);
           const liveNode = nodeById.get(lnk.containerId);
-          if (!liveNode) return lnk;
+          if (!liveNode) {
+            return storedLabel === (lnk.lockLabel || '') ? lnk : { ...lnk, lockLabel: storedLabel };
+          }
           return {
             ...lnk,
             locked: Boolean(liveNode.locked),
-            lockLabel: liveNode.lockLabel !== undefined ? String(liveNode.lockLabel || '') : lnk.lockLabel,
+            lockLabel: liveNode.lockLabel !== undefined
+              ? readableSessionLockLabel(liveNode.lockLabel)
+              : storedLabel,
           };
         });
         await db.saveGmContainer({

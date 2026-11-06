@@ -162,6 +162,10 @@ const HubTreeView = ({
     dragContextRef.current = null;
     setDragPreview(null);
     if (cancelled || !drag) return;
+    // Патч 548: порядок меняет только настоящее движение. Иначе простое
+    // нажатие на стрелку (точка нажатия ещё не сдвинулась) могло попасть
+    // в соседнюю строку и молча переставить позицию.
+    if (!drag.moved) return;
     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
     if (!targetId || targetId === drag.childId) return;
     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
@@ -181,6 +185,7 @@ const HubTreeView = ({
         ...context,
         bounds: measureSiblingRows(context.siblingIds),
         overId: null,
+        moved: false,
         point: { x: gesture.x0, y: gesture.y0 },
       };
       setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
@@ -189,6 +194,7 @@ const HubTreeView = ({
       const drag = activeDragRef.current;
       if (!drag) return;
       if (gesture.moveX === 0 && gesture.moveY === 0) return;
+      drag.moved = true;
       drag.point = { x: gesture.moveX, y: gesture.moveY };
       const overId = siblingAtPoint(drag, drag.point);
       if (overId !== drag.overId) {
@@ -200,19 +206,34 @@ const HubTreeView = ({
     onPanResponderTerminate: () => finishDrag(true),
   })).current;
 
-  const dragHandlersFor = (parentNode, container, siblingIds) => ({
-    ...panResponder.panHandlers,
-    onStartShouldSetPanResponder: () => {
+  /**
+   * Патч 548: контекст строки задаётся в CAPTURE-фазе, а не только в bubble.
+   *
+   * Баг владельца: «стрелки перемещения в админке не активны». Ручка отдавала
+   * `onStartShouldSetPanResponderCapture: () => true`, а контекст (`parentId`,
+   * `childId`, братья) писала только в `onStartShouldSetPanResponder`. Система
+   * ответственности RN (и react-native-web: `findWantsResponder`) опрашивает
+   * capture сверху вниз и ПРИНИМАЕТ решение сразу, как только обработчик вернул
+   * true — до bubble-фазы дело не доходит. Поэтому контекст оставался null,
+   * `onPanResponderGrant` выходил по проверке `if (!context) return`, и
+   * перетаскивание не начиналось никогда: стрелка выглядела мёртвой.
+   *
+   * Теперь одна функция `claimDrag` пишет контекст во всех четырёх точках
+   * опроса — и в capture (реальный путь), и в bubble (запасной).
+   */
+  const dragHandlersFor = (parentNode, container, siblingIds) => {
+    const claimDrag = () => {
       dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
       return true;
-    },
-    onMoveShouldSetPanResponder: () => {
-      if (!dragContextRef.current) {
-        dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
-      }
-      return true;
-    },
-  });
+    };
+    return {
+      ...panResponder.panHandlers,
+      onStartShouldSetPanResponderCapture: claimDrag,
+      onMoveShouldSetPanResponderCapture: claimDrag,
+      onStartShouldSetPanResponder: claimDrag,
+      onMoveShouldSetPanResponder: claimDrag,
+    };
+  };
 
   const setRowRef = (id) => (ref) => {
     if (ref) rowRefs.current[id] = ref;
