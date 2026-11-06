@@ -1,0 +1,1081 @@
+diff --git a/__tests__/lootTrade/lock-label-writeback-548.test.js b/__tests__/lootTrade/lock-label-writeback-548.test.js
+new file mode 100644
+index 0000000..3e640cb
+--- /dev/null
++++ b/__tests__/lootTrade/lock-label-writeback-548.test.js
+@@ -0,0 +1,207 @@
++// ПРИЁМОЧНЫЙ (патч 548): удалить при конверсии/приживании.
++// Патч 548, вторая половина: обратная запись живой сессии не должна затирать
++// человеческую подпись замка техническим маркером. До фикса выдача локации
++// превращала «Ржавая дверь» в `F2D20-LOC:{"v":1,...}` и портила карточку Мастера
++// навсегда. Маркер прячет исходный текст в поле `l` — его и возвращаем.
++import { describe, expect, it, beforeEach, vi } from 'vitest';
++
++const h = vi.hoisted(() => ({
++  cards: {},
++  listeners: new Set(),
++  state: { rooms: {} },
++}));
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++  Alert: { alert: vi.fn() },
++}));
++
++vi.mock('../../db', () => ({
++  getGmContainerById: vi.fn(async (id) => h.cards[id] || null),
++  getGmContainersList: vi.fn(async () => Object.values(h.cards)),
++  saveGmContainer: vi.fn(async (card) => { h.cards[card.id] = card; return card; }),
++  deleteGmContainer: vi.fn(async (id) => { delete h.cards[id]; }),
++  getFolderRooms: vi.fn(async () => []),
++}));
++
++vi.mock('../../src/room/roomStore', () => ({
++  default: { getState: () => h.state },
++  onRoomSessionState: (fn) => { h.listeners.add(fn); return () => h.listeners.delete(fn); },
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn(async () => {}),
++  deleteGmContainerFromCloudIfEnabled: vi.fn(async () => {}),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (key) => key,
++}));
++vi.mock('../../domain/premium', async (importOriginal) => ({
++  ...(await importOriginal()),
++  isGmLootTradeLicensed: () => true,
++}));
++
++import * as db from '../../db';
++import {
++  CONTAINER_KIND,
++  buildLocationSessionNodes,
++  encodeLockNodeMarker,
++  encodeTerminalNodeMarker,
++  normalizeContainerEntity,
++  normalizeHubLink,
++  readableSessionLockLabel,
++} from '../../domain/lootTrade.js';
++import { encodeLocationNodeMarker } from '../../domain/locationNodeMarker.js';
++import {
++  resetPromptedEmptySessionsForTests,
++  startGmSessionPersistence,
++} from '../../src/lootTrade/gmSessionPersistence.js';
++
++const cards = () => [
++  normalizeContainerEntity({
++    id: 'town', kind: CONTAINER_KIND.HUB, name: 'Город',
++    links: [
++      { containerId: 'cellar', locked: true, lockLabel: 'Ржавая дверь' },
++      { containerId: 'hatch', locked: false, lockLabel: '' },
++    ],
++  }),
++  normalizeContainerEntity({ id: 'cellar', kind: CONTAINER_KIND.LOOT, name: 'Подвал', items: [] }),
++  normalizeContainerEntity({ id: 'hatch', kind: CONTAINER_KIND.LOCK, name: 'Люк', difficulty: 2 }),
++];
++
++const seed = (all) => {
++  h.cards = {};
++  all.forEach((c) => { h.cards[c.id] = c; });
++};
++
++/** Прогоняет конверт сессии через настоящий слушатель и ждёт цепочку записи. */
++const emitSession = async (session) => {
++  const stop = startGmSessionPersistence();
++  try {
++    await Promise.all([...h.listeners].map((fn) => fn({ roomCode: 'ROOM1', payload: { session } })));
++  } finally {
++    stop();
++  }
++};
++
++beforeEach(() => {
++  h.listeners.clear();
++  h.state = { rooms: { ROOM1: { role: 'gm', joined: true, activeSession: null } } };
++  resetPromptedEmptySessionsForTests();
++  vi.clearAllMocks();
++});
++
++describe('548: разбор подписи замка', () => {
++  it('обычный текст возвращается без изменений', () => {
++    expect(readableSessionLockLabel('Ржавая дверь')).toBe('Ржавая дверь');
++    expect(readableSessionLockLabel('')).toBe('');
++    expect(readableSessionLockLabel(undefined)).toBe('');
++    expect(readableSessionLockLabel(null)).toBe('');
++  });
++
++  it('маркер локации, замка и терминала отдают исходный текст Мастера', () => {
++    expect(readableSessionLockLabel(encodeLocationNodeMarker({
++      kind: 'loot', parentIds: ['town'], lockLabel: 'Ржавая дверь',
++    }))).toBe('Ржавая дверь');
++    expect(readableSessionLockLabel(encodeLockNodeMarker({
++      difficulty: 3, label: 'Тугой замок',
++    }))).toBe('Тугой замок');
++    expect(readableSessionLockLabel(encodeTerminalNodeMarker({
++      difficulty: 2, label: 'Старый терминал',
++    }))).toBe('Старый терминал');
++  });
++
++  it('маркер без подписи даёт пустую строку, а не JSON', () => {
++    expect(readableSessionLockLabel(encodeLocationNodeMarker({ kind: 'lock', parentIds: ['town'] }))).toBe('');
++  });
++
++  it('битый маркер не роняет чтение и остаётся как есть', () => {
++    const broken = 'F2D20-LOC:{не json';
++    expect(readableSessionLockLabel(broken)).toBe(broken);
++  });
++
++  it('нормализация ссылки лечит маркер, уже осевший в БД', () => {
++    const polluted = encodeLocationNodeMarker({ kind: 'loot', parentIds: ['town'], lockLabel: 'Ржавая дверь' });
++    expect(normalizeHubLink({ containerId: 'cellar', locked: true, lockLabel: polluted }))
++      .toEqual({ containerId: 'cellar', locked: true, lockLabel: 'Ржавая дверь' });
++    // Карточка, сохранённая прошлой версией, читается уже с человеческой подписью.
++    const restored = normalizeContainerEntity({
++      id: 'town', kind: CONTAINER_KIND.HUB, name: 'Город',
++      links: [{ containerId: 'cellar', locked: true, lockLabel: polluted }],
++    });
++    expect(restored.links[0].lockLabel).toBe('Ржавая дверь');
++  });
++});
++
++describe('548: обратная запись сессии сохраняет подпись Мастера', () => {
++  it('выдача локации с маркером 544 не затирает подпись замка', async () => {
++    const all = cards();
++    seed(all);
++    const nodes = buildLocationSessionNodes(all[0], all);
++    // Живые узлы действительно несут маркер — это условие бага.
++    expect(String(nodes.find((n) => n.containerId === 'cellar').lockLabel)).toMatch(/^F2D20-/);
++
++    await emitSession({
++      sessionId: 's548', containerId: 'town', kind: 'hub', revision: 1, nodes,
++    });
++
++    const saved = h.cards.town;
++    expect(saved.links.find((l) => l.containerId === 'cellar').lockLabel).toBe('Ржавая дверь');
++    expect(saved.links.find((l) => l.containerId === 'hatch').lockLabel).toBe('');
++    // Флаг замка по-прежнему синхронизируется — поведение 546/547 не тронуто.
++    expect(saved.links.find((l) => l.containerId === 'cellar').locked).toBe(true);
++  });
++
++  it('взлом замка снимает флаг, но подпись остаётся человеческой', async () => {
++    const all = cards();
++    seed(all);
++    const nodes = buildLocationSessionNodes(all[0], all).map((n) => (
++      n.containerId === 'cellar' ? { ...n, locked: false } : n
++    ));
++    await emitSession({
++      sessionId: 's548b', containerId: 'town', kind: 'hub', revision: 1, nodes,
++    });
++    const link = h.cards.town.links.find((l) => l.containerId === 'cellar');
++    expect(link.locked).toBe(false);
++    expect(link.lockLabel).toBe('Ржавая дверь');
++  });
++
++  it('повторная выдача не накапливает маркеры (идемпотентность)', async () => {
++    const all = cards();
++    seed(all);
++    const nodes = buildLocationSessionNodes(all[0], all);
++    await emitSession({ sessionId: 's548c', containerId: 'town', kind: 'hub', revision: 1, nodes });
++    const afterFirst = h.cards.town.links.find((l) => l.containerId === 'cellar').lockLabel;
++    const again = buildLocationSessionNodes(normalizeContainerEntity(h.cards.town), Object.values(h.cards));
++    await emitSession({ sessionId: 's548d', containerId: 'town', kind: 'hub', revision: 1, nodes: again });
++    expect(h.cards.town.links.find((l) => l.containerId === 'cellar').lockLabel).toBe(afterFirst);
++    expect(afterFirst).toBe('Ржавая дверь');
++  });
++
++  it('узел без подписи в конверте не стирает сохранённую, а маркер в БД лечится', async () => {
++    const all = cards();
++    all[0] = normalizeContainerEntity({
++      ...all[0],
++      links: [
++        { containerId: 'cellar', locked: true, lockLabel: 'Ржавая дверь' },
++        {
++          containerId: 'hatch',
++          locked: false,
++          lockLabel: encodeLockNodeMarker({ difficulty: 2, label: 'Люк во двор' }),
++        },
++      ],
++    });
++    seed(all);
++    // Конверт несёт только один узел: вторая ссылка идёт мимо синхронизации.
++    await emitSession({
++      sessionId: 's548e', containerId: 'town', kind: 'hub', revision: 1,
++      nodes: [{ containerId: 'cellar', kind: 'loot', name: 'Подвал', locked: true, lockLabel: 'Ржавая дверь', items: [] }],
++    });
++    const links = h.cards.town.links;
++    expect(links.find((l) => l.containerId === 'cellar').lockLabel).toBe('Ржавая дверь');
++    expect(links.find((l) => l.containerId === 'hatch').lockLabel).toBe('Люк во двор');
++    expect(db.saveGmContainer).toHaveBeenCalled();
++  });
++});
+diff --git a/__tests__/room/admin-reorder-arrows-548.test.js b/__tests__/room/admin-reorder-arrows-548.test.js
+new file mode 100644
+index 0000000..6767776
+--- /dev/null
++++ b/__tests__/room/admin-reorder-arrows-548.test.js
+@@ -0,0 +1,270 @@
++// ПРИЁМОЧНЫЙ (патч 548): удалить при конверсии/приживании.
++// Патч 548: «стрелки перемещения в админке не активны».
++//
++// Настоящая причина — порядок опроса ответственности в React Native.
++// `findWantsResponder` (react-native-web: modules/useResponderEvents/
++// ResponderSystem.js) идёт по CAPTURE-фазе сверху вниз и принимает решение
++// СРАЗУ, как только обработчик вернул true; bubble-фаза после этого не
++// опрашивается. Ручка дерева отдавала `onStartShouldSetPanResponderCapture:
++// () => true`, а контекст строки (`parentId`, `childId`, братья) писала только
++// в `onStartShouldSetPanResponder`. Поэтому `dragContextRef.current` оставался
++// null, `onPanResponderGrant` выходил по `if (!context) return`, и стрелка не
++// перетаскивалась никогда.
++//
++// Тест 545 этого не увидел: он звал bubble-обработчик руками, чего живой
++// браузер не делает. Здесь опрос идёт как в RN: сначала capture, и bubble
++// вызывается ТОЛЬКО если capture отказался.
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const mockLayout = vi.hoisted(() => ({ bounds: {} }));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  const View = React.forwardRef(({ children, ...props }, ref) => {
++    React.useImperativeHandle(ref, () => ({
++      measureInWindow: (cb) => {
++        const b = mockLayout.bounds[props.testID] || { x: 0, y: 0, width: 200, height: 24 };
++        cb(b.x, b.y, b.width, b.height);
++      },
++    }));
++    return React.createElement('View', props, children);
++  });
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View,
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++    // Как настоящий PanResponder: конфиг превращается в набор обработчиков.
++    PanResponder: { create: (config) => ({ panHandlers: config }) },
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => 'ru-RU', useModuleLocale: () => 'ru-RU' };
++});
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (template, values) => `${template}:${JSON.stringify(values || {})}`,
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++
++import HubTreeView from '../../components/screens/LootTradeScreen/modals/HubTreeView.js';
++import { CONTAINER_KIND, normalizeContainerEntity } from '../../domain/lootTrade.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const findAll = (root, testID) => root.findAll((node) => node.props?.testID === testID);
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.HUB, name: id, ...extra,
++});
++const child = (id, kind, extra = {}) => normalizeContainerEntity({ id, kind, name: id, ...extra });
++
++// Город: торговец, сундук и вложенная мэрия; в мэрии стол и сейф.
++const cards = () => [
++  hub('town', {
++    childOrder: ['shop', 'chest', 'mayor'],
++    links: [{ containerId: 'chest' }, { containerId: 'shop' }],
++  }),
++  hub('mayor', {
++    parentLocationId: 'town',
++    childOrder: ['desk', 'safe'],
++    links: [{ containerId: 'safe' }, { containerId: 'desk' }],
++  }),
++  child('chest', CONTAINER_KIND.LOOT),
++  child('shop', CONTAINER_KIND.MERCHANT, { caps: 100 }),
++  child('desk', CONTAINER_KIND.LOOT),
++  child('safe', CONTAINER_KIND.LOOT),
++];
++
++const mountTree = (all, onReorderChildren) => {
++  let renderer;
++  act(() => {
++    renderer = create(React.createElement(HubTreeView, {
++      hub: all[0], containers: all, keyItems: [],
++      onOpenSettings: vi.fn(), onReorderChildren,
++    }));
++  });
++  return renderer;
++};
++
++const rowIds = (renderer) => renderer.root
++  .findAll((node) => node.type === 'View'
++    && typeof node.props?.testID === 'string'
++    && node.props.testID.startsWith('hub-tree-row-'))
++  .map((node) => node.props.testID.replace('hub-tree-row-', ''));
++
++const setRowBounds = (ids, startY = 0) => {
++  ids.forEach((id, index) => {
++    mockLayout.bounds[`hub-tree-row-${id}`] = { x: 0, y: startY + index * 30, width: 200, height: 24 };
++  });
++};
++
++/**
++ * Опрос ответственности как в RN/react-native-web: capture идёт первым и
++ * принимает решение сразу; bubble опрашивается только если capture отказался.
++ * Возвращает имя сработавшей фазы — чтобы тест видел, кто именно захватил жест.
++ */
++const negotiate = (handle, kind = 'start') => {
++  const capture = kind === 'start'
++    ? 'onStartShouldSetPanResponderCapture'
++    : 'onMoveShouldSetPanResponderCapture';
++  const bubble = kind === 'start'
++    ? 'onStartShouldSetPanResponder'
++    : 'onMoveShouldSetPanResponder';
++  if (handle.props[capture]?.() === true) return 'capture';
++  if (handle.props[bubble]?.() === true) return 'bubble';
++  return null;
++};
++
++const handleOf = (renderer, childId) => {
++  const [handle] = findAll(renderer.root, `hub-tree-reorder-${childId}`);
++  expect(handle, childId).toBeTruthy();
++  return handle;
++};
++
++/** Живой жест: negotiation (capture-first) → grant → move → release. */
++const dragLikeNative = (renderer, childId, targetId, kind = 'start') => {
++  const handle = handleOf(renderer, childId);
++  const target = mockLayout.bounds[`hub-tree-row-${targetId}`];
++  let phase = null;
++  act(() => {
++    phase = negotiate(handle, kind);
++    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
++    handle.props.onPanResponderRelease();
++  });
++  return phase;
++};
++
++describe('548: стрелка дерева работает при настоящем порядке опроса', () => {
++  it('capture принимает жест, и перенос всё равно меняет порядок', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    expect(rowIds(renderer)).toEqual(['shop', 'chest', 'mayor']);
++    setRowBounds(['shop', 'chest', 'mayor']);
++
++    // В живом браузере решение принимает именно capture-фаза.
++    expect(dragLikeNative(renderer, 'chest', 'shop')).toBe('capture');
++    expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
++  });
++
++  it('перенос вниз через capture-фазу тоже меняет порядок', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    setRowBounds(['shop', 'chest', 'mayor']);
++    dragLikeNative(renderer, 'shop', 'mayor');
++    expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'mayor', 'shop']);
++  });
++
++  it('захват по движению (move), а не по нажатию, тоже начинает перетаскивание', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    setRowBounds(['shop', 'chest', 'mayor']);
++    expect(dragLikeNative(renderer, 'chest', 'shop', 'move')).toBe('capture');
++    expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
++  });
++
++  it('bubble-путь остаётся рабочим, если платформа опросила только его', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    setRowBounds(['shop', 'chest', 'mayor']);
++    const handle = handleOf(renderer, 'chest');
++    act(() => {
++      expect(handle.props.onStartShouldSetPanResponder()).toBe(true);
++      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++      handle.props.onPanResponderMove({}, { moveX: 10, moveY: 5 });
++      handle.props.onPanResponderRelease();
++    });
++    expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
++  });
++
++  it('вложенная локация переставляет своих детей через capture-фазу', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    act(() => findAll(renderer.root, 'hub-tree-toggle-mayor')[0].props.onPress());
++    setRowBounds(['desk', 'safe'], 120);
++    expect(dragLikeNative(renderer, 'safe', 'desk')).toBe('capture');
++    expect(onReorderChildren).toHaveBeenCalledWith('mayor', ['safe', 'desk']);
++  });
++
++  it('каждая ручка захватывает свою строку: чужой порядок не наследуется', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    setRowBounds(['shop', 'chest', 'mayor']);
++    dragLikeNative(renderer, 'chest', 'shop');
++    dragLikeNative(renderer, 'mayor', 'shop');
++    expect(onReorderChildren).toHaveBeenNthCalledWith(1, 'town', ['chest', 'shop', 'mayor']);
++    expect(onReorderChildren).toHaveBeenNthCalledWith(2, 'town', ['mayor', 'shop', 'chest']);
++  });
++
++  it('без движения порядок не меняется — простое нажатие стрелки безвредно', () => {
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(cards(), onReorderChildren);
++    setRowBounds(['shop', 'chest', 'mayor']);
++    const handle = handleOf(renderer, 'chest');
++    act(() => {
++      negotiate(handle);
++      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++      handle.props.onPanResponderRelease();
++    });
++    expect(onReorderChildren).not.toHaveBeenCalled();
++  });
++
++  it('ручка не отдаёт жест ScrollView и блокирует нативный скролл', () => {
++    const renderer = mountTree(cards(), vi.fn());
++    const handle = handleOf(renderer, 'chest');
++    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
++    expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
++  });
++});
++
++describe('548: обе группы стрелок и защита от возврата бага', () => {
++  it('контекст строки задаётся в capture-фазе, а не только в bubble', () => {
++    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++    expect(tree).toContain('onStartShouldSetPanResponderCapture: claimDrag');
++    expect(tree).toContain('onMoveShouldSetPanResponderCapture: claimDrag');
++    expect(tree).toContain('onStartShouldSetPanResponder: claimDrag');
++    expect(tree).toContain('onMoveShouldSetPanResponder: claimDrag');
++    // Причина бага зафиксирована в коде, чтобы её не вернули «упрощением».
++    expect(tree).toContain('Патч 548');
++    expect(tree).toContain('capture');
++  });
++
++  it('стрелки карточек сетки не зависят от контекста и остаются рабочими', () => {
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    const start = screen.indexOf('const ContainerCardCell');
++    const end = screen.indexOf('export default function LootTradeScreen');
++    expect(start).toBeGreaterThan(0);
++    expect(end).toBeGreaterThan(start);
++    const cell = screen.slice(start, end);
++    // Grant карточки читает сам контейнер, а не ref-контекст строки дерева.
++    expect(cell).toContain('onStartShouldSetPanResponderCapture: () => true');
++    expect(cell).toContain('dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };');
++    expect(cell).toContain('dragCallbacks.current.onDragStart?.(');
++    expect(cell).not.toContain('dragContextRef');
++    // Ручка есть у всех карточек, включая хабы (канон 539).
++    expect(screen).toContain('{onDragStart && (');
++  });
++});
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 92a91dc..43d59c1 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('547');
++    expect(version.version).toBe('548');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(146);
+-    expect(version.notes['en-EN']).toHaveLength(146);
+-    expect(json('patchs/baseline.json').baseline).toBe('547');
++    expect(version.notes['ru-RU']).toHaveLength(147);
++    expect(version.notes['en-EN']).toHaveLength(147);
++    expect(json('patchs/baseline.json').baseline).toBe('548');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -273,15 +273,16 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
++    expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **547**');
++    expect(roadmap).toContain('Текущая версия: **548**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 547');
++    expect(roadmap).toContain('Осталось после патча 548');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -290,6 +291,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/patch-547-install.md')).toContain('547');
++    expect(read('docs/patch-548-install.md')).toContain('548');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 600f3d1..8c9c40e 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('547');
++    expect(version.version).toBe('548');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(146);
+-    expect(version.notes['en-EN']).toHaveLength(146);
+-    expect(json('patchs/baseline.json').baseline).toBe('547');
++    expect(version.notes['ru-RU']).toHaveLength(147);
++    expect(version.notes['en-EN']).toHaveLength(147);
++    expect(json('patchs/baseline.json').baseline).toBe('548');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -457,15 +457,16 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     expect(read('patchs/546-location-lock-barrier.patch')).toContain('location-lock-barrier');
+     expect(read('patchs/547-hack-success-signal.patch')).toContain('hack-success-signal');
++    expect(read('patchs/548-admin-reorder-arrows.patch')).toContain('admin-reorder-arrows');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **547**');
++    expect(roadmap).toContain('Текущая версия: **548**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 547');
++    expect(roadmap).toContain('Осталось после патча 548');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -474,6 +475,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/patch-546-install.md')).toContain('546');
+     expect(read('docs/patch-547-install.md')).toContain('547');
++    expect(read('docs/patch-548-install.md')).toContain('548');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index ae70287..a46858b 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -162,6 +162,10 @@ const HubTreeView = ({
+     dragContextRef.current = null;
+     setDragPreview(null);
+     if (cancelled || !drag) return;
++    // Патч 548: порядок меняет только настоящее движение. Иначе простое
++    // нажатие на стрелку (точка нажатия ещё не сдвинулась) могло попасть
++    // в соседнюю строку и молча переставить позицию.
++    if (!drag.moved) return;
+     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
+     if (!targetId || targetId === drag.childId) return;
+     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
+@@ -181,6 +185,7 @@ const HubTreeView = ({
+         ...context,
+         bounds: measureSiblingRows(context.siblingIds),
+         overId: null,
++        moved: false,
+         point: { x: gesture.x0, y: gesture.y0 },
+       };
+       setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
+@@ -189,6 +194,7 @@ const HubTreeView = ({
+       const drag = activeDragRef.current;
+       if (!drag) return;
+       if (gesture.moveX === 0 && gesture.moveY === 0) return;
++      drag.moved = true;
+       drag.point = { x: gesture.moveX, y: gesture.moveY };
+       const overId = siblingAtPoint(drag, drag.point);
+       if (overId !== drag.overId) {
+@@ -200,19 +206,34 @@ const HubTreeView = ({
+     onPanResponderTerminate: () => finishDrag(true),
+   })).current;
+ 
+-  const dragHandlersFor = (parentNode, container, siblingIds) => ({
+-    ...panResponder.panHandlers,
+-    onStartShouldSetPanResponder: () => {
++  /**
++   * Патч 548: контекст строки задаётся в CAPTURE-фазе, а не только в bubble.
++   *
++   * Баг владельца: «стрелки перемещения в админке не активны». Ручка отдавала
++   * `onStartShouldSetPanResponderCapture: () => true`, а контекст (`parentId`,
++   * `childId`, братья) писала только в `onStartShouldSetPanResponder`. Система
++   * ответственности RN (и react-native-web: `findWantsResponder`) опрашивает
++   * capture сверху вниз и ПРИНИМАЕТ решение сразу, как только обработчик вернул
++   * true — до bubble-фазы дело не доходит. Поэтому контекст оставался null,
++   * `onPanResponderGrant` выходил по проверке `if (!context) return`, и
++   * перетаскивание не начиналось никогда: стрелка выглядела мёртвой.
++   *
++   * Теперь одна функция `claimDrag` пишет контекст во всех четырёх точках
++   * опроса — и в capture (реальный путь), и в bubble (запасной).
++   */
++  const dragHandlersFor = (parentNode, container, siblingIds) => {
++    const claimDrag = () => {
+       dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
+       return true;
+-    },
+-    onMoveShouldSetPanResponder: () => {
+-      if (!dragContextRef.current) {
+-        dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
+-      }
+-      return true;
+-    },
+-  });
++    };
++    return {
++      ...panResponder.panHandlers,
++      onStartShouldSetPanResponderCapture: claimDrag,
++      onMoveShouldSetPanResponderCapture: claimDrag,
++      onStartShouldSetPanResponder: claimDrag,
++      onMoveShouldSetPanResponder: claimDrag,
++    };
++  };
+ 
+   const setRowRef = (id) => (ref) => {
+     if (ref) rowRefs.current[id] = ref;
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1c59b94..55d3821 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,36 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (548) — стрелки перемещения в админке снова активны
++
++Баг владельца: «стрелки перемещения в админке не активны, возможно после выдачи
++и взлома замка на локации». Предположение про выдачу/взлом не подтвердилось:
++ручка дерева была мертва ВСЕГДА, с 545. На том же пути нашёлся второй дефект —
++подпись замка затиралась маркером; владелец разрешил чинить оба в 548.
++
++- Причина №1 (жест): ручка отдавала `onStartShouldSetPanResponderCapture: () => true`,
++  а контекст строки писала только в `onStartShouldSetPanResponder`. RN опрашивает
++  capture сверху вниз и принимает решение СРАЗУ при `true` — bubble не зовётся.
++  Контекст оставался null, `onPanResponderGrant` выходил. Фикс: одна `claimDrag`
++  во всех четырёх точках опроса. Подтверждено по `react-native-web/dist/modules/
++  useResponderEvents/ResponderSystem.js` (`findWantsResponder`, цикл `// capture`)
++  и `vendor/react-native/PanResponder/index.js`.
++- Попутно: `finishDrag` без движения брал точку нажатия и мог переставить строку.
++  Добавлен флаг `moved` — порядок меняет только настоящее движение.
++- Причина №2 (подпись): `gmSessionPersistence` писал `lockLabel` узла сессии как
++  есть, а узел несёт маркер 544/520. «Ржавая дверь» → `F2D20-LOC:{"v":1,...}`.
++  Новый `readableSessionLockLabel` разворачивает ЦЕПОЧКУ маркеров (они вложенные:
++  `F2D20-LOC:` → `F2D20-LOCK:` → текст в `l`), применён в `normalizeHubLink`
++  (лечит уже испорченное при чтении) и в обратной записи. Флаг `locked` как раньше.
++- Стрелки карточек сетки были исправны: их grant читает `dragCallbacks.current.container`,
++  а не ref-контекст. Закреплено тестом, чтобы обе группы проверялись вместе.
++- УРОК: тест 545 мокал `PanResponder.create` и звал bubble-обработчик руками —
++  реальная negotiation не проверялась, поэтому мёртвая ручка прошла приёмку.
++  Тест 548 опрашивает фазы как RN: capture первым, bubble только если capture
++  отказался. Так проверять любой новый жест.
++- Приёмка: `__tests__/room/admin-reorder-arrows-548.test.js` (10),
++  `__tests__/lootTrade/lock-label-writeback-548.test.js` (9). Версия/отсечка 548,
++  тезис 38, `docs/patch-548-install.md`. Сервер комнат обновлять не нужно.
++
+ ## 2026-11-06 (547) — успех взлома передаётся дальше, победа оконечна
+ 
+ Баг владельца: «я взломал замок, модалка взлома предложила ещё попытку…
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 191b111..cd30261 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,42 @@
+ # Changelog
+ ---
+ 
++## Move arrows in the admin screen work again (patch 548)
++
++Fixed the owner's bug: "the move arrows in the admin screen are inactive,
++possibly after issuing and picking a lock on a location". The cause was neither
++issuing nor hacking: the drag handle in the location tree was always dead.
++
++- **Claiming the gesture in the right phase.** The handle returned
++  `onStartShouldSetPanResponderCapture: () => true`, but wrote the row context
++  (`parentId`, `childId`, sibling list) only in `onStartShouldSetPanResponder`.
++  The RN responder system walks the capture phase top-down and decides as soon
++  as a handler returns `true` — the bubble phase is never reached. The context
++  stayed empty, `onPanResponderGrant` bailed out, and dragging never started.
++  A single `claimDrag` now sets the context at all four negotiation points:
++  capture (the real browser path) and bubble (the fallback).
++- **A tap no longer reorders.** Releasing without movement used to take the
++  press point and could land on a neighbouring row, silently changing the
++  order. A `moved` flag now requires real movement before the order changes.
++- **The lock note survives issuing.** The live-session write-back took the
++  node's `lockLabel` verbatim, while the node carries a technical marker
++  (`F2D20-LOC:`/`F2D20-LOCK:`/`F2D20-TERM:`) for legacy room servers.
++  "Rusty door" became `F2D20-LOC:{"v":1,...}` and ruined the GM card. The new
++  `readableSessionLockLabel` unwraps the marker chain (markers can nest) and
++  returns the human text; it is also applied when normalizing links, so already
++  corrupted notes are restored on read. The lock flag syncs as before.
++- **Grid card arrows were unaffected.** Their grant handler reads the container
++  itself rather than the tree row context and was correct — a test now pins
++  this so both arrow groups are covered together.
++- **Acceptance.** `__tests__/room/admin-reorder-arrows-548.test.js` (10) drives
++  the gesture in the real negotiation order: capture first, bubble only if
++  capture declines. The 545 test missed this because it called the bubble
++  handler by hand, which a real browser never does.
++  `__tests__/lootTrade/lock-label-writeback-548.test.js` (9) pushes a session
++  envelope through the real persistence listener.
++
++---
++
+ ## A successful hack carries through (patch 547)
+ 
+ Fixed the owner's bug: "I picked the lock, the hacking modal offered another
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 32b15ee..c4faef8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,44 @@
+ 
+ ---
+ 
++## Стрелки перемещения в админке снова активны (патч 548)
++
++Исправлен баг владельца: «стрелки перемещения в админке не активны, возможно
++после выдачи и взлома замка на локации». Причина оказалась не в выдаче и не во
++взломе: ручка перетаскивания в дереве локации была мертва всегда.
++
++- **Захват жеста в правильной фазе.** Ручка отдавала
++  `onStartShouldSetPanResponderCapture: () => true`, а данные строки
++  (`parentId`, `childId`, список братьев) писала только в
++  `onStartShouldSetPanResponder`. Система ответственности RN опрашивает фазу
++  перехода сверху вниз и принимает решение сразу, как только обработчик вернул
++  `true` — до фазы всплытия дело не доходит. Контекст оставался пустым,
++  `onPanResponderGrant` выходил по проверке, и перетаскивание не начиналось.
++  Теперь одна функция `claimDrag` задаёт контекст во всех четырёх точках
++  опроса: и в перехвате (живой путь браузера), и во всплытии (запасной).
++- **Нажатие не переставляет.** Раньше отпускание без движения брало точку
++  нажатия и могло попасть в соседнюю строку, молча меняя порядок. Добавлен
++  признак `moved`: порядок меняет только настоящее движение.
++- **Подпись замка переживает выдачу.** Обратная запись живой сессии брала
++  `lockLabel` узла как есть, а узел несёт технический маркер
++  (`F2D20-LOC:`/`F2D20-LOCK:`/`F2D20-TERM:`) для старого сервера комнат.
++  «Ржавая дверь» превращалась в `F2D20-LOC:{"v":1,...}` и портила карточку
++  Мастера. Новый разбор `readableSessionLockLabel` разворачивает цепочку
++  маркеров (они бывают вложенными) и возвращает человеческий текст; он
++  применён и в нормализации ссылок, поэтому уже испорченные подписи
++  восстанавливаются при чтении. Флаг замка синхронизируется как раньше.
++- **Стрелки карточек сетки не пострадали.** Их обработчик нажатия читает сам
++  контейнер, а не контекст строки дерева, и работал верно — это закреплено
++  тестом, чтобы обе группы стрелок проверялись вместе.
++- **Приёмка.** `__tests__/room/admin-reorder-arrows-548.test.js` (10) гоняет
++  жест в настоящем порядке опроса: сначала перехват, всплытие только если
++  перехват отказался. Тест 545 этого не видел — он звал обработчик всплытия
++  руками, чего живой браузер не делает.
++  `__tests__/lootTrade/lock-label-writeback-548.test.js` (9) прогоняет конверт
++  сессии через настоящий слушатель записи.
++
++---
++
+ ## Успех взлома передаётся дальше (патч 547)
+ 
+ Исправлен баг владельца: «я взломал замок, модалка взлома предложила ещё
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index 928fd21..6d7646b 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -252,3 +252,28 @@ GRANTED и кнопку «Закрыть» вместо «Ещё подход».
+ спрашивается только когда `roomHasTerminalProtocol(room) === false`; при
+ наличии протокола источником истины остаётся сервер и общий `accessEvents`
+ (урок 506). Закон снимка 529 и адресность 523 не менялись.
++
++## 548. Захват жеста и живая подпись замка
++
++Слово владельца: «стрелки перемещения в админке не активны, возможно после
++выдачи и взлома замка на локации».
++
++**Порядок опроса жеста.** Ручка перестановки в дереве живёт в
++`HubTreeView.dragHandlersFor`. Система ответственности RN принимает решение в
++фазе перехода (`capture`) и до фазы всплытия не доходит, если обработчик вернул
++`true`. Поэтому контекст строки (`parentId`, `childId`, братья) обязан задаваться
++в capture: иначе `onPanResponderGrant` видит пустой контекст и перетаскивание не
++начинается. Одна функция `claimDrag` задаёт его во всех четырёх точках опроса —
++и в перехвате (живой путь), и во всплытии (запасной). Канон порядка 545 не
++изменился: источник истины — `childOrder` родителя и `locationGraph`.
++
++**Нажатие ≠ перенос.** Порядок меняет только движение (`drag.moved`). Отпускание
++без движения раньше брало точку нажатия и могло попасть в соседнюю строку.
++
++**Подпись замка — человеческий текст.** Технический маркер узла сессии
++(`F2D20-LOC:` для графа, `F2D20-LOCK:`/`F2D20-TERM:` для проверок) существует
++только чтобы старый сервер комнат не потерял тип точки и рёбра. В карточку
++Мастера он попадать не должен: `readableSessionLockLabel` разворачивает цепочку
++маркеров до текста (поле `l`), а `normalizeHubLink` применяет разбор при чтении,
++чтобы вылечить подписи, испорченные до 548. Обратная запись сессии пишет
++человеческую подпись; флаг `locked` синхронизируется по правилу 546/547.
+diff --git a/docs/patch-548-install.md b/docs/patch-548-install.md
+new file mode 100644
+index 0000000..2fe073f
+--- /dev/null
++++ b/docs/patch-548-install.md
+@@ -0,0 +1,88 @@
++# Установка патча 548: стрелки перемещения в админке
++
++Патч подготовлен от состояния **версии 547**. Файл установки:
++`patchs/548-admin-reorder-arrows.patch`.
++
++> Баг владельца: «стрелки перемещения в админке не активны, возможно после
++> выдачи и взлома замка на локации».
++
++Предположение о выдаче и взломе не подтвердилось: ручка перетаскивания в дереве
++локации была мертва **всегда**, с патча 545. Но на том же пути выдачи нашёлся
++второй, настоящий дефект — подпись замка Мастера затиралась техническим
++маркером. По слову владельца в 548 исправлены оба.
++
++## Причина №1: жест захватывался раньше, чем задавался контекст
++
++Ручка отдавала `onStartShouldSetPanResponderCapture: () => true`, а данные
++строки (`parentId`, `childId`, список братьев) писала только в
++`onStartShouldSetPanResponder`.
++
++Система ответственности RN опрашивает **фазу перехода** сверху вниз и принимает
++решение сразу, как только обработчик вернул `true`; фаза всплытия после этого не
++опрашивается вовсе. Подтверждено по коду:
++
++- `react-native-web/dist/modules/useResponderEvents/ResponderSystem.js`,
++  `findWantsResponder` — цикл `// capture` возвращает результат немедленно;
++- `react-native-web/dist/vendor/react-native/PanResponder/index.js` —
++  `onStartShouldSetResponderCapture` вызывает
++  `config.onStartShouldSetPanResponderCapture`.
++
++Итог: контекст оставался `null`, `onPanResponderGrant` выходил по проверке
++`if (!context) return`, перетаскивание не начиналось никогда.
++
++Тест 545 этого не увидел, потому что вызывал обработчик всплытия руками —
++живой браузер так не делает. Новый тест опрашивает фазы в настоящем порядке.
++
++## Причина №2: маркер вместо подписи замка
++
++Обратная запись живой сессии брала `lockLabel` узла как есть, а узел несёт
++технический маркер для старого сервера комнат. Проверено на живом коде:
++`«Ржавая дверь»` → `F2D20-LOC:{"v":1,"k":"loot","p":["town"],...}`.
++Маркеры бывают вложенными: у замка внутри локации это
++`F2D20-LOC:` → `F2D20-LOCK:` → текст в поле `l`.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | одна `claimDrag` задаёт контекст строки во всех четырёх точках опроса (перехват + всплытие); признак `moved` — порядок меняет только настоящее движение, нажатие безвредно |
++| `domain/lootTrade.js` | `readableSessionLockLabel` разворачивает цепочку маркеров (`F2D20-LOC:`/`F2D20-LOCK:`/`F2D20-TERM:`, до 4 шагов) и возвращает человеческий текст; применён в `normalizeHubLink`, поэтому уже испорченные подписи лечатся при чтении |
++| `src/lootTrade/gmSessionPersistence.js` | обратная запись пишет человеческую подпись, а не маркер; ссылка без живого узла сохраняет свою подпись и лечится, если в БД осел маркер |
++| `__tests__/room/admin-reorder-arrows-548.test.js` | приёмка (10): жест в настоящем порядке опроса, перенос вверх/вниз, захват по движению, запасной путь всплытия, вложенная локация, независимость строк, безвредное нажатие, отказ отдать жест ScrollView, обе группы стрелок |
++| `__tests__/lootTrade/lock-label-writeback-548.test.js` | приёмка (9): разбор трёх маркеров и вложенной цепочки, битый маркер, лечение записи в БД, выдача и взлом через настоящий слушатель, идемпотентность повторной выдачи |
++| `__tests__/room/gm-decision-535.test.js` | guard версии/отсечки/roadmap/доки переведён на 548 |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 548, тезис 38 |
++
++## Границы
++
++- Канон порядка 545 не тронут: источник истины — `childOrder` родителя и
++  `server/locationGraph.js`; несколько родителей держат независимый порядок.
++- Стрелки карточек сетки не менялись: их обработчик нажатия читает сам
++  контейнер, а не контекст строки дерева, и работал верно. Это закреплено тестом.
++- Флаг замка (`locked`) синхронизируется как раньше — правило преграды 546 и
++  оконечность победы 547 не тронуты.
++- Разбор подписи только читает: обычный текст возвращается без изменений,
++  битый маркер не роняет чтение и остаётся как есть.
++- Сервер комнат обновлять не нужно: обе правки клиентские.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 548
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 547, патч 548 их не трогает.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/548-admin-reorder-arrows.patch` вернёт дерево, словари
++и версию к состоянию 547.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 865af2b..9b0e8f5 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **547**.
++Дата ревизии: 2026-11-06. Текущая версия: **548**.
+ 
+ ## Тезисы
+ 
+@@ -49,10 +49,11 @@
+ | 35 | **Порядок позиций в хабе/локации:** в дереве Мастера строки одного родителя меняются местами перетаскиванием за ручку-стрелки; порядок хранится на родителе (`childOrder`) и один-в-один воспроизводится в окне игрока (список мест текущей локации). Несколько родителей держат независимый порядок; новые дети попадают в конец fallback-порядка, ключи не перетаскиваются | ✅ сделано | **545** |
+ | 36 | **Замок локации — преграда входа:** непройденная проверка (`accessExpression`/`linkedCheckIds`) держит границу видимости, лута и торговли даже без флага `locked`; единый предикат `accessBarrierPending` для сервера и окна игрока, gate-first вход, страховка старого сервера по маркеру 544 | ✅ сделано | **546** |
+ | 37 | **Успех взлома передаётся дальше:** победа оконечна — «ещё подход» после ACCESS GRANTED не предлагается и отказывает на сервере/в локальном резерве; замок и терминал показывают успех и «Закрыть», которое передаёт сигнал о взломе и открывает содержимое. Сигнал доходит и в локальном резерве через журнал пройденных проверок | ✅ сделано | **547** |
++| 38 | **Стрелки перемещения в админке снова активны:** ручка дерева захватывает жест и в фазе перехода, и в фазе всплытия, поэтому перетаскивание действительно начинается; простое нажатие на стрелку порядок не меняет. Подпись замка Мастера переживает выдачу локации: технический маркер разворачивается обратно в текст, уже испорченные подписи лечатся при чтении | ✅ сделано | **548** |
+ 
+-## Осталось после патча 547
++## Осталось после патча 548
+ 
+-Патч 547 замкнул цепочку взлома: успех не порождает новую попытку, а сигнал победы доходит до окна игрока и открывает содержимое (в том числе в локальном резерве). Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
++Патч 548 вернул работоспособность стрелок перемещения в админке: решение о захвате жеста принимается в фазе перехода, где контекст строки раньше не задавался, поэтому ручка была мертва всегда, а не только после выдачи; заодно подпись замка перестала затираться техническим маркером при обратной записи сессии. Патч 547 замкнул цепочку взлома: успех не порождает новую попытку, а сигнал победы доходит до окна игрока и открывает содержимое (в том числе в локальном резерве). Патч 546 вернул замку локации силу преграды: непройденная проверка закрывает вход, содержимое, лут и торговлю и на сервере, и в окне игрока, в том числе через старый WS. Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 7442729..73f90f1 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -9,7 +9,7 @@
+ 
+ import itemStacking from './itemStacking.js';
+ import locationGraph from './locationGraph.js';
+-import { withLocationNodeMarker } from './locationNodeMarker.js';
++import { withLocationNodeMarker, decodeLocationNodeMarker } from './locationNodeMarker.js';
+ import {
+   normalizeAccessExpression,
+   expressionCheckIds,
+@@ -192,6 +192,35 @@ export const withLockNodeMarker = (node) => ({
+   }),
+ });
+ 
++/**
++ * Патч 548: человеческая подпись замка из подписи узла сессии.
++ *
++ * Узел выдачи прячет в `lockLabel` технический маркер (`F2D20-LOC:`,
++ * `F2D20-LOCK:`, `F2D20-TERM:`) — иначе старый сервер комнат теряет тип точки
++ * и рёбра графа. Внутри маркера исходный текст Мастера лежит в поле `l`.
++ * Обратная запись сессии брала `lockLabel` как есть и затирала подпись Мастера
++ * технической строкой: «Ржавая дверь» превращалась в `F2D20-LOC:{"v":1,...}`.
++ *
++ * Здесь маркер разворачивается, а обычный текст возвращается без изменений.
++ * Маркеры бывают вложенными: узел замка внутри локации несёт `F2D20-LOC:`,
++ * внутри которого лежит `F2D20-LOCK:` с текстом в поле `l`. Поэтому цепочка
++ * разворачивается до первого человеческого текста; ограничение в 4 шага
++ * защищает от испорченной самоссылки.
++ */
++export const readableSessionLockLabel = (value) => {
++  let raw = String(value ?? '');
++  for (let step = 0; step < 4; step += 1) {
++    if (!raw) return '';
++    const location = decodeLocationNodeMarker(raw);
++    const lock = location ? null : decodeLockNodeMarker(raw);
++    const terminal = location || lock ? null : decodeTerminalNodeMarker(raw);
++    const inner = location ? location.lockLabel : (lock ? lock.label : (terminal ? terminal.label : null));
++    if (inner === null) return raw;
++    raw = String(inner ?? '');
++  }
++  return raw;
++};
++
+ /** Восстановление узла: терминал, замок или обычная точка. */
+ export const resolveCheckSessionNode = (node) => {
+   const terminal = resolveTerminalSessionNode(node);
+@@ -454,7 +483,9 @@ export const normalizeHubLink = (raw) => {
+   return {
+     containerId,
+     locked: Boolean(raw.locked),
+-    lockLabel: String(raw.lockLabel || '').trim(),
++    // Патч 548: в БД мог осесть маркер с прошлой выдачи — разворачиваем его
++    // обратно в текст Мастера уже при чтении, чтобы поле не показывало JSON.
++    lockLabel: readableSessionLockLabel(raw.lockLabel).trim(),
+   };
+ };
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 100dbda..138d782 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "547"
++  "baseline": "548"
+ }
+diff --git a/public/version.json b/public/version.json
+index ed4be37..732234a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "547",
++  "version": "548",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Стрелки перемещения в админке снова работают: перетаскивание позиций в дереве локации начиналось только в «пузырьковой» фазе опроса жеста, а решение принималось раньше — в фазе перехвата, поэтому строка не двигалась никогда. Теперь захват строки происходит в обеих фазах, порядок меняется перетаскиванием, а простое нажатие на стрелку порядок не меняет. Попутно исправлено: после выдачи локации подпись замка Мастера больше не превращается в техническую строку — человеческий текст сохраняется, а уже испорченные подписи восстанавливаются при чтении.",
+       "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
+       "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
+       "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
+@@ -151,6 +152,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
+       "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
+       "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
+       "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index 90726a5..acfe5c1 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -21,6 +21,7 @@ import {
+ } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
+ import { debugLog } from '../debug/falloutDebug';
+ import { isGmLootTradeLicensed } from '../../domain/premium';
++import { readableSessionLockLabel } from '../../domain/lootTrade';
+ 
+ const gmContainerSyncListeners = new Set();
+ const promptedEmptySessionIds = new Set();
+@@ -193,14 +194,22 @@ const handleRoomSessionEnvelope = async (envelope) => {
+         const nodes = Array.isArray(session.nodes) ? session.nodes : [];
+         const nodeById = new Map(nodes.map((n) => [n.containerId, n]));
+ 
+-        // Синхронизируем флаги замков/подписей локации
++        // Синхронизируем флаги замков/подписей локации.
++        // Патч 548: подпись Мастера — человеческий текст. Узел сессии несёт в
++        // `lockLabel` технический маркер (иначе старый сервер комнат теряет тип
++        // точки и рёбра), поэтому маркер разворачиваем, а не пишем в БД как есть.
+         const updatedLinks = (existing.links || []).map((lnk) => {
++          const storedLabel = readableSessionLockLabel(lnk.lockLabel);
+           const liveNode = nodeById.get(lnk.containerId);
+-          if (!liveNode) return lnk;
++          if (!liveNode) {
++            return storedLabel === (lnk.lockLabel || '') ? lnk : { ...lnk, lockLabel: storedLabel };
++          }
+           return {
+             ...lnk,
+             locked: Boolean(liveNode.locked),
+-            lockLabel: liveNode.lockLabel !== undefined ? String(liveNode.lockLabel || '') : lnk.lockLabel,
++            lockLabel: liveNode.lockLabel !== undefined
++              ? readableSessionLockLabel(liveNode.lockLabel)
++              : storedLabel,
+           };
+         });
+         await db.saveGmContainer({

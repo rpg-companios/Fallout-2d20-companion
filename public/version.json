@@ -1,8 +1,9 @@
 {
-  "version": "547",
+  "version": "549",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Стрелки перемещения в админке снова работают: перетаскивание позиций в дереве локации начиналось только в «пузырьковой» фазе опроса жеста, а решение принималось раньше — в фазе перехвата, поэтому строка не двигалась никогда. Теперь захват строки происходит в обеих фазах, порядок меняется перетаскиванием, а простое нажатие на стрелку порядок не меняет. Попутно исправлено: после выдачи локации подпись замка Мастера больше не превращается в техническую строку — человеческий текст сохраняется, а уже испорченные подписи восстанавливаются при чтении.",
       "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
       "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
       "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
@@ -148,9 +149,11 @@
       "Ответ «Да» мгновенно собирает новую доску по текущим настройкам терминала: новые слова, подсказки и скобки, снова четыре попытки, а характеристики выбравшего персонажа сохраняются.",
       "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
-      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
+      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
     ],
     "en-EN": [
+      "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
       "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
       "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
       "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
@@ -296,7 +299,8 @@
       "Answering «Yes» instantly builds a fresh board from the current terminal settings: new words, hints and brackets, four attempts again, and the chosen character stats are preserved.",
       "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
-      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away."
+      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
+      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
     ]
   }
 }

@@ -11,12 +11,12 @@ import {
   Modal,
   Linking,
   TextInput,
-  PanResponder,
   Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import useCharacterStore from '../../../src/store/characterStore';
+import useDragResponder from '../../../src/ui/useDragResponder';
 // Шаг 8б (патч 242): сохранения — обычный модуль без React.
 import * as savesModule from '../../../src/saves/characterSaves';
 import { findEnrichedOrigin } from '../../../domain/origins';
@@ -194,49 +194,19 @@ const CharacterCell = ({
     action();
   };
 
-  // PanResponder keeps ownership of the pointer after it leaves the small handle,
-  // which Touchable's touch callbacks do not guarantee on web and native.
-  const callbacks = useRef({});
-  callbacks.current = { character, onDragStart, onDragMove, onDragEnd };
-  // Track the last known pointer position: on release/terminate the gesture can
-  // report moveX/moveY as 0 when no move was registered in that cycle.
-  const lastPoint = useRef({ pageX: 0, pageY: 0 });
-  const dragging = useRef(false);
-  const panResponder = useRef(PanResponder.create({
-    // Capture variants keep the parent TouchableOpacity/ScrollView from taking
-    // the touch before the handle gets it.
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    // Never hand the gesture over to the enclosing ScrollView: otherwise the
-    // first vertical movement terminates the drag and the handle immediately
-    // re-grabs the finger, which makes the card jitter.
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-    onPanResponderGrant: (_event, gesture) => {
-      dragging.current = true;
-      lastPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
-      callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character);
-    },
-    onPanResponderMove: (_event, gesture) => {
-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
-      lastPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
-      callbacks.current.onDragMove(lastPoint.current);
-    },
-    onPanResponderRelease: () => {
-      callbacks.current.onDragEnd(lastPoint.current);
-      // Let the synthetic press that follows the release be swallowed.
-      setTimeout(() => { dragging.current = false; }, 0);
-    },
-    onPanResponderTerminate: () => {
-      callbacks.current.onDragEnd(lastPoint.current);
-      setTimeout(() => { dragging.current = false; }, 0);
-    },
-  })).current;
+  // Патч 549: единый механизм перетаскивания на всё приложение. Здесь он и
+  // родился — этот шаблон был рабочим, а копия в дереве локаций сломалась
+  // (патч 548). Теперь механизм один: `src/ui/useDragResponder.js`.
+  const { panHandlers, draggingRef } = useDragResponder({
+    payload: character,
+    onStart: onDragStart,
+    onMove: onDragMove,
+    onEnd: onDragEnd,
+    enabled: Boolean(onDragStart),
+  });
 
   return (
-    <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
+    <TouchableOpacity style={styles.characterCell} onPress={() => { if (!draggingRef.current) onPress(); }} activeOpacity={0.8}>
       {serverBound && (
         readOnlyRoomCard ? (
           <View
@@ -268,7 +238,7 @@ const CharacterCell = ({
         )
       )}
       {!readOnlyRoomCard && (
-        <View {...panResponder.panHandlers} style={styles.dragHandle}>
+        <View {...panHandlers} style={styles.dragHandle}>
           <MaterialCommunityIcons name="arrow-all" size={18} color="#111827" />
         </View>
       )}
@@ -1013,7 +983,17 @@ export default function HomeScreen({ navigation }) {
     await measureDropTargets();
   };
   const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
-  const handleDragEnd = async (event) => {
+  const handleDragEnd = async (event, _payload, meta) => {
+    // Патч 549: перенос засчитывается только при настоящем движении. Простое
+    // нажатие на стрелку не должно бросать персонажа в папку, под которой
+    // оказалась точка нажатия. Признак движения даёт общий хук — то же
+    // правило, что у карточек Мастера и строк дерева локаций.
+    if (meta?.moved === false) {
+      setMovingCharacterId(null);
+      setDrag(null);
+      dropBounds.current = {};
+      return;
+    }
     // A final measurement covers the case where the pointer is released
     // immediately after the conditionally rendered root zone appears.
     await measureDropTargets();

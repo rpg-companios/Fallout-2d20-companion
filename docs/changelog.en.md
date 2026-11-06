@@ -1,6 +1,94 @@
 # Changelog
 ---
 
+## One drag mechanism and GM/player parity (patch 549)
+
+Work requested by the owner: "The Game Master section must match the player's
+mechanisms as closely as possible. The commands the Master sends to a player are
+commands the player could perform themselves, or receive as a result of their own
+actions." The owner set the order explicitly: a green test suite first, then one
+shared gesture mechanism, then behavioural checks of the Master section.
+
+- **Tapping an arrow no longer moves anything.** A real bug was found: pressing a
+  card's arrow and releasing without moving dropped the card into whatever
+  location sat under the touch point. The character screen had the same defect —
+  a plain tap could drop a character into a folder. Only real movement now counts
+  as a drop; a tap is harmless. This is the same defect patch 548 found in the
+  location tree, but in two other places the old acceptance checks could not see.
+- **Dragging lives in one place.** The mechanism had been copied into four
+  screens: character cards, key item cards, the Master's grid and the location
+  tree. Three copies followed the working pattern; the fourth invented its own and
+  broke (bug 548). All four now take the gesture from the shared
+  `src/ui/useDragResponder.js`, so one rule applies everywhere and a fix reaches
+  every screen at once.
+- **The Master section is checked by behaviour, not by source text.** Acceptance
+  used to look for particular lines in the screen file — a dead handle passed that
+  check. The Master screen is now genuinely mounted in tests: a card is moved into
+  a location and the result is verified in the database, and location tree rows are
+  reordered with the same gesture negotiation a browser performs. That is exactly
+  how the tap bug was caught.
+- **The test suite is fully green again.** Eight terminal balance failures had
+  been carried as "known" since patch 542. Investigation showed the program was
+  right and the test was stale: it demanded rules the owner had since cancelled
+  (five attempts on high difficulty, brackets driven by Luck, the old board size).
+  The owner reconfirmed the canon: **four attempts at every difficulty**. The test
+  now follows the live rules, so a red baseline no longer hides real regressions.
+- **The GM/player parity law is written down.** A Master command must be an action
+  the player can perform themselves and must run through the same mechanism.
+  Verified against real character state: spending a bobby pin by hand and by Master
+  command yields an identical sheet, magazine use matches, and shortage or a
+  repeated command behave the same way. The Master has no separate "admin"
+  mechanics — a prerequisite for networked play and for engine work.
+- **Acceptance.** `drag-responder-549` (12) — shared gesture contract;
+  `gm-screen-behaviour-549` (7) — mounted Master screen and database results;
+  `gm-player-parity-549` (7) — identical player and command outcomes;
+  `single-drag-mechanism-549` (6) — no new copies of the mechanism.
+  Total: 281 files, 2587 checks, all green.
+
+**Open question for the owner.** When bobby pins are short, the remainder is spent
+instead of refusing outright: with one pin and a request for three, one is spent.
+Both paths — player and Master — behave identically, so the parity law holds and
+patch 549 left the rule unchanged. Your decision is needed: keep "broke what was
+there", or require a clean refusal with no spending.
+
+---
+
+## Move arrows in the admin screen work again (patch 548)
+
+Fixed the owner's bug: "the move arrows in the admin screen are inactive,
+possibly after issuing and picking a lock on a location". The cause was neither
+issuing nor hacking: the drag handle in the location tree was always dead.
+
+- **Claiming the gesture in the right phase.** The handle returned
+  `onStartShouldSetPanResponderCapture: () => true`, but wrote the row context
+  (`parentId`, `childId`, sibling list) only in `onStartShouldSetPanResponder`.
+  The RN responder system walks the capture phase top-down and decides as soon
+  as a handler returns `true` — the bubble phase is never reached. The context
+  stayed empty, `onPanResponderGrant` bailed out, and dragging never started.
+  A single `claimDrag` now sets the context at all four negotiation points:
+  capture (the real browser path) and bubble (the fallback).
+- **A tap no longer reorders.** Releasing without movement used to take the
+  press point and could land on a neighbouring row, silently changing the
+  order. A `moved` flag now requires real movement before the order changes.
+- **The lock note survives issuing.** The live-session write-back took the
+  node's `lockLabel` verbatim, while the node carries a technical marker
+  (`F2D20-LOC:`/`F2D20-LOCK:`/`F2D20-TERM:`) for legacy room servers.
+  "Rusty door" became `F2D20-LOC:{"v":1,...}` and ruined the GM card. The new
+  `readableSessionLockLabel` unwraps the marker chain (markers can nest) and
+  returns the human text; it is also applied when normalizing links, so already
+  corrupted notes are restored on read. The lock flag syncs as before.
+- **Grid card arrows were unaffected.** Their grant handler reads the container
+  itself rather than the tree row context and was correct — a test now pins
+  this so both arrow groups are covered together.
+- **Acceptance.** `__tests__/room/admin-reorder-arrows-548.test.js` (10) drives
+  the gesture in the real negotiation order: capture first, bubble only if
+  capture declines. The 545 test missed this because it called the bubble
+  handler by hand, which a real browser never does.
+  `__tests__/lootTrade/lock-label-writeback-548.test.js` (9) pushes a session
+  envelope through the real persistence listener.
+
+---
+
 ## A successful hack carries through (patch 547)
 
 Fixed the owner's bug: "I picked the lock, the hacking modal offered another

@@ -9,7 +9,7 @@
 
 import itemStacking from './itemStacking.js';
 import locationGraph from './locationGraph.js';
-import { withLocationNodeMarker } from './locationNodeMarker.js';
+import { withLocationNodeMarker, decodeLocationNodeMarker } from './locationNodeMarker.js';
 import {
   normalizeAccessExpression,
   expressionCheckIds,
@@ -191,6 +191,35 @@ export const withLockNodeMarker = (node) => ({
     label: node?.lockLabel,
   }),
 });
+
+/**
+ * Патч 548: человеческая подпись замка из подписи узла сессии.
+ *
+ * Узел выдачи прячет в `lockLabel` технический маркер (`F2D20-LOC:`,
+ * `F2D20-LOCK:`, `F2D20-TERM:`) — иначе старый сервер комнат теряет тип точки
+ * и рёбра графа. Внутри маркера исходный текст Мастера лежит в поле `l`.
+ * Обратная запись сессии брала `lockLabel` как есть и затирала подпись Мастера
+ * технической строкой: «Ржавая дверь» превращалась в `F2D20-LOC:{"v":1,...}`.
+ *
+ * Здесь маркер разворачивается, а обычный текст возвращается без изменений.
+ * Маркеры бывают вложенными: узел замка внутри локации несёт `F2D20-LOC:`,
+ * внутри которого лежит `F2D20-LOCK:` с текстом в поле `l`. Поэтому цепочка
+ * разворачивается до первого человеческого текста; ограничение в 4 шага
+ * защищает от испорченной самоссылки.
+ */
+export const readableSessionLockLabel = (value) => {
+  let raw = String(value ?? '');
+  for (let step = 0; step < 4; step += 1) {
+    if (!raw) return '';
+    const location = decodeLocationNodeMarker(raw);
+    const lock = location ? null : decodeLockNodeMarker(raw);
+    const terminal = location || lock ? null : decodeTerminalNodeMarker(raw);
+    const inner = location ? location.lockLabel : (lock ? lock.label : (terminal ? terminal.label : null));
+    if (inner === null) return raw;
+    raw = String(inner ?? '');
+  }
+  return raw;
+};
 
 /** Восстановление узла: терминал, замок или обычная точка. */
 export const resolveCheckSessionNode = (node) => {
@@ -454,7 +483,9 @@ export const normalizeHubLink = (raw) => {
   return {
     containerId,
     locked: Boolean(raw.locked),
-    lockLabel: String(raw.lockLabel || '').trim(),
+    // Патч 548: в БД мог осесть маркер с прошлой выдачи — разворачиваем его
+    // обратно в текст Мастера уже при чтении, чтобы поле не показывало JSON.
+    lockLabel: readableSessionLockLabel(raw.lockLabel).trim(),
   };
 };
 

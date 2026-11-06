@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { useLocale } from '../../../../i18n/locale';
@@ -9,6 +9,7 @@ import {
   getHubIdsContainingChild,
 } from '../../../../domain/lootTrade';
 import locationGraph from '../../../../domain/locationGraph';
+import useDragResponder from '../../../../src/ui/useDragResponder';
 import {
   resolveAccessExpression,
   formatAccessExpression,
@@ -56,10 +57,10 @@ const HubTreeView = ({
   const [expanded, setExpanded] = useState(() => new Set());
   // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
   const [passagePrompt, setPassagePrompt] = useState(null);
-  // Патч 545: перетаскивание строк одного родителя. Контекст задаётся ручкой
-  // строки, PanResponder только измеряет/подсвечивает и отдаёт новый порядок.
+  // Патч 545: перетаскивание строк одного родителя. Контекст строки заявляет
+  // ручка, общий хук (549) ведёт жест, компонент измеряет/подсвечивает и
+  // отдаёт новый порядок.
   const rowRefs = useRef({});
-  const dragContextRef = useRef(null);
   const activeDragRef = useRef(null);
   const reorderRef = useRef(onReorderChildren);
   reorderRef.current = onReorderChildren;
@@ -156,12 +157,16 @@ const HubTreeView = ({
     return null;
   };
 
-  const finishDrag = (cancelled) => {
+  const finishDrag = ({ cancelled, moved } = {}) => {
     const drag = activeDragRef.current;
     activeDragRef.current = null;
-    dragContextRef.current = null;
     setDragPreview(null);
     if (cancelled || !drag) return;
+    // Патч 548: порядок меняет только настоящее движение. Иначе простое
+    // нажатие на стрелку (точка нажатия ещё не сдвинулась) могло попасть
+    // в соседнюю строку и молча переставить позицию. Признак движения даёт
+    // общий хук (патч 549) — правило одно для всех экранов.
+    if (!moved) return;
     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
     if (!targetId || targetId === drag.childId) return;
     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
@@ -169,49 +174,42 @@ const HubTreeView = ({
     reorderRef.current?.(drag.parentId, nextOrder);
   };
 
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-    onPanResponderGrant: (_evt, gesture) => {
-      const context = dragContextRef.current;
+  /**
+   * Патч 549: жест берётся из общего хука, как у карточек персонажей, ключей
+   * и сетки Мастера. Своя копия жеста здесь и сломалась в 548: контекст строки
+   * задавался в bubble-фазе, а решение RN принимает в capture — ручка была
+   * мертва всегда. Хук заявляет нагрузку строки в обеих фазах, поэтому этот
+   * класс бага закрыт для всех экранов сразу.
+   */
+  const { handlersFor } = useDragResponder({
+    enabled: typeof onReorderChildren === 'function',
+    onStart: (point, context) => {
       if (!context) return;
       activeDragRef.current = {
         ...context,
         bounds: measureSiblingRows(context.siblingIds),
         overId: null,
-        point: { x: gesture.x0, y: gesture.y0 },
+        point: { x: point.pageX, y: point.pageY },
       };
       setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
     },
-    onPanResponderMove: (_evt, gesture) => {
+    onMove: (point) => {
       const drag = activeDragRef.current;
       if (!drag) return;
-      if (gesture.moveX === 0 && gesture.moveY === 0) return;
-      drag.point = { x: gesture.moveX, y: gesture.moveY };
+      drag.point = { x: point.pageX, y: point.pageY };
       const overId = siblingAtPoint(drag, drag.point);
       if (overId !== drag.overId) {
         drag.overId = overId;
         setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
       }
     },
-    onPanResponderRelease: () => finishDrag(false),
-    onPanResponderTerminate: () => finishDrag(true),
-  })).current;
+    onEnd: (_point, _context, meta) => finishDrag(meta),
+  });
 
-  const dragHandlersFor = (parentNode, container, siblingIds) => ({
-    ...panResponder.panHandlers,
-    onStartShouldSetPanResponder: () => {
-      dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
-      return true;
-    },
-    onMoveShouldSetPanResponder: () => {
-      if (!dragContextRef.current) {
-        dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
-      }
-      return true;
-    },
+  const dragHandlersFor = (parentNode, container, siblingIds) => handlersFor({
+    parentId: parentNode.id,
+    childId: container.id,
+    siblingIds,
   });
 
   const setRowRef = (id) => (ref) => {
