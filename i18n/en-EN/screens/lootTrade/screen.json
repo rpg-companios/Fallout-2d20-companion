@@ -184,7 +184,11 @@
     "hubGatesEmpty": "No links between points yet",
     "hubGatePassed": "passed",
     "hubGatePending": "pending",
-    "hubGateOr": "or"
+    "hubGateOr": "or",
+    "passageBlock": "Block",
+    "passageOpen": "Unblock",
+    "passageReasonTitle": "Block reason (optional)",
+    "passageReasonPlaceholder": "e.g. rubble"
   },
   "catalog": {
     "titleLoot": "Add to Container",
@@ -320,7 +324,8 @@
     "hackLocationHint": "Hacking unlocks entry to this location",
     "hackContainerHint": "Hacking unlocks the contents",
     "gateAnd": "and",
-    "exitToLocation": "Exit → {name}"
+    "exitToLocation": "Exit → {name}",
+    "passageBlocked": "Passage blocked"
   },
   "keyItems": {
     "title": "Keys and notes",

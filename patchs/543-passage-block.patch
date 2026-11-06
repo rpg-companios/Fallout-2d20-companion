@@ -1,0 +1,1252 @@
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 2db59d7..fb04912 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('542');
++    expect(version.version).toBe('543');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(141);
+-    expect(version.notes['en-EN']).toHaveLength(141);
+-    expect(json('patchs/baseline.json').baseline).toBe('542');
++    expect(version.notes['ru-RU']).toHaveLength(142);
++    expect(version.notes['en-EN']).toHaveLength(142);
++    expect(json('patchs/baseline.json').baseline).toBe('543');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -268,18 +268,20 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
+     expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
++    expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **542**');
++    expect(roadmap).toContain('Текущая версия: **543**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 542');
++    expect(roadmap).toContain('Осталось после патча 543');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
++    expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 874dd0f..12f9a2c 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('542');
++    expect(version.version).toBe('543');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(141);
+-    expect(version.notes['en-EN']).toHaveLength(141);
+-    expect(json('patchs/baseline.json').baseline).toBe('542');
++    expect(version.notes['ru-RU']).toHaveLength(142);
++    expect(version.notes['en-EN']).toHaveLength(142);
++    expect(json('patchs/baseline.json').baseline).toBe('543');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -452,18 +452,20 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/540-nested-location-params.patch')).toContain('renderHubMeta');
+     expect(read('patchs/541-hub-tree-parameters.patch')).toContain('hub-tree-parameters');
+     expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
++    expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **542**');
++    expect(roadmap).toContain('Текущая версия: **543**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 542');
++    expect(roadmap).toContain('Осталось после патча 543');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
++    expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/passage-block-543.test.js b/__tests__/room/passage-block-543.test.js
+new file mode 100644
+index 0000000..c0e5404
+--- /dev/null
++++ b/__tests__/room/passage-block-543.test.js
+@@ -0,0 +1,441 @@
++// Патч 543: перекрытие проходов (тезис 28) — по слову владельца.
++// 1) Данные: пара полей passageBlocked/passageReason на самой локации,
++//    без новых сущностей и списков рёбер.
++// 2) Эффект: в цепи А–Б–В блок Б = нельзя войти в Б ни из А, ни из В;
++//    транзит через Б обрывается, но обходные пути (другой родитель/выход)
++//    не пересчитываются и работают. Прямая выдача Мастера — не вход, корень
++//    выдачи блок не ломает.
++// 3) UI Мастера: в строке названия локации, перед «Параметрами», кнопка
++//    «Блокировать» → диалог причины (пусто = «Проход заблокирован»);
++//    при блоке кнопка становится «Открыть» (снимает блок, чистит причину).
++// 4) UI игрока: экран-дверь (имя, причина, «Назад», без взлома — глухая
++//    преграда сильнее замка) и плашка с причиной в списке.
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) =>
++    React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible, autoStart }) => React.createElement('LockPickingModal', {
++    containerId: lock?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId, visible, autoStart,
++  }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible, onHack, onView }) => React.createElement('StandaloneCheckModal', {
++    visible, onHack, onView,
++  }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import HubTreeView from '../../components/screens/LootTradeScreen/modals/HubTreeView';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import {
++  CONTAINER_KIND,
++  normalizeContainerEntity,
++  buildLocationSessionNodes,
++} from '../../domain/lootTrade';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++// ── Окно игрока ─────────────────────────────────────────────────────────────
++// Локация «Бета» перекрыта (глухая преграда), её сундук скрыт до снятия.
++const session = (beta = {}) => ({
++  sessionId: 'session-543',
++  containerId: 'alpha',
++  kind: 'hub',
++  name: 'Альфа',
++  targetType: 'room',
++  nodes: [
++    {
++      containerId: 'beta', kind: 'hub', name: 'Бета',
++      parentIds: ['alpha'], childIds: ['chest-beta'], items: [],
++      passageBlocked: true, passageReason: 'Обвал',
++      ...beta,
++    },
++    {
++      containerId: 'chest-beta', kind: 'loot', name: 'Сундук в Бете',
++      parentIds: ['beta'], childIds: [], items: [],
++    },
++    {
++      containerId: 'gamma', kind: 'loot', name: 'Гамма',
++      parentIds: ['alpha'], childIds: [], items: [],
++    },
++  ],
++});
++
++const mount = async (activeSession) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({
++    currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0,
++  });
++  useRoomStore.setState({
++    clientId: 'player-client',
++    status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession: null,
++        terminalStates: {},
++      },
++    },
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await Promise.resolve();
++  });
++  await act(async () => {
++    useRoomStore.setState((state) => ({
++      rooms: { ...state.rooms, ROOM1: { ...state.rooms.ROOM1, activeSession } },
++    }));
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const allText = (renderer) => renderer.root.findAllByType('Text')
++  .map((node) => String(node.props.children ?? '')).join(' | ');
++const tap = async (renderer, testID) => {
++  const [button] = renderer.root
++    .findAllByType('TouchableOpacity')
++    .filter((node) => node.props.testID === testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++  return button;
++};
++// Мок react-native рендерит компонент-обёртку + host-узел: testID виден дважды,
++// считаем только host-узлы (как findAllByType в оверлее).
++const findAll = (root, testID) => root.findAll(
++  (node) => typeof node.type === 'string' && node.props?.testID === testID,
++);
++
++describe('543: домен и граф — поля на локации, обрыв транзита, обход не трогаем', () => {
++  it('перекрытое звено остаётся «дверью» с причиной, его дети не попадают в сессию', () => {
++    const containers = [
++      {
++        id: 'alpha', kind: CONTAINER_KIND.HUB, name: 'Альфа',
++        links: [{ containerId: 'beta', locked: false, lockLabel: '' }],
++      },
++      {
++        id: 'beta', kind: CONTAINER_KIND.HUB, name: 'Бета',
++        links: [{ containerId: 'chest-beta', locked: false, lockLabel: '' }],
++        passageBlocked: true, passageReason: 'Обвал',
++      },
++      { id: 'chest-beta', kind: CONTAINER_KIND.LOOT, name: 'Сундук в Бете', items: [] },
++    ];
++    const nodes = buildLocationSessionNodes(containers[0], containers);
++    const beta = nodes.find((n) => n.containerId === 'beta');
++    expect(beta).toBeTruthy();
++    expect(beta.passageBlocked).toBe(true);
++    expect(beta.passageReason).toBe('Обвал');
++    // Транзит через Б обрывается: содержимое не выдаётся.
++    expect(nodes.find((n) => n.containerId === 'chest-beta')).toBeUndefined();
++  });
++
++  it('обходной путь не пересчитывается: ребро мимо блокированного звена работает', () => {
++    const containers = [
++      {
++        id: 'alpha', kind: CONTAINER_KIND.HUB, name: 'Альфа',
++        links: [
++          { containerId: 'beta', locked: false, lockLabel: '' },
++          { containerId: 'chest-beta', locked: false, lockLabel: '' },
++        ],
++      },
++      {
++        id: 'beta', kind: CONTAINER_KIND.HUB, name: 'Бета',
++        links: [{ containerId: 'chest-beta', locked: false, lockLabel: '' }],
++        passageBlocked: true, passageReason: '',
++      },
++      { id: 'chest-beta', kind: CONTAINER_KIND.LOOT, name: 'Сундук в Бете', items: [] },
++    ];
++    const nodes = buildLocationSessionNodes(containers[0], containers);
++    // Прямое ребро А→сундук не проходит через Б — сундук остаётся.
++    expect(nodes.find((n) => n.containerId === 'chest-beta')).toBeTruthy();
++    expect(nodes.find((n) => n.containerId === 'beta')?.passageBlocked).toBe(true);
++  });
++
++  it('прямая выдача Мастера — не вход: корень выдачи блок не ломает', () => {
++    const containers = [
++      {
++        id: 'beta', kind: CONTAINER_KIND.HUB, name: 'Бета',
++        links: [{ containerId: 'chest-beta', locked: false, lockLabel: '' }],
++        passageBlocked: true, passageReason: 'Обвал',
++      },
++      { id: 'chest-beta', kind: CONTAINER_KIND.LOOT, name: 'Сундук в Бете', items: [] },
++    ];
++    const nodes = buildLocationSessionNodes(containers[0], containers);
++    expect(nodes.find((n) => n.containerId === 'chest-beta')).toBeTruthy();
++  });
++
++  it('normalizeContainerEntity: пара полей только у локаций, причина чистится', () => {
++    const loc = normalizeContainerEntity({ id: 'loc', kind: CONTAINER_KIND.HUB, name: 'Локация' });
++    expect(loc.passageBlocked).toBe(false);
++    expect(loc.passageReason).toBe('');
++    const blocked = normalizeContainerEntity({
++      id: 'loc2', kind: CONTAINER_KIND.HUB, name: 'Локация',
++      passageBlocked: true, passageReason: '  Обвал  ',
++    });
++    expect(blocked.passageBlocked).toBe(true);
++    expect(blocked.passageReason).toBe('Обвал');
++    const chest = normalizeContainerEntity({
++      id: 'chest', kind: CONTAINER_KIND.LOOT, name: 'Сундук',
++      passageBlocked: true, passageReason: 'x',
++    });
++    expect(chest.passageBlocked).toBe(false);
++    expect(chest.passageReason).toBe('');
++  });
++});
++
++describe('543: дерево Мастера — кнопка «Блокировать» и диалог причины', () => {
++  const setup = () => {
++    const nested = normalizeContainerEntity({
++      id: 'nested', kind: CONTAINER_KIND.HUB, name: 'nested',
++      roomCodes: ['GM-AAA111'], parentLocationId: 'root',
++    });
++    const chest = normalizeContainerEntity({ id: 'chest', kind: CONTAINER_KIND.LOOT, name: 'chest' });
++    const terminal = normalizeContainerEntity({ id: 'terminal', kind: CONTAINER_KIND.TERMINAL, name: 'terminal' });
++    const containers = [
++      normalizeContainerEntity({
++        id: 'root', kind: CONTAINER_KIND.HUB, name: 'root', roomCodes: ['GM-AAA111'],
++      }),
++      nested, chest, terminal,
++    ];
++    containers[0].links = [chest, terminal].map((c) => ({
++      containerId: c.id, locked: false, lockLabel: '',
++    }));
++    const onTogglePassage = vi.fn();
++    const onOpenSettings = vi.fn();
++    let renderer;
++    act(() => {
++      renderer = create(React.createElement(HubTreeView, {
++        hub: containers[0],
++        containers,
++        keyItems: [],
++        onOpenSettings,
++        onTogglePassage,
++      }));
++    });
++    return { renderer, containers, nested, onTogglePassage, onOpenSettings };
++  };
++
++  it('кнопка есть только у локаций и стоит перед «Параметрами»', () => {
++    const { renderer } = setup();
++    expect(findAll(renderer.root, 'hub-tree-passage-nested').length).toBeGreaterThan(0);
++    // Не у сундука, терминала и прочих не-локаций.
++    expect(findAll(renderer.root, 'hub-tree-passage-chest')).toHaveLength(0);
++    expect(findAll(renderer.root, 'hub-tree-passage-terminal')).toHaveLength(0);
++    expect(findAll(renderer.root, 'hub-tree-passage-root')).toHaveLength(0);
++    const ids = renderer.root
++      .findAll((node) => typeof node.props?.testID === 'string')
++      .map((node) => node.props.testID);
++    expect(ids.indexOf('hub-tree-passage-nested'))
++      .toBeLessThan(ids.indexOf('hub-tree-parameters-nested'));
++  });
++
++  it('диалог причины: пустая причина не подтверждается молча, ОК отдаёт текст', () => {
++    const { renderer, nested, onTogglePassage } = setup();
++    // Открываем диалог.
++    act(() => findAll(renderer.root, 'hub-tree-passage-nested')[0].props.onPress());
++    expect(findAll(renderer.root, 'passage-reason-input')).toHaveLength(1);
++    // Ввод причины.
++    const [input] = findAll(renderer.root, 'passage-reason-input');
++    act(() => input.props.onChangeText('Обвал'));
++    // Отмена — не блокируем.
++    act(() => findAll(renderer.root, 'passage-block-cancel')[0].props.onPress());
++    expect(onTogglePassage).not.toHaveBeenCalled();
++    expect(findAll(renderer.root, 'passage-reason-input')).toHaveLength(0);
++    // Повторно: ОК передаёт причину.
++    act(() => findAll(renderer.root, 'hub-tree-passage-nested')[0].props.onPress());
++    const [input2] = findAll(renderer.root, 'passage-reason-input');
++    act(() => input2.props.onChangeText('Обвал'));
++    act(() => findAll(renderer.root, 'passage-block-confirm')[0].props.onPress());
++    expect(onTogglePassage).toHaveBeenCalledTimes(1);
++    expect(onTogglePassage).toHaveBeenCalledWith(nested, true, 'Обвал');
++    expect(findAll(renderer.root, 'passage-reason-input')).toHaveLength(0);
++  });
++
++  it('пустая причина уходит пустой строкой (дефолт даёт сервер/клиент)', () => {
++    const { renderer, nested, onTogglePassage } = setup();
++    act(() => findAll(renderer.root, 'hub-tree-passage-nested')[0].props.onPress());
++    act(() => findAll(renderer.root, 'passage-block-confirm')[0].props.onPress());
++    expect(onTogglePassage).toHaveBeenCalledWith(nested, true, '');
++  });
++
++  it('при блоке кнопка становится «Открыть» и снимает блок без диалога', () => {
++    const { renderer, containers, onTogglePassage } = setup();
++    const nested = containers.find((c) => c.id === 'nested');
++    nested.passageBlocked = true;
++    nested.passageReason = 'Обвал';
++    let rerender;
++    act(() => {
++      rerender = create(React.createElement(HubTreeView, {
++        hub: containers[0],
++        containers,
++        keyItems: [],
++        onOpenSettings: vi.fn(),
++        onTogglePassage,
++      }));
++    });
++    const [button] = findAll(rerender.root, 'hub-tree-passage-nested');
++    expect(button).toBeTruthy();
++    act(() => button.props.onPress());
++    expect(onTogglePassage).toHaveBeenCalledWith(nested, false, '');
++    // Диалог не открывался.
++    expect(findAll(rerender.root, 'passage-reason-input')).toHaveLength(0);
++  });
++});
++
++describe('543: окно игрока — дверь и плашка', () => {
++  it('в списке плашка с причиной, содержимое перекрытого звена скрыто', async () => {
++    const renderer = await mount(session());
++    const text = allText(renderer);
++    expect(text).toContain('Бета');
++    expect(text).toContain('Гамма');
++    expect(text).not.toContain('Сундук в Бете');
++    const [badge] = findAll(renderer.root, 'passage-blocked-hint-beta');
++    expect(badge).toBeTruthy();
++    expect(String(badge.props.children)).toContain('Обвал');
++    await act(async () => renderer.unmount());
++  });
++
++  it('вход ведёт на экран-дверь: причина, «Назад», без взлома и детей', async () => {
++    const renderer = await mount(session());
++    await tap(renderer, 'hub-node-enter-beta');
++    const text = allText(renderer);
++    expect(findAll(renderer.root, 'passage-blocked-screen').length).toBeGreaterThan(0);
++    const [reason] = findAll(renderer.root, 'passage-blocked-reason');
++    expect(String(reason.props.children)).toContain('Обвал');
++    // Глухая преграда сильнее замка: кнопок взлома/ограничений нет.
++    expect(renderer.root.findAllByProps({ testID: 'current-gate-option-beta' })).toHaveLength(0);
++    expect(renderer.root.findAll((n) => String(n.props.testID || '').startsWith('current-gate-hack-'))).toHaveLength(0);
++    expect(text).not.toContain('Сундук в Бете');
++    // «Назад» возвращает в родителя.
++    await tap(renderer, 'passage-blocked-back');
++    expect(findAll(renderer.root, 'passage-blocked-screen')).toHaveLength(0);
++    expect(allText(renderer)).toContain('Альфа');
++    await act(async () => renderer.unmount());
++  });
++
++  it('без причины игрок видит дефолт «Проход заблокирован»', async () => {
++    const renderer = await mount(session({ passageReason: '' }));
++    const [badge] = findAll(renderer.root, 'passage-blocked-hint-beta');
++    expect(String(badge.props.children)).toMatch(/Проход заблокирован|Passage blocked/);
++    await act(async () => renderer.unmount());
++  });
++
++  it('замок на перекрытой локации не даёт взлома: подпись входа обычная', async () => {
++    const renderer = await mount(session({ locked: true, linkedCheckIds: ['term-543'] }));
++    const text = allText(renderer);
++    expect(text).toContain('Обвал');
++    // Подсказка замка под плашкой не показывается — блок сильнее.
++    expect(text).not.toMatch(/Требуется взлом|Requires lockpicking/);
++    const [enterBtn] = findAll(renderer.root, 'hub-node-enter-beta');
++    expect(enterBtn).toBeTruthy();
++    const label = enterBtn.findAllByType('Text')
++      .map((node) => String(node.props.children ?? '')).join('');
++    expect(label).toMatch(/Войти|Enter/);
++    expect(label).not.toMatch(/Взломать|Hack/);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('543: контракт по файлам', () => {
++  const domain = read('domain/lootTrade.js');
++  const graph = read('server/locationGraph.js');
++  const sessionSrc = read('server/lootTradeSession.js');
++  const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++  const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++  const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++  const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++  const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++
++  it('данные — пара полей на локации, без новых сущностей', () => {
++    expect(domain).toContain('passageBlocked: kind === CONTAINER_KIND.HUB');
++    expect(domain).toContain('passageReason: kind === CONTAINER_KIND.HUB');
++    expect(domain).toContain('passageBlocked: Boolean(child.passageBlocked)');
++    expect(sessionSrc).toContain('passageBlocked: Boolean(raw.passageBlocked)');
++    expect(sessionSrc).toContain('node.locked || node.passageBlocked');
++    expect(graph).toContain('passageBlocked: Boolean(raw.passageBlocked)');
++    expect(graph).toContain('Boolean(node.passageBlocked) && id !== root');
++  });
++
++  it('Мастер: кнопка в строке перед «Параметрами», синк живой сессии пересбором', () => {
++    expect(tree).toContain('hub-tree-passage-');
++    expect(tree).toContain('onTogglePassage');
++    expect(tree).toContain('passage-block-confirm');
++    expect(tree).toContain("container.passageBlocked ? 'detail.passageOpen' : 'detail.passageBlock'");
++    expect(screen).toContain('handleTogglePassage');
++    expect(screen).toContain('passageBlocked: Boolean(blocked)');
++    expect(screen).toContain('buildLocationSessionNodes(rootContainer, freshList)');
++  });
++
++  it('игрок: gate-first двери и плашка в списке', () => {
++    expect(overlay).toContain('currentPassageBlocked');
++    expect(overlay).toContain('testID="passage-blocked-screen"');
++    expect(overlay).toContain('passage-blocked-back');
++    expect(overlay).toContain('passage-blocked-hint-');
++    expect(overlay).toContain("tLootTrade('player.passageBlocked')");
++  });
++
++  it('словари RU/EN парные, формулировки владельца дословно', () => {
++    expect(Object.keys(ru.detail).sort()).toEqual(Object.keys(en.detail).sort());
++    expect(Object.keys(ru.player).sort()).toEqual(Object.keys(en.player).sort());
++    expect(ru.detail.passageBlock).toBe('Блокировать');
++    expect(ru.detail.passageOpen).toBe('Открыть');
++    expect(ru.player.passageBlocked).toBe('Проход заблокирован');
++    expect(en.player.passageBlocked).toBe('Passage blocked');
++  });
++});
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index ad67812..eeaf712 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -677,7 +677,11 @@ export default function PlayerLootTradeOverlay() {
+     const currentTitle = currentNode?.name || activeSession.name;
+     const currentDescription = currentNode?.description ?? activeSession.description;
+     // Патч 542: вход в локацию с преградой показывает сначала только проверки.
+-    const currentGatePending = currentTarget.keyAccessState === 'needs-check'
++    // Патч 543: глухая преграда сильнее замка — при перекрытом проходе
++    // взлом не предлагается вообще; снимает только Мастер.
++    const currentPassageBlocked = Boolean(currentNode?.passageBlocked);
++    const currentGatePending = currentPassageBlocked
++      || currentTarget.keyAccessState === 'needs-check'
+       || currentTarget.keyAccessState === 'denied'
+       || (Boolean(currentTarget.locked)
+         && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
+@@ -810,6 +814,26 @@ export default function PlayerLootTradeOverlay() {
+                 contentContainerStyle={styles.lootScrollContent}
+               >
+                 {currentGatePending ? (
++                  currentPassageBlocked ? (
++                    // Патч 543: экран-дверь — имя локации, причина, «Назад».
++                    <View testID="passage-blocked-screen" style={styles.terminalButtons}>
++                      <Text testID="passage-blocked-reason" style={styles.hubLockedHintText}>
++                        {String(currentNode?.passageReason || '').trim()
++                          || tLootTrade('player.passageBlocked')}
++                      </Text>
++                      {parentStack.length > 0 && (
++                        <TouchableOpacity
++                          testID="passage-blocked-back"
++                          style={styles.terminalViewButton}
++                          onPress={() => setParentStack((stack) => stack.slice(0, -1))}
++                        >
++                          <Text style={styles.terminalViewButtonText}>
++                            {tLootTrade('player.backToParent')}
++                          </Text>
++                        </TouchableOpacity>
++                      )}
++                    </View>
++                  ) : (
+                   <View style={styles.terminalButtons}>
+                     <Text style={styles.hubLockedHintText}>
+                       {tLootTrade(currentTarget.keyAccessState === 'denied'
+@@ -865,6 +889,7 @@ export default function PlayerLootTradeOverlay() {
+                       <Text style={styles.hubLockedHintText}>{tLootTrade('player.hubNodeLockedBadge')}</Text>
+                     )}
+                   </View>
++                  )
+                 ) : hubNodes.length === 0 ? (
+                   <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+                 ) : (
+@@ -978,7 +1003,18 @@ export default function PlayerLootTradeOverlay() {
+                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
+                           )}
+ 
+-                          {(nodeLocked || nodeIsTerminal) ? (
++                          {/* Патч 543: плашка с причиной перекрытия в списке. */}
++                          {node.passageBlocked ? (
++                            <Text
++                              testID={`passage-blocked-hint-${node.containerId}`}
++                              style={styles.hubLockedHintText}
++                            >
++                              {String(node.passageReason || '').trim()
++                                || tLootTrade('player.passageBlocked')}
++                            </Text>
++                          ) : null}
++
++                          {(nodeLocked || nodeIsTerminal) && !node.passageBlocked ? (
+                             <Text
+                               testID={`hack-outcome-hint-${node.containerId}`}
+                               style={styles.hubLockedHintText}
+@@ -991,7 +1027,9 @@ export default function PlayerLootTradeOverlay() {
+                             <Text style={styles.hubUnlockedMetaText}>
+                               {tLootTrade('player.hubNodeKeyUnlockedBadge')}
+                             </Text>
+-                          ) : nodeLocked ? (
++                          ) : nodeLocked && !node.passageBlocked ? (
++                            // Патч 543: при перекрытом проходе подсказка замка
++                            // не показывается — блок сильнее, взлома не будет.
+                             <Text style={styles.hubLockedHintText}>
+                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                             </Text>
+@@ -1155,9 +1193,11 @@ export default function PlayerLootTradeOverlay() {
+                               <Text style={styles.takeAllRowBtnText}>
+                                 {tLootTrade(
+                                   nodeIsLocation
+-                                    ? (nodeLocked
++                                    ? ((nodeLocked && !node.passageBlocked)
+                                       // Патч 542: запертая локация ведёт к
+                                       // экрану преград, а не мимо неё.
++                                      // Патч 543: перекрытая — тоже к двери,
++                                      // но без «взломать» в подписи.
+                                       ? nodeHackLabelKey
+                                       : 'player.hubNodeOpenLocation')
+                                     : (nodeIsMerch
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 167e1a9..be7a76e 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -743,8 +743,10 @@ export default function LootTradeScreen() {
+       }
+     }
+ 
+-    // 2. Если отредактирована вложенная карточка, которая сейчас открыта внутри живой Локации — обновляем узел
+-    if (saved.kind !== CONTAINER_KIND.HUB) {
++    // 2. Если отредактирована вложенная карточка, которая сейчас открыта внутри живой Локации — обновляем узел.
++    // Патч 543: вложенная локация обновляет сессию пересбором узлов целиком —
++    // потомки перекрытого звена уходят из выдачи, «дверь» остаётся с причиной.
++    if (saved.id) {
+       for (const [rCode, rEntry] of Object.entries(useRoomStore.getState().rooms || {})) {
+         const sess = rEntry?.activeSession;
+         if (
+@@ -754,6 +756,16 @@ export default function LootTradeScreen() {
+           && sess.nodes.some((n) => n.containerId === saved.id)
+         ) {
+           try {
++            if (saved.kind === CONTAINER_KIND.HUB) {
++              const rootContainer = (freshList || []).find((c) => c && c.id === sess.containerId);
++              if (rootContainer) {
++                await useRoomStore.getState().updateRoomSessionRates({
++                  code: rCode,
++                  sessionId: sess.sessionId,
++                  nodes: buildLocationSessionNodes(rootContainer, freshList),
++                });
++              }
++            } else {
+             await useRoomStore.getState().updateRoomSessionRates({
+               code: rCode,
+               sessionId: sess.sessionId,
+@@ -770,6 +782,7 @@ export default function LootTradeScreen() {
+                 buyDepreciationPercent: saved.buyDepreciationPercent,
+               } : {}),
+             });
++            }
+           } catch (e) {
+             debugLog('lootTrade.liveHubNodeSync:failed', { message: e?.message });
+           }
+@@ -1495,6 +1508,19 @@ export default function LootTradeScreen() {
+     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+   };
+ 
++  // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
++  // «Блокировать» спрашивает причину (пусто = «Проход заблокирован»),
++  // «Открыть» снимает блок и чистит причину.
++  const handleTogglePassage = async (container, blocked, reason) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
++    if (!container || container.kind !== CONTAINER_KIND.HUB) return;
++    await persistAndSyncContainer({
++      ...container,
++      passageBlocked: Boolean(blocked),
++      passageReason: blocked ? String(reason || '').trim() : '',
++    });
++  };
++
+   const handleToggleHubChildLock = async (childId) => {
+     if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
+     const existingLink = (activeContainer.links || []).find((l) => l.containerId === childId);
+@@ -2466,6 +2492,7 @@ export default function LootTradeScreen() {
+                 onUnlink={handleRemoveHubChild}
+                 onUpdateLockLabel={handleUpdateHubChildLockLabel}
+                 onMoveNestedOut={handleMoveNestedLocationOut}
++                onTogglePassage={handleTogglePassage}
+               />
+             </>
+           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index 8f332f2..cd24a55 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -1,5 +1,5 @@
+ import React, { useMemo, useState } from 'react';
+-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
++import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import { useLocale } from '../../../../i18n/locale';
+@@ -44,9 +44,12 @@ const HubTreeView = ({
+   onUnlink,
+   onUpdateLockLabel,
+   onMoveNestedOut,
++  onTogglePassage,
+ }) => {
+   useLocale();
+   const [expanded, setExpanded] = useState(() => new Set());
++  // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
++  const [passagePrompt, setPassagePrompt] = useState(null);
+ 
+   const list = Array.isArray(containers) ? containers : [];
+   const byId = useMemo(() => {
+@@ -321,6 +324,27 @@ const HubTreeView = ({
+             </View>
+           )}
+ 
++          {/* Патч 543: перекрытие прохода — только у локаций, в строке
++              названия, сразу перед кнопкой «Параметры». */}
++          {isHub && (
++            <TouchableOpacity
++              testID={`hub-tree-passage-${container.id}`}
++              style={[styles.smallBtn, container.passageBlocked && styles.passageBtnBlocked]}
++              onPress={() => {
++                if (container.passageBlocked) {
++                  onTogglePassage?.(container, false, '');
++                } else {
++                  setPassagePrompt({ container, reason: '' });
++                }
++              }}
++              accessibilityRole="button"
++            >
++              <Text style={container.passageBlocked ? styles.passageBtnBlockedText : styles.smallBtnText}>
++                {tLootTrade(container.passageBlocked ? 'detail.passageOpen' : 'detail.passageBlock')}
++              </Text>
++            </TouchableOpacity>
++          )}
++
+           {/* Патч 541: «Параметры» в правой части строки названия — у каждого
+               элемента дерева, а не только у прямого ребёнка активного хаба. */}
+           {renderParametersButton(`hub-tree-parameters-${container.id}`, () => open(container))}
+@@ -371,6 +395,54 @@ const HubTreeView = ({
+           {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
+         </>
+       )}
++      {/* Патч 543: причина перекрытия — свободный текст Мастера. */}
++      {passagePrompt ? (
++        <Modal
++          visible
++          transparent
++          animationType="fade"
++          onRequestClose={() => setPassagePrompt(null)}
++        >
++          <View style={styles.passageBackdrop}>
++            <View style={styles.passageDialog}>
++              <Text style={styles.passageDialogTitle}>
++                {tLootTrade('detail.passageReasonTitle')}
++              </Text>
++              <TextInput
++                testID="passage-reason-input"
++                style={styles.passageReasonInput}
++                value={passagePrompt.reason}
++                onChangeText={(text) => setPassagePrompt((prev) => (prev ? { ...prev, reason: text } : prev))}
++                placeholder={tLootTrade('detail.passageReasonPlaceholder')}
++                placeholderTextColor="#888888"
++                autoFocus
++              />
++              <View style={styles.passageDialogRow}>
++                <TouchableOpacity
++                  testID="passage-block-cancel"
++                  style={styles.smallBtn}
++                  onPress={() => setPassagePrompt(null)}
++                  accessibilityRole="button"
++                >
++                  <Text style={styles.smallBtnText}>{tLootTrade('form.cancel')}</Text>
++                </TouchableOpacity>
++                <TouchableOpacity
++                  testID="passage-block-confirm"
++                  style={styles.smallBtn}
++                  onPress={() => {
++                    const next = passagePrompt;
++                    setPassagePrompt(null);
++                    if (next) onTogglePassage?.(next.container, true, next.reason);
++                  }}
++                  accessibilityRole="button"
++                >
++                  <Text style={styles.smallBtnText}>{tLootTrade('detail.passageBlock')}</Text>
++                </TouchableOpacity>
++              </View>
++            </View>
++          </View>
++        </Modal>
++      ) : null}
+     </ScrollView>
+   );
+ };
+@@ -410,6 +482,37 @@ const styles = StyleSheet.create({
+     backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+   },
+   smallBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 10 },
++  // Патч 543: состояние перекрытия и диалог причины.
++  passageBtnBlocked: { borderWidth: 1, borderColor: '#c9a227', backgroundColor: '#3a3212' },
++  passageBtnBlockedText: { color: '#e8c95a', fontSize: 10 },
++  passageBackdrop: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.55)',
++    alignItems: 'center',
++    justifyContent: 'center',
++    padding: 24,
++  },
++  passageDialog: {
++    width: '100%',
++    maxWidth: 360,
++    backgroundColor: ADMIN_MODAL_PALETTE.card || '#1d2126',
++    borderWidth: 1,
++    borderColor: '#3d4650',
++    borderRadius: 8,
++    padding: 16,
++    gap: 12,
++  },
++  passageDialogTitle: { color: ADMIN_MODAL_PALETTE.text, fontSize: 14, fontWeight: '600' },
++  passageReasonInput: {
++    borderWidth: 1,
++    borderColor: '#3d4650',
++    borderRadius: 6,
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++    color: ADMIN_MODAL_PALETTE.text,
++    backgroundColor: '#12161b',
++  },
++  passageDialogRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+   unlinkBtn: { borderColor: ADMIN_MODAL_PALETTE.danger },
+   unlinkBtnText: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 10 },
+   depBlock: { marginLeft: 30, marginTop: 3 },
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 865d360..2dc1292 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,30 @@
+ # Changelog
+ ---
+ 
++## Passage blocking (patch 543)
++
++Thesis 28 implemented per the owner's approved model: the Master blocks a
++location's passage, the player sees a "door" with a reason, and alternate
++routes are never recalculated. Just two fields on the location — no new
++entities.
++
++- **A "Block" button in the hub tree.** In the location's name row, right
++  before "Settings" (locations only). A dialog asks for the reason — the
++  Master's free text; an empty reason reaches the player as "Passage
++  blocked". While blocked the button becomes "Unblock": it lifts the block
++  and clears the reason.
++- **Effect: the location cannot be entered from any side.** Transit through
++  the blocked link breaks (children and the special exit are hidden), but
++  alternate routes are not recalculated: another parent or exit keeps
++  working. A direct Master issue is not an entry — the issue root is never
++  blocked.
++- **The player gets a "door" screen** modelled on the 542 gatekeeper: the
++  location name, the reason, a "Back" button, no lockpicking buttons — a
++  hard barrier beats a lock, and only the Master lifts it. The list shows a
++  badge with the reason (or the default) on the row; the blocked link's
++  contents stay hidden.
++
++
+ ## A whole hub issue and the player window (patch 542)
+ 
+ The owner's clarifications are closed in one patch: hubs issue whole, the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 759fa84..34576c0 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,27 @@
+ 
+ ---
+ 
++## Перекрытие проходов (патч 543)
++
++Реализация тезиса 28 по утверждённой модели владельца: Мастер перекрывает
++проход локации, игрок видит «дверь» с причиной, обходные пути не
++пересчитываются. Только пара полей на локации — без новых сущностей.
++
++- **Кнопка «Блокировать» в дереве хаба.** В строке названия локации, сразу
++  перед «Параметрами» (только у локаций). Диалог спрашивает причину —
++  свободный текст Мастера; пустая причина доходит до игрока как «Проход
++  заблокирован». При блоке кнопка становится «Открыть»: снимает блок и
++  чистит причину.
++- **Эффект: нельзя войти в локацию ни с какой стороны.** Транзит через
++  заблокированное звено обрывается (дети и особый выход скрыты), но
++  обходные пути не пересчитываются: если есть другой родитель или выход,
++  они продолжают работать. Прямая выдача Мастера — не вход, корень выдачи
++  блок не ломает.
++- **У игрока — экран-дверь** по образцу привратника 542: имя локации,
++  причина, кнопка «Назад», кнопок взлома нет — глухая преграда сильнее
++  замка, снимает только Мастер. В списке у строки — плашка с причиной
++  (или дефолтом), содержимое перекрытого звена скрыто.
++
+ ## Выдача хаба целиком и окно игрока (патч 542)
+ 
+ Уточнения владельца закрыты одним патчем: хаб выдаётся целиком, окно игрока
+diff --git a/docs/location-level-design.md b/docs/location-level-design.md
+index 4c91936..57d56d0 100644
+--- a/docs/location-level-design.md
++++ b/docs/location-level-design.md
+@@ -1,8 +1,11 @@
+ # Многоуровневые локации и переходы (левел-дизайн)
+ 
+-Ревизия: 2026-11-05, патч **537** — **проект, без кода**. Документ фиксирует
+-слово владельца, согласованные решения и предлагаемую модель переходов между
+-локациями. Реализация — отдельным патчем после утверждения модели. Фундамент —
++Ревизия: 2026-11-06, патч **537** (проект) → реализация — патч **543**.
++Документ фиксирует слово владельца, согласованные решения и модель переходов
++между локациями; блокировка прохода реализована в 543 (пара полей на
++локации, кнопка «Блокировать» с причиной, экран-дверь и плашка у игрока,
++обходные пути не пересчитываются), автоправила и карта остаются заделом.
++Фундамент —
+ `docs/location-hierarchy-design.md` (тезис 13, граф 523); этот документ его не
+ отменяет, а развивает.
+ 
+diff --git a/docs/patch-543-install.md b/docs/patch-543-install.md
+new file mode 100644
+index 0000000..7a5d8ea
+--- /dev/null
++++ b/docs/patch-543-install.md
+@@ -0,0 +1,72 @@
++# Установка патча 543: перекрытие проходов
++
++Патч подготовлен от состояния **версии 542**. Файл установки:
++`patchs/543-passage-block.patch`.
++
++> Владелец (модель тезиса 28): в цепи А–Б–В блок Б = нельзя войти в Б ни из
++> А, ни из В (транзит через Б обрывается); исключение — обходной путь
++> («только если в В нет выхода А»): если есть выход В→А или любая цепь не
++> через Б, А↔В остаются связанными, автопереходов/пересчёта нет. Мастер
++> указывает причину свободным текстом; если не указано — «Проход заблокирован»
++> / EN «Passage blocked». Данные — пара полей на самой локации, без новых
++> сущностей и списков рёбер. UI Мастера: в строке названия локации, рядом с
++> кнопкой параметров, перед ней, кнопка надписью «Блокировать»; при блоке —
++> «Открыть». UI игрока: экран-дверь по образцу привратника 542 (имя, причина,
++> «Назад», без кнопок взлома) и плашка с причиной в списке. Глухая преграда
++> сильнее замка — снимает только Мастер.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `domain/lootTrade.js` | `normalizeContainerEntity` несёт пару `passageBlocked`/`passageReason` только у локацией (причина чистится trim); `makeSessionNode` прокидывает поля в узлы сессии |
++| `server/locationGraph.js` | `normalizeGraphNode` читает поля прохода; `flattenForSession` не заходит в дети и особый выход перекрытой локации (корень выдачи не блокируется) — содержимое не попадает в сессию, обходные рёбра мимо звена продолжают работать |
++| `server/lootTradeSession.js` | `normalizeHubSessionNode` сохраняет поля после WS; `sanitizeSessionForMember` считает перекрытую локацию границей видимости наравне с замком (потомки не уходят игроку) |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | `handleTogglePassage` сохраняет пару полей через `persistAndSyncContainer`; правка вложенной локации пересобирает узлы живой сессии (`buildLocationSessionNodes(rootContainer, freshList)`) |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | кнопка «Блокировать»/«Открыть» в строке названия локации перед «Параметрами» (только у локаций); диалог причины с полям ввода, «Отмена» и подтверждением |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | gate-first двери: перекрытая локация показывает причину и «Назад» без кнопок взлома; в списке плашка причины (дефолт «Проход заблокирован»), подсказки замка и «Взломать и войти» не показываются |
++| `i18n/{ru-RU,en-EN}/screens/lootTrade/screen.json` | парные ключи `detail.passageBlock` («Блокировать»/«Block»), `detail.passageOpen` («Открыть»/«Unblock»), `detail.passageReasonTitle`, `detail.passageReasonPlaceholder`, `player.passageBlocked` («Проход заблокирован»/«Passage blocked») |
++| `__tests__/room/passage-block-543.test.js` | новый приёмочный тест: обрыв транзита и обходной путь, корень выдачи, кнопка/диалог в дереве, экран-дверь и плашка, контракт файлов (16 проверок) |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | guards переведены на 543: версия/отсечка/заметки/roadmap/файл патча |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `docs/location-level-design.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 543, тезис 28 закрыт, «Осталось после патча 543» |
++
++## Границы
++
++- Блокируется сама локация-узел: запрещён вход в неё со всех сторон
++  (ребро/направление не хранятся); выход из заблокированного узла разрешён —
++  правило запрещает вход, не выход.
++- Обходные пути не пересчитываются: другой родитель или выход в обход блока
++  продолжают работать; автопереходов и пересчёта графа нет.
++- Прямая выдача Мастера — не вход: корень выдачи блок не ломает (иначе
++  выданная локация была бы пустым экраном).
++- Замок при блоке не предлагается (глухая преграда сильнее), но механика
++  замков/терминалов, закон снимка 529 и канон 542 не менялись.
++- Автоправила (обвал по времени, направленность, «выхода назад нет»), карта
++  и экспорт Owlbear — задел по слову владельца, в этом патче нет.
++- `apply-patch.sh` смотрит на ту же ветку доставки
++  `arena/aa289f1c-fallout-2d20-companion`.
++
++## Установка через консоль
++
++Из корня репозитория приложения: сначала заменить `apply-patch.sh` свежей
++версией из ветки доставки, затем поставить патч 543.
++
++```bash
++git fetch --no-tags origin arena/aa289f1c-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 543
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 542, патч 543 их не трогает.
++- `git apply --check` вперёд от дерева 542 и в обратную сторону от 543.
++
++## Откат
++
++`git apply -R patchs/543-passage-block.patch` вернёт поля прохода, кнопку,
++диалог, дверь, словари и версию к состоянию 542.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 1a66155..71258c4 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-05. Текущая версия: **542**.
++Дата ревизии: 2026-11-06. Текущая версия: **543**.
+ 
+ ## Тезисы
+ 
+@@ -39,14 +39,14 @@
+ | 25 | **«Мастер решает»:** единый штатный выход «Да/Нет» для спорных ситуаций; игрок просит решения, Мастер отвечает поверх любого экрана, плюс ручной переключатель «Заблокировать / Открыть» в карточке точки. «Открыть» = сразу ACCESS GRANTED без взлома. Каркас расширяемый, сейчас подключены только замки | ✅ сделано | **535** |
+ | 26 | **Общая доска и общий журнал для привязанных комнат:** `terminalStates` и `accessEvents` объединены по контуру `roomCodes`, точки видны во всех комнатах контура, доска терминала (а не только замка) и события доступа расходятся вместе; автоблокировка 526 не возвращалась | ✅ сделано | **535** |
+ | 27 | **Взлом замка: два блока один под другим:** строка статуса разнесена на вертикальную колонку — сверху счётчик заколок, контейнер 1 «Правила» (описание мини-игры), контейнер 2 «Сведения» (сложность, LOCKPICK, навык/восприятие/удача). Текст подсказки не менялся, перенос описания сохранён; рамка блоков по образцу модалок | ✅ сделано | **536** |
+-| 28 | **Многоуровневые локации / левел-дизайн:** переходы между локациями, которые Мастер перекрывает вручную (обвал, ловушка, сигнализация — любой нарратив); взламываемый замок и глухая преграда, направленность проходов, «выхода назад нет». Без новых сущностей, карта и автоправила — задел на будущее. Проект готов, реализация после утверждения модели | 📐 проект | **537** |
++| 28 | **Многоуровневые локации / левел-дизайн:** переходы между локациями, которые Мастер перекрывает вручную (обвал, ловушка, сигнализация — любой нарратив); взламываемый замок и глухая преграда, направленность проходов, «выхода назад нет». Без новых сущностей, карта и автоправила — задел на будущее. Модель утверждена владельцем; блокировка прохода (543): пара полей на локации, кнопка «Блокировать» с причиной в дереве, у игрока экран-дверь и плашка; блок бьёт замок, обходные пути не пересчитываются | ✅ сделано | **537, 543** |
+ | 29 | **Структура локаций в админке:** строки «Родительская локация» и «Выход из локации», чекбокс «Хаб» после названия (2 ячейки: чекбокс + пояснение), дерево структуры с переходом в настройки секции, матрёшка «локация в локацию». Требование доступа — конструктор И/ИЛИ (`+` = И, `/` = ИЛИ), нельзя начать/закончить оператором; `+` связывает сильнее `/`. Только админка; окно игрока — следующим шагом | ✅ сделано (админка) | **538** |
+ | 30 | **Хаб — сам папка-дерево (переработка 538 по слову владельца):** отдельной карточки «Структура локаций» больше нет — открыл хаб и видишь дерево вложенного. Локации — спойлерами (нажал — видно, что входит), пунктирные линии показывают, что от чего зависит (что чем заблокировано, какой ключ нужен, что во что выходит); узел открывает настройки. У хаба-папки нет родителя/выхода (он сам родитель), остаются серверные комнаты; хабы вкладываются друг в друга. Родитель/выход обычной локации — выпадающие списки с поиском, не кнопки. Локацию таскают за стрелки и кладут в локацию — она становится дочерней, как папки в Windows; вложенную можно вынуть обратно. Ключ и замок/терминал — отдельные поля с понятными подписями; И/ИЛИ = войти, только пройдя обе преграды или одну из них. Только админка | ✅ сделано (админка) | **539** |
+ | 31 | **Вложенная локация — только внутри родителя + параметры в дереве:** папка, вложенная в папку, исчезает с корневого экрана (не дублируется карточкой), живёт в дереве родителя и открывается из него. У вложенной локации в дереве видны параметры, как у других записей в хабе: комнаты, число объектов и запертых точек, ключ, замок/терминал, выход. Кнопка «Содержимое» открывает вложенную локацию (переход внутрь). При удалении родителя вложенные локации возвращаются на корень и не теряются | ✅ сделано (админка) | **540** |
+ | 32 | **Параметры элемента в строке дерева хаба:** название элемента больше не открывает настройки; кнопка «Параметры» стоит в правой части строки названия у каждого элемента дерева (локация, сундук, торговец, терминал, замок, ключ), включая вложенные после раскрытия. С экрана локации убраны отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца». Ключи показываются строками дерева; зависимости ворот остаются пунктирными линиями. `apply-patch.sh` смотрит на ветку доставки 541. Только админка, игровые механики не менялись | ✅ сделано (админка) | **541** |
+ | 33 | **Выдача хаба целиком и окно игрока (542):** граф сессии собирается по `links` + `parentLocationId`, поэтому выдача Ниптона с вложенными локациями/терминалом/замком больше не падает пустым экраном. Верхний уровень окна игрока — только прямые элементы (локации, сундуки, торговцы); вложенные точки скрыты до входа. Вход в запертую локацию сначала показывает экран преграды (замок/терминал, варианты И/ИЛИ), после прохождения — содержимое; особый выход вынесен в кнопку «Выход → …». Замок никогда не бывает самостоятельной точкой игрока: отдельная выдача убрана из интерфейса, строки замков скрыты, `lock_never_standalone`. «Назад» возвращает только в локацию, через которую пришёл (история входа), `exitLocationId` даёт вход в другую локацию, возврат — по истории, а не по административному дереву | ✅ сделано | **542** |
+ 
+-## Осталось после патча 542
++## Осталось после патча 543
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -120,6 +120,18 @@
+ слову владельца. Уточнение 526: баг 506 был про автоматический перезапуск
+ после ACCESS GRANTED, а не про запрет новых подходов игрока; «один взлом на
+ трансляцию» больше не действует.
++Патч 543 реализовал блокировку проходов по утверждённой модели (тезис 28):
++в цепи А–Б–В блок Б = нельзя войти в Б ни из А, ни из В, транзит через Б
++обрывается; обходной путь (выход В→А или любое ребро мимо Б) не
++пересчитывается и остаётся рабочим. Данные — пара полей `passageBlocked` /
++`passageReason` на самой локации, без новых сущностей и списков рёбер. В
++дереве хаба в строке названия локации перед «Параметрами» стоит кнопка
++«Блокировать»: диалог спрашивает причину (свободный текст, пусто — «Проход
++заблокирован»), при блоке кнопка становится «Открыть» и чистит причину. У
++игрока перекрытая локация — экран-дверь по образцу привратника 542 (имя,
++причина, «Назад», без кнопок взлома: глухая преграда сильнее замка) и плашка
++с причиной в списке; содержимое и дочерние узлы скрыты, снимает только
++Мастер. Прямая выдача Мастера — не вход: корень выдачи блок не ломает.
+ 
+ 1. **Иерархия пространств и доступ** (в работе, первый шаг сделан в 523) —
+    все уточнения владельца одним этапом: граф локаций с циклами и несколькими
+@@ -156,14 +168,17 @@
+ `docs/gm-snapshot-law.md`**: он обязателен для всех будущих функций
+ пространства Мастера, включая оставшиеся пункты тезиса 13.
+ 
+-### Что осталось после 542 (структура локаций)
++### Что осталось после 543 (структура локаций)
+ 
+ - ~~**Окно просмотра локаций для игрока**~~ ✅ **542** — игрок видит хаб
+   целиком, верхний уровень = прямые элементы, преграды — экраном-«привратником».
+ - ~~**Переходы между локациями в игре**~~ ✅ **542** — вход через родителя и
+   особый выход (`exitLocationId`) исполняются в сессии, «Назад» идёт по
+-  истории входа. Ручная блокировка прохода Мастером под любой нарратив — по
+-  модели тезиса 28 (`docs/location-level-design.md`), без автоправил.
++  истории входа.
++- ~~**Ручная блокировка прохода Мастером**~~ ✅ **543** — пара полей на
++  локации, кнопка «Блокировать» с причиной, экран-дверь и плашка у игрока;
++  автоправила (обвал по времени, направленность) — задел в модели тезиса 28
++  (`docs/location-level-design.md`).
+ - **«Заблокировать всё» из карточки** — по-прежнему ⏸ отложено владельцем.
+ - **Экспорт структуры в Owlbear** — задел на будущее: приложение-кампаньон
+   отдаёт данные из админки, карта внутри приложения не строится.
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 79f7526..58cbbc9 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -635,6 +635,9 @@ const makeSessionNode = (child, link = {}) => ({
+       // Патч 542: явное И/ИЛИ-выражение и особый выход доходят до сессии.
+       accessExpression: resolveAccessExpression(child),
+       exitLocationId: String(child.exitLocationId || '').trim(),
++      // Патч 543: перекрытый проход — игрок у «двери» с причиной.
++      passageBlocked: Boolean(child.passageBlocked),
++      passageReason: String(child.passageReason || '').trim(),
+       characterOverrides: {},
+   items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
+     ? []
+@@ -840,6 +843,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+     exitLocationId: kind === CONTAINER_KIND.HUB
+       ? String(raw.exitLocationId || '').trim()
+       : '',
++    // Патч 543: перекрытый проход локации (глухая преграда) — только у
++    // локаций; причина свободный текст, пусто = «Проход заблокирован».
++    passageBlocked: kind === CONTAINER_KIND.HUB ? Boolean(raw.passageBlocked) : false,
++    passageReason: kind === CONTAINER_KIND.HUB ? String(raw.passageReason || '').trim() : '',
+     isCatalogHub: kind === CONTAINER_KIND.HUB ? Boolean(raw.isCatalogHub) : false,
+     createdAt: Number(raw.createdAt) || now,
+     updatedAt: Number(raw.updatedAt) || now,
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 27e8c62..3e914b3 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -184,7 +184,11 @@
+     "hubGatesEmpty": "No links between points yet",
+     "hubGatePassed": "passed",
+     "hubGatePending": "pending",
+-    "hubGateOr": "or"
++    "hubGateOr": "or",
++    "passageBlock": "Block",
++    "passageOpen": "Unblock",
++    "passageReasonTitle": "Block reason (optional)",
++    "passageReasonPlaceholder": "e.g. rubble"
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+@@ -320,7 +324,8 @@
+     "hackLocationHint": "Hacking unlocks entry to this location",
+     "hackContainerHint": "Hacking unlocks the contents",
+     "gateAnd": "and",
+-    "exitToLocation": "Exit → {name}"
++    "exitToLocation": "Exit → {name}",
++    "passageBlocked": "Passage blocked"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 1179c6f..b4ab944 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -185,7 +185,11 @@
+     "hubGatesEmpty": "Связей между точками пока нет",
+     "hubGatePassed": "пройдено",
+     "hubGatePending": "ожидает",
+-    "hubGateOr": "или"
++    "hubGateOr": "или",
++    "passageBlock": "Блокировать",
++    "passageOpen": "Открыть",
++    "passageReasonTitle": "Причина перекрытия (необязательно)",
++    "passageReasonPlaceholder": "Например: обвал"
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+@@ -321,7 +325,8 @@
+     "hackLocationHint": "Взлом откроет вход в локацию",
+     "hackContainerHint": "Взлом откроет содержимое",
+     "gateAnd": "и",
+-    "exitToLocation": "Выход → {name}"
++    "exitToLocation": "Выход → {name}",
++    "passageBlocked": "Проход заблокирован"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 999ddc3..e2a799f 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "542"
++  "baseline": "543"
+ }
+diff --git a/public/version.json b/public/version.json
+index b1373ba..70fa0b3 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "542",
++  "version": "543",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
+       "Хаб выдаётся целиком: граф собирается по связям и родительским локациям, поэтому Ниптон с вложенными локациями, терминалом и замком больше не рисует пустой экран. В окне игрока на верхнем уровне видны только прямые элементы — локации, сундуки, торговцы, а вложенные точки открываются после входа. Вход в запертую локацию сначала показывает только преграду (замок или терминал), после прохождения — содержимое. Замок стал частью локации, сундука или двери и больше не выдаётся отдельной точкой игрока. «Назад» возвращает в локацию, из которой игрок пришёл, а особый выход ведёт в указанную локацию.",
+       "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик обновлён на ветку доставки 541.",
+       "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
+@@ -146,6 +147,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",
+       "A hub now issues whole: the graph is built from links plus parent locations, so Nipton with nested locations, a terminal and a lock no longer renders an empty screen. The player's top level shows only direct elements — locations, chests, merchants — and nested points appear after you enter. Entering a locked location shows only the barrier (lock or terminal) first, and its contents once the check is passed. The lock is now part of a location, chest or door and is never issued as a standalone player point. Back returns only to the location you came through, and the special exit leads to its configured location.",
+       "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The installer now points at the delivery branch 541.",
+       "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
+diff --git a/server/locationGraph.js b/server/locationGraph.js
+index be7f912..73a8c75 100644
+--- a/server/locationGraph.js
++++ b/server/locationGraph.js
+@@ -70,6 +70,9 @@ const normalizeGraphNode = (raw) => {
+     // Патч 542: админская матрёшка и особый выход — часть игрового графа.
+     parentLocationId: normalizeId(raw.parentLocationId),
+     exitLocationId: normalizeId(raw.exitLocationId),
++    // Патч 543: перекрытая локация не пропускает сквозь себя.
++    passageBlocked: Boolean(raw.passageBlocked),
++    passageReason: String(raw.passageReason || '').trim(),
+   };
+ };
+ 
+@@ -224,10 +227,17 @@ const flattenForSession = (graph, rootId) => {
+       exitLocationId: node.exitLocationId || '',
+     };
+     if (id !== root) result.set(id, entry);
+-    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
+-    const exitId = graph.exits?.get(id);
+-    if (exitId && graph.byId.has(exitId)) {
+-      queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
++    // Патч 543: сквозь перекрытую локацию не ходят — ни в дети, ни в особый
++    // выход. Само звено в сессии остаётся (игрок видит «дверь» с причиной),
++    // а обходной путь (другой родитель/выход) продолжает работать. Корень
++    // выдачи не блокируется: прямая выдача Мастера — явное действие.
++    const passageBlocked = Boolean(node.passageBlocked) && id !== root;
++    if (!passageBlocked) {
++      for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
++      const exitId = graph.exits?.get(id);
++      if (exitId && graph.byId.has(exitId)) {
++        queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
++      }
+     }
+   }
+   return [...result.values()];
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index e6e1c15..95ec8e1 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -199,6 +199,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+     // Патч 542: особый выход и признак «только через выход» переживают WS.
+     exitLocationId: String(raw.exitLocationId || '').trim(),
+     exitOnly: Boolean(raw.exitOnly),
++    // Патч 543: перекрытый проход переживает WS-нормализацию.
++    passageBlocked: Boolean(raw.passageBlocked),
++    passageReason: String(raw.passageReason || '').trim(),
+     keyAccessState: String(raw.keyAccessState || 'none'),
+     keyUnlocked: Boolean(raw.keyUnlocked),
+     // Патч 519: терминал, привязанный к другой точке как замок, не должен
+@@ -261,7 +264,11 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+   // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
+   // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
+   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
+-  const lockedIds = nodes.filter((node) => node.locked).map((node) => node.containerId);
++  // Патч 543: перекрытая локация — граница видимости как замок: её потомки
++  // не уходят игроку, хотя сама «дверь» с причиной остаётся в списке.
++  const lockedIds = nodes
++    .filter((node) => node.locked || node.passageBlocked)
++    .map((node) => node.containerId);
+   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
+     lockedIds,
+     isGm,

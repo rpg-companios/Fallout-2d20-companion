@@ -70,6 +70,9 @@ const normalizeGraphNode = (raw) => {
     // Патч 542: админская матрёшка и особый выход — часть игрового графа.
     parentLocationId: normalizeId(raw.parentLocationId),
     exitLocationId: normalizeId(raw.exitLocationId),
+    // Патч 543: перекрытая локация не пропускает сквозь себя.
+    passageBlocked: Boolean(raw.passageBlocked),
+    passageReason: String(raw.passageReason || '').trim(),
   };
 };
 
@@ -224,10 +227,17 @@ const flattenForSession = (graph, rootId) => {
       exitLocationId: node.exitLocationId || '',
     };
     if (id !== root) result.set(id, entry);
-    for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
-    const exitId = graph.exits?.get(id);
-    if (exitId && graph.byId.has(exitId)) {
-      queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
+    // Патч 543: сквозь перекрытую локацию не ходят — ни в дети, ни в особый
+    // выход. Само звено в сессии остаётся (игрок видит «дверь» с причиной),
+    // а обходной путь (другой родитель/выход) продолжает работать. Корень
+    // выдачи не блокируется: прямая выдача Мастера — явное действие.
+    const passageBlocked = Boolean(node.passageBlocked) && id !== root;
+    if (!passageBlocked) {
+      for (const child of entry.childIds) queue.push({ id: child, parentId: id, depth: depth + 1, viaExit: false });
+      const exitId = graph.exits?.get(id);
+      if (exitId && graph.byId.has(exitId)) {
+        queue.push({ id: exitId, parentId: id, depth: depth + 1, viaExit: true });
+      }
     }
   }
   return [...result.values()];

@@ -635,6 +635,9 @@ const makeSessionNode = (child, link = {}) => ({
       // Патч 542: явное И/ИЛИ-выражение и особый выход доходят до сессии.
       accessExpression: resolveAccessExpression(child),
       exitLocationId: String(child.exitLocationId || '').trim(),
+      // Патч 543: перекрытый проход — игрок у «двери» с причиной.
+      passageBlocked: Boolean(child.passageBlocked),
+      passageReason: String(child.passageReason || '').trim(),
       characterOverrides: {},
   items: child.kind === CONTAINER_KIND.TERMINAL || child.kind === CONTAINER_KIND.LOCK
     ? []
@@ -840,6 +843,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     exitLocationId: kind === CONTAINER_KIND.HUB
       ? String(raw.exitLocationId || '').trim()
       : '',
+    // Патч 543: перекрытый проход локации (глухая преграда) — только у
+    // локаций; причина свободный текст, пусто = «Проход заблокирован».
+    passageBlocked: kind === CONTAINER_KIND.HUB ? Boolean(raw.passageBlocked) : false,
+    passageReason: kind === CONTAINER_KIND.HUB ? String(raw.passageReason || '').trim() : '',
     isCatalogHub: kind === CONTAINER_KIND.HUB ? Boolean(raw.isCatalogHub) : false,
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,

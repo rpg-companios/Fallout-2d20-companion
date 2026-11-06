@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { useLocale } from '../../../../i18n/locale';
@@ -44,9 +44,12 @@ const HubTreeView = ({
   onUnlink,
   onUpdateLockLabel,
   onMoveNestedOut,
+  onTogglePassage,
 }) => {
   useLocale();
   const [expanded, setExpanded] = useState(() => new Set());
+  // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
+  const [passagePrompt, setPassagePrompt] = useState(null);
 
   const list = Array.isArray(containers) ? containers : [];
   const byId = useMemo(() => {
@@ -321,6 +324,27 @@ const HubTreeView = ({
             </View>
           )}
 
+          {/* Патч 543: перекрытие прохода — только у локаций, в строке
+              названия, сразу перед кнопкой «Параметры». */}
+          {isHub && (
+            <TouchableOpacity
+              testID={`hub-tree-passage-${container.id}`}
+              style={[styles.smallBtn, container.passageBlocked && styles.passageBtnBlocked]}
+              onPress={() => {
+                if (container.passageBlocked) {
+                  onTogglePassage?.(container, false, '');
+                } else {
+                  setPassagePrompt({ container, reason: '' });
+                }
+              }}
+              accessibilityRole="button"
+            >
+              <Text style={container.passageBlocked ? styles.passageBtnBlockedText : styles.smallBtnText}>
+                {tLootTrade(container.passageBlocked ? 'detail.passageOpen' : 'detail.passageBlock')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* Патч 541: «Параметры» в правой части строки названия — у каждого
               элемента дерева, а не только у прямого ребёнка активного хаба. */}
           {renderParametersButton(`hub-tree-parameters-${container.id}`, () => open(container))}
@@ -371,6 +395,54 @@ const HubTreeView = ({
           {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
         </>
       )}
+      {/* Патч 543: причина перекрытия — свободный текст Мастера. */}
+      {passagePrompt ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPassagePrompt(null)}
+        >
+          <View style={styles.passageBackdrop}>
+            <View style={styles.passageDialog}>
+              <Text style={styles.passageDialogTitle}>
+                {tLootTrade('detail.passageReasonTitle')}
+              </Text>
+              <TextInput
+                testID="passage-reason-input"
+                style={styles.passageReasonInput}
+                value={passagePrompt.reason}
+                onChangeText={(text) => setPassagePrompt((prev) => (prev ? { ...prev, reason: text } : prev))}
+                placeholder={tLootTrade('detail.passageReasonPlaceholder')}
+                placeholderTextColor="#888888"
+                autoFocus
+              />
+              <View style={styles.passageDialogRow}>
+                <TouchableOpacity
+                  testID="passage-block-cancel"
+                  style={styles.smallBtn}
+                  onPress={() => setPassagePrompt(null)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.smallBtnText}>{tLootTrade('form.cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="passage-block-confirm"
+                  style={styles.smallBtn}
+                  onPress={() => {
+                    const next = passagePrompt;
+                    setPassagePrompt(null);
+                    if (next) onTogglePassage?.(next.container, true, next.reason);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.smallBtnText}>{tLootTrade('detail.passageBlock')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </ScrollView>
   );
 };
@@ -410,6 +482,37 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
   },
   smallBtnText: { color: ADMIN_MODAL_PALETTE.text, fontSize: 10 },
+  // Патч 543: состояние перекрытия и диалог причины.
+  passageBtnBlocked: { borderWidth: 1, borderColor: '#c9a227', backgroundColor: '#3a3212' },
+  passageBtnBlockedText: { color: '#e8c95a', fontSize: 10 },
+  passageBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  passageDialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: ADMIN_MODAL_PALETTE.card || '#1d2126',
+    borderWidth: 1,
+    borderColor: '#3d4650',
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
+  },
+  passageDialogTitle: { color: ADMIN_MODAL_PALETTE.text, fontSize: 14, fontWeight: '600' },
+  passageReasonInput: {
+    borderWidth: 1,
+    borderColor: '#3d4650',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: ADMIN_MODAL_PALETTE.text,
+    backgroundColor: '#12161b',
+  },
+  passageDialogRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   unlinkBtn: { borderColor: ADMIN_MODAL_PALETTE.danger },
   unlinkBtnText: { color: ADMIN_MODAL_PALETTE.danger, fontSize: 10 },
   depBlock: { marginLeft: 30, marginTop: 3 },

@@ -199,6 +199,9 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
     // Патч 542: особый выход и признак «только через выход» переживают WS.
     exitLocationId: String(raw.exitLocationId || '').trim(),
     exitOnly: Boolean(raw.exitOnly),
+    // Патч 543: перекрытый проход переживает WS-нормализацию.
+    passageBlocked: Boolean(raw.passageBlocked),
+    passageReason: String(raw.passageReason || '').trim(),
     keyAccessState: String(raw.keyAccessState || 'none'),
     keyUnlocked: Boolean(raw.keyUnlocked),
     // Патч 519: терминал, привязанный к другой точке как замок, не должен
@@ -261,7 +264,11 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   // Патч 523: замок — граница видимости. Игрок видит саму «дверь», но не
   // знает, что за ней: все потомки запертого узла скрыты сервером целиком.
   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
-  const lockedIds = nodes.filter((node) => node.locked).map((node) => node.containerId);
+  // Патч 543: перекрытая локация — граница видимости как замок: её потомки
+  // не уходят игроку, хотя сама «дверь» с причиной остаётся в списке.
+  const lockedIds = nodes
+    .filter((node) => node.locked || node.passageBlocked)
+    .map((node) => node.containerId);
   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
     lockedIds,
     isGm,

@@ -677,7 +677,11 @@ export default function PlayerLootTradeOverlay() {
     const currentTitle = currentNode?.name || activeSession.name;
     const currentDescription = currentNode?.description ?? activeSession.description;
     // Патч 542: вход в локацию с преградой показывает сначала только проверки.
-    const currentGatePending = currentTarget.keyAccessState === 'needs-check'
+    // Патч 543: глухая преграда сильнее замка — при перекрытом проходе
+    // взлом не предлагается вообще; снимает только Мастер.
+    const currentPassageBlocked = Boolean(currentNode?.passageBlocked);
+    const currentGatePending = currentPassageBlocked
+      || currentTarget.keyAccessState === 'needs-check'
       || currentTarget.keyAccessState === 'denied'
       || (Boolean(currentTarget.locked)
         && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
@@ -810,6 +814,26 @@ export default function PlayerLootTradeOverlay() {
                 contentContainerStyle={styles.lootScrollContent}
               >
                 {currentGatePending ? (
+                  currentPassageBlocked ? (
+                    // Патч 543: экран-дверь — имя локации, причина, «Назад».
+                    <View testID="passage-blocked-screen" style={styles.terminalButtons}>
+                      <Text testID="passage-blocked-reason" style={styles.hubLockedHintText}>
+                        {String(currentNode?.passageReason || '').trim()
+                          || tLootTrade('player.passageBlocked')}
+                      </Text>
+                      {parentStack.length > 0 && (
+                        <TouchableOpacity
+                          testID="passage-blocked-back"
+                          style={styles.terminalViewButton}
+                          onPress={() => setParentStack((stack) => stack.slice(0, -1))}
+                        >
+                          <Text style={styles.terminalViewButtonText}>
+                            {tLootTrade('player.backToParent')}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ) : (
                   <View style={styles.terminalButtons}>
                     <Text style={styles.hubLockedHintText}>
                       {tLootTrade(currentTarget.keyAccessState === 'denied'
@@ -865,6 +889,7 @@ export default function PlayerLootTradeOverlay() {
                       <Text style={styles.hubLockedHintText}>{tLootTrade('player.hubNodeLockedBadge')}</Text>
                     )}
                   </View>
+                  )
                 ) : hubNodes.length === 0 ? (
                   <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
                 ) : (
@@ -978,7 +1003,18 @@ export default function PlayerLootTradeOverlay() {
                             <IconText style={styles.lootRowSub}>{node.description}</IconText>
                           )}
 
-                          {(nodeLocked || nodeIsTerminal) ? (
+                          {/* Патч 543: плашка с причиной перекрытия в списке. */}
+                          {node.passageBlocked ? (
+                            <Text
+                              testID={`passage-blocked-hint-${node.containerId}`}
+                              style={styles.hubLockedHintText}
+                            >
+                              {String(node.passageReason || '').trim()
+                                || tLootTrade('player.passageBlocked')}
+                            </Text>
+                          ) : null}
+
+                          {(nodeLocked || nodeIsTerminal) && !node.passageBlocked ? (
                             <Text
                               testID={`hack-outcome-hint-${node.containerId}`}
                               style={styles.hubLockedHintText}
@@ -991,7 +1027,9 @@ export default function PlayerLootTradeOverlay() {
                             <Text style={styles.hubUnlockedMetaText}>
                               {tLootTrade('player.hubNodeKeyUnlockedBadge')}
                             </Text>
-                          ) : nodeLocked ? (
+                          ) : nodeLocked && !node.passageBlocked ? (
+                            // Патч 543: при перекрытом проходе подсказка замка
+                            // не показывается — блок сильнее, взлома не будет.
                             <Text style={styles.hubLockedHintText}>
                               {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
                             </Text>
@@ -1155,9 +1193,11 @@ export default function PlayerLootTradeOverlay() {
                               <Text style={styles.takeAllRowBtnText}>
                                 {tLootTrade(
                                   nodeIsLocation
-                                    ? (nodeLocked
+                                    ? ((nodeLocked && !node.passageBlocked)
                                       // Патч 542: запертая локация ведёт к
                                       // экрану преград, а не мимо неё.
+                                      // Патч 543: перекрытая — тоже к двери,
+                                      // но без «взломать» в подписи.
                                       ? nodeHackLabelKey
                                       : 'player.hubNodeOpenLocation')
                                     : (nodeIsMerch

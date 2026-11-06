@@ -743,8 +743,10 @@ export default function LootTradeScreen() {
       }
     }
 
-    // 2. Если отредактирована вложенная карточка, которая сейчас открыта внутри живой Локации — обновляем узел
-    if (saved.kind !== CONTAINER_KIND.HUB) {
+    // 2. Если отредактирована вложенная карточка, которая сейчас открыта внутри живой Локации — обновляем узел.
+    // Патч 543: вложенная локация обновляет сессию пересбором узлов целиком —
+    // потомки перекрытого звена уходят из выдачи, «дверь» остаётся с причиной.
+    if (saved.id) {
       for (const [rCode, rEntry] of Object.entries(useRoomStore.getState().rooms || {})) {
         const sess = rEntry?.activeSession;
         if (
@@ -754,6 +756,16 @@ export default function LootTradeScreen() {
           && sess.nodes.some((n) => n.containerId === saved.id)
         ) {
           try {
+            if (saved.kind === CONTAINER_KIND.HUB) {
+              const rootContainer = (freshList || []).find((c) => c && c.id === sess.containerId);
+              if (rootContainer) {
+                await useRoomStore.getState().updateRoomSessionRates({
+                  code: rCode,
+                  sessionId: sess.sessionId,
+                  nodes: buildLocationSessionNodes(rootContainer, freshList),
+                });
+              }
+            } else {
             await useRoomStore.getState().updateRoomSessionRates({
               code: rCode,
               sessionId: sess.sessionId,
@@ -770,6 +782,7 @@ export default function LootTradeScreen() {
                 buyDepreciationPercent: saved.buyDepreciationPercent,
               } : {}),
             });
+            }
           } catch (e) {
             debugLog('lootTrade.liveHubNodeSync:failed', { message: e?.message });
           }
@@ -1493,6 +1506,19 @@ export default function LootTradeScreen() {
     if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
     const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+  };
+
+  // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
+  // «Блокировать» спрашивает причину (пусто = «Проход заблокирован»),
+  // «Открыть» снимает блок и чистит причину.
+  const handleTogglePassage = async (container, blocked, reason) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    if (!container || container.kind !== CONTAINER_KIND.HUB) return;
+    await persistAndSyncContainer({
+      ...container,
+      passageBlocked: Boolean(blocked),
+      passageReason: blocked ? String(reason || '').trim() : '',
+    });
   };
 
   const handleToggleHubChildLock = async (childId) => {
@@ -2466,6 +2492,7 @@ export default function LootTradeScreen() {
                 onUnlink={handleRemoveHubChild}
                 onUpdateLockLabel={handleUpdateHubChildLockLabel}
                 onMoveNestedOut={handleMoveNestedLocationOut}
+                onTogglePassage={handleTogglePassage}
               />
             </>
           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
