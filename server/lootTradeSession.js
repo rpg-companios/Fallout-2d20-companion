@@ -13,7 +13,12 @@ const {
 } = require('./itemStacking.js');
 const locationGraph = require('./locationGraph.js');
 const { resolveLocationNodeMarker, restoreLocationSessionNodes } = require('./locationNodeMarker.js');
-const { expressionCheckIds, normalizeAccessExpression, resolveAccessExpression } = require('./accessExpression.js');
+const {
+  expressionCheckIds,
+  normalizeAccessExpression,
+  resolveAccessExpression,
+  accessBarrierPending,
+} = require('./accessExpression.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
 
@@ -253,7 +258,9 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   if (!session || isGm || session.kind !== 'hub') return session;
   // Патч 542: преграда на самой выданной локации скрывает всё её содержимое
   // до прохождения. Игрок видит только проверку входа (узел сессии-корня).
-  if (session.keyAccessState === 'needs-check' || session.keyAccessState === 'denied') {
+  // Патч 546: преграда — не только флаг `locked`, но и непройденная проверка
+  // (`accessExpression`/`linkedCheckIds`), даже если флаг не доехал.
+  if (accessBarrierPending(session)) {
     return { ...session, nodes: [] };
   }
   const nodes = session.nodes || [];
@@ -262,11 +269,12 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
   // Патч 543: перекрытая локация — граница видимости как замок: её потомки
   // не уходят игроку, хотя сама «дверь» с причиной остаётся в списке.
+  // Патч 546: единый предикат — запертый ИЛИ с непройденной проверкой.
   const lockedIds = nodes
-    .filter((node) => node.locked || node.passageBlocked)
+    .filter((node) => accessBarrierPending(node))
     .map((node) => node.containerId);
   // Патч 544: запертый корень выдачи тоже граница видимости для своих детей.
-  if (session.locked) lockedIds.push(session.containerId);
+  if (accessBarrierPending(session)) lockedIds.push(session.containerId);
   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
     lockedIds,
     isGm,
@@ -277,7 +285,8 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
     nodes: nodes
       .filter((node) => !node.hiddenForPlayers && !hidden.has(node.containerId))
       .map((node) => {
-      if (!node.locked) return node;
+      // Патч 546: содержимое и касса прячутся за любой непройденной преградой.
+      if (!accessBarrierPending(node)) return node;
       return {
         ...node,
         items: [],
@@ -312,7 +321,9 @@ const applyKeyAccessToSession = (session, resolve) => {
       ...target,
       keyAccessState: state,
       keyUnlocked: state === 'open-by-key',
-      locked: state === 'none' ? Boolean(target.locked) : restricted,
+      // Патч 546: флаг `locked` больше не единственный признак преграды —
+      // непройденная проверка держит границу даже без ручного флага.
+      locked: restricted || (state === 'none' && accessBarrierPending(target)),
     };
   };
   const next = decorate(session);
@@ -725,10 +736,11 @@ const isNodeBehindSessionBarrier = (session, nodeId) => {
   if (!session || session.kind !== 'hub') return false;
   const nodes = Array.isArray(session.nodes) ? session.nodes : [];
   const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
+  // Патч 546: граница — запертый узел ИЛИ узел с непройденной проверкой.
   const lockedIds = nodes
-    .filter((node) => node.locked || node.passageBlocked)
+    .filter((node) => accessBarrierPending(node))
     .map((node) => node.containerId);
-  if (session.locked) lockedIds.push(session.containerId);
+  if (accessBarrierPending(session)) lockedIds.push(session.containerId);
   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
     lockedIds,
     isGm: false,
@@ -745,7 +757,8 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
   }
   // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
-  if (session.locked) {
+  // Патч 546: непройденная проверка входа — такая же преграда, как locked.
+  if (accessBarrierPending(session)) {
     return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
@@ -767,7 +780,7 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
     }
     const targetNode = session.nodes[nodeIdx];
-    if (targetNode.locked || isNodeBehindSessionBarrier(session, targetNode.containerId)) {
+    if (accessBarrierPending(targetNode) || isNodeBehindSessionBarrier(session, targetNode.containerId)) {
       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
     }
 
@@ -824,7 +837,8 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
   }
   // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
   // пройдена привязанная проверка.
-  if (session.locked) {
+  // Патч 546: единый предикат преграды вместо одного флага locked.
+  if (accessBarrierPending(session)) {
     return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
@@ -846,7 +860,7 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
     }
     merchantTarget = session.nodes[hubNodeIdx];
-    if (merchantTarget.locked || isNodeBehindSessionBarrier(session, merchantTarget.containerId)) {
+    if (accessBarrierPending(merchantTarget) || isNodeBehindSessionBarrier(session, merchantTarget.containerId)) {
       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
     }
   }

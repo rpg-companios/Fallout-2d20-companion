@@ -1,8 +1,9 @@
 {
-  "version": "545",
+  "version": "546",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
       "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
       "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
       "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
@@ -149,6 +150,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
       "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
       "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
       "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",

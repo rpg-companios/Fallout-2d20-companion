@@ -256,7 +256,9 @@ describe('542: контракт по файлам', () => {
   });
 
   it('сервер скрывает замки/привязанные терминалы и закрывает корень-преграду пустым списком', () => {
-    expect(sessionSrc).toContain("session.keyAccessState === 'needs-check'");
+    // Патч 546: корень-преграда определяется единым предикатом, а не только
+    // состоянием ключа — непройденная проверка тоже закрывает выдачу.
+    expect(sessionSrc).toContain('accessBarrierPending(session)');
     expect(sessionSrc).toContain('return { ...session, nodes: [] }');
     expect(sessionSrc).toContain('exitOnly');
     expect(sessionSrc).toContain('next.accessExpression = normalizeAccessExpression');

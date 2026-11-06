@@ -408,7 +408,8 @@ describe('543: контракт по файлам', () => {
     expect(domain).toContain('passageReason: kind === CONTAINER_KIND.HUB');
     expect(domain).toContain('passageBlocked: Boolean(child.passageBlocked)');
     expect(sessionSrc).toContain('passageBlocked: Boolean(source.passageBlocked)');
-    expect(sessionSrc).toContain('node.locked || node.passageBlocked');
+    // Патч 546: перекрытый проход входит в единый предикат преграды.
+    expect(sessionSrc).toContain('accessBarrierPending(node)');
     expect(graph).toContain('passageBlocked: Boolean(raw.passageBlocked)');
     expect(graph).toContain('Boolean(node.passageBlocked) && id !== root');
   });

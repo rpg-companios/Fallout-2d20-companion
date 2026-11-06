@@ -1,6 +1,35 @@
 # Changelog
 ---
 
+## A location lock is an entry barrier (patch 546)
+
+Fixed the owner's bug: "Doctor's Basement" locked by "Locked Hatch" and the
+"Tap House" locked by "Locked Door" could be entered freely — contents, the
+"Mad Doctor" merchant and loot were available without hacking.
+
+- **One barrier rule.** The new `accessBarrierPending` predicate
+  (`server/accessExpression.js`, client facade `domain/accessExpression.js`)
+  treats a node as closed when it has an unpassed check
+  (`accessExpression`/`linkedCheckIds`), an explicit server refusal
+  (`needs-check`/`denied`), a manual `locked` flag, or a blocked passage.
+  An explicit open state (`open`/`open-by-key`/`keyUnlocked`) removes the barrier.
+- **The server holds the boundary.** Node visibility, item/caps stripping,
+  direct WS looting and trading all use the same predicate. A location with a
+  configured lock no longer lets players inside even if the `locked` flag was lost.
+- **Player window.** Entering a locked location again shows only the barrier
+  (lock/terminal, AND/OR options); contents and loot/trade buttons stay hidden
+  until the check passes. The AND/OR separator uses the canonical `+` operator
+  instead of the string `and`.
+- **Legacy-server safety net.** The patch 544 marker restores the access
+  requirement; the client evaluates passed checks from the shared room registry
+  (`terminalStates`/`accessEvents`) and hides descendants behind a barrier even
+  if a legacy server dropped `locked`/`keyAccessState`. The updated server remains
+  the source of truth.
+- **Acceptance.** `__tests__/room/hub-location-lock-546.test.js`: the owner's
+  scenario (Doctor's Basement / Locked Hatch / Mad Doctor, Tap House / Locked
+  Door), server-side loot/trade denial, opening after a hack, and a legacy
+  server without the `locked` flag.
+
 ## Place order in a location: Master drag order = player order (patch 545)
 
 In the Master interface, while working with a hub/location, positions can be

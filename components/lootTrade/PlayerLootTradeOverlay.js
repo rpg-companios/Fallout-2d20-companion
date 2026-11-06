@@ -24,9 +24,12 @@ import {
   formatLootTrade,
 } from '../screens/LootTradeScreen/logic/lootTradeI18n';
 import {
+  ACCESS_OP,
+  accessBarrierPending,
   expressionCheckIds,
   resolveAccessExpression,
 } from '../../domain/accessExpression';
+import locationGraph from '../../domain/locationGraph.js';
 import {
   CONTAINER_KIND,
   computeBarterSummary,
@@ -63,6 +66,24 @@ import {
   hackWinKey,
   applyHackOutcome,
 } from './hackOutcome';
+
+/**
+ * Патч 546: проверка считается пройденной по общему реестру комнаты. Нужно
+ * только как страховка для старого сервера, который мог потерять `locked` /
+ * `keyAccessState`: маркер 544 возвращает само требование, а победу замка или
+ * терминала клиент видит в `terminalStates`/`accessEvents`. Обновлённый сервер
+ * остаётся источником истины — его явное `open`/`denied` важнее этой оценки.
+ */
+const roomCheckPassed = (room, checkId) => {
+  const id = String(checkId || '').trim();
+  if (!id || !room) return false;
+  const state = room.terminalStates?.[id];
+  return Boolean(
+    state?.game?.status === 'won'
+    || state?.keyUnlocked
+    || room.accessEvents?.[id],
+  );
+};
 
 const getItemIcon = (itemType) => {
   if (itemType === 'caps') return '💰';
@@ -276,14 +297,17 @@ export default function PlayerLootTradeOverlay() {
 
   const selectedHubNode = useMemo(() => {
     if (!isHubSession || !selectedHubNodeId) return null;
+    const room = rooms?.[matchedContext?.roomCode];
     const found = sessionNodes.find(
-      (n) => n.containerId === selectedHubNodeId && !n.locked,
+      // Патч 546: содержимое нельзя открыть и мимо непройденной проверки.
+      (n) => n.containerId === selectedHubNodeId
+        && !accessBarrierPending(n, { isPassed: (id) => roomCheckPassed(room, id) }),
     );
     // Локация и точки проверки никогда не попадают в сценарий «открыть сундук»:
     // локация требует входа, терминал/замок — мини-игры.
     if (found && (nodeHasChildren(found) || resolveCheckSessionNode(found).checkKind)) return null;
     return found || null;
-  }, [isHubSession, sessionNodes, selectedHubNodeId]);
+  }, [isHubSession, sessionNodes, selectedHubNodeId, rooms, matchedContext?.roomCode]);
 
   // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
   const viewTarget = isHubSession ? selectedHubNode : activeSession;
@@ -687,11 +711,11 @@ export default function PlayerLootTradeOverlay() {
     // Патч 543: глухая преграда сильнее замка — при перекрытом проходе
     // взлом не предлагается вообще; снимает только Мастер.
     const currentPassageBlocked = Boolean(currentNode?.passageBlocked);
-    const currentGatePending = currentPassageBlocked
-      || currentTarget.keyAccessState === 'needs-check'
-      || currentTarget.keyAccessState === 'denied'
-      || (Boolean(currentTarget.locked)
-        && expressionCheckIds(resolveAccessExpression(currentTarget)).length > 0);
+    // Патч 546: единый предикат преграды. Локация с настроенным замком не
+    // пропускает внутрь, даже если старый сервер не прислал флаг `locked`.
+    const currentRoom = rooms?.[matchedContext.roomCode];
+    const currentIsPassed = (id) => roomCheckPassed(currentRoom, id);
+    const currentGatePending = accessBarrierPending(currentTarget, { isPassed: currentIsPassed });
     const gateOptionsFor = (target, gateIds) => gateIds.map((id) => {
       const state = rooms?.[matchedContext.roomCode]?.terminalStates?.[id];
       const sourceNode = sessionNodes.find((node) => node.containerId === id);
@@ -748,7 +772,7 @@ export default function PlayerLootTradeOverlay() {
       ])]
       : []);
     const gateSeparatorKeyFor = (node) => (
-      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === 'and')
+      resolveAccessExpression(node).some((token) => token?.type === 'op' && token?.op === ACCESS_OP.AND)
         ? 'player.gateAnd'
         : 'player.gateOr'
     );
@@ -759,8 +783,21 @@ export default function PlayerLootTradeOverlay() {
     // считаются детьми корня. Запертые потомки уже скрыты сервером.
     // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
     // никогда не самостоятельная строка игрока.
+    // Патч 546: клиентская страховка границы видимости для старого сервера.
+    // Потомки узла с непройденной проверкой не показываются, даже если флаг
+    // `locked` потерялся по дороге; обновлённый сервер уже скрыл их сам.
+    const barrierIds = sessionNodes
+      .filter((node) => accessBarrierPending(node, { isPassed: currentIsPassed }))
+      .map((node) => node.containerId);
+    const barrierGraph = locationGraph.buildGraphFromSession(rootId, sessionNodes);
+    const hiddenBehindBarrier = new Set(locationGraph.hiddenBehindLock(barrierGraph, {
+      lockedIds: barrierIds,
+      isGm: false,
+      rootId,
+    }));
     const visibleHubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
       if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
+      if (hiddenBehindBarrier.has(node.containerId)) return false;
       const parents = Array.isArray(node.parentIds) && node.parentIds.length
         ? node.parentIds
         : [rootId];
@@ -936,7 +973,9 @@ export default function PlayerLootTradeOverlay() {
                       ...(terminalState?.config || {}),
                       kind: nodeCheckKind,
                     };
-                    const nodeLocked = Boolean(node.locked);
+                    // Патч 546: строка заперта не только по флагу, но и по
+                    // непройденной проверке входа/содержимого.
+                    const nodeLocked = accessBarrierPending(node, { isPassed: currentIsPassed });
                     // Патч 530: выигранная проверка = доступ к содержимому
                     // (или вход в локацию), а не только надпись «взломано».
                     const nodeCheckPassed = Boolean(

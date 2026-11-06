@@ -117,6 +117,9 @@ describe('523: серверная сессия и доступ', () => {
     sessionId: 's1', containerId: 'factory', kind: 'hub', name: 'Завод',
     targetType: 'room', roomCodes: ['R1', 'R2'],
     linkedCheckIds: ['t1', 'k1'], linkedCheckId: 't1',
+    // Патч 546: требование корня уже пересчитано сервером и пройдено;
+    // непройденная проверка корня теперь скрывает всё содержимое (см. 546).
+    keyAccessState: 'open',
     nodes,
   }, 1000);
 
