@@ -1,8 +1,9 @@
 {
-  "version": "543",
+  "version": "544",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
       "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
       "Хаб выдаётся целиком: граф собирается по связям и родительским локациям, поэтому Ниптон с вложенными локациями, терминалом и замком больше не рисует пустой экран. В окне игрока на верхнем уровне видны только прямые элементы — локации, сундуки, торговцы, а вложенные точки открываются после входа. Вход в запертую локацию сначала показывает только преграду (замок или терминал), после прохождения — содержимое. Замок стал частью локации, сундука или двери и больше не выдаётся отдельной точкой игрока. «Назад» возвращает в локацию, из которой игрок пришёл, а особый выход ведёт в указанную локацию.",
       "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик обновлён на ветку доставки 541.",
@@ -147,6 +148,7 @@
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
     ],
     "en-EN": [
+      "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
       "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",
       "A hub now issues whole: the graph is built from links plus parent locations, so Nipton with nested locations, a terminal and a lock no longer renders an empty screen. The player's top level shows only direct elements — locations, chests, merchants — and nested points appear after you enter. Entering a locked location shows only the barrier (lock or terminal) first, and its contents once the check is passed. The lock is now part of a location, chest or door and is never issued as a standalone player point. Back returns only to the location you came through, and the special exit leads to its configured location.",
       "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The installer now points at the delivery branch 541.",

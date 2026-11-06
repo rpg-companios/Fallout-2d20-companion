@@ -22,8 +22,11 @@ export const HACK_OUTCOME_DELAY_MS = 700;
 export const HUB_KIND = 'hub';
 
 export const nodeHasChildren = (node) => {
+  // Патч 544: локация остаётся локацией даже пустой или ещё не раскрытой
+  // сервером (childIds может быть пустым за преградой); kind=hub приоритетнее.
+  if (node?.kind === HUB_KIND) return true;
   if (Array.isArray(node?.childIds)) return node.childIds.length > 0;
-  return node?.kind === HUB_KIND;
+  return false;
 };
 
 export const hackOutcomeForNode = (node) => (

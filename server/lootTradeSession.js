@@ -12,6 +12,7 @@ const {
   effectiveItemWeight,
 } = require('./itemStacking.js');
 const locationGraph = require('./locationGraph.js');
+const { resolveLocationNodeMarker, restoreLocationSessionNodes } = require('./locationNodeMarker.js');
 const { expressionCheckIds, normalizeAccessExpression, resolveAccessExpression } = require('./accessExpression.js');
 const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 const { encodeLockNodeMarker, decodeLockNodeMarker } = require('./lockPicking');
@@ -150,74 +151,69 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
   const containerId = String(raw.containerId || raw.id || '').trim();
   if (!containerId) return null;
-  // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
-  // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
-  const marker = decodeTerminalNodeMarker(raw.lockLabel);
-  const lockMarker = decodeLockNodeMarker(raw.lockLabel);
-  const explicitTerminal = raw.kind === 'terminal';
-  const explicitLock = raw.kind === 'lock';
-  const kind = raw.kind === 'merchant' ? 'merchant'
-    : (raw.kind === 'hub' ? 'hub'
+  // Патч 544: старый сервер мог понизить локацию до сундука и выбросить рёбра
+  // графа. Пространственная обёртка в lockLabel восстанавливает тип и связи;
+  // внутри неё может лежать прежний маркер терминала/замка.
+  const source = resolveLocationNodeMarker(raw);
+  const marker = decodeTerminalNodeMarker(source.lockLabel);
+  const lockMarker = decodeLockNodeMarker(source.lockLabel);
+  const explicitTerminal = source.kind === 'terminal';
+  const explicitLock = source.kind === 'lock';
+  const kind = source.kind === 'merchant' ? 'merchant'
+    : (source.kind === 'hub' ? 'hub'
       : (explicitTerminal || marker ? 'terminal'
         : (explicitLock || lockMarker ? 'lock' : 'loot')));
   const items = kind === 'terminal' || kind === 'lock' || kind === 'hub'
     ? []
-    : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+    : normalizeSessionItemsList(source.items, now, nodeIdx * 1000);
   return {
     containerId,
     kind,
-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец'
+    name: String(source.name || '').trim() || (kind === 'merchant' ? 'Торговец'
       : (kind === 'hub' ? 'Локация'
         : (kind === 'terminal' ? 'Терминал' : (kind === 'lock' ? 'Замок' : 'Контейнер')))),
-    description: String(raw.description || '').trim(),
-    locked: Boolean(raw.locked),
-    // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
-    // старый сервер, и просто скрывается при отрисовке.
-    lockLabel: String(raw.lockLabel || '').trim(),
-    caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
-    saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
+    description: String(source.description || '').trim(),
+    locked: Boolean(source.locked),
+    // На новом сервере обёртка уже развёрнута в поля; наружу отдаём исходную
+    // подпись (или маркер терминала/замка), а не служебную JSON-строку.
+    lockLabel: String(source.lockLabel || '').trim(),
+    caps: kind === 'merchant' ? normalizeCapsAmount(source.caps, 0) : 0,
+    saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(source.saleMarkupPercent, 0) : 0,
     buyDepreciationPercent: kind === 'merchant'
-      ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
+      ? normalizeBuyDepreciationPercent(source.buyDepreciationPercent, 50)
       : 50,
-    characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+    characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(source.characterOverrides) : {},
     difficulty: kind === 'terminal'
       ? (marker && !explicitTerminal
           ? marker.difficulty
-          : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+          : Math.max(0, Math.min(5, Math.floor(Number(source.difficulty) || 0))))
       : (kind === 'lock'
           ? (lockMarker && !explicitLock
               ? lockMarker.difficulty
-              : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+              : Math.max(0, Math.min(5, Math.floor(Number(source.difficulty) || 0))))
           : 0),
     items,
-    // Патч 516: требование ключа у вложенной точки доступа.
-    requiredKeyItemId: String(raw.requiredKeyItemId || '').trim(),
-    keyRequirement: String(raw.keyRequirement || 'none'),
-    linkedCheckIds: normalizeLinkedCheckIds(raw),
-    linkedCheckId: String(raw.linkedCheckId || '').trim(),
-    accessExpression: normalizeAccessExpression(raw.accessExpression),
-    // Патч 542: особый выход и признак «только через выход» переживают WS.
-    exitLocationId: String(raw.exitLocationId || '').trim(),
-    exitOnly: Boolean(raw.exitOnly),
-    // Патч 543: перекрытый проход переживает WS-нормализацию.
-    passageBlocked: Boolean(raw.passageBlocked),
-    passageReason: String(raw.passageReason || '').trim(),
-    keyAccessState: String(raw.keyAccessState || 'none'),
-    keyUnlocked: Boolean(raw.keyUnlocked),
-    // Патч 519: терминал, привязанный к другой точке как замок, не должен
-    // торчать отдельной карточкой в локации у игроков.
-    hiddenForPlayers: Boolean(raw.hiddenForPlayers),
-    // Патч 523: граф пространств. Несколько родителей, глубина, дети и
-    // эффективные коды комнат (объединение кодов всех родителей).
-    parentIds: Array.isArray(raw.parentIds)
-      ? [...new Set(raw.parentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+    requiredKeyItemId: String(source.requiredKeyItemId || '').trim(),
+    keyRequirement: String(source.keyRequirement || 'none'),
+    linkedCheckIds: normalizeLinkedCheckIds(source),
+    linkedCheckId: String(source.linkedCheckId || '').trim(),
+    accessExpression: normalizeAccessExpression(source.accessExpression),
+    exitLocationId: String(source.exitLocationId || '').trim(),
+    exitOnly: Boolean(source.exitOnly),
+    passageBlocked: Boolean(source.passageBlocked),
+    passageReason: String(source.passageReason || '').trim(),
+    keyAccessState: String(source.keyAccessState || 'none'),
+    keyUnlocked: Boolean(source.keyUnlocked),
+    hiddenForPlayers: Boolean(source.hiddenForPlayers),
+    parentIds: Array.isArray(source.parentIds)
+      ? [...new Set(source.parentIds.map((id) => String(id || '').trim()).filter(Boolean))]
       : [],
-    childIds: Array.isArray(raw.childIds)
-      ? [...new Set(raw.childIds.map((id) => String(id || '').trim()).filter(Boolean))]
+    childIds: Array.isArray(source.childIds)
+      ? [...new Set(source.childIds.map((id) => String(id || '').trim()).filter(Boolean))]
       : [],
-    depth: Math.max(0, Math.floor(Number(raw.depth) || 0)),
-    roomCodes: Array.isArray(raw.roomCodes)
-      ? [...new Set(raw.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
+    depth: Math.max(0, Math.floor(Number(source.depth) || 0)),
+    roomCodes: Array.isArray(source.roomCodes)
+      ? [...new Set(source.roomCodes.map((code) => String(code || '').trim()).filter(Boolean))]
       : [],
   };
 };
@@ -226,7 +222,7 @@ const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
   if (!Array.isArray(rawNodes)) return [];
   const seen = new Set();
   const out = [];
-  rawNodes.forEach((raw, idx) => {
+  restoreLocationSessionNodes(rawNodes).forEach((raw, idx) => {
     const node = normalizeHubSessionNode(raw, now, idx);
     if (!node || seen.has(node.containerId)) return;
     seen.add(node.containerId);
@@ -269,6 +265,8 @@ const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
   const lockedIds = nodes
     .filter((node) => node.locked || node.passageBlocked)
     .map((node) => node.containerId);
+  // Патч 544: запертый корень выдачи тоже граница видимости для своих детей.
+  if (session.locked) lockedIds.push(session.containerId);
   const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
     lockedIds,
     isGm,
@@ -719,6 +717,27 @@ const deductLootItems = (itemsList, takes) => {
 };
 
 /**
+ * Патч 544: серверная граница доступа. Узел считается закрытым не только когда
+ * заперт он сам, но и когда он лежит за запертой/перекрытой локацией-родителем.
+ * Клиентский фильтр списка не является защитой: прямой WS-запрос тоже проверяется.
+ */
+const isNodeBehindSessionBarrier = (session, nodeId) => {
+  if (!session || session.kind !== 'hub') return false;
+  const nodes = Array.isArray(session.nodes) ? session.nodes : [];
+  const graph = locationGraph.buildGraphFromSession(session.containerId, nodes);
+  const lockedIds = nodes
+    .filter((node) => node.locked || node.passageBlocked)
+    .map((node) => node.containerId);
+  if (session.locked) lockedIds.push(session.containerId);
+  const hidden = new Set(locationGraph.hiddenBehindLock(graph, {
+    lockedIds,
+    isGm: false,
+    rootId: session.containerId,
+  }));
+  return hidden.has(String(nodeId || '').trim());
+};
+
+/**
  * Атомарное взятие предметов игроком из контейнера добычи (или вложенного узла локации).
  */
 const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
@@ -726,8 +745,8 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
   }
   // Патч 516: без требуемого ключа точку нельзя ни открыть, ни обобрать.
-  if (session.locked && session.keyAccessState !== 'none') {
-    return { error: ERROR_CODE.KEY_REQUIRED, session };
+  if (session.locked) {
+    return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
@@ -748,7 +767,7 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
     }
     const targetNode = session.nodes[nodeIdx];
-    if (targetNode.locked) {
+    if (targetNode.locked || isNodeBehindSessionBarrier(session, targetNode.containerId)) {
       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
     }
 
@@ -805,8 +824,8 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
   }
   // Патч 516: торговля закрыта, пока не добыт обязательный ключ или не
   // пройдена привязанная проверка.
-  if (session.locked && session.keyAccessState !== 'none') {
-    return { error: ERROR_CODE.KEY_REQUIRED, session };
+  if (session.locked) {
+    return { error: session.keyAccessState !== 'none' ? ERROR_CODE.KEY_REQUIRED : ERROR_CODE.CONTAINER_LOCKED, session };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
@@ -827,7 +846,7 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
       return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
     }
     merchantTarget = session.nodes[hubNodeIdx];
-    if (merchantTarget.locked) {
+    if (merchantTarget.locked || isNodeBehindSessionBarrier(session, merchantTarget.containerId)) {
       return { error: ERROR_CODE.CONTAINER_LOCKED, session };
     }
   }

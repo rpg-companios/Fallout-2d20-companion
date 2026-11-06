@@ -1,6 +1,24 @@
 # Changelog
 ---
 
+## Player location window: location, lock, chest (patch 544)
+
+Fixed the nested-location viewing regression: players again see
+"location → lock → chest → contents" instead of a flat pile of chests and
+terminals.
+
+- **A location is not a chest.** Nested locations use the map icon and an
+  entry button; an empty or not-yet-revealed location never shows "all taken".
+  Kind and graph edges survive a legacy room server via a spatial node marker
+  in `lockLabel`.
+- **A lock is not a terminal.** A door barrier opens the lockpicking mini-game;
+  the shared check registry no longer rewrites the node kind to terminal.
+- **Hierarchy and barrier.** A child location's contents stay hidden until
+  entry and passing the barrier; after success only direct children appear.
+  A chest reveals its contents as a separate step.
+- **Server guard.** Direct WS loot/trade requests behind a locked or blocked
+  parent location are rejected even if the client tries to bypass the list.
+
 ## Passage blocking (patch 543)
 
 Thesis 28 implemented per the owner's approved model: the Master blocks a

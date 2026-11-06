@@ -9,6 +9,7 @@
 
 import itemStacking from './itemStacking.js';
 import locationGraph from './locationGraph.js';
+import { withLocationNodeMarker } from './locationNodeMarker.js';
 import {
   normalizeAccessExpression,
   expressionCheckIds,
@@ -650,9 +651,12 @@ const makeSessionNode = (child, link = {}) => ({
 });
 
 const stampSessionNode = (node) => {
-  if (node.kind === CONTAINER_KIND.TERMINAL) return withTerminalNodeMarker(node);
-  if (node.kind === CONTAINER_KIND.LOCK) return withLockNodeMarker(node);
-  return node;
+  let stamped = node;
+  if (node.kind === CONTAINER_KIND.TERMINAL) stamped = withTerminalNodeMarker(node);
+  else if (node.kind === CONTAINER_KIND.LOCK) stamped = withLockNodeMarker(node);
+  // Патч 544: поверх маркера проверки кладём пространственную обёртку, чтобы
+  // старый сервер комнат не превратил локацию в сундук и не потерял рёбра графа.
+  return withLocationNodeMarker(stamped);
 };
 
 /** Прежний построитель: ровно один уровень, только точки выдачи. Сохранён для совместимости. */

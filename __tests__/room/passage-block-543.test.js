@@ -406,7 +406,7 @@ describe('543: контракт по файлам', () => {
     expect(domain).toContain('passageBlocked: kind === CONTAINER_KIND.HUB');
     expect(domain).toContain('passageReason: kind === CONTAINER_KIND.HUB');
     expect(domain).toContain('passageBlocked: Boolean(child.passageBlocked)');
-    expect(sessionSrc).toContain('passageBlocked: Boolean(raw.passageBlocked)');
+    expect(sessionSrc).toContain('passageBlocked: Boolean(source.passageBlocked)');
     expect(sessionSrc).toContain('node.locked || node.passageBlocked');
     expect(graph).toContain('passageBlocked: Boolean(raw.passageBlocked)');
     expect(graph).toContain('Boolean(node.passageBlocked) && id !== root');
