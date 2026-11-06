@@ -1,6 +1,30 @@
 # Changelog
 ---
 
+## Passage blocking (patch 543)
+
+Thesis 28 implemented per the owner's approved model: the Master blocks a
+location's passage, the player sees a "door" with a reason, and alternate
+routes are never recalculated. Just two fields on the location — no new
+entities.
+
+- **A "Block" button in the hub tree.** In the location's name row, right
+  before "Settings" (locations only). A dialog asks for the reason — the
+  Master's free text; an empty reason reaches the player as "Passage
+  blocked". While blocked the button becomes "Unblock": it lifts the block
+  and clears the reason.
+- **Effect: the location cannot be entered from any side.** Transit through
+  the blocked link breaks (children and the special exit are hidden), but
+  alternate routes are not recalculated: another parent or exit keeps
+  working. A direct Master issue is not an entry — the issue root is never
+  blocked.
+- **The player gets a "door" screen** modelled on the 542 gatekeeper: the
+  location name, the reason, a "Back" button, no lockpicking buttons — a
+  hard barrier beats a lock, and only the Master lifts it. The list shows a
+  badge with the reason (or the default) on the row; the blocked link's
+  contents stay hidden.
+
+
 ## A whole hub issue and the player window (patch 542)
 
 The owner's clarifications are closed in one patch: hubs issue whole, the

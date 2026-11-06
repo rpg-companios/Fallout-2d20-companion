@@ -185,7 +185,11 @@
     "hubGatesEmpty": "Связей между точками пока нет",
     "hubGatePassed": "пройдено",
     "hubGatePending": "ожидает",
-    "hubGateOr": "или"
+    "hubGateOr": "или",
+    "passageBlock": "Блокировать",
+    "passageOpen": "Открыть",
+    "passageReasonTitle": "Причина перекрытия (необязательно)",
+    "passageReasonPlaceholder": "Например: обвал"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",
@@ -321,7 +325,8 @@
     "hackLocationHint": "Взлом откроет вход в локацию",
     "hackContainerHint": "Взлом откроет содержимое",
     "gateAnd": "и",
-    "exitToLocation": "Выход → {name}"
+    "exitToLocation": "Выход → {name}",
+    "passageBlocked": "Проход заблокирован"
   },
   "keyItems": {
     "title": "Ключи и записки",
