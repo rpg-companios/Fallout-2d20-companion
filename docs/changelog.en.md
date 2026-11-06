@@ -1,6 +1,38 @@
 # Changelog
 ---
 
+## A whole hub issue and the player window (patch 542)
+
+The owner's clarifications are closed in one patch: hubs issue whole, the
+player window follows entry history, and the lock is finally removed from
+standalone points.
+
+- **Graph from links plus parents.** The session is built from `links` +
+  `parentLocationId`: Nipton with nested locations, a terminal and a lock
+  issues whole instead of an empty screen with the "add at least one container
+  or merchant" warning.
+- **The top level holds only direct elements.** Top-level locations, chests
+  and merchants show immediately; nested points (a chest inside a house) stay
+  hidden until you enter. The special exit target no longer sticks out as a
+  child card — it is an "Exit → …" button.
+- **A barrier is a gatekeeper screen.** Entering a locked location first shows
+  only the lock/terminal (AND/OR options labelled "and"/"or"); contents and
+  children open after the check passes. A locked chest hides its contents, a
+  locked location hides its children.
+- **The lock is never a standalone player point** (`lock_never_standalone`):
+  standalone lock issuing is removed from the UI, lock rows and standalone
+  lock sessions are not drawn for the player; the server issuing API stays for
+  internal calls. A terminal can still be both a standalone child point and a
+  barrier.
+- **Navigation follows entry history.** Back returns only to the location you
+  came through (A→B, A→C, C→D ⇒ from D back only to C), even when it belongs
+  to another hub; `exitLocationId` lets you enter the configured location, and
+  the way back follows history rather than the administrative tree. History
+  resets when the session changes.
+- **Master hub edits reach the server:** live location updates carry the
+  access requirement and special exit, and lock/terminal difficulty syncs via
+  `nodeDifficulty` without recreating the point.
+
 ## Element parameters in the hub tree row (patch 541)
 
 A targeted admin hub-tree change at the owner's word (thesis 32). Admin-only;

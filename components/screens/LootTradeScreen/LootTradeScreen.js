@@ -40,9 +40,7 @@ import {
   buildLocationSessionNodes,
   effectiveLocationRoomCodes,
   buildStandaloneTerminalSessionNode,
-  buildStandaloneLockSessionNode,
   decodeTerminalNodeMarker,
-  decodeLockNodeMarker,
   normalizeLinkedCheckIds,
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
@@ -339,19 +337,21 @@ const ContainerCardCell = ({
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuPos(null)}>
           {menuPos && (
             <View style={[styles.actionMenu, menuPos]}>
-              <TouchableOpacity
-                style={styles.actionMenuItem}
-                onPress={() => runMenuAction(onIssueOrClose)}
-              >
-                <MaterialCommunityIcons
-                  name={isLive ? 'close-octagon-outline' : 'broadcast'}
-                  size={19}
-                  color={isLive ? '#e57373' : '#f0e68c'}
-                />
-                <Text style={styles.actionMenuText}>
-                  {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
-                </Text>
-              </TouchableOpacity>
+              {container.kind !== CONTAINER_KIND.LOCK && (
+                <TouchableOpacity
+                  style={styles.actionMenuItem}
+                  onPress={() => runMenuAction(onIssueOrClose)}
+                >
+                  <MaterialCommunityIcons
+                    name={isLive ? 'close-octagon-outline' : 'broadcast'}
+                    size={19}
+                    color={isLive ? '#e57373' : '#f0e68c'}
+                  />
+                  <Text style={styles.actionMenuText}>
+                    {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {canMoveToHub && onMoveToHub && (
                 <TouchableOpacity
@@ -658,7 +658,9 @@ export default function LootTradeScreen() {
 
     // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
     const liveEntries = getActiveLiveEntriesForContainer(saved);
-    if (saved.kind === CONTAINER_KIND.TERMINAL || saved.kind === CONTAINER_KIND.LOCK) {
+    // Патч 542: отдельно выдаётся только терминал. Замок живёт узлом сессии
+    // цели и не регистрируется через terminal.issue как самостоятельная точка.
+    if (saved.kind === CONTAINER_KIND.TERMINAL) {
       for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
         const registered = Boolean(roomEntry?.terminalStates?.[saved.id]);
         const liveSession = roomEntry?.activeSession;
@@ -682,6 +684,7 @@ export default function LootTradeScreen() {
                 keyRequirement: saved.keyRequirement || 'none',
                 linkedCheckId: saved.linkedCheckId || '',
                 linkedCheckIds: normalizeLinkedCheckIds(saved),
+                accessExpression: Array.isArray(saved.accessExpression) ? saved.accessExpression : [],
               },
             });
           } else if (terminalNode) {
@@ -692,15 +695,10 @@ export default function LootTradeScreen() {
               sessionId: liveSession.sessionId,
               nodes: (liveSession.nodes || []).map((n) => (
                 n.containerId === saved.id
-                  ? (saved.kind === CONTAINER_KIND.LOCK
-                      ? buildStandaloneLockSessionNode(saved, {
-                          locked: n.locked,
-                          lockLabel: decodeLockNodeMarker(n.lockLabel)?.label || n.lockLabel,
-                        })
-                      : buildStandaloneTerminalSessionNode(saved, {
-                          locked: n.locked,
-                          lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
-                        }))
+                  ? buildStandaloneTerminalSessionNode(saved, {
+                      locked: n.locked,
+                      lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
+                    })
                   : n
               )),
             });
@@ -719,6 +717,12 @@ export default function LootTradeScreen() {
             name: saved.name,
             description: saved.description,
             nodes: buildLocationSessionNodes(saved, freshList),
+            requiredKeyItemId: saved.requiredKeyItemId || '',
+            keyRequirement: saved.keyRequirement || 'none',
+            linkedCheckIds: saved.linkedCheckIds || [],
+            linkedCheckId: saved.linkedCheckId || '',
+            accessExpression: Array.isArray(saved.accessExpression) ? saved.accessExpression : [],
+            exitLocationId: saved.exitLocationId || '',
           });
         } else {
           await useRoomStore.getState().updateRoomSessionRates({
@@ -757,7 +761,7 @@ export default function LootTradeScreen() {
               nodeName: saved.name,
               nodeDescription: saved.description,
               nodeItems: saved.items,
-              ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
+              ...(saved.kind === CONTAINER_KIND.TERMINAL || saved.kind === CONTAINER_KIND.LOCK ? {
                 nodeDifficulty: saved.difficulty,
               } : {}),
               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
@@ -1231,6 +1235,9 @@ export default function LootTradeScreen() {
       return;
     }
 
+    // Патч 542: замок — только преграда цели, отдельной выдачи у него нет.
+    if (container.kind === CONTAINER_KIND.LOCK) return;
+
     if (container.kind === CONTAINER_KIND.HUB) {
       const resolvedNodes = buildLocationSessionNodes(container, containers);
       if (resolvedNodes.length === 0) {
@@ -1264,8 +1271,8 @@ export default function LootTradeScreen() {
       const freshAllContainers = await db.getGmContainersList();
       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
       const terminalProtocol = roomSupportsTerminalProtocol(effectiveRoomCode);
-      const isCheckSource = freshSource.kind === CONTAINER_KIND.TERMINAL
-        || freshSource.kind === CONTAINER_KIND.LOCK;
+      // Патч 542: замок не выдаётся отдельно; одиночная выдача — только терминал.
+      const isCheckSource = freshSource.kind === CONTAINER_KIND.TERMINAL;
       if (isCheckSource && terminalProtocol) {
         await useRoomStore.getState().issueTerminal({
           code: effectiveRoomCode,
@@ -1281,6 +1288,7 @@ export default function LootTradeScreen() {
             keyRequirement: freshSource.keyRequirement || 'none',
             linkedCheckId: freshSource.linkedCheckId || '',
             linkedCheckIds: normalizeLinkedCheckIds(freshSource),
+            accessExpression: Array.isArray(freshSource.accessExpression) ? freshSource.accessExpression : [],
           },
         });
       } else if (isCheckSource) {
@@ -1299,9 +1307,7 @@ export default function LootTradeScreen() {
             targetCharacterId,
             targetCharacterName,
             items: [],
-            nodes: [freshSource.kind === CONTAINER_KIND.LOCK
-              ? buildStandaloneLockSessionNode(freshSource)
-              : buildStandaloneTerminalSessionNode(freshSource)],
+            nodes: [buildStandaloneTerminalSessionNode(freshSource)],
           },
         });
       } else {
@@ -1330,6 +1336,8 @@ export default function LootTradeScreen() {
               keyRequirement: freshSource.keyRequirement || 'none',
               linkedCheckIds: freshSource.linkedCheckIds || [],
               linkedCheckId: freshSource.linkedCheckId || '',
+              accessExpression: Array.isArray(freshSource.accessExpression) ? freshSource.accessExpression : [],
+              exitLocationId: freshSource.exitLocationId || '',
             } : {}),
           },
         });
@@ -2061,22 +2069,24 @@ export default function LootTradeScreen() {
                   <Text style={styles.smallHeaderBtnText}>{tLootTrade('detail.editSettings')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.smallHeaderBtn,
-                    activeLiveSession ? styles.stopIssueHeaderBtn : styles.issueHeaderBtn,
-                  ]}
-                  onPress={() => handleIssueOrClosePress(activeContainer)}
-                >
-                  <MaterialCommunityIcons
-                    name={activeLiveSession ? 'stop-circle-outline' : 'broadcast'}
-                    size={15}
-                    color="#fff"
-                  />
-                  <Text style={styles.smallHeaderBtnText}>
-                    {tLootTrade(activeLiveSession ? 'detail.stopIssueButton' : 'detail.issueButton')}
-                  </Text>
-                </TouchableOpacity>
+                {activeContainer.kind !== CONTAINER_KIND.LOCK && (
+                  <TouchableOpacity
+                    style={[
+                      styles.smallHeaderBtn,
+                      activeLiveSession ? styles.stopIssueHeaderBtn : styles.issueHeaderBtn,
+                    ]}
+                    onPress={() => handleIssueOrClosePress(activeContainer)}
+                  >
+                    <MaterialCommunityIcons
+                      name={activeLiveSession ? 'stop-circle-outline' : 'broadcast'}
+                      size={15}
+                      color="#fff"
+                    />
+                    <Text style={styles.smallHeaderBtnText}>
+                      {tLootTrade(activeLiveSession ? 'detail.stopIssueButton' : 'detail.issueButton')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
@@ -2633,7 +2643,7 @@ export default function LootTradeScreen() {
           void ensureGmRoomConnected(code).catch(() => {});
         }}
         onConfirmIssue={handleConfirmIssue}
-        roomWideOnly={[CONTAINER_KIND.TERMINAL, CONTAINER_KIND.LOCK].includes(issueTargetContainer?.kind) || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL || node.kind === CONTAINER_KIND.LOCK))}
+        roomWideOnly={issueTargetContainer?.kind === CONTAINER_KIND.TERMINAL || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildLocationSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL || node.kind === CONTAINER_KIND.LOCK))}
         onClose={() => setIssueTargetContainer(null)}
       />
 

@@ -60,6 +60,8 @@ import useCharacterStore from '../../src/store/characterStore';
 import useRoomStore from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
 
+// Патч 542: замок больше не рисуется строкой игрока (lock_never_standalone),
+// поэтому для проверки берём терминал — законная самостоятельная дочерняя точка.
 const location = () => ({
   sessionId: 'session-524',
   containerId: 'vault',
@@ -67,7 +69,7 @@ const location = () => ({
   name: 'Убежище',
   targetType: 'room',
   nodes: [
-    { containerId: 'lock-1', kind: 'lock', name: 'Замок', difficulty: 2, parentIds: ['vault'], childIds: [] },
+    { containerId: 'term-1', kind: 'terminal', name: 'Терминал', difficulty: 2, parentIds: ['vault'], childIds: [] },
     { containerId: 'box-1', kind: 'loot', name: 'Сундук', parentIds: ['vault'], childIds: [], items: [] },
   ],
 });
@@ -116,7 +118,17 @@ describe('524: окно локации и «Покинуть локацию»', 
           joined: true,
           members: [{ clientId: 'player-client', role: 'player' }],
           activeSession: null,
-          terminalStates: {},
+          terminalStates: {
+            'term-1': {
+              containerId: 'term-1',
+              config: {
+                containerId: 'term-1', kind: 'terminal', name: 'Терминал', difficulty: 2,
+              },
+              game: null,
+              closed: false,
+              locked: false,
+            },
+          },
         },
       },
     });
@@ -127,7 +139,7 @@ describe('524: окно локации и «Покинуть локацию»', 
     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' }).length).toBeGreaterThan(0);
     const hack = renderer.root.findAllByProps({ testID: 'terminal-hack-button' })[0];
     await act(async () => { hack.props.onPress(); await Promise.resolve(); });
-    expect(renderer.root.findAllByType('LockPickingModal').length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByType('TerminalHackingModal').length).toBeGreaterThan(0);
     // visible={!terminalSelection}: кнопка «Покинуть локацию» больше не видна
     // и не «залипает» под затемнением мини-игры.
     expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
@@ -146,15 +158,13 @@ describe('524: окно локации и «Покинуть локацию»', 
     await act(async () => renderer.unmount());
   });
 
-  it('отдельный замок сначала даёт входную модалку, доска — только по «Взломать» (525)', async () => {
+  it('отдельно выданный замок не становится точкой игрока (542)', async () => {
+    // lock_never_standalone: владелец убрал отдельную выдачу замка — такая
+    // сессия не открывает для игрока ни окна, ни кнопок.
     const renderer = await mount(standaloneLock());
-    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
+    expect(renderer.root.findAllByType('StandaloneCheckModal')).toHaveLength(0);
     expect(renderer.root.findAllByType('LockPickingModal')).toHaveLength(0);
-    const entry = renderer.root.findByType('StandaloneCheckModal');
-    expect(entry.props.visible).toBe(true);
-    await act(async () => { entry.props.onHack(); await Promise.resolve(); });
-    const modal = renderer.root.findByType('LockPickingModal');
-    expect(modal.props).toMatchObject({ containerId: 'lock-1', visible: true, autoStart: true });
+    expect(renderer.root.findAllByProps({ testID: 'leave-hub-button' })).toHaveLength(0);
     const texts = renderer.root.findAllByType('Text').map((n) => String(n.props.children ?? ''));
     expect(texts.some((t) => t.includes('Покинуть локацию'))).toBe(false);
     await act(async () => renderer.unmount());

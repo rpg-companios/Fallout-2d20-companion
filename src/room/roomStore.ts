@@ -166,6 +166,13 @@ interface RoomStoreState {
     nodeDifficulty?: number;
     locked?: boolean;
     lockLabel?: string;
+    // Патч 542: живая правка требования доступа и особого выхода корня.
+    requiredKeyItemId?: string;
+    keyRequirement?: string;
+    linkedCheckId?: string;
+    linkedCheckIds?: unknown[];
+    accessExpression?: unknown[];
+    exitLocationId?: string;
     // Патч 523: «заблокировать всё» на узле с детьми и адресное открытие.
     lockAll?: string | null;
     unlock?: string | null;
