@@ -1,6 +1,32 @@
 # Changelog
 ---
 
+## Not enough bobby pins — stop (patch 550)
+
+The owner's ruling on the question surfaced by patch 549 acceptance: **"when bobby
+pins are short — stop. One pin equals one pin."**
+
+- **The remainder is no longer consumed.** Previously a pin still disappeared when
+  stock was short: storage refused correctly, but the legacy fallback for older
+  save formats spent what was there — with one pin and a request for three, one was
+  spent. Now exactly the requested number is spent, or nothing at all.
+- **A refusal leaves the sheet untouched.** Stock is checked before any change: if
+  pins are short, the inventory stays as it was, the sheet is neither saved nor
+  published to the Game Master. No matter how often such a command arrives, the pin
+  survives.
+- **One rule for everyone.** It applies when the player breaks a pin, when the
+  change arrives as a Game Master command, and for both current and older character
+  save formats. GM/player parity (patch 549) holds: both paths give the same result.
+- **Picking stops.** With no pins the board does not play: "Out of pins", and presses
+  are rejected. That behaviour was already correct and is now locked in by a check
+  so it cannot be lost.
+- **Acceptance.** `pin-spend-all-or-nothing-550` (15): shortage and exact stock,
+  several stacks, empty inventory, legacy save formats, the last pin, repeated
+  refusal, parity between a Master command and the player's own action, and the
+  board stopping. Total: 282 files, 2602 checks, all green.
+
+---
+
 ## One drag mechanism and GM/player parity (patch 549)
 
 Work requested by the owner: "The Game Master section must match the player's
