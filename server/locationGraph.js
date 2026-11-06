@@ -56,6 +56,75 @@ const normalizeLinks = (raw) => {
   return out;
 };
 
+/**
+ * Патч 545: единый закон порядка детей. Мастер таскает строки дерева хаба,
+ * порядок сохраняется на родителе (`childOrder`) и один-в-один едет игроку
+ * через `childIds` сессии. Канон здесь, чтобы лёгкий серверный деплой и
+ * клиентское дерево не разошлись.
+ */
+const CONTAINER_KIND_SORT_ORDER = Object.freeze({
+  hub: 0,
+  loot: 1,
+  terminal: 2,
+  lock: 3,
+  merchant: 4,
+});
+
+const normalizeChildOrder = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const value of raw) {
+    const id = normalizeId(value);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+};
+
+const compareChildIds = (byId) => (a, b) => {
+  const na = byId?.get?.(a) || {};
+  const nb = byId?.get?.(b) || {};
+  const ra = CONTAINER_KIND_SORT_ORDER[na.kind] ?? 99;
+  const rb = CONTAINER_KIND_SORT_ORDER[nb.kind] ?? 99;
+  if (ra !== rb) return ra - rb;
+  const nameCmp = String(na.name || '').localeCompare(String(nb.name || ''), 'ru');
+  if (nameCmp !== 0) return nameCmp;
+  return String(a).localeCompare(String(b), 'ru');
+};
+
+/**
+ * Упорядочить прямых детей родителя: сначала явный `childOrder` Мастера,
+ * затем новые/неупомянутые дети — по типу и имени (прежний порядок дерева).
+ * Лишние id в `childOrder` игнорируются, дубли детей не появляются.
+ */
+const orderChildIds = (parent, childIds, byId) => {
+  const ids = normalizeChildOrder(childIds);
+  const order = normalizeChildOrder(parent?.childOrder);
+  if (!order.length) return [...ids].sort(compareChildIds(byId));
+  const position = new Map(order.map((id, index) => [id, index]));
+  const ordered = ids
+    .filter((id) => position.has(id))
+    .sort((a, b) => position.get(a) - position.get(b));
+  const rest = ids
+    .filter((id) => !position.has(id))
+    .sort(compareChildIds(byId));
+  return [...ordered, ...rest];
+};
+
+/** Перестановка перетаскиванием: переносимый занимает место цели среди братьев. */
+const moveChildInOrder = (childIds, childId, targetChildId) => {
+  const ids = normalizeChildOrder(childIds);
+  const from = ids.indexOf(normalizeId(childId));
+  const to = ids.indexOf(normalizeId(targetChildId));
+  if (from < 0 || to < 0 || from === to) return ids;
+  const next = [...ids];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+};
+
 /** Узел графа: только то, что важно для связей и видимости. */
 const normalizeGraphNode = (raw) => {
   if (!raw || typeof raw !== 'object') return null;
@@ -64,9 +133,13 @@ const normalizeGraphNode = (raw) => {
   return {
     id,
     kind: String(raw.kind || 'loot'),
+    // Патч 545: имя нужно единому fallback-порядку детей (тип → имя → id).
+    name: String(raw.name || '').trim(),
     roomCodes: normalizeRoomCodes(raw),
     locked: Boolean(raw.locked),
     links: normalizeLinks(raw),
+    // Патч 545: явный порядок прямых детей, заданный Мастером в дереве.
+    childOrder: normalizeChildOrder(raw.childOrder),
     // Патч 542: админская матрёшка и особый выход — часть игрового графа.
     parentLocationId: normalizeId(raw.parentLocationId),
     exitLocationId: normalizeId(raw.exitLocationId),
@@ -107,6 +180,12 @@ const buildLocationGraph = (containers = []) => {
     if (node.exitLocationId && byId.has(node.exitLocationId) && node.exitLocationId !== node.id) {
       exits.set(node.id, node.exitLocationId);
     }
+  }
+  // Патч 545: порядок детей у родителя — канон и для дерева Мастера, и для
+  // плоского списка сессии. Несколько родителей не смешивают порядки: каждый
+  // родитель сортирует своих детей по своему `childOrder`.
+  for (const [parentId, ids] of children.entries()) {
+    children.set(parentId, orderChildIds(byId.get(parentId), ids, byId));
   }
   return { byId, children, parents, exits };
 };
@@ -297,6 +376,15 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
     const exitId = normalizeId(node.exitLocationId);
     if (exitId && byId.has(exitId)) exits.set(id, exitId);
   }
+  // Патч 545: в сессии порядок детей уже записан в `childIds` родителя.
+  // Граф из сессии уважает его, а не порядок обхода плоского списка.
+  for (const node of list) {
+    const id = nodeId(node);
+    if (!id || !children.has(id)) continue;
+    const ordered = normalizeChildOrder(node.childIds);
+    if (!ordered.length) continue;
+    children.set(id, orderChildIds({ childOrder: ordered }, children.get(id), byId));
+  }
   return { byId, children, parents, exits };
 };
 
@@ -316,6 +404,11 @@ module.exports = {
   normalizeId,
   normalizeRoomCodes,
   normalizeLinks,
+  // Патч 545: единый закон порядка детей (Мастер = игрок).
+  CONTAINER_KIND_SORT_ORDER,
+  normalizeChildOrder,
+  orderChildIds,
+  moveChildInOrder,
   normalizeGraphNode,
   buildLocationGraph,
   descendantsOf,

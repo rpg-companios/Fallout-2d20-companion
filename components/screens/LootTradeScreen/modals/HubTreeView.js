@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
 import {
   CONTAINER_KIND,
-  CONTAINER_KIND_SORT_ORDER,
   getHubIdsContainingChild,
 } from '../../../../domain/lootTrade';
+import locationGraph from '../../../../domain/locationGraph';
 import {
   resolveAccessExpression,
   formatAccessExpression,
@@ -29,6 +29,11 @@ import {
  * Патч 541: название элемента больше не открывает настройки. У каждой строки
  * (локация, сундук, торговец, терминал, замок, ключ) справа стоит кнопка
  * «Параметры»; раскрытие вложенных локаций по-прежнему идёт стрелкой-шевроном.
+ *
+ * Патч 545: строки одного родителя меняются местами перетаскиванием за ручку.
+ * Дерево не пишет в БД само — отдаёт новый порядок наружу; канон порядка и
+ * переноса живёт в `server/locationGraph.js` (через domain-фасад), тот же
+ * порядок получает игрок. Ключи остаются после объектов и не перетаскиваются.
  */
 const HubTreeView = ({
   hub,
@@ -45,11 +50,20 @@ const HubTreeView = ({
   onUpdateLockLabel,
   onMoveNestedOut,
   onTogglePassage,
+  onReorderChildren,
 }) => {
   useLocale();
   const [expanded, setExpanded] = useState(() => new Set());
   // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
   const [passagePrompt, setPassagePrompt] = useState(null);
+  // Патч 545: перетаскивание строк одного родителя. Контекст задаётся ручкой
+  // строки, PanResponder только измеряет/подсвечивает и отдаёт новый порядок.
+  const rowRefs = useRef({});
+  const dragContextRef = useRef(null);
+  const activeDragRef = useRef(null);
+  const reorderRef = useRef(onReorderChildren);
+  reorderRef.current = onReorderChildren;
+  const [dragPreview, setDragPreview] = useState(null);
 
   const list = Array.isArray(containers) ? containers : [];
   const byId = useMemo(() => {
@@ -99,13 +113,12 @@ const HubTreeView = ({
         result.push({ container: c, link });
       }
     }
-    result.sort((a, b) => {
-      const ra = CONTAINER_KIND_SORT_ORDER[a.container?.kind] ?? 99;
-      const rb = CONTAINER_KIND_SORT_ORDER[b.container?.kind] ?? 99;
-      if (ra !== rb) return ra - rb;
-      return String(a.container?.name || '').localeCompare(String(b.container?.name || ''), 'ru');
-    });
-    return result;
+    // Патч 545: тот же закон порядка, что у графа сессии: явный childOrder
+    // Мастера, затем новые дети по типу/имени. Мастер и игрок не расходятся.
+    const entryById = new Map(result.map((entry) => [entry.container.id, entry]));
+    return locationGraph.orderChildIds(node, result.map((entry) => entry.container.id), byId)
+      .map((id) => entryById.get(id))
+      .filter(Boolean);
   };
 
   const toggleExpanded = (id) => {
@@ -114,6 +127,96 @@ const HubTreeView = ({
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  // Патч 545: перетаскивание меняет порядок только среди строк одного
+  // родителя. Границы строк измеряются в окне, как у карточек на сетке.
+  const measureSiblingRows = (siblingIds) => {
+    const bounds = {};
+    for (const id of siblingIds) {
+      const ref = rowRefs.current[id];
+      if (ref?.measureInWindow) {
+        ref.measureInWindow((x, y, width, height) => {
+          bounds[id] = { x, y, width, height };
+        });
+      }
+    }
+    return bounds;
+  };
+
+  const siblingAtPoint = (drag, point) => {
+    if (!drag || !point) return null;
+    for (const id of drag.siblingIds) {
+      if (id === drag.childId) continue;
+      const b = drag.bounds[id];
+      if (b
+        && point.x >= b.x && point.x <= b.x + b.width
+        && point.y >= b.y && point.y <= b.y + b.height) return id;
+    }
+    return null;
+  };
+
+  const finishDrag = (cancelled) => {
+    const drag = activeDragRef.current;
+    activeDragRef.current = null;
+    dragContextRef.current = null;
+    setDragPreview(null);
+    if (cancelled || !drag) return;
+    const targetId = drag.overId || siblingAtPoint(drag, drag.point);
+    if (!targetId || targetId === drag.childId) return;
+    const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
+    if (nextOrder.join('\u0000') === drag.siblingIds.join('\u0000')) return;
+    reorderRef.current?.(drag.parentId, nextOrder);
+  };
+
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+    onPanResponderGrant: (_evt, gesture) => {
+      const context = dragContextRef.current;
+      if (!context) return;
+      activeDragRef.current = {
+        ...context,
+        bounds: measureSiblingRows(context.siblingIds),
+        overId: null,
+        point: { x: gesture.x0, y: gesture.y0 },
+      };
+      setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
+    },
+    onPanResponderMove: (_evt, gesture) => {
+      const drag = activeDragRef.current;
+      if (!drag) return;
+      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+      drag.point = { x: gesture.moveX, y: gesture.moveY };
+      const overId = siblingAtPoint(drag, drag.point);
+      if (overId !== drag.overId) {
+        drag.overId = overId;
+        setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
+      }
+    },
+    onPanResponderRelease: () => finishDrag(false),
+    onPanResponderTerminate: () => finishDrag(true),
+  })).current;
+
+  const dragHandlersFor = (parentNode, container, siblingIds) => ({
+    ...panResponder.panHandlers,
+    onStartShouldSetPanResponder: () => {
+      dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
+      return true;
+    },
+    onMoveShouldSetPanResponder: () => {
+      if (!dragContextRef.current) {
+        dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
+      }
+      return true;
+    },
+  });
+
+  const setRowRef = (id) => (ref) => {
+    if (ref) rowRefs.current[id] = ref;
+    else delete rowRefs.current[id];
   };
 
   const open = (container) => {
@@ -222,7 +325,7 @@ const HubTreeView = ({
   };
 
   // Рекурсивный узел. visited защищает от циклов матрёшки.
-  const renderNode = (entry, depth, visited, isDirectChild) => {
+  const renderNode = (entry, depth, visited, isDirectChild, parentNode) => {
     const { container, link } = entry;
     if (!container || visited.has(container.id)) return null;
     const nextVisited = new Set(visited);
@@ -233,10 +336,35 @@ const HubTreeView = ({
     const kids = isHub ? childrenOf(container) : [];
     const sharedHubCount = getHubIdsContainingChild(container.id, list).length;
     const pieces = (container.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+    // Патч 545: ручка перестановки есть у строк с братьями внутри одного
+    // родителя (включая раскрытую вложенную локацию). Ключи не трогаем.
+    const siblingIds = parentNode ? childrenOf(parentNode).map((kid) => kid.container.id) : [];
+    const canReorder = Boolean(parentNode && siblingIds.length > 1 && typeof onReorderChildren === 'function');
+    const isDragging = dragPreview?.childId === container.id;
+    const isDropTarget = dragPreview?.overId === container.id;
 
     return (
       <View key={container.id} style={[styles.node, { marginLeft: depth * 16 }]}>
-        <View style={styles.nodeHeader}>
+        <View
+          ref={setRowRef(container.id)}
+          testID={`hub-tree-row-${container.id}`}
+          style={[
+            styles.nodeHeader,
+            isDragging && styles.nodeHeaderDragging,
+            isDropTarget && styles.nodeHeaderDropTarget,
+          ]}
+        >
+          {canReorder && (
+            <View
+              testID={`hub-tree-reorder-${container.id}`}
+              {...dragHandlersFor(parentNode, container, siblingIds)}
+              style={styles.dragHandle}
+              accessibilityRole="button"
+              accessibilityLabel={formatLootTrade(tLootTrade('detail.hubReorderHandle'), { name: container.name })}
+            >
+              <MaterialCommunityIcons name="arrow-all" size={14} color={ADMIN_MODAL_PALETTE.mutedText} />
+            </View>
+          )}
           {isHub ? (
             <TouchableOpacity
               testID={`hub-tree-toggle-${container.id}`}
@@ -371,7 +499,7 @@ const HubTreeView = ({
               <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmptyNode')}</Text>
             ) : (
               <>
-                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
+                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false, container))}
                 {(container.keyItemIds || []).map((keyId) => renderKeyNode(keyId, depth + 1, container))}
               </>
             )}
@@ -387,11 +515,16 @@ const HubTreeView = ({
 
   return (
     <ScrollView style={styles.scroll} nestedScrollEnabled>
+      {dragPreview ? (
+        <Text testID="hub-tree-reorder-hint" style={styles.reorderHint}>
+          {tLootTrade('detail.hubReorderHint')}
+        </Text>
+      ) : null}
       {directKids.length === 0 && directKeyIds.length === 0 ? (
         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
       ) : (
         <>
-          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))}
+          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true, hub))}
           {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
         </>
       )}
@@ -459,6 +592,29 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     paddingHorizontal: 6,
     paddingVertical: 6,
+  },
+  // Патч 545: ручка и подсветка перестановки — в палитре соседних модалок.
+  dragHandle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  nodeHeaderDragging: { opacity: 0.55 },
+  nodeHeaderDropTarget: {
+    borderWidth: 2,
+    borderColor: ADMIN_MODAL_PALETTE.gold,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+  },
+  reorderHint: {
+    color: ADMIN_MODAL_PALETTE.mutedText,
+    fontSize: 11,
+    paddingVertical: 4,
   },
   chevronBtn: { width: 26, alignItems: 'center', justifyContent: 'center' },
   nodeNameBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },

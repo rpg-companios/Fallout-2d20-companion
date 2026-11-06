@@ -19,6 +19,7 @@ vi.mock('react-native', () => {
     TextInput: host('TextInput'),
     ScrollView: host('ScrollView'),
     StyleSheet: { create: (styles) => styles },
+    PanResponder: { create: (config) => ({ panHandlers: config }) },
   };
 });
 

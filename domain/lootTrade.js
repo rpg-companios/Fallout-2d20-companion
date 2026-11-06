@@ -494,13 +494,9 @@ export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
   return out;
 };
 
-export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
-  [CONTAINER_KIND.HUB]: 0,
-  [CONTAINER_KIND.LOOT]: 1,
-  [CONTAINER_KIND.TERMINAL]: 2,
-  [CONTAINER_KIND.LOCK]: 3,
-  [CONTAINER_KIND.MERCHANT]: 4,
-});
+// Патч 545: ранги типов для fallback-порядка детей живут в каноне графа
+// (server/locationGraph.js), чтобы дерево Мастера и список игрока не разошлись.
+export const CONTAINER_KIND_SORT_ORDER = locationGraph.CONTAINER_KIND_SORT_ORDER;
 
 /**
  * Сортировка карточек на главном экране «Добыча/Торговля»:
@@ -791,6 +787,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   // узла не имеет смысла), а циклы из нескольких узлов — разрешены.
   const links = normalizeHubLinks(raw.links)
     .filter((lnk) => lnk.containerId !== String(raw.id || ''));
+  // Патч 545: порядок прямых детей, заданный перетаскиванием в дереве Мастера.
+  // Хранится на родителе, поэтому у узла с несколькими родителями каждый
+  // родитель держит свой порядок; игроку он приходит как `childIds` сессии.
+  const childOrder = locationGraph.normalizeChildOrder(raw.childOrder);
   const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
   const primaryRoomCode = roomCodes[0] || '';
   const inRoot = kind === CONTAINER_KIND.HUB
@@ -820,6 +820,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
       : DEFAULT_BUY_DEPRECIATION_PERCENT,
     items,
     links,
+    childOrder,
     // Патч 514: вложенные ключевые записи и две строки требования доступа.
     // Терминал ключи не содержит ни при создании, ни перетаскиванием.
     keyItemIds: containerCanHoldKey(kind) ? normalizeKeyItemIds(raw.keyItemIds) : [],

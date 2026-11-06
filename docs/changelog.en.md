@@ -1,6 +1,32 @@
 # Changelog
 ---
 
+## Place order in a location: Master drag order = player order (patch 545)
+
+In the Master interface, while working with a hub/location, positions can be
+reordered by dragging. The key rule: the Master's order of locations/objects
+matches the player's order of places.
+
+- **An arrow handle on tree rows.** Rows sharing the same parent (locations,
+  chests, merchants, terminals, locks) now have a drag icon. Drag a row onto
+  another row at the same level and it takes that position; the target is
+  highlighted and a hint reminds you that players will see the same order.
+  It also works inside an expanded nested location.
+- **Order is stored on the parent.** A new `childOrder` on the location/node
+  defines the sequence of direct children. A child shared by several parents
+  keeps an independent order for each parent. New/unmentioned children append
+  using the previous "kind → name" fallback, and removed ids do not break the
+  list.
+- **Players see the same thing.** The session graph sorts children by
+  `childOrder`; the flat session list and `childIds` carry that order, and the
+  player window inside a nested location additionally sorts places by the
+  parent's `childIds`. The patch 544 marker preserves the order even through a
+  legacy room server.
+- **Live issues keep up.** Saving the order uses the regular
+  `persistAndSyncContainer`: live sessions receive rebuilt graph nodes, so
+  players see the new order without re-issuing. Keys remain rows after objects
+  and are not draggable; game links/locks/barriers are unchanged.
+
 ## Player location window: location, lock, chest (patch 544)
 
 Fixed the nested-location viewing regression: players again see

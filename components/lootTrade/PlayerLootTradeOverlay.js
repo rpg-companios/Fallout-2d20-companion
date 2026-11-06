@@ -759,13 +759,25 @@ export default function PlayerLootTradeOverlay() {
     // считаются детьми корня. Запертые потомки уже скрыты сервером.
     // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
     // никогда не самостоятельная строка игрока.
-    const hubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
+    const visibleHubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
       if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
       const parents = Array.isArray(node.parentIds) && node.parentIds.length
         ? node.parentIds
         : [rootId];
       return parents.includes(currentParentId);
     });
+    // Патч 545: порядок мест у игрока = порядок дерева Мастера. Внутри
+    // вложенной локации сортируем по `childIds` родителя (канон графа), а не
+    // по плоскому BFS-списку: общий ребёнок нескольких родителей не «всплывает»
+    // раньше братьев. Корень идёт в порядке сессии, собранной тем же графом.
+    const parentChildOrder = Array.isArray(currentNode?.childIds) ? currentNode.childIds : [];
+    const hubNodes = parentChildOrder.length
+      ? [...visibleHubNodes].sort((a, b) => {
+        const ia = parentChildOrder.indexOf(a.containerId);
+        const ib = parentChildOrder.indexOf(b.containerId);
+        return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
+      })
+      : visibleHubNodes;
     const exitLocationId = String(currentTarget.exitLocationId || '').trim();
     const exitNode = exitLocationId && !currentGatePending
       ? sessionNodes.find((node) => node.containerId === exitLocationId)

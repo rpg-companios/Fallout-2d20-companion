@@ -36,6 +36,7 @@ vi.mock('react-native', () => {
     ScrollView: host('ScrollView'),
     Image: host('Image'),
     useWindowDimensions: () => ({ width: 420, height: 800 }),
+    PanResponder: { create: (config) => ({ panHandlers: config }) },
   };
 });
 

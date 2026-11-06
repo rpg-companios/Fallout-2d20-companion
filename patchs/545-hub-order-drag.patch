@@ -1,0 +1,1256 @@
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index fb1c5fc..b819ce6 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('544');
++    expect(version.version).toBe('545');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(143);
+-    expect(version.notes['en-EN']).toHaveLength(143);
+-    expect(json('patchs/baseline.json').baseline).toBe('544');
++    expect(version.notes['ru-RU']).toHaveLength(144);
++    expect(version.notes['en-EN']).toHaveLength(144);
++    expect(json('patchs/baseline.json').baseline).toBe('545');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -270,20 +270,22 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
+     expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
++    expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **544**');
++    expect(roadmap).toContain('Текущая версия: **545**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 544');
++    expect(roadmap).toContain('Осталось после патча 545');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/patch-544-install.md')).toContain('544');
++    expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/hub-order-drag-545.test.js b/__tests__/room/hub-order-drag-545.test.js
+new file mode 100644
+index 0000000..dbbf733
+--- /dev/null
++++ b/__tests__/room/hub-order-drag-545.test.js
+@@ -0,0 +1,308 @@
++// ПРИЁМОЧНЫЙ (патч 545): удалить при конверсии/приживании.
++// Патч 545: перетаскивание меняет порядок позиций в дереве Мастера, и этот
++// порядок один-в-один воспроизводится в окне игрока. Канон порядка —
++// `childOrder` родителя + `server/locationGraph.js`; сессия несёт его в
++// `childIds`, маркер 544 сохраняет рёбра/порядок через старый сервер.
++import { describe, expect, it, vi } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const mockLayout = vi.hoisted(() => ({ bounds: {} }));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  const View = React.forwardRef(({ children, ...props }, ref) => {
++    React.useImperativeHandle(ref, () => ({
++      measureInWindow: (cb) => {
++        const b = mockLayout.bounds[props.testID] || { x: 0, y: 0, width: 200, height: 24 };
++        cb(b.x, b.y, b.width, b.height);
++      },
++    }));
++    return React.createElement('View', props, children);
++  });
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View,
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++    PanResponder: { create: (config) => ({ panHandlers: config }) },
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => 'ru-RU', useModuleLocale: () => 'ru-RU' };
++});
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (template, values) => `${template}:${JSON.stringify(values || {})}`,
++}));
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: ({ lock, visible }) => React.createElement('LockPickingModal', { containerId: lock?.containerId, visible }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, visible }) => React.createElement('TerminalHackingModal', { containerId: terminal?.containerId, visible }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: ({ visible }) => React.createElement('StandaloneCheckModal', { visible }),
++}));
++
++import HubTreeView from '../../components/screens/LootTradeScreen/modals/HubTreeView.js';
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay.js';
++import useCharacterStore from '../../src/store/characterStore.js';
++import useRoomStore from '../../src/room/roomStore.js';
++import useUiModeStore from '../../src/room/uiModeStore.js';
++import graph from '../../domain/locationGraph.js';
++import {
++  CONTAINER_KIND,
++  buildLocationSessionNodes,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade.js';
++import { restoreLocationSessionNodes } from '../../domain/locationNodeMarker.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const findAll = (root, testID) => root.findAll((node) => node.props?.testID === testID);
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.HUB, name: id, roomCodes: ['ROOM1'], ...extra,
++});
++const child = (id, kind, extra = {}) => normalizeContainerEntity({ id, kind, name: id, ...extra });
++
++// Город: Мастер явно поставил торговца раньше сундука и вложенной мэрии.
++// Мэрия: письменный стол раньше сейфа. Сундук общий с другой локацией.
++const cards = () => [
++  hub('town', {
++    childOrder: ['shop', 'chest', 'mayor'],
++    links: [{ containerId: 'chest' }, { containerId: 'shop' }],
++  }),
++  hub('mayor', {
++    parentLocationId: 'town',
++    childOrder: ['desk', 'safe'],
++    links: [{ containerId: 'safe' }, { containerId: 'desk' }],
++  }),
++  child('chest', CONTAINER_KIND.LOOT),
++  child('shop', CONTAINER_KIND.MERCHANT, { caps: 100 }),
++  child('desk', CONTAINER_KIND.LOOT),
++  child('safe', CONTAINER_KIND.LOOT),
++  hub('other', { childOrder: ['chest'], links: [{ containerId: 'chest' }] }),
++];
++
++describe('545: канон порядка детей — граф и сессия', () => {
++  it('normalizeContainerEntity хранит childOrder без дублей, граф сортирует детей родителя', () => {
++    const all = cards();
++    expect(all[0].childOrder).toEqual(['shop', 'chest', 'mayor']);
++    const dirty = normalizeContainerEntity({ id: 'x', kind: CONTAINER_KIND.HUB, childOrder: [' a ', 'a', '', 'b'] });
++    expect(dirty.childOrder).toEqual(['a', 'b']);
++
++    const g = graph.buildLocationGraph(all);
++    expect(graph.childIdsOf(g, 'town')).toEqual(['shop', 'chest', 'mayor']);
++    expect(graph.childIdsOf(g, 'mayor')).toEqual(['desk', 'safe']);
++    // У общего ребёнка каждый родитель держит свой порядок.
++    expect(graph.childIdsOf(g, 'other')).toEqual(['chest']);
++  });
++
++  it('сессия Мастера и маркер старого сервера сохраняют порядок прямых детей', () => {
++    const all = cards();
++    const nodes = buildLocationSessionNodes(all[0], all);
++    const direct = nodes.filter((n) => n.parentIds.includes('town')).map((n) => n.containerId);
++    expect(direct).toEqual(['shop', 'chest', 'mayor']);
++    expect(nodes.find((n) => n.containerId === 'mayor').childIds).toEqual(['desk', 'safe']);
++
++    const legacy = nodes.map((n) => ({
++      containerId: n.containerId, kind: 'loot', name: n.name, description: n.description,
++      locked: false, lockLabel: n.lockLabel, caps: 0, saleMarkupPercent: 0,
++      buyDepreciationPercent: 50, characterOverrides: {}, items: [],
++    }));
++    const restored = restoreLocationSessionNodes(legacy, 'town');
++    expect(restored.filter((n) => n.parentIds.includes('town')).map((n) => n.containerId))
++      .toEqual(['shop', 'chest', 'mayor']);
++    expect(restored.find((n) => n.containerId === 'mayor').childIds).toEqual(['desk', 'safe']);
++  });
++
++  it('moveChildInOrder переносит позицию на место цели и не ломает неизвестные id', () => {
++    expect(graph.moveChildInOrder(['a', 'b', 'c'], 'a', 'c')).toEqual(['b', 'c', 'a']);
++    expect(graph.moveChildInOrder(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
++    expect(graph.moveChildInOrder(['a', 'b'], 'x', 'a')).toEqual(['a', 'b']);
++  });
++});
++
++const mountTree = (all, onReorderChildren) => {
++  let renderer;
++  act(() => {
++    renderer = create(React.createElement(HubTreeView, {
++      hub: all[0], containers: all, keyItems: [],
++      onOpenSettings: vi.fn(), onReorderChildren,
++    }));
++  });
++  return renderer;
++};
++
++const rowIds = (renderer) => renderer.root
++  .findAll((node) => node.type === 'View'
++    && typeof node.props?.testID === 'string'
++    && node.props.testID.startsWith('hub-tree-row-'))
++  .map((node) => node.props.testID.replace('hub-tree-row-', ''));
++
++const setRowBounds = (ids, startY = 0) => {
++  ids.forEach((id, index) => {
++    mockLayout.bounds[`hub-tree-row-${id}`] = { x: 0, y: startY + index * 30, width: 200, height: 24 };
++  });
++};
++
++const dragRow = (renderer, childId, targetId) => {
++  const [handle] = findAll(renderer.root, `hub-tree-reorder-${childId}`);
++  expect(handle, childId).toBeTruthy();
++  const target = mockLayout.bounds[`hub-tree-row-${targetId}`];
++  act(() => {
++    handle.props.onStartShouldSetPanResponder();
++    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
++    handle.props.onPanResponderRelease();
++  });
++};
++
++describe('545: дерево Мастера — ручка перетаскивания и новый порядок', () => {
++  it('строки идут в childOrder, перетаскивание отдаёт новый порядок родителя', () => {
++    const all = cards();
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(all, onReorderChildren);
++    expect(rowIds(renderer)).toEqual(['shop', 'chest', 'mayor']);
++    expect(findAll(renderer.root, 'hub-tree-reorder-chest').length).toBeGreaterThan(0);
++
++    setRowBounds(['shop', 'chest', 'mayor']);
++    dragRow(renderer, 'chest', 'shop');
++    expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
++
++    // После сохранения порядок читается из того же канона.
++    all[0] = { ...all[0], childOrder: ['chest', 'shop', 'mayor'] };
++    const rerender = mountTree(all, onReorderChildren);
++    expect(rowIds(rerender)).toEqual(['chest', 'shop', 'mayor']);
++  });
++
++  it('вложенная локация переставляет своих детей отдельно от родителя', () => {
++    const all = cards();
++    const onReorderChildren = vi.fn();
++    const renderer = mountTree(all, onReorderChildren);
++    act(() => findAll(renderer.root, 'hub-tree-toggle-mayor')[0].props.onPress());
++    expect(rowIds(renderer)).toContain('desk');
++    setRowBounds(['desk', 'safe'], 100);
++    dragRow(renderer, 'safe', 'desk');
++    expect(onReorderChildren).toHaveBeenCalledWith('mayor', ['safe', 'desk']);
++  });
++});
++
++const mountPlayer = async (nodes) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  useCharacterStore.setState({ currentCharacterId: 'player-char', characterName: 'Player', items: {}, currency: 0 });
++  useRoomStore.setState({
++    clientId: 'player-client', status: 'online',
++    rooms: {
++      ROOM1: {
++        joined: true,
++        members: [{ clientId: 'player-client', role: 'player' }],
++        capabilities: { terminalHacking: true, lockPicking: true },
++        activeSession: {
++          sessionId: 's545', containerId: 'town', kind: 'hub', name: 'Город', targetType: 'room', nodes,
++        },
++        terminalStates: {},
++      },
++    },
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const enterIds = (renderer) => renderer.root
++  .findAll((node) => node.type === 'TouchableOpacity'
++    && typeof node.props?.testID === 'string'
++    && node.props.testID.startsWith('hub-node-enter-'))
++  .map((node) => node.props.testID.replace('hub-node-enter-', ''));
++
++const tap = async (renderer, testID) => {
++  const [button] = findAll(renderer.root, testID);
++  expect(button, testID).toBeTruthy();
++  await act(async () => { button.props.onPress(); await Promise.resolve(); });
++};
++
++describe('545: окно игрока повторяет порядок Мастера', () => {
++  it('корень и вложенная локация показывают те же позиции в том же порядке', async () => {
++    const all = cards();
++    const renderer = await mountPlayer(buildLocationSessionNodes(all[0], all));
++    expect(enterIds(renderer)).toEqual(['shop', 'chest', 'mayor']);
++    await tap(renderer, 'hub-node-enter-mayor');
++    expect(enterIds(renderer)).toEqual(['desk', 'safe']);
++    await act(async () => renderer.unmount());
++  });
++
++  it('старый сервер комнат не сбрасывает порядок (маркер 544 + childIds)', async () => {
++    const all = cards();
++    const nodes = buildLocationSessionNodes(all[0], all).map((n) => ({
++      containerId: n.containerId, kind: 'loot', name: n.name, description: n.description,
++      locked: false, lockLabel: n.lockLabel, caps: 0, saleMarkupPercent: 0,
++      buyDepreciationPercent: 50, characterOverrides: {}, items: [],
++    }));
++    const renderer = await mountPlayer(nodes);
++    expect(enterIds(renderer)).toEqual(['shop', 'chest', 'mayor']);
++    await tap(renderer, 'hub-node-enter-mayor');
++    expect(enterIds(renderer)).toEqual(['desk', 'safe']);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('545: проводка и парные строки', () => {
++  it('экран сохраняет childOrder через persistAndSyncContainer и отдаёт обработчик дереву', () => {
++    const screen = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++    const tree = read('components/screens/LootTradeScreen/modals/HubTreeView.js');
++    expect(screen).toContain('const handleReorderHubChildren');
++    expect(screen).toContain('await persistAndSyncContainer({ ...parent, childOrder });');
++    expect(screen).toContain('onReorderChildren={handleReorderHubChildren}');
++    expect(tree).toContain('onReorderChildren');
++    expect(tree).toContain('locationGraph.moveChildInOrder');
++    expect(tree).toContain('hub-tree-reorder-');
++  });
++
++  it('RU/EN строки перетаскивания добавлены парно', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const en = JSON.parse(read('i18n/en-EN/screens/lootTrade/screen.json'));
++    expect(ru.detail.hubReorderHandle).toContain('{name}');
++    expect(en.detail.hubReorderHandle).toContain('{name}');
++    expect(ru.detail.hubReorderHint).toBeTruthy();
++    expect(en.detail.hubReorderHint).toBeTruthy();
++  });
++});
+diff --git a/__tests__/room/hub-tree-parameters-541.test.js b/__tests__/room/hub-tree-parameters-541.test.js
+index b8351b0..dade448 100644
+--- a/__tests__/room/hub-tree-parameters-541.test.js
++++ b/__tests__/room/hub-tree-parameters-541.test.js
+@@ -19,6 +19,7 @@ vi.mock('react-native', () => {
+     TextInput: host('TextInput'),
+     ScrollView: host('ScrollView'),
+     StyleSheet: { create: (styles) => styles },
++    PanResponder: { create: (config) => ({ panHandlers: config }) },
+   };
+ });
+ 
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 320d6b6..63940a7 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('544');
++    expect(version.version).toBe('545');
+     expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(143);
+-    expect(version.notes['en-EN']).toHaveLength(143);
+-    expect(json('patchs/baseline.json').baseline).toBe('544');
++    expect(version.notes['ru-RU']).toHaveLength(144);
++    expect(version.notes['en-EN']).toHaveLength(144);
++    expect(json('patchs/baseline.json').baseline).toBe('545');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -454,20 +454,22 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/542-hub-player-window.patch')).toContain('hub-player-window');
+     expect(read('patchs/543-passage-block.patch')).toContain('passage-blocked-screen');
+     expect(read('patchs/544-hub-location-display.patch')).toContain('hub-location-display');
++    expect(read('patchs/545-hub-order-drag.patch')).toContain('hub-order-drag');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **544**');
++    expect(roadmap).toContain('Текущая версия: **545**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 544');
++    expect(roadmap).toContain('Осталось после патча 545');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+     expect(read('docs/patch-543-install.md')).toContain('543');
+     expect(read('docs/patch-544-install.md')).toContain('544');
++    expect(read('docs/patch-545-install.md')).toContain('545');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/passage-block-543.test.js b/__tests__/room/passage-block-543.test.js
+index 8767e2c..4142b8e 100644
+--- a/__tests__/room/passage-block-543.test.js
++++ b/__tests__/room/passage-block-543.test.js
+@@ -36,6 +36,7 @@ vi.mock('react-native', () => {
+     ScrollView: host('ScrollView'),
+     Image: host('Image'),
+     useWindowDimensions: () => ({ width: 420, height: 800 }),
++    PanResponder: { create: (config) => ({ panHandlers: config }) },
+   };
+ });
+ 
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 3c5a083..43f0f3a 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -759,13 +759,25 @@ export default function PlayerLootTradeOverlay() {
+     // считаются детьми корня. Запертые потомки уже скрыты сервером.
+     // Патч 542: цель особого выхода не торчит дочерней карточкой; замок
+     // никогда не самостоятельная строка игрока.
+-    const hubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
++    const visibleHubNodes = currentGatePending ? [] : sessionNodes.filter((node) => {
+       if (node.exitOnly || node.hiddenForPlayers || node.kind === CONTAINER_KIND.LOCK) return false;
+       const parents = Array.isArray(node.parentIds) && node.parentIds.length
+         ? node.parentIds
+         : [rootId];
+       return parents.includes(currentParentId);
+     });
++    // Патч 545: порядок мест у игрока = порядок дерева Мастера. Внутри
++    // вложенной локации сортируем по `childIds` родителя (канон графа), а не
++    // по плоскому BFS-списку: общий ребёнок нескольких родителей не «всплывает»
++    // раньше братьев. Корень идёт в порядке сессии, собранной тем же графом.
++    const parentChildOrder = Array.isArray(currentNode?.childIds) ? currentNode.childIds : [];
++    const hubNodes = parentChildOrder.length
++      ? [...visibleHubNodes].sort((a, b) => {
++        const ia = parentChildOrder.indexOf(a.containerId);
++        const ib = parentChildOrder.indexOf(b.containerId);
++        return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
++      })
++      : visibleHubNodes;
+     const exitLocationId = String(currentTarget.exitLocationId || '').trim();
+     const exitNode = exitLocationId && !currentGatePending
+       ? sessionNodes.find((node) => node.containerId === exitLocationId)
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index be7a76e..1299f6d 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -1508,6 +1508,20 @@ export default function LootTradeScreen() {
+     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+   };
+ 
++  // Патч 545: перестановка строк дерева перетаскиванием. Порядок хранится на
++  // родителе (`childOrder`), а не на ребёнке: у узла с несколькими родителями
++  // каждый родитель держит свой порядок. persistAndSyncContainer уже пересылает
++  // живым сессиям пересобранные узлы графа — игрок получает тот же порядок.
++  const handleReorderHubChildren = async (parentId, orderedChildIds) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
++    const parent = containers.find((c) => c?.id === parentId && c.kind === CONTAINER_KIND.HUB);
++    if (!parent || !Array.isArray(orderedChildIds)) return;
++    const childOrder = [...new Set(orderedChildIds.map((id) => String(id || '').trim()).filter(Boolean))];
++    if (!childOrder.length) return;
++    if (childOrder.join('\u0000') === (parent.childOrder || []).join('\u0000')) return;
++    await persistAndSyncContainer({ ...parent, childOrder });
++  };
++
+   // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
+   // «Блокировать» спрашивает причину (пусто = «Проход заблокирован»),
+   // «Открыть» снимает блок и чистит причину.
+@@ -2493,6 +2507,7 @@ export default function LootTradeScreen() {
+                 onUpdateLockLabel={handleUpdateHubChildLockLabel}
+                 onMoveNestedOut={handleMoveNestedLocationOut}
+                 onTogglePassage={handleTogglePassage}
++                onReorderChildren={handleReorderHubChildren}
+               />
+             </>
+           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index cd24a55..ae70287 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -1,14 +1,14 @@
+-import React, { useMemo, useState } from 'react';
+-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal } from 'react-native';
++import React, { useMemo, useRef, useState } from 'react';
++import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal, PanResponder } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import {
+   CONTAINER_KIND,
+-  CONTAINER_KIND_SORT_ORDER,
+   getHubIdsContainingChild,
+ } from '../../../../domain/lootTrade';
++import locationGraph from '../../../../domain/locationGraph';
+ import {
+   resolveAccessExpression,
+   formatAccessExpression,
+@@ -29,6 +29,11 @@ import {
+  * Патч 541: название элемента больше не открывает настройки. У каждой строки
+  * (локация, сундук, торговец, терминал, замок, ключ) справа стоит кнопка
+  * «Параметры»; раскрытие вложенных локаций по-прежнему идёт стрелкой-шевроном.
++ *
++ * Патч 545: строки одного родителя меняются местами перетаскиванием за ручку.
++ * Дерево не пишет в БД само — отдаёт новый порядок наружу; канон порядка и
++ * переноса живёт в `server/locationGraph.js` (через domain-фасад), тот же
++ * порядок получает игрок. Ключи остаются после объектов и не перетаскиваются.
+  */
+ const HubTreeView = ({
+   hub,
+@@ -45,11 +50,20 @@ const HubTreeView = ({
+   onUpdateLockLabel,
+   onMoveNestedOut,
+   onTogglePassage,
++  onReorderChildren,
+ }) => {
+   useLocale();
+   const [expanded, setExpanded] = useState(() => new Set());
+   // Патч 543: диалог причины перекрытия (пусто = «Проход заблокирован»).
+   const [passagePrompt, setPassagePrompt] = useState(null);
++  // Патч 545: перетаскивание строк одного родителя. Контекст задаётся ручкой
++  // строки, PanResponder только измеряет/подсвечивает и отдаёт новый порядок.
++  const rowRefs = useRef({});
++  const dragContextRef = useRef(null);
++  const activeDragRef = useRef(null);
++  const reorderRef = useRef(onReorderChildren);
++  reorderRef.current = onReorderChildren;
++  const [dragPreview, setDragPreview] = useState(null);
+ 
+   const list = Array.isArray(containers) ? containers : [];
+   const byId = useMemo(() => {
+@@ -99,13 +113,12 @@ const HubTreeView = ({
+         result.push({ container: c, link });
+       }
+     }
+-    result.sort((a, b) => {
+-      const ra = CONTAINER_KIND_SORT_ORDER[a.container?.kind] ?? 99;
+-      const rb = CONTAINER_KIND_SORT_ORDER[b.container?.kind] ?? 99;
+-      if (ra !== rb) return ra - rb;
+-      return String(a.container?.name || '').localeCompare(String(b.container?.name || ''), 'ru');
+-    });
+-    return result;
++    // Патч 545: тот же закон порядка, что у графа сессии: явный childOrder
++    // Мастера, затем новые дети по типу/имени. Мастер и игрок не расходятся.
++    const entryById = new Map(result.map((entry) => [entry.container.id, entry]));
++    return locationGraph.orderChildIds(node, result.map((entry) => entry.container.id), byId)
++      .map((id) => entryById.get(id))
++      .filter(Boolean);
+   };
+ 
+   const toggleExpanded = (id) => {
+@@ -116,6 +129,96 @@ const HubTreeView = ({
+     });
+   };
+ 
++  // Патч 545: перетаскивание меняет порядок только среди строк одного
++  // родителя. Границы строк измеряются в окне, как у карточек на сетке.
++  const measureSiblingRows = (siblingIds) => {
++    const bounds = {};
++    for (const id of siblingIds) {
++      const ref = rowRefs.current[id];
++      if (ref?.measureInWindow) {
++        ref.measureInWindow((x, y, width, height) => {
++          bounds[id] = { x, y, width, height };
++        });
++      }
++    }
++    return bounds;
++  };
++
++  const siblingAtPoint = (drag, point) => {
++    if (!drag || !point) return null;
++    for (const id of drag.siblingIds) {
++      if (id === drag.childId) continue;
++      const b = drag.bounds[id];
++      if (b
++        && point.x >= b.x && point.x <= b.x + b.width
++        && point.y >= b.y && point.y <= b.y + b.height) return id;
++    }
++    return null;
++  };
++
++  const finishDrag = (cancelled) => {
++    const drag = activeDragRef.current;
++    activeDragRef.current = null;
++    dragContextRef.current = null;
++    setDragPreview(null);
++    if (cancelled || !drag) return;
++    const targetId = drag.overId || siblingAtPoint(drag, drag.point);
++    if (!targetId || targetId === drag.childId) return;
++    const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
++    if (nextOrder.join('\u0000') === drag.siblingIds.join('\u0000')) return;
++    reorderRef.current?.(drag.parentId, nextOrder);
++  };
++
++  const panResponder = useRef(PanResponder.create({
++    onStartShouldSetPanResponderCapture: () => true,
++    onMoveShouldSetPanResponderCapture: () => true,
++    onPanResponderTerminationRequest: () => false,
++    onShouldBlockNativeResponder: () => true,
++    onPanResponderGrant: (_evt, gesture) => {
++      const context = dragContextRef.current;
++      if (!context) return;
++      activeDragRef.current = {
++        ...context,
++        bounds: measureSiblingRows(context.siblingIds),
++        overId: null,
++        point: { x: gesture.x0, y: gesture.y0 },
++      };
++      setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
++    },
++    onPanResponderMove: (_evt, gesture) => {
++      const drag = activeDragRef.current;
++      if (!drag) return;
++      if (gesture.moveX === 0 && gesture.moveY === 0) return;
++      drag.point = { x: gesture.moveX, y: gesture.moveY };
++      const overId = siblingAtPoint(drag, drag.point);
++      if (overId !== drag.overId) {
++        drag.overId = overId;
++        setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
++      }
++    },
++    onPanResponderRelease: () => finishDrag(false),
++    onPanResponderTerminate: () => finishDrag(true),
++  })).current;
++
++  const dragHandlersFor = (parentNode, container, siblingIds) => ({
++    ...panResponder.panHandlers,
++    onStartShouldSetPanResponder: () => {
++      dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
++      return true;
++    },
++    onMoveShouldSetPanResponder: () => {
++      if (!dragContextRef.current) {
++        dragContextRef.current = { parentId: parentNode.id, childId: container.id, siblingIds };
++      }
++      return true;
++    },
++  });
++
++  const setRowRef = (id) => (ref) => {
++    if (ref) rowRefs.current[id] = ref;
++    else delete rowRefs.current[id];
++  };
++
+   const open = (container) => {
+     if (typeof onOpenSettings === 'function' && container) onOpenSettings(container);
+   };
+@@ -222,7 +325,7 @@ const HubTreeView = ({
+   };
+ 
+   // Рекурсивный узел. visited защищает от циклов матрёшки.
+-  const renderNode = (entry, depth, visited, isDirectChild) => {
++  const renderNode = (entry, depth, visited, isDirectChild, parentNode) => {
+     const { container, link } = entry;
+     if (!container || visited.has(container.id)) return null;
+     const nextVisited = new Set(visited);
+@@ -233,10 +336,35 @@ const HubTreeView = ({
+     const kids = isHub ? childrenOf(container) : [];
+     const sharedHubCount = getHubIdsContainingChild(container.id, list).length;
+     const pieces = (container.items || []).reduce((s, it) => s + (Number(it.quantity) || 0), 0);
++    // Патч 545: ручка перестановки есть у строк с братьями внутри одного
++    // родителя (включая раскрытую вложенную локацию). Ключи не трогаем.
++    const siblingIds = parentNode ? childrenOf(parentNode).map((kid) => kid.container.id) : [];
++    const canReorder = Boolean(parentNode && siblingIds.length > 1 && typeof onReorderChildren === 'function');
++    const isDragging = dragPreview?.childId === container.id;
++    const isDropTarget = dragPreview?.overId === container.id;
+ 
+     return (
+       <View key={container.id} style={[styles.node, { marginLeft: depth * 16 }]}>
+-        <View style={styles.nodeHeader}>
++        <View
++          ref={setRowRef(container.id)}
++          testID={`hub-tree-row-${container.id}`}
++          style={[
++            styles.nodeHeader,
++            isDragging && styles.nodeHeaderDragging,
++            isDropTarget && styles.nodeHeaderDropTarget,
++          ]}
++        >
++          {canReorder && (
++            <View
++              testID={`hub-tree-reorder-${container.id}`}
++              {...dragHandlersFor(parentNode, container, siblingIds)}
++              style={styles.dragHandle}
++              accessibilityRole="button"
++              accessibilityLabel={formatLootTrade(tLootTrade('detail.hubReorderHandle'), { name: container.name })}
++            >
++              <MaterialCommunityIcons name="arrow-all" size={14} color={ADMIN_MODAL_PALETTE.mutedText} />
++            </View>
++          )}
+           {isHub ? (
+             <TouchableOpacity
+               testID={`hub-tree-toggle-${container.id}`}
+@@ -371,7 +499,7 @@ const HubTreeView = ({
+               <Text style={styles.emptyText}>{tLootTrade('form.locationTreeEmptyNode')}</Text>
+             ) : (
+               <>
+-                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false))}
++                {kids.map((kid) => renderNode(kid, depth + 1, nextVisited, false, container))}
+                 {(container.keyItemIds || []).map((keyId) => renderKeyNode(keyId, depth + 1, container))}
+               </>
+             )}
+@@ -387,11 +515,16 @@ const HubTreeView = ({
+ 
+   return (
+     <ScrollView style={styles.scroll} nestedScrollEnabled>
++      {dragPreview ? (
++        <Text testID="hub-tree-reorder-hint" style={styles.reorderHint}>
++          {tLootTrade('detail.hubReorderHint')}
++        </Text>
++      ) : null}
+       {directKids.length === 0 && directKeyIds.length === 0 ? (
+         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+       ) : (
+         <>
+-          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true))}
++          {directKids.map((entry) => renderNode(entry, 0, new Set([hub.id]), true, hub))}
+           {directKeyIds.map((keyId) => renderKeyNode(keyId, 0, hub))}
+         </>
+       )}
+@@ -460,6 +593,29 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 6,
+     paddingVertical: 6,
+   },
++  // Патч 545: ручка и подсветка перестановки — в палитре соседних модалок.
++  dragHandle: {
++    width: 24,
++    height: 24,
++    borderRadius: 12,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++    alignItems: 'center',
++    justifyContent: 'center',
++    marginRight: 4,
++  },
++  nodeHeaderDragging: { opacity: 0.55 },
++  nodeHeaderDropTarget: {
++    borderWidth: 2,
++    borderColor: ADMIN_MODAL_PALETTE.gold,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++  },
++  reorderHint: {
++    color: ADMIN_MODAL_PALETTE.mutedText,
++    fontSize: 11,
++    paddingVertical: 4,
++  },
+   chevronBtn: { width: 26, alignItems: 'center', justifyContent: 'center' },
+   nodeNameBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+   nodeName: { flex: 1, color: ADMIN_MODAL_PALETTE.text, fontSize: 13, fontWeight: '700' },
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1015926..4ba9dfe 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,22 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-06 (545) — порядок мест в хабе/локации: перетаскивание Мастера = порядок игрока
++
++Слово владельца: «в интерфейсе мастера, при работе с хабом/локацией, нужна
++возможность менять местами позиции перетаскиванием. И порядок локаций у
++мастера = порядок мест у юзера. Это важно».
++
++- Канон порядка детей — `server/locationGraph.js`: `childOrder` на родителе,
++  `orderChildIds`, `moveChildInOrder`; `domain/lootTrade.js` нормализует
++  `childOrder`, граф/сессия несут порядок в `childIds`.
++- `HubTreeView` получил ручку-стрелки и PanResponder для строк одного
++  родителя; `LootTradeScreen.handleReorderHubChildren` сохраняет порядок через
++  `persistAndSyncContainer` и живую пересылку узлов. Игрок внутри вложенной
++  локации сортирует места по `childIds` родителя; маркер 544 сохраняет порядок
++  через старый сервер.
++- Приёмка: `__tests__/room/hub-order-drag-545.test.js`. Версия/отсечка 545,
++  тезис 35, `docs/patch-545-install.md`. Открытые пункты roadmap не менялись.
++
+ ## 2026-10-29 (468) — новый экран администратора «Добыча/Торговля», синхронизация контейнеров Мастера с Google Drive и живая сетевая выдача в комнату
+ 
+ Слово владельца (согласованная спецификация «Добыча/Торговля»):
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index aed5330..f5e2691 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,32 @@
+ # Changelog
+ ---
+ 
++## Place order in a location: Master drag order = player order (patch 545)
++
++In the Master interface, while working with a hub/location, positions can be
++reordered by dragging. The key rule: the Master's order of locations/objects
++matches the player's order of places.
++
++- **An arrow handle on tree rows.** Rows sharing the same parent (locations,
++  chests, merchants, terminals, locks) now have a drag icon. Drag a row onto
++  another row at the same level and it takes that position; the target is
++  highlighted and a hint reminds you that players will see the same order.
++  It also works inside an expanded nested location.
++- **Order is stored on the parent.** A new `childOrder` on the location/node
++  defines the sequence of direct children. A child shared by several parents
++  keeps an independent order for each parent. New/unmentioned children append
++  using the previous "kind → name" fallback, and removed ids do not break the
++  list.
++- **Players see the same thing.** The session graph sorts children by
++  `childOrder`; the flat session list and `childIds` carry that order, and the
++  player window inside a nested location additionally sorts places by the
++  parent's `childIds`. The patch 544 marker preserves the order even through a
++  legacy room server.
++- **Live issues keep up.** Saving the order uses the regular
++  `persistAndSyncContainer`: live sessions receive rebuilt graph nodes, so
++  players see the new order without re-issuing. Keys remain rows after objects
++  and are not draggable; game links/locks/barriers are unchanged.
++
+ ## Player location window: location, lock, chest (patch 544)
+ 
+ Fixed the nested-location viewing regression: players again see
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d6ec9ac..e615c5c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,30 @@
+ 
+ ---
+ 
++## Порядок мест в локации: перетаскивание у Мастера = порядок у игрока (патч 545)
++
++В интерфейсе Мастера при работе с хабом/локацией позиции можно менять
++местами перетаскиванием. Главное правило: порядок локаций/объектов у Мастера
++совпадает с порядком мест у игрока.
++
++- **Ручка-стрелки в строке дерева.** У строк одного родителя (локации,
++  сундуки, торговцы, терминалы, замки) появилась иконка перетаскивания.
++  Тянете строку на другую строку того же уровня — она занимает её место;
++  подсветка показывает цель, подсказка напоминает, что порядок сохранится
++  и у игрока. Работает и внутри раскрытой вложенной локации.
++- **Порядок хранится на родителе.** Новый `childOrder` локации/узла задаёт
++  последовательность прямых детей. У общего ребёнка нескольких родителей
++  каждый родитель помнит свой порядок. Новые/неупомянутые дети добавляются
++  в конец по прежнему правилу «тип → имя», удалённые id не ломают список.
++- **Игрок видит то же самое.** Граф сессии сортирует детей по `childOrder`,
++  плоский список и `childIds` несут этот порядок, окно игрока внутри
++  вложенной локации дополнительно сортирует места по `childIds` родителя.
++  Маркер 544 сохраняет порядок даже через старый сервер комнат.
++- **Живая выдача не отстаёт.** Сохранение порядка идёт через штатный
++  `persistAndSyncContainer`: живые сессии получают пересобранные узлы графа,
++  игроки видят новый порядок без перевыдачи. Ключи остаются строками после
++  объектов и не перетаскиваются; игровые связи/замки/преграды не менялись.
++
+ ## Окно локаций у игрока: локация, замок, сундук (патч 544)
+ 
+ Исправлена регрессия просмотра вложенных локаций: игрок снова видит
+diff --git a/docs/key-items-and-gates-design.md b/docs/key-items-and-gates-design.md
+index 831c0e5..4d63e49 100644
+--- a/docs/key-items-and-gates-design.md
++++ b/docs/key-items-and-gates-design.md
+@@ -613,7 +613,9 @@ WYSIWYG-редактор с нуля не нужен: в проекте уже 
+    исключение обратной совместимости; удалять его и ломать снимок хранилища
+    нельзя.
+ 3. У контейнера, торговца, терминала и ключа есть иконка перетаскивания со
+-   стрелками; все четыре переносятся внутрь локации.
++   стрелками; все четыре переносятся внутрь локации. В дереве хаба та же
++   иконка у строк одного родителя меняет порядок мест (патч 545): порядок
++   Мастера = порядок игрока; ключи в дереве порядок мест не задают.
+ 4. Контейнер, торговец, терминал и будущий «замок» могут требовать ключ;
+    требование бывает **обязательным** и **необязательным**.
+ 5. Есть ключ на общем складе — мини-игра не запускается, точка открыта сразу.
+diff --git a/docs/location-hierarchy-design.md b/docs/location-hierarchy-design.md
+index 175829f..c869a3b 100644
+--- a/docs/location-hierarchy-design.md
++++ b/docs/location-hierarchy-design.md
+@@ -153,3 +153,39 @@
+ взлом без каскада, граница видимости, одна сессия до выхода из родителя и
+ закон снимка 529 сохранены. Решение Мастера «открыть точку» описано в
+ `docs/lockpicking-mini-game-design.md` §20.
++
++
++## 545. Порядок детей: Мастер перетаскивает, игрок видит тот же порядок
++
++Слово владельца: «в интерфейсе мастера, при работе с хабом/локацией, нужна
++возможность менять местами позиции перетаскиванием. И порядок локаций у
++мастера = порядок мест у юзера. Это важно».
++
++**Канон:** `server/locationGraph.js` (клиентская дверь `domain/locationGraph.js`).
++- Порядок прямых детей хранится НА РОДИТЕЛЕ: `childOrder: string[]`. У узла с
++  несколькими родителями каждый родитель держит свой порядок; порядок не
++  пишется на ребёнке и не зависит от порядка карточек в списке Мастера.
++- `orderChildIds(parent, childIds, byId)`: сначала явный `childOrder`, затем
++  новые/неупомянутые дети по fallback «тип → имя → id». Лишние id игнорируются,
++  дубли не появляются. `normalizeContainerEntity` сохраняет `childOrder`.
++- `buildLocationGraph` сортирует `children` каждого родителя этим законом;
++  `flattenForSession` переносит его в `childIds` и плоский список сессии.
++  `buildGraphFromSession` уважает `childIds` уже выданной сессии.
++- `moveChildInOrder(childIds, childId, targetChildId)` — чистая перестановка:
++  переносимая строка занимает место цели среди братьев.
++
++**UI Мастера:** `HubTreeView` рисует ручку-стрелки у строк с братьями внутри
++одного родителя (включая раскрытую вложенную локацию), измеряет строки через
++`measureInWindow`, подсвечивает цель и отдаёт новый порядок наружу.
++`LootTradeScreen.handleReorderHubChildren` сохраняет `childOrder` через
++`persistAndSyncContainer`; живые хаб-сессии получают пересобранные узлы графа.
++Ключи остаются после объектов и не перетаскиваются.
++
++**Игрок:** `PlayerLootTradeOverlay` фильтрует прямые места текущего родителя и
++внутри вложенной локации сортирует их по `childIds` родителя, чтобы общий
++ребёнок нескольких родителей не «всплывал» раньше братьев из-за BFS. Корень
++идёт в порядке сессии, собранной тем же графом. Маркер 544 сохраняет
++`childIds`/тип через старый сервер комнат.
++
++Границы: перестановка не меняет `links`, `parentLocationId`, замки, преграды,
++видимость и закон снимка; перенос внутрь/наружу остаётся прежним.
+diff --git a/docs/patch-545-install.md b/docs/patch-545-install.md
+new file mode 100644
+index 0000000..eed2c60
+--- /dev/null
++++ b/docs/patch-545-install.md
+@@ -0,0 +1,53 @@
++# Установка патча 545: порядок мест перетаскиванием
++
++Патч подготовлен от состояния **версии 544**. Файл установки:
++`patchs/545-hub-order-drag.patch`.
++
++> Владелец: «в интерфейсе мастера, при работе с хабом/локацией, нужна
++> возможность менять местами позиции перетаскиванием. И порядок локаций у
++> мастера = порядок мест у юзера. Это важно».
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `server/locationGraph.js` | канон порядка детей: `childOrder` родителя, `orderChildIds`, `moveChildInOrder`; граф и сессия сортируют детей одинаково, несколько родителей не смешивают порядки |
++| `domain/lootTrade.js` | `normalizeContainerEntity` хранит `childOrder`; ранги типов для fallback-порядка берутся из канона графа |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | ручка-стрелки и PanResponder в строках одного родителя, подсветка цели, новый порядок отдаётся наружу; ключи не перетаскиваются |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | `handleReorderHubChildren` сохраняет `childOrder` через `persistAndSyncContainer` — живые сессии получают пересобранные узлы |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | список мест внутри вложенной локации сортируется по `childIds` родителя; корень идёт в порядке сессии |
++| `i18n/ru-RU/screens/lootTrade/screen.json`, `i18n/en-EN/screens/lootTrade/screen.json` | парные строки ручки и подсказки перестановки |
++| `__tests__/room/hub-order-drag-545.test.js` | приёмка: канон порядка, перетаскивание в дереве, порядок игрока, старый сервер/маркер 544 |
++| `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | версия/отсечка 545, тезис 35, «Осталось после патча 545» |
++
++## Границы
++
++- Перетаскивание меняет порядок только среди строк одного родителя. Перенос
++  карточки внутрь локации/наружу прежний (стрелки на сетке и кнопки дерева).
++- Порядок хранится на родителе, поэтому общий ребёнок нескольких родителей
++  имеет независимый порядок в каждом родителе.
++- Ключи остаются строками после объектов и не участвуют в перестановке мест.
++- Закон снимка 529, адресный взлом 523, gate-first 542, перекрытие проходов
++  543 и маркер пространственного узла 544 сохранены.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/f90c80d8-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 545
++```
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: зелёные, кроме восьми заранее известных падений
++  `__tests__/room/terminal-hacking-balance-496.test.js` — они падают теми же
++  ошибками и на чистом дереве 544, патч 545 их не трогает.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/545-hub-order-drag.patch` вернёт дерево, порядок,
++словари и версию к состоянию 544.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 5524f59..bef8d84 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-06. Текущая версия: **544**.
++Дата ревизии: 2026-11-06. Текущая версия: **545**.
+ 
+ ## Тезисы
+ 
+@@ -46,10 +46,11 @@
+ | 32 | **Параметры элемента в строке дерева хаба:** название элемента больше не открывает настройки; кнопка «Параметры» стоит в правой части строки названия у каждого элемента дерева (локация, сундук, торговец, терминал, замок, ключ), включая вложенные после раскрытия. С экрана локации убраны отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца». Ключи показываются строками дерева; зависимости ворот остаются пунктирными линиями. `apply-patch.sh` смотрит на ветку доставки 541. Только админка, игровые механики не менялись | ✅ сделано (админка) | **541** |
+ | 33 | **Выдача хаба целиком и окно игрока (542):** граф сессии собирается по `links` + `parentLocationId`, поэтому выдача Ниптона с вложенными локациями/терминалом/замком больше не падает пустым экраном. Верхний уровень окна игрока — только прямые элементы (локации, сундуки, торговцы); вложенные точки скрыты до входа. Вход в запертую локацию сначала показывает экран преграды (замок/терминал, варианты И/ИЛИ), после прохождения — содержимое; особый выход вынесен в кнопку «Выход → …». Замок никогда не бывает самостоятельной точкой игрока: отдельная выдача убрана из интерфейса, строки замков скрыты, `lock_never_standalone`. «Назад» возвращает только в локацию, через которую пришёл (история входа), `exitLocationId` даёт вход в другую локацию, возврат — по истории, а не по административному дереву | ✅ сделано | **542** |
+ | 34 | **Окно локаций у игрока: локация ≠ сундук, замок ≠ терминал:** вложенная локация сохраняет тип и рёбра графа даже через старый сервер комнат (маркер пространственного узла), рисуется иконкой карты и входом, а не пустым сундуком. Вход в запертую локацию показывает только преграду; после взлома видны прямые дети, сундук открывает содержимое отдельным шагом. Сервер запрещает добычу/торговлю за запертым родителем прямым запросом | ✅ сделано | **544** |
++| 35 | **Порядок позиций в хабе/локации:** в дереве Мастера строки одного родителя меняются местами перетаскиванием за ручку-стрелки; порядок хранится на родителе (`childOrder`) и один-в-один воспроизводится в окне игрока (список мест текущей локации). Несколько родителей держат независимый порядок; новые дети попадают в конец fallback-порядка, ключи не перетаскиваются | ✅ сделано | **545** |
+ 
+-## Осталось после патча 544
++## Осталось после патча 545
+ 
+-Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
++Патч 545 добавил перестановку позиций перетаскиванием в дереве Мастера и единый порядок с окном игрока. Патч 544 закрыл регрессию окна локаций: тип/вложенность переживают старый WS, замок не подменяется терминалом, содержимое за преградой не утекает прямым запросом. Список ниже сохраняет прежние открытые пункты.
+ 
+ Патчи 524–532 закрыли сбой мини-игры замка, окна локации, входа в игру,
+ правило подходов, терминологию, вид стрелок, списание заколок из инвентаря,
+@@ -268,6 +269,7 @@
+ - `docs/patch-528-install.md` — установка обновления 528 и его проверки.
+ - `docs/patch-531-install.md` — установка исправления 531 и его проверки.
+ - `docs/patch-523-install.md`, `docs/location-hierarchy-design.md` — иерархия пространств (523).
++- `docs/patch-545-install.md` — порядок позиций перетаскиванием (545).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 5db6dca..7442729 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -494,13 +494,9 @@ export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
+   return out;
+ };
+ 
+-export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
+-  [CONTAINER_KIND.HUB]: 0,
+-  [CONTAINER_KIND.LOOT]: 1,
+-  [CONTAINER_KIND.TERMINAL]: 2,
+-  [CONTAINER_KIND.LOCK]: 3,
+-  [CONTAINER_KIND.MERCHANT]: 4,
+-});
++// Патч 545: ранги типов для fallback-порядка детей живут в каноне графа
++// (server/locationGraph.js), чтобы дерево Мастера и список игрока не разошлись.
++export const CONTAINER_KIND_SORT_ORDER = locationGraph.CONTAINER_KIND_SORT_ORDER;
+ 
+ /**
+  * Сортировка карточек на главном экране «Добыча/Торговля»:
+@@ -791,6 +787,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+   // узла не имеет смысла), а циклы из нескольких узлов — разрешены.
+   const links = normalizeHubLinks(raw.links)
+     .filter((lnk) => lnk.containerId !== String(raw.id || ''));
++  // Патч 545: порядок прямых детей, заданный перетаскиванием в дереве Мастера.
++  // Хранится на родителе, поэтому у узла с несколькими родителями каждый
++  // родитель держит свой порядок; игроку он приходит как `childIds` сессии.
++  const childOrder = locationGraph.normalizeChildOrder(raw.childOrder);
+   const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
+   const primaryRoomCode = roomCodes[0] || '';
+   const inRoot = kind === CONTAINER_KIND.HUB
+@@ -820,6 +820,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+       : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     items,
+     links,
++    childOrder,
+     // Патч 514: вложенные ключевые записи и две строки требования доступа.
+     // Терминал ключи не содержит ни при создании, ни перетаскиванием.
+     keyItemIds: containerCanHoldKey(kind) ? normalizeKeyItemIds(raw.keyItemIds) : [],
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 3e914b3..d369b8f 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -188,7 +188,9 @@
+     "passageBlock": "Block",
+     "passageOpen": "Unblock",
+     "passageReasonTitle": "Block reason (optional)",
+-    "passageReasonPlaceholder": "e.g. rubble"
++    "passageReasonPlaceholder": "e.g. rubble",
++    "hubReorderHandle": "Drag «{name}» to reorder",
++    "hubReorderHint": "Drop on a row at the same level: the order is saved and players see the same order."
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index b4ab944..77a2d13 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -189,7 +189,9 @@
+     "passageBlock": "Блокировать",
+     "passageOpen": "Открыть",
+     "passageReasonTitle": "Причина перекрытия (необязательно)",
+-    "passageReasonPlaceholder": "Например: обвал"
++    "passageReasonPlaceholder": "Например: обвал",
++    "hubReorderHandle": "Перетащить «{name}» — сменить порядок",
++    "hubReorderHint": "Отпустите на строке того же уровня: порядок сохранится и будет тем же у игрока."
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index d64c4f1..843f63c 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "544"
++  "baseline": "545"
+ }
+diff --git a/public/version.json b/public/version.json
+index 8379b2f..8552997 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "544",
++  "version": "545",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
+       "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
+       "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
+       "Хаб выдаётся целиком: граф собирается по связям и родительским локациям, поэтому Ниптон с вложенными локациями, терминалом и замком больше не рисует пустой экран. В окне игрока на верхнем уровне видны только прямые элементы — локации, сундуки, торговцы, а вложенные точки открываются после входа. Вход в запертую локацию сначала показывает только преграду (замок или терминал), после прохождения — содержимое. Замок стал частью локации, сундука или двери и больше не выдаётся отдельной точкой игрока. «Назад» возвращает в локацию, из которой игрок пришёл, а особый выход ведёт в указанную локацию.",
+@@ -148,6 +149,7 @@
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да»."
+     ],
+     "en-EN": [
++      "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
+       "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
+       "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",
+       "A hub now issues whole: the graph is built from links plus parent locations, so Nipton with nested locations, a terminal and a lock no longer renders an empty screen. The player's top level shows only direct elements — locations, chests, merchants — and nested points appear after you enter. Entering a locked location shows only the barrier (lock or terminal) first, and its contents once the check is passed. The lock is now part of a location, chest or door and is never issued as a standalone player point. Back returns only to the location you came through, and the special exit leads to its configured location.",
+diff --git a/server/locationGraph.js b/server/locationGraph.js
+index 73a8c75..48f0419 100644
+--- a/server/locationGraph.js
++++ b/server/locationGraph.js
+@@ -56,6 +56,75 @@ const normalizeLinks = (raw) => {
+   return out;
+ };
+ 
++/**
++ * Патч 545: единый закон порядка детей. Мастер таскает строки дерева хаба,
++ * порядок сохраняется на родителе (`childOrder`) и один-в-один едет игроку
++ * через `childIds` сессии. Канон здесь, чтобы лёгкий серверный деплой и
++ * клиентское дерево не разошлись.
++ */
++const CONTAINER_KIND_SORT_ORDER = Object.freeze({
++  hub: 0,
++  loot: 1,
++  terminal: 2,
++  lock: 3,
++  merchant: 4,
++});
++
++const normalizeChildOrder = (raw) => {
++  if (!Array.isArray(raw)) return [];
++  const seen = new Set();
++  const out = [];
++  for (const value of raw) {
++    const id = normalizeId(value);
++    if (!id || seen.has(id)) continue;
++    seen.add(id);
++    out.push(id);
++  }
++  return out;
++};
++
++const compareChildIds = (byId) => (a, b) => {
++  const na = byId?.get?.(a) || {};
++  const nb = byId?.get?.(b) || {};
++  const ra = CONTAINER_KIND_SORT_ORDER[na.kind] ?? 99;
++  const rb = CONTAINER_KIND_SORT_ORDER[nb.kind] ?? 99;
++  if (ra !== rb) return ra - rb;
++  const nameCmp = String(na.name || '').localeCompare(String(nb.name || ''), 'ru');
++  if (nameCmp !== 0) return nameCmp;
++  return String(a).localeCompare(String(b), 'ru');
++};
++
++/**
++ * Упорядочить прямых детей родителя: сначала явный `childOrder` Мастера,
++ * затем новые/неупомянутые дети — по типу и имени (прежний порядок дерева).
++ * Лишние id в `childOrder` игнорируются, дубли детей не появляются.
++ */
++const orderChildIds = (parent, childIds, byId) => {
++  const ids = normalizeChildOrder(childIds);
++  const order = normalizeChildOrder(parent?.childOrder);
++  if (!order.length) return [...ids].sort(compareChildIds(byId));
++  const position = new Map(order.map((id, index) => [id, index]));
++  const ordered = ids
++    .filter((id) => position.has(id))
++    .sort((a, b) => position.get(a) - position.get(b));
++  const rest = ids
++    .filter((id) => !position.has(id))
++    .sort(compareChildIds(byId));
++  return [...ordered, ...rest];
++};
++
++/** Перестановка перетаскиванием: переносимый занимает место цели среди братьев. */
++const moveChildInOrder = (childIds, childId, targetChildId) => {
++  const ids = normalizeChildOrder(childIds);
++  const from = ids.indexOf(normalizeId(childId));
++  const to = ids.indexOf(normalizeId(targetChildId));
++  if (from < 0 || to < 0 || from === to) return ids;
++  const next = [...ids];
++  const [moved] = next.splice(from, 1);
++  next.splice(to, 0, moved);
++  return next;
++};
++
+ /** Узел графа: только то, что важно для связей и видимости. */
+ const normalizeGraphNode = (raw) => {
+   if (!raw || typeof raw !== 'object') return null;
+@@ -64,9 +133,13 @@ const normalizeGraphNode = (raw) => {
+   return {
+     id,
+     kind: String(raw.kind || 'loot'),
++    // Патч 545: имя нужно единому fallback-порядку детей (тип → имя → id).
++    name: String(raw.name || '').trim(),
+     roomCodes: normalizeRoomCodes(raw),
+     locked: Boolean(raw.locked),
+     links: normalizeLinks(raw),
++    // Патч 545: явный порядок прямых детей, заданный Мастером в дереве.
++    childOrder: normalizeChildOrder(raw.childOrder),
+     // Патч 542: админская матрёшка и особый выход — часть игрового графа.
+     parentLocationId: normalizeId(raw.parentLocationId),
+     exitLocationId: normalizeId(raw.exitLocationId),
+@@ -108,6 +181,12 @@ const buildLocationGraph = (containers = []) => {
+       exits.set(node.id, node.exitLocationId);
+     }
+   }
++  // Патч 545: порядок детей у родителя — канон и для дерева Мастера, и для
++  // плоского списка сессии. Несколько родителей не смешивают порядки: каждый
++  // родитель сортирует своих детей по своему `childOrder`.
++  for (const [parentId, ids] of children.entries()) {
++    children.set(parentId, orderChildIds(byId.get(parentId), ids, byId));
++  }
+   return { byId, children, parents, exits };
+ };
+ 
+@@ -297,6 +376,15 @@ const buildGraphFromSession = (rootId = '', nodes = []) => {
+     const exitId = normalizeId(node.exitLocationId);
+     if (exitId && byId.has(exitId)) exits.set(id, exitId);
+   }
++  // Патч 545: в сессии порядок детей уже записан в `childIds` родителя.
++  // Граф из сессии уважает его, а не порядок обхода плоского списка.
++  for (const node of list) {
++    const id = nodeId(node);
++    if (!id || !children.has(id)) continue;
++    const ordered = normalizeChildOrder(node.childIds);
++    if (!ordered.length) continue;
++    children.set(id, orderChildIds({ childOrder: ordered }, children.get(id), byId));
++  }
+   return { byId, children, parents, exits };
+ };
+ 
+@@ -316,6 +404,11 @@ module.exports = {
+   normalizeId,
+   normalizeRoomCodes,
+   normalizeLinks,
++  // Патч 545: единый закон порядка детей (Мастер = игрок).
++  CONTAINER_KIND_SORT_ORDER,
++  normalizeChildOrder,
++  orderChildIds,
++  moveChildInOrder,
+   normalizeGraphNode,
+   buildLocationGraph,
+   descendantsOf,
