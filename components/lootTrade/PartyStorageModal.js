@@ -49,6 +49,8 @@ import itemStacking from '../../domain/itemStacking.js';
 import { getItemIcon } from './itemIcons';
 import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
 import TransferQuantityModal from './TransferQuantityModal';
+import { buildModsIndex } from '../../domain/itemNameParts';
+import ItemNameLines from './ItemNameLines';
 
 // Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
 // не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
@@ -78,6 +80,9 @@ const PartyStorageModal = ({
   onWithdrawLocal,
 }) => {
   useLocale();
+  // 562: имена показываем без обрезки — базовое имя целиком + моды отдельной
+  // строкой. У книг базового имени нет, поэтому идёт полное название.
+  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
   const { width: windowWidth } = useWindowDimensions();
   const isWideLayout = windowWidth >= 680;
   const rooms = useRoomStore((state) => state.rooms);
@@ -275,7 +280,7 @@ const PartyStorageModal = ({
                 style={trade.bufferRow}
                 onPress={() => addTake(entryById(entryId), -1)}
               >
-                <Text style={trade.bufferItalicText} numberOfLines={1}>
+                <Text style={trade.bufferItalicText}>
                   {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
                 </Text>
                 <TouchableOpacity
@@ -312,9 +317,7 @@ const PartyStorageModal = ({
                 delayLongPress={400}
               >
                 <View style={trade.tradeRowInfo}>
-                  <Text style={trade.tradeRowName} numberOfLines={2}>
-                    {`${getItemIcon(item.itemType)} ${item.name}`}
-                  </Text>
+                  <ItemNameLines item={item} modsIndex={modsIndex} />
                 </View>
                 <View style={localStyles.rowQtyBadge}>
                   <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
@@ -385,7 +388,7 @@ const PartyStorageModal = ({
                 addGive(item, -1);
               }}
             >
-              <Text style={trade.bufferItalicText} numberOfLines={1}>
+              <Text style={trade.bufferItalicText}>
                 {`+ ${nameOfBufferedItem(id)} ×${qty}`}
               </Text>
               <TouchableOpacity
@@ -422,9 +425,7 @@ const PartyStorageModal = ({
               delayLongPress={400}
             >
               <View style={trade.tradeRowInfo}>
-                <Text style={trade.tradeRowName} numberOfLines={2}>
-                  {`${getItemIcon(entry.itemType)} ${entry.name}`}
-                </Text>
+                <ItemNameLines item={entry} modsIndex={modsIndex} />
               </View>
               <View style={localStyles.rowQtyBadge}>
                 <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
@@ -604,9 +605,7 @@ const PartyStorageModal = ({
                     style={trade.tradeRow}
                   >
                     <View style={trade.tradeRowInfo}>
-                      <Text style={trade.tradeRowName} numberOfLines={1}>
-                        {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
-                      </Text>
+                      <ItemNameLines item={entry} modsIndex={modsIndex} />
                     </View>
                   </View>
                 ))

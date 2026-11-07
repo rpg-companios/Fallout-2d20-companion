@@ -1,6 +1,30 @@
 # Changelog
 ---
 
+## "Long names read in full" (patch 562)
+
+The owner's words: "Long names must read in full. Pay attention to two-word base
+names, like combat rifle, double-barrel shotgun and so on".
+
+- **Where the length comes from.** A weapon's name is glued together from mod
+  prefixes, unique qualities and the base name — for a fully modded gun that is
+  up to 129 characters in one line, which reads badly in a list either way.
+- **Two levels instead of clipping.** On top the title: qualities and the base
+  name in full, including two-word ones ("Combat Rifle", "Double-Barrel
+  Shotgun"), plus a stock rename. Below, the full mod names in grey 12px. No
+  mods — no second line, the name simply wraps.
+- **Parsed from the real name.** Exactly the prefixes shown on the second line
+  are taken off the item's name; everything else stays in the title. No word is
+  lost, and the title never lies: a pistol with a stock reads as the rifle it is.
+- **One layout for both windows.** The new `ItemNameLines` renders the name the
+  same way in storage (give, take, GM pane), at the trader (sell, buy) and in the
+  loot list. `numberOfLines` is gone from every item name.
+- **Acceptance.** New `item-name-parts-562` (9 checks), including an invariant
+  over the whole weapon catalog: not a single lost word, and the title always
+  contains the base name.
+
+---
+
 ## "How many to move?" in storage and at the trader (patch 561)
 
 The owner's words: "a tap transfers the item… a modal opens on top: how many to

@@ -170,9 +170,11 @@ describe('Патч 561: склад и торговец по одному диз�
     expect(trader).toContain('styles.rowQtyBadge');
   });
 
-  it('строка: количество бейджем, название до двух строк', () => {
+  it('строка: количество бейджем, название без обрезки (562)', () => {
     const storage = read('components/lootTrade/PartyStorageModal.js');
-    expect(storage).toContain('numberOfLines={2}');
+    // 562: имя рисует общий ItemNameLines (заголовок + строка модов), обрезки нет.
+    expect(storage).not.toContain('tradeRowName} numberOfLines');
+    expect(storage).toContain('ItemNameLines');
     const trader = read('components/lootTrade/PlayerLootTradeOverlay.js');
     expect(trader).toContain('rowQtyBadgeText');
     const styles = read('components/lootTrade/tradeOverlayStyles.js');

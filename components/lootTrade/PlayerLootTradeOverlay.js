@@ -12,7 +12,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
 import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
 import TransferQuantityModal from './TransferQuantityModal';
-import { getItemIcon } from './itemIcons';
+import { buildModsIndex } from '../../domain/itemNameParts';
+import ItemNameLines from './ItemNameLines';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
@@ -109,6 +111,8 @@ export default function PlayerLootTradeOverlay() {
 
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
   const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
+  // 562: имя без обрезки — базовое имя целиком плюс моды отдельной строкой.
+  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
   const storeItems = useCharacterStore((s) => s.items);
   const playerCaps = useCharacterStore((s) => s.currency);
   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
@@ -1737,11 +1741,18 @@ export default function PlayerLootTradeOverlay() {
                   return (
                     <View key={entry.entryId} style={styles.lootRow}>
                       <View style={styles.lootRowInfo}>
-                        <IconText style={styles.lootRowTitle}>
-                          {isCaps
-                            ? formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })
-                            : `${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
-                        </IconText>
+                        {isCaps ? (
+                          <IconText style={styles.lootRowTitle}>
+                            {formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })}
+                          </IconText>
+                        ) : (
+                          <ItemNameLines
+                            item={entry}
+                            modsIndex={modsIndex}
+                            suffix={` ×${entry.quantity}`}
+                            nameStyle={styles.lootRowTitle}
+                          />
+                        )}
                         {!isCaps && entry.weight > 0 && (
                           <Text style={styles.lootRowSub}>
                             {formatLootTrade(tLootTrade('detail.weight'), {
@@ -1867,9 +1878,7 @@ export default function PlayerLootTradeOverlay() {
                 delayLongPress={400}
               >
                 <View style={styles.tradeRowInfo}>
-                  <Text style={styles.tradeRowName}>
-                    {getItemIcon(pItem.itemType)} {pItem.name}{durSuffix} ×{remaining}
-                  </Text>
+                  <ItemNameLines item={pItem} modsIndex={modsIndex} suffix={durSuffix} />
                   <IconText style={styles.tradeRowPrice}>
                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
                   </IconText>
@@ -1957,11 +1966,12 @@ export default function PlayerLootTradeOverlay() {
                   delayLongPress={400}
                 >
                   <View style={styles.tradeRowInfo}>
-                    <Text style={styles.tradeRowName}>
-                      {getItemIcon(entry.itemType)} {entry.name} ×{remaining}
-                    </Text>
+                    <ItemNameLines
+                      item={entry.itemSnapshot && entry.itemSnapshot.name ? entry.itemSnapshot : entry}
+                      modsIndex={modsIndex}
+                    />
                     {Boolean(basics) && (
-                      <IconText style={styles.tradeRowBasics} numberOfLines={2}>{basics}</IconText>
+                      <IconText style={styles.tradeRowBasics}>{basics}</IconText>
                     )}
                     <IconText style={styles.tradeRowPriceBuy}>
                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}

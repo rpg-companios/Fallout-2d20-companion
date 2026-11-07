@@ -185,6 +185,9 @@ export const tradeOverlayStyles = StyleSheet.create({
   },
   lootRowInfo: {
     flex: 1,
+    // 562: та же веб-флекс-ловушка, что в tradeRowInfo — без minWidth: 0
+    // длинное имя выпирает вместо переноса.
+    minWidth: 0,
     paddingRight: 8,
   },
   lootRowTitle: {
@@ -380,12 +383,23 @@ export const tradeOverlayStyles = StyleSheet.create({
   },
   tradeRowInfo: {
     flex: 1,
+    // 562: без minWidth: 0 веб-флекс не сжимает текст (тот же баг, что в 436),
+    // и длинное название выпирает вместо переноса.
+    minWidth: 0,
     paddingRight: 10,
   },
   tradeRowName: {
     color: '#f0f0f0',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  // 562: моды — отдельной строкой, тоже без обрезки.
+  tradeRowMods: {
+    color: '#a8a8a8',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   tradeRowBasics: {
     color: '#a8a8a8',
