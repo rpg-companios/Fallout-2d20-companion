@@ -17,11 +17,8 @@ export const GM_DICTIONARIES = {
       emptyPlayers: 'В этой комнате пока нет подключённых персонажей. Передайте адрес комнаты игрокам — их карточки со сводкой появятся здесь автоматически.',
     },
     notices: {
-      title: 'Сообщения Мастера',
+      title: 'Что прислал Мастер',
       subtitle: 'Персонаж: {character}',
-      sectionTranslations: 'Трансляции',
-      sectionCommands: 'Разовые команды',
-      translationLine: 'Мастер открыл: {name}',
       ok: 'Понятно',
     },
     card: {
@@ -432,11 +429,8 @@ export const GM_DICTIONARIES = {
       emptyPlayers: 'No characters are connected to this room yet. Share the room code with your players — their live summary cards will appear here automatically.',
     },
     notices: {
-      title: 'Messages from the GM',
+      title: 'What the GM sent',
       subtitle: 'Character: {character}',
-      sectionTranslations: 'Transmissions',
-      sectionCommands: 'One-off commands',
-      translationLine: 'GM opened: {name}',
       ok: 'Got it',
     },
     card: {

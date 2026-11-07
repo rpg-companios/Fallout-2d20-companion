@@ -1,12 +1,16 @@
-// Патч 558 — «что Мастер прислал» приходит ЛИЧНО персонажу.
+// Патч 559 — уточнение владельца после 558:
 //
-// Слово владельца:
-//   1) На списке персонажей ничего не всплывает — меняется цвет иконки
-//      сервера (синий) на карточке того персонажа, кому пришло.
-//   2) Списком, что происходит: трансляции отдельно от разовых команд.
-//      Уровень и т.п. — окно по типу релиза с кнопкой ОК.
-//   3) Трансляция не даёт «доставлено»; у разовой команды — факт отправки.
-//   4) Ключи/склад не трогаем.
+//   «А мы можем трансляцию оставить как есть. Она оффлайн не работает.
+//    А посланные эффекты в стиле "что нового" при входе».
+//
+// Значит:
+//   1) Трансляция (локация/торговец/терминал) — РОВНО как до 558: плашка и
+//      окно работают по-прежнему, никакой привязки к открытому персонажу и
+//      никаких записей в список уведомлений.
+//   2) Присланные эффекты (уровень, крышки, лечение, увечья, медикаменты) —
+//      одно окно в стиле «Что нового» при входе в персонажа, кнопка «Понятно».
+//   3) На списке персонажей ничего не всплывает: там только синяя иконка
+//      сервера на карточке того персонажа, кому пришло.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,7 +44,6 @@ vi.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
 }));
 
-// Частичный мок локали — как в остальных render-тестах репозитория.
 vi.mock('../../i18n/locale', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -65,7 +68,6 @@ vi.mock('../../src/room/uiModeStore', () => {
 });
 
 const usePlayerNoticesStore = (await import('../../src/room/playerNoticesStore')).default;
-const { PLAYER_NOTICE_KIND } = await import('../../src/room/playerNoticesStore');
 const usePlayerFocusStore = (await import('../../src/room/playerFocusStore')).default;
 const useCharacterStore = (await import('../../src/store/characterStore')).default;
 const PlayerNoticesModal = (await import('../../components/gm/PlayerNoticesModal')).default;
@@ -97,20 +99,18 @@ const seed = () => {
     characterId: 'char_a',
     roomCode: 'ROOM1',
     roomName: 'Тапхаус',
-    kind: PLAYER_NOTICE_KIND.COMMAND,
     text: 'Пайпер: +1 уровень (ур. 3)',
   });
   store.addNotice({
-    id: 'ROOM1:session:sess_1:char_a',
+    id: 'ROOM1:dir_2:char_a',
     characterId: 'char_a',
     roomCode: 'ROOM1',
     roomName: 'Тапхаус',
-    kind: PLAYER_NOTICE_KIND.TRANSLATION,
-    text: 'Дом у дороги',
+    text: 'Пайпер: +50 крышек',
   });
 };
 
-describe('Патч 558: уведомления Мастера привязаны к персонажу', () => {
+describe('Патч 559: трансляция как раньше, эффекты — окном «Что нового» при входе', () => {
   beforeEach(async () => {
     await usePlayerNoticesStore.getState().resetForTests();
     usePlayerFocusStore.getState().resetForTests();
@@ -118,35 +118,31 @@ describe('Патч 558: уведомления Мастера привязаны
     useCharacterStore.setState({ currentCharacterId: 'char_a', characterName: 'Пайпер' });
   });
 
-  it('склад уведомлений помнит персонажа, не дублирует и считает непрочитанное', () => {
+  it('склад уведомлений помнит персонажа, не дублирует и знает только эффекты', () => {
     seed();
     usePlayerNoticesStore.getState().addNotice({
       id: 'ROOM1:dir_1:char_a',
       characterId: 'char_a',
-      kind: PLAYER_NOTICE_KIND.COMMAND,
       text: 'дубль',
     });
     usePlayerNoticesStore.getState().addNotice({
       id: 'ROOM1:dir_9:char_b',
       characterId: 'char_b',
-      kind: PLAYER_NOTICE_KIND.COMMAND,
       text: 'чужое',
     });
 
     const { notices } = usePlayerNoticesStore.getState();
-    expect(notices).toHaveLength(3); // дубль не добавился, чужое — добавилось своему
-    const mine = notices.filter((n) => n.characterId === 'char_a');
-    expect(mine).toHaveLength(2);
-    expect(mine.every((n) => n.read === false)).toBe(true);
+    expect(notices).toHaveLength(3); // дубль отброшен, чужое легло своему
+    expect(notices.every((n) => n.kind === 'command')).toBe(true);
+    expect(notices.every((n) => n.read === false)).toBe(true);
 
     usePlayerNoticesStore.getState().markReadForCharacter('char_a');
     const after = usePlayerNoticesStore.getState().notices;
     expect(after.filter((n) => n.characterId === 'char_a').every((n) => n.read)).toBe(true);
-    // Чужой персонаж не затронут.
     expect(after.find((n) => n.characterId === 'char_b').read).toBe(false);
   });
 
-  it('на списке персонажей окно не всплывает, внутри персонажа — показывает оба раздела', async () => {
+  it('на списке персонажей окно не всплывает, при входе — список эффектов', async () => {
     seed();
 
     usePlayerFocusStore.getState().setHomeFocused(true);
@@ -156,15 +152,16 @@ describe('Патч 558: уведомления Мастера привязаны
     usePlayerFocusStore.getState().setHomeFocused(false);
     const inside = await mount();
     const text = allText(inside);
-    expect(text).toContain('Сообщения Мастера');
-    expect(text).toContain('Трансляции');
-    expect(text).toContain('Мастер открыл: Дом у дороги');
-    expect(text).toContain('Разовые команды');
+    expect(text).toContain('Что прислал Мастер');
+    expect(text).toContain('Пайпер');
     expect(text).toContain('+1 уровень');
+    expect(text).toContain('+50 крышек');
+    expect(text).toContain('Тапхаус');
+    expect(text).not.toContain('Трансляции');
     expect(inside.root.findByProps({ testID: 'player-notices-ok' })).toBeTruthy();
   });
 
-  it('«Понятно» гасит уведомления этого персонажа и убирает окно', async () => {
+  it('«Понятно» гасит эффекты этого персонажа и убирает окно', async () => {
     seed();
     usePlayerFocusStore.getState().setHomeFocused(false);
     const renderer = await mount();
@@ -178,7 +175,7 @@ describe('Патч 558: уведомления Мастера привязаны
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it('чужие уведомления не показываются тому, кто сидит за другим персонажем', async () => {
+  it('чужой персонаж не видит чужих эффектов', async () => {
     seed();
     useCharacterStore.setState({ currentCharacterId: 'char_b', characterName: 'Ник' });
     usePlayerFocusStore.getState().setHomeFocused(false);
@@ -186,33 +183,29 @@ describe('Патч 558: уведомления Мастера привязаны
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it('карточка в списке: синяя иконка сервера вместо всплывающего окна', () => {
+  it('трансляция не тронута: окно локации/торговца работает как до 558', () => {
+    const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
+    // Никакой привязки к фокусу игрока и никаких записей в список уведомлений.
+    expect(overlaySrc).not.toContain('playerFocusStore');
+    expect(overlaySrc).not.toContain('playerNoticesStore');
+    expect(overlaySrc).not.toContain('homeFocused');
+    expect(overlaySrc).not.toContain('focusedBindings');
+    // Прежний отбор сессии по привязкам на месте.
+    expect(overlaySrc).toContain("if (session.targetType === 'room' || session.targetCharacterId === bind.characterId)");
+    const baseline = read('patchs/baseline.json');
+    expect(baseline).toContain('"559"');
+  });
+
+  it('команды Мастера не всплывают поверх списка, а ложатся в окно персонажа', () => {
+    const overlaySrc = read('components/gm/PlayerDirectiveOverlay.js');
+    expect(overlaySrc).not.toContain('showRawAlert');
+    expect(overlaySrc).toContain('usePlayerNoticesStore.getState().addNotice({');
+    expect(overlaySrc).toContain('characterId,');
     const homeSrc = read('components/screens/HomeScreen/HomeScreen.js');
     expect(homeSrc).toContain(
       "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
     );
     expect(homeSrc).toContain('noticesCount={unreadNoticeCountFor(notices, item.id)}');
-    // В списке персонажей окно Мастера больше не всплывает: о пришедшем
-    // сообщает только цвет иконки.
-    expect(homeSrc).not.toContain('subscribePlayerDirectiveApplied(() => {\n      showRawAlert');
-  });
-
-  it('трансляция идёт только открытому персонажу и не всплывает на списке', () => {
-    const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
-    expect(overlaySrc).toContain('const homeFocused = usePlayerFocusStore((s) => s.homeFocused);');
-    expect(overlaySrc).toContain('const focusedBindings = useMemo(');
-    expect(overlaySrc).toContain('return bindings.filter((bind) => bind.characterId === currentCharacterId);');
-    expect(overlaySrc.match(/if \(isGmMode \|\| homeFocused === true \|\| focusedBindings\.length === 0\) return null;/g))
-      .toHaveLength(2);
-    expect(overlaySrc).toContain('PLAYER_NOTICE_KIND.TRANSLATION');
-  });
-
-  it('команды Мастера больше не всплывают поверх списка, а ложатся в список персонажа', () => {
-    const overlaySrc = read('components/gm/PlayerDirectiveOverlay.js');
-    expect(overlaySrc).not.toContain('showRawAlert');
-    expect(overlaySrc).toContain('usePlayerNoticesStore.getState().addNotice({');
-    expect(overlaySrc).toContain('characterId,');
-    expect(overlaySrc).toContain('PLAYER_NOTICE_KIND.COMMAND');
   });
 
   it('у Мастера только факт отправки: «Доставлено» из интерфейса ушло', () => {
@@ -225,7 +218,7 @@ describe('Патч 558: уведомления Мастера привязаны
     expect(homeSrc).not.toContain('acked >= total');
   });
 
-  it('ключи и склад патч не трогает', () => {
+  it('ключи и склад не тронуты', () => {
     const storage = read('components/lootTrade/PartyStorageModal.js');
     expect(storage).toContain('storageTabs');
     expect(storage).not.toContain('playerNotices');

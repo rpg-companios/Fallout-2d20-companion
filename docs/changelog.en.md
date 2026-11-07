@@ -1,6 +1,28 @@
 # Changelog
 ---
 
+## Transmissions untouched, effects shown on entry (patch 559)
+
+The owner's words: "can we leave the transmission as it is? It does not work
+offline. And the sent effects in the 'what's new' style on entry."
+
+- **Transmissions untouched.** A location, trader or terminal opens through the
+  pill and its window exactly as before 558: no binding to the open character and
+  no entries in the list. It cannot work offline, so nothing can pile up.
+- **Effects only in the window.** On entering a character a window in the "What's
+  new" style — "What the GM sent" — lists what the GM applied: level, caps,
+  healing, injuries, a peer's first aid. The lines are the usual ones, with the
+  room name.
+- **Character list.** No windows: the card of the character that received
+  something shows a blue server icon. "Got it" in the window clears it.
+- **No sections.** Since the window now holds effects only, splitting it into
+  "Transmissions" and "One-off commands" has nothing left to split.
+- **Everything else as in 558:** notices bound to the character, "Sent: N" for
+  the GM instead of "Delivered", keys and storage untouched.
+- **Acceptance.** New `effects-window-559` (8 checks).
+
+---
+
 ## GM messages arrive personally (patch 558)
 
 The owner's words: "nothing pops up over the character list — change the colour
