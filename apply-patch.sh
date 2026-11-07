@@ -661,6 +661,11 @@ if [[ "$MODE" == "status" ]]; then
     echo "Стоящих патчей нет — дерево до самой первой цепочки."
   fi
   echo
+  if [[ -n "${BASELINE_NUM:-}" ]] \
+    && { [[ -z "$TOP_APPLIED_NUMBER" ]] || number_lt "$TOP_APPLIED_NUMBER" "$BASELINE_NUM"; }; then
+    echo "Свежий ключевой патч ставится одним шагом:  ./apply-patch.sh $BASELINE_NUM"
+    echo
+  fi
   if [[ ${#will_apply[@]} -gt 0 ]]; then
     last="${will_apply[${#will_apply[@]} - 1]}"
     echo "Поставить всё недостающее:  ./apply-patch.sh $(patch_number "$last")"
