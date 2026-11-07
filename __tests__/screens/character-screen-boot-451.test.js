@@ -154,7 +154,9 @@ describe('патч 451: целостность запуска приложени
 
   it('apply-patch.sh указывает на рабочую ветку и проверяет целостность node_modules', () => {
     const script = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
-    expect(script).toContain('ARENA_BRANCH="arena/f90c80d8-fallout-2d20-companion"');
+    // Ветка сессии меняется от сессии к сессии: проверяем форму и то, что
+    // имя не зашито намертво, а берётся из одной точки (плюс переопределение).
+    expect(script).toMatch(/ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-arena\/[a-z0-9]+-fallout-2d20-companion\}"/);
     expect(script).toContain('deps_check()');
     expect(script).toContain('deps_check || exit 1');
   });

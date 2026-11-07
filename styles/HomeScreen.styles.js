@@ -475,6 +475,8 @@ const styles = StyleSheet.create({
   gmRoomRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     gap: 8,
   },
   gmDeliveryPill: {
@@ -516,6 +518,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  gmPcModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#232323',
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  gmPcModeBtnActive: {
+    backgroundColor: 'rgba(212, 175, 55, 0.18)',
+    borderColor: '#d4af37',
+  },
+  gmPcModeBtnText: {
+    color: '#cccccc',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  gmPcModeBtnTextActive: {
+    color: '#f0e68c',
+  },
   gmReadonlyHint: {
     color: '#9ca3af',
     fontSize: 11,
@@ -526,6 +551,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingTop: 4,
     paddingBottom: 16,
+  },
+  // ПК-режим (555): широкий центрированный столбец карточек вместо узкой ленты.
+  gmCardsListWrapPc: {
+    width: '100%',
+    maxWidth: 960,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   gmEmptyRoomCard: {
     backgroundColor: '#1f1f1f',

@@ -11,6 +11,7 @@ export const GM_DICTIONARIES = {
       deliveryBadge: 'Команда: {acked}/{total}',
       deliveryDone: 'Доставлено ({acked}/{total})',
       readonlyHint: 'Только просмотр · влияние на персонажей через команды и добычу',
+      pcMode: 'ПК-режим',
       emptyPlayers: 'В этой комнате пока нет подключённых персонажей. Передайте адрес комнаты игрокам — их карточки со сводкой появятся здесь автоматически.',
     },
     card: {
@@ -417,6 +418,7 @@ export const GM_DICTIONARIES = {
       deliveryBadge: 'Command: {acked}/{total}',
       deliveryDone: 'Delivered ({acked}/{total})',
       readonlyHint: 'Read-only view · affect characters via commands and loot/trade',
+      pcMode: 'PC mode',
       emptyPlayers: 'No characters are connected to this room yet. Share the room code with your players — their live summary cards will appear here automatically.',
     },
     card: {

@@ -508,7 +508,15 @@ export const extractGmCharacterSummary = (
       });
     }
   }
-  const perks = [...perksAgg.values()];
+  // 555: к описанию перка добавляем текст эффекта текущего ранга — в ПК-режиме
+  // карточка показывает перки не чипами, а строками с пояснением.
+  const perks = [...perksAgg.values()].map((perkEntry) => {
+    const loc = perkEntry.id ? perksMap.get(perkEntry.id) : null;
+    const rankEffects = Array.isArray(loc?.rankEffects) ? loc.rankEffects : [];
+    const rankIndex = Math.max(0, Math.min(perkEntry.rank - 1, rankEffects.length - 1));
+    const description = rankEffects[rankIndex] || loc?.effect || '';
+    return { ...perkEntry, description: String(description || '') };
+  });
 
   const groupedInvMap = new Map();
   for (const item of allItems) {

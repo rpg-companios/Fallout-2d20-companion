@@ -5,7 +5,8 @@
 //   settings   — общее окно «Настройки»;
 //   characters — экран менеджера персонажей;
 //   equipment  — экран экипировки;
-//   inventory  — экран инвентаря.
+//   inventory  — экран инвентаря;
+//   room       — панель комнаты Мастера (переключатели прямо в окне комнаты).
 //
 // Движок владеет общими UI-настройками. Механики и доступные варианты
 // конкретной игры описывает modules/<id>/settings.json. Например, движок умеет
@@ -21,6 +22,7 @@ export const SETTING_CONTROL_SURFACES = Object.freeze({
   CHARACTERS: 'characters',
   EQUIPMENT: 'equipment',
   INVENTORY: 'inventory',
+  ROOM: 'room',
 });
 
 /** Движковые настройки (UI-фичи, общие для любых сеттингов). */
@@ -77,6 +79,18 @@ export const ENGINE_SETTINGS = [
     sectionKey: 'appearance',
     labelKey: 'settings.adminScreenTitle',
     descriptionKey: 'settings.adminScreenDescription',
+    defaultValue: false,
+  },
+  {
+    // 555: ПК-режим карточек в окне комнаты Мастера. Включается кнопкой
+    // «ПК-режим» в панели комнаты, поэтому поверхность управления — room,
+    // а не общее окно «Настройки». По умолчанию выключен.
+    id: 'gmPcMode',
+    type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.ROOM,
+    sectionKey: 'appearance',
+    labelKey: 'settings.gmPcModeTitle',
+    descriptionKey: 'settings.gmPcModeDescription',
     defaultValue: false,
   },
   {

@@ -10,7 +10,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(__dirname, '../..');
-const BRANCH = 'arena/f90c80d8-fallout-2d20-companion';
+// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
+// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
+// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
+const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
+const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
+  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
+if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
 
 const git = (cwd, args) =>
   execFileSync('git', args, {

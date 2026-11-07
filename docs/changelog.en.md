@@ -1,6 +1,51 @@
 # Changelog
 ---
 
+## PC mode for room cards (patch 555)
+
+The owner's words: "The switch will live in the room view. Do patch 555." Before
+this patch no PC mode existed — Settings only had "Admin screen" (access to the
+GM workspace), not a wide card layout.
+
+- **Where the switch is.** In the room bar, next to the command delivery pill and
+  the "Party Command" button: `gm-room-pc-mode-btn` labelled "PC mode". It is not
+  in the general Settings window — the setting is declared on the `room` surface.
+- **Explicit choice.** The mode is never inferred from window width: only a press
+  turns it on. The value is stored as a regular engine setting `gmPcMode`
+  (default off), so it survives restarts and tab switches.
+- **What changes on screen.** The card list becomes a wide centred column up to
+  960 px; each card gets more padding; all four sections (S.P.E.C.I.A.L. & skills,
+  armour & conditions, weapons & ammo, perks & inventory) are expanded at once,
+  the "expand all" button disappears and section headers stop being buttons.
+- **Perks with descriptions.** The character summary now returns `description` —
+  the effect text of the current perk rank; in PC mode perks render as
+  "name · rank" rows with that text instead of chips.
+- **Acceptance.** New `gm-pc-mode-555` (7 checks): the setting on the `room`
+  surface, choice persistence, ru/en labels, the button in the room bar, card
+  behaviour in both modes (real mount via react-test-renderer), and the perk
+  effect text in the summary.
+
+## Release 5 — "What's new" notes (patch 554)
+
+The owner's words: "we need a new list of what went into the release". The list is
+built from the previous release (its themes are not repeated), the changelog and the
+patches: only what was created, not fixes of earlier patches. Internal matters —
+licences, the "canonical storage", the two storage panels, JSON transfer, key cards
+in the admin area — were left out: "players won't find that interesting".
+
+- **What the player sees.** Ten items instead of 150 patch lines: playing in a room
+  with the GM and their decisions landing on the sheet, the GM seeing the hero's
+  state, locations with rooms and passages, locked doors, lockpicking, terminal
+  hacking, keys and notes, gates, party storage, loot and traders.
+- **What changed in the file.** `version` is 554 (the patch number), `release` is 5.
+  Notes are paired ru/en; the "What's new" window shows them once: release 5 > 4.
+- **Acceptance.** New `release-5-notes-554` (5 checks): release number, ru/en parity,
+  player language without patch numbers or internal words, no admin terms, themes
+  with canonical names, no duplication of release 4. `release-4-notes-461` became a
+  set of general laws (release 4 is no longer pinned — its themes left with its
+  notes). The 535/532 pins now expect 554/5/10, note thresholds in 525/526 are at
+  least 10, `baseline` is 554.
+
 ## Range scale clarified (patch 553)
 
 Docs and acceptance only — game mechanics are unchanged.

@@ -1,0 +1,920 @@
+diff --git a/__tests__/installer/baseline-sync-patchs-493.test.js b/__tests__/installer/baseline-sync-patchs-493.test.js
+index 79868f90..da0e547b 100644
+--- a/__tests__/installer/baseline-sync-patchs-493.test.js
++++ b/__tests__/installer/baseline-sync-patchs-493.test.js
+@@ -10,7 +10,13 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
+-const BRANCH = 'arena/f90c80d8-fallout-2d20-companion';
++// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
++// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
++// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
++const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
++const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
++  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
++if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+diff --git a/__tests__/installer/cleanup-gitlinks-460.test.js b/__tests__/installer/cleanup-gitlinks-460.test.js
+index 4b6ca99b..987c0caf 100644
+--- a/__tests__/installer/cleanup-gitlinks-460.test.js
++++ b/__tests__/installer/cleanup-gitlinks-460.test.js
+@@ -14,6 +14,14 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
++// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
++// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
++// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
++const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
++const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
++  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
++if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
++
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+@@ -73,7 +81,7 @@ describe('Патч 460: уборка неиспользуемых папок/ф
+       const subSha = git(subRepo, ['rev-parse', 'HEAD']).trim();
+ 
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/f90c80d8-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', BRANCH]);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, '.kiro/specs/old'), { recursive: true });
+diff --git a/__tests__/installer/concise-installer-output-455.test.js b/__tests__/installer/concise-installer-output-455.test.js
+index b4576d21..4470f649 100644
+--- a/__tests__/installer/concise-installer-output-455.test.js
++++ b/__tests__/installer/concise-installer-output-455.test.js
+@@ -14,6 +14,14 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
++// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
++// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
++// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
++const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
++const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
++  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
++if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
++
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+@@ -36,7 +44,7 @@ describe('Патч 455: лаконичный отчёт apply-patch.sh и явн
+ 
+     try {
+       fs.mkdirSync(upstream, { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/f90c80d8-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', BRANCH]);
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+diff --git a/__tests__/installer/preserve-owner-commits-464.test.js b/__tests__/installer/preserve-owner-commits-464.test.js
+index d3d0be57..b5138a76 100644
+--- a/__tests__/installer/preserve-owner-commits-464.test.js
++++ b/__tests__/installer/preserve-owner-commits-464.test.js
+@@ -13,6 +13,14 @@ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
++// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
++// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
++// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
++const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
++const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
++  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
++if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
++
+ 
+ const git = (cwd, args) =>
+   execFileSync('git', args, {
+@@ -52,7 +60,7 @@ describe('Патч 464: восстановление ghoul.png из 39bb559 и 
+       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
+       fs.mkdirSync(path.join(upstream, 'modules/fallout/assets/origins'), { recursive: true });
+-      git(upstream, ['init', '-b', 'arena/f90c80d8-fallout-2d20-companion']);
++      git(upstream, ['init', '-b', BRANCH]);
+ 
+       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
+       fs.writeFileSync(path.join(upstream, 'modules/fallout/assets/origins/survivor.png'), 'arena-survivor-v1');
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 04443f5b..83972b00 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('553');
+-    expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(150);
+-    expect(version.notes['en-EN']).toHaveLength(150);
+-    expect(json('patchs/baseline.json').baseline).toBe('553');
++    expect(version.version).toBe('554');
++    expect(version.release).toBe(5);
++    expect(version.notes['ru-RU']).toHaveLength(10);
++    expect(version.notes['en-EN']).toHaveLength(10);
++    expect(json('patchs/baseline.json').baseline).toBe('554');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **553**');
++    expect(roadmap).toContain('Текущая версия: **554**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-attempts-526.test.js b/__tests__/room/lock-attempts-526.test.js
+index 492e3dd7..0fdd385b 100644
+--- a/__tests__/room/lock-attempts-526.test.js
++++ b/__tests__/room/lock-attempts-526.test.js
+@@ -289,8 +289,8 @@ describe('526: доставка и регрессии', () => {
+   it('версия, отсечка, заметки, журналы, план и установка', () => {
+     const version = json('public/version.json');
+     expect(Number(version.version)).toBeGreaterThanOrEqual(526);
+-    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(97);
+-    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(97);
++    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(10);
++    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(10);
+     expect(Number(json('patchs/baseline.json').baseline)).toBeGreaterThanOrEqual(526);
+     expect(read('docs/changelog.ru.md')).toContain('526');
+     expect(read('docs/changelog.en.md')).toContain('526');
+diff --git a/__tests__/room/lock-entry-light-525.test.js b/__tests__/room/lock-entry-light-525.test.js
+index 7b23b178..14b72243 100644
+--- a/__tests__/room/lock-entry-light-525.test.js
++++ b/__tests__/room/lock-entry-light-525.test.js
+@@ -103,9 +103,9 @@ describe('525: регрессии и доставка', () => {
+   it('версия, отсечка, заметки, журналы, план и файл установки', () => {
+     const version = json('public/version.json');
+     expect(Number(version.version)).toBeGreaterThanOrEqual(525);
+-    expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(95);
+-    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(95);
++    expect(version.release).toBeGreaterThanOrEqual(4);
++    expect(version.notes['ru-RU'].length).toBeGreaterThanOrEqual(10);
++    expect(version.notes['en-EN'].length).toBeGreaterThanOrEqual(10);
+     expect(Number(json('patchs/baseline.json').baseline)).toBeGreaterThanOrEqual(525);
+     expect(read('docs/changelog.ru.md')).toContain('525');
+     expect(read('docs/changelog.en.md')).toContain('525');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 4331d6ad..e3a3aba5 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('553');
+-    expect(version.release).toBe(4);
+-    expect(version.notes['ru-RU']).toHaveLength(150);
+-    expect(version.notes['en-EN']).toHaveLength(150);
+-    expect(json('patchs/baseline.json').baseline).toBe('553');
++    expect(version.version).toBe('554');
++    expect(version.release).toBe(5);
++    expect(version.notes['ru-RU']).toHaveLength(10);
++    expect(version.notes['en-EN']).toHaveLength(10);
++    expect(json('patchs/baseline.json').baseline).toBe('554');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **553**');
++    expect(roadmap).toContain('Текущая версия: **554**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/screens/character-screen-boot-451.test.js b/__tests__/screens/character-screen-boot-451.test.js
+index e8217b7e..8fada6bd 100644
+--- a/__tests__/screens/character-screen-boot-451.test.js
++++ b/__tests__/screens/character-screen-boot-451.test.js
+@@ -154,7 +154,9 @@ describe('патч 451: целостность запуска приложени
+ 
+   it('apply-patch.sh указывает на рабочую ветку и проверяет целостность node_modules', () => {
+     const script = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
+-    expect(script).toContain('ARENA_BRANCH="arena/f90c80d8-fallout-2d20-companion"');
++    // Ветка сессии меняется от сессии к сессии: проверяем форму и то, что
++    // имя не зашито намертво, а берётся из одной точки (плюс переопределение).
++    expect(script).toMatch(/ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-arena\/[a-z0-9]+-fallout-2d20-companion\}"/);
+     expect(script).toContain('deps_check()');
+     expect(script).toContain('deps_check || exit 1');
+   });
+diff --git a/__tests__/screens/release-4-notes-461.test.js b/__tests__/screens/release-4-notes-461.test.js
+index afe83b89..a1408958 100644
+--- a/__tests__/screens/release-4-notes-461.test.js
++++ b/__tests__/screens/release-4-notes-461.test.js
+@@ -1,14 +1,18 @@
+-// ПРИЁМОЧНЫЙ (патч 461): релиз 4 объявлен владельцем («давай новый релиз
+-// сделаем и на этом пока всё»). Покрывает патчи 441–460. Заметки — на языке
+-// игрока (без номеров патчей и внутренней кухни), парные ru/en, опираются на
+-// реальные названия разделов из словарей, не дублируют релиз 3, окно «Что
+-// нового» покажет их один раз (release 4 > 3).
++// ПРИЁМОЧНЫЙ (патч 461): релиз 4 объявлен владельцем.
++//
++// Патч 554 начал релиз 5 и заменил заметки: темы релиза 4 (портрет, своё и
++// самодельное снаряжение, живой индикатор запуска) вместе с его списком ушли,
++// поэтому здесь остаются только законы, которые обязаны переживать любой релиз:
++// номер релиза только растёт, версия — номер последнего патча, заметки парные
++// ru/en, язык игрока без служебных слов, темы релиза 3 не возвращаются.
++// Конкретные темы текущего релиза закрепляет защёлка старшего релиза
++// (release-5-notes-554).
+ import { describe, expect, it } from 'vitest';
+ import notes from '../../public/version.json';
+ 
+-describe('патч 461: релиз 4 — заметки «Что нового»', () => {
+-  it('релиз поднят до 4; версия — номер последнего патча; заметки парные', () => {
+-    expect(notes.release).toBe(4);
++describe('патч 461: законы заметок релиза (461 → релиз 5)', () => {
++  it('релиз только растёт; версия — номер последнего патча; заметки парные', () => {
++    expect(notes.release).toBeGreaterThanOrEqual(4);
+     expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
+     expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
+     expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
+@@ -23,28 +27,6 @@ describe('патч 461: релиз 4 — заметки «Что нового»'
+     }
+   });
+ 
+-  it('главные темы релиза 4 присутствуют с каноническими названиями из словарей', () => {
+-    const ru = notes.notes['ru-RU'].join(' ');
+-    const en = notes.notes['en-EN'].join(' ');
+-
+-    expect(ru).toContain('портрет персонажа');
+-    expect(ru).toContain('Собственное снаряжение');
+-    expect(ru).toContain('Самодельное снаряжение');
+-    expect(ru).toContain('Экран администратора');
+-    expect(ru).toContain('Сервер');
+-    expect(ru).toContain('Пользователь');
+-    expect(ru).toContain('Админ');
+-    expect(ru).toContain('живой индикатор запуска');
+-
+-    expect(en).toContain('Custom character portrait');
+-    expect(en).toContain('Own equipment');
+-    expect(en).toContain('Homebrew Equipment');
+-    expect(en).toContain('Admin screen');
+-    expect(en).toContain('Server');
+-    expect(en).toContain('User');
+-    expect(en).toContain('Admin');
+-  });
+-
+   it('не дублирует релиз 3 (его темы ушли вместе с его заметками)', () => {
+     const ru = notes.notes['ru-RU'].join(' ');
+     expect(ru).not.toContain('Супер Дупер');
+diff --git a/__tests__/screens/release-5-notes-554.test.js b/__tests__/screens/release-5-notes-554.test.js
+new file mode 100644
+index 00000000..f47bc9c7
+--- /dev/null
++++ b/__tests__/screens/release-5-notes-554.test.js
+@@ -0,0 +1,79 @@
++// ПРИЁМОЧНЫЙ (патч 554): релиз 5 объявлен владельцем.
++//
++// Владелец: «нужен новый список, что вошло в релиз»; источник — прошлый релиз
++// (чтобы не повторять темы), чейнджлог и патчи: берём СОЗДАННОЕ, а не
++// исправления прошлых патчей. Отдельно сказано: игрокам не интересна
++// внутренняя кухня — лицензии, «канон хранилища», две панели склада, перенос
++// через JSON и карточки ключей в админке в список не входят.
++//
++// Заметки — на языке игрока (без номеров патчей и служебных слов), парные
++// ru/en, описывают, что игрок сможет сделать за столом. Окно «Что нового»
++// покажет их один раз (release 5 > 4).
++import { describe, expect, it } from 'vitest';
++import notes from '../../public/version.json';
++
++describe('патч 554: релиз 5 — заметки «Что нового»', () => {
++  it('релиз поднят до 5; версия — номер последнего патча; заметки парные', () => {
++    expect(notes.release).toBe(5);
++    expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
++    expect(Number(notes.version)).toBeGreaterThanOrEqual(554);
++    expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
++    expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(10);
++  });
++
++  it('язык игрока: без номеров патчей и внутренней технической кухни', () => {
++    for (const list of [notes.notes['ru-RU'], notes.notes['en-EN']]) {
++      for (const line of list) {
++        expect(line).not.toMatch(/патч|patch \d/i);
++        expect(line).not.toMatch(/агент|baseline|мост контур|bridge|отсечк|metro|vitest|gitlink|kiro/i);
++      }
++    }
++  });
++
++  it('внутренняя кухня и админские термины в релиз не попали', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    const en = notes.notes['en-EN'].join(' ');
++
++    expect(ru).not.toMatch(/лицензи|канон|две панели|JSON|карточк[аи] ключ/i);
++    expect(en).not.toMatch(/licen[cs]e|canonical|two panels|JSON/i);
++  });
++
++  it('главные темы релиза 5 присутствуют с каноническими названиями из словарей', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    const en = notes.notes['en-EN'].join(' ');
++
++    expect(ru).toContain('комнате');
++    expect(ru).toContain('Локации');
++    expect(ru).toContain('Запертая дверь');
++    expect(ru).toContain('Взлом замков');
++    expect(ru).toContain('Взлом терминалов');
++    expect(ru).toContain('Ключи и записки');
++    expect(ru).toContain('Ворота');
++    expect(ru).toContain('Общий склад партии');
++    expect(ru).toContain('Добыча и торговцы');
++
++    expect(en).toContain('room with your GM');
++    expect(en).toContain('Locations');
++    expect(en).toContain('locked door');
++    expect(en).toContain('Lockpicking');
++    expect(en).toContain('Terminal hacking');
++    expect(en).toContain('Keys and notes');
++    expect(en).toContain('Gates');
++    expect(en).toContain('Party storage');
++    expect(en).toContain('Loot and traders');
++  });
++
++  it('не дублирует релиз 4 (его темы ушли вместе с его заметками)', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    const en = notes.notes['en-EN'].join(' ');
++
++    expect(ru).not.toContain('портрет персонажа');
++    expect(ru).not.toContain('Собственное снаряжение');
++    expect(ru).not.toContain('Самодельное снаряжение');
++    expect(ru).not.toContain('живой индикатор запуска');
++
++    expect(en).not.toContain('Custom character portrait');
++    expect(en).not.toContain('Own equipment');
++    expect(en).not.toContain('Homebrew Equipment');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index bfaf3619..15ae8adf 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,29 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (554) — релиз 5: новые заметки «Что нового»
++
++Слово владельца: «нужен новый список, что вошло в релиз». Источник — прошлый
++релиз (его темы не повторяем), чейнджлог и патчи; в список идёт созданное, а не
++исправления прошлых патчей. Внутренняя кухня — лицензии, «канон хранилища», две
++панели склада, перенос через JSON, карточки ключей в админке — в заметки не
++попала: «игрокам это не интересно».
++
++- **`public/version.json`.** `version: 554`, `release: 5`; 150 патчевых строк
++  релиза 4 заменены на 10 пунктов на языке игрока (парные ru/en): игра в комнате
++  с ведущим и его решения на листе, состояние героя у Мастера, локации с
++  комнатами и переходами, запертые двери, взлом замков, взлом терминалов, ключи
++  и записки, ворота, общий склад партии, добыча и торговцы.
++- **Защёлки.** Новый `release-5-notes-554` закрепляет номер релиза, парность,
++  язык без патчей и служебных слов, отсутствие админских терминов и темы с
++  каноническими названиями. `release-4-notes-461` переведён в общие законы: его
++  темы ушли вместе с заметками. Защёлки версии в 535/532 — 554/5/10,
++  `baseline` — 554; пороги заметок в 525/526 — не меньше 10.
++- **Отсечка.** `patchs/baseline.json` → 554; установка 554 — один шаг.
++- **Приёмка:** `release-5-notes-554` (5), `release-4-notes-461` (3),
++  обновлённые 535/532/525/526 и установщик-тесты (ветка сессии больше не
++  запинена на имя, а читается из `apply-patch.sh`). Итого **286 файлов /
++  2641 проверка**, `typecheck` exit 0, `build` — успешно.
++
+ ## 2026-11-07 (553) — пояснение шкалы дальности (только документы и приёмка)
+ 
+ Вопрос владельца: «в смысле короткая дистанция + мод на +1 дистанцию =
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a7ae4bb9..21e5f132 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,27 @@
+ # Changelog
+ ---
+ 
++## Release 5 — "What's new" notes (patch 554)
++
++The owner's words: "we need a new list of what went into the release". The list is
++built from the previous release (its themes are not repeated), the changelog and the
++patches: only what was created, not fixes of earlier patches. Internal matters —
++licences, the "canonical storage", the two storage panels, JSON transfer, key cards
++in the admin area — were left out: "players won't find that interesting".
++
++- **What the player sees.** Ten items instead of 150 patch lines: playing in a room
++  with the GM and their decisions landing on the sheet, the GM seeing the hero's
++  state, locations with rooms and passages, locked doors, lockpicking, terminal
++  hacking, keys and notes, gates, party storage, loot and traders.
++- **What changed in the file.** `version` is 554 (the patch number), `release` is 5.
++  Notes are paired ru/en; the "What's new" window shows them once: release 5 > 4.
++- **Acceptance.** New `release-5-notes-554` (5 checks): release number, ru/en parity,
++  player language without patch numbers or internal words, no admin terms, themes
++  with canonical names, no duplication of release 4. `release-4-notes-461` became a
++  set of general laws (release 4 is no longer pinned — its themes left with its
++  notes). The 535/532 pins now expect 554/5/10, note thresholds in 525/526 are at
++  least 10, `baseline` is 554.
++
+ ## Range scale clarified (patch 553)
+ 
+ Docs and acceptance only — game mechanics are unchanged.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 02f008d4..0e5d3ecb 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,27 @@
+ 
+ ---
+ 
++## Релиз 5 — заметки «Что нового» (патч 554)
++
++Слово владельца: «нужен новый список, что вошло в релиз». Список собран по
++прошлому релизу (его темы не повторяются), чейнджлогу и патчам: в релиз идёт
++созданное, а не исправления прошлых патчей. Внутренняя кухня — лицензии,
++«канон хранилища», две панели склада, перенос через JSON, карточки ключей в
++админке — в заметки не попала: «игрокам это не интересно».
++
++- **Что видит игрок.** Десять пунктов вместо 150 патчевых строк: игра в комнате
++  с ведущим и его решения прямо на листе, состояние героя у Мастера, локации с
++  комнатами и переходами, запертые двери, взлом замков, взлом терминалов, ключи
++  и записки, ворота, общий склад партии, добыча и торговцы.
++- **Что изменилось в файле.** `version` — 554 (номер патча), `release` — 5.
++  Заметки парные ru/en, окно «Что нового» покажет их один раз: релиз 5 > 4.
++- **Приёмка.** Новый `release-5-notes-554` (5 проверок): номер релиза, парность,
++  язык без номеров патчей и служебных слов, отсутствие админских терминов, темы
++  с каноническими названиями, недублирование релиза 4. `release-4-notes-461`
++  переведён в общие законы (релиз 4 больше не пинится — его темы ушли вместе с
++  заметками). Защёлки 535/532 обновлены под 554/5/10, пороги заметок в 525/526 —
++  не меньше 10, `baseline` → 554.
++
+ ## Пояснение шкалы дальности (патч 553)
+ 
+ Только документы и приёмка — механика игры не менялась.
+diff --git a/docs/patch-554-install.md b/docs/patch-554-install.md
+new file mode 100644
+index 00000000..d1980a03
+--- /dev/null
++++ b/docs/patch-554-install.md
+@@ -0,0 +1,70 @@
++# Установка патча 554: релиз 5 — новые заметки «Что нового»
++
++Патч подготовлен от состояния **версии 553**. Файл установки:
++`patchs/554-release-5-notes.patch`.
++
++> **Слово владельца:** «нужен новый список, что вошло в релиз».
++> **Уточнение владельца:** «игрокам будет интересно читать, как работает
++> внутрянка и все эти лицензии/каноническое/две панели/перенос json/ключи?» —
++> нет. В заметки идёт только то, что игрок может сделать за столом.
++
++## Что меняется
++
++Только заметки «Что нового» и защёлки, которые их проверяют. Игровая механика,
++экраны и данные не менялись.
++
++| Файл | Что сделано |
++| --- | --- |
++| `public/version.json` | `version: 554`, `release: 5`; 150 патчевых строк релиза 4 заменены на **10 пунктов** на языке игрока, парные ru/en |
++| `__tests__/screens/release-5-notes-554.test.js` | новая приёмка: номер релиза, парность, язык без номеров патчей и служебных слов, отсутствие админских терминов, темы с каноническими названиями, недублирование релиза 4 (5 проверок) |
++| `__tests__/screens/release-4-notes-461.test.js` | переведён в общие законы: релиз 4 больше не пинится, его темы ушли вместе с заметками |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 554 / release 5 / 10 заметок / `baseline` 554 |
++| `__tests__/room/lock-entry-light-525.test.js`, `__tests__/room/lock-attempts-526.test.js` | пороги заметок — не меньше 10 (были 95 и 97) |
++| `patchs/baseline.json` | отсечка 554 |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md` | запись патча 554, тезис 44, версия 554 |
++
++## Новый список (что увидит игрок)
++
++1. Игра в комнате с ведущим: лист уезжает ведущему, его решения приходят на лист
++   и сохраняются.
++2. Ведущий видит состояние героя: ОЗ, радиация, условия, ключевые показатели.
++3. Локации с комнатами и переходами: здание, подвал, сундук — движение по местам.
++4. Запертая дверь не пускает внутрь: сначала ключ или взлом.
++5. Взлом замков: ячейки по восприятию и сложности, ограниченные попытки.
++6. Взлом терминалов: четыре попытки, слова, скобки, доска по интеллекту, решение
++   ведущего после провала.
++7. Ключи и записки: найти, носить, оставить на складе, открыть дверь или сундук.
++8. Ворота: взлом одного терминала открывает путь дальше.
++9. Общий склад партии: положить и забрать может каждый, ведущий видит, что где.
++10. Добыча и торговцы: выдача предметов, покупка и продажа по ценам торговца.
++
++## Что осталось за списком (сознательно)
++
++Лицензии и доступ к разделу Мастера, «канон хранилища», две панели склада,
++экспорт/импорт JSON, карточки ключей в админке, дерево локаций у Мастера,
++термины «команды Мастера» — это интерфейс и техника Мастера, игроку они ничего
++не объясняют.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 554
++```
++
++После установки: `git add -A && git commit -m "Патч 554"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/screens/release-5-notes-554.test.js \
++  __tests__/screens/release-4-notes-461.test.js \
++  __tests__/room/gm-decision-535.test.js \
++  __tests__/room/lock-progress-532.test.js
++npm run typecheck
++```
++
++Ожидаемо: релиз 5, заметки 10/10, окно «Что нового» показывается один раз на
++устройство (ключ `app_version_ack` хранит номер релиза, а не патча).
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index a03caf29..67a2b5a7 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **553**.
++Дата ревизии: 2026-11-07. Текущая версия: **554**.
+ 
+ ## Тезисы
+ 
+@@ -56,6 +56,15 @@
+ 
+ | 42 | **Долг и старые сейвы «Тренированного».** Пропущенные очки навыков начисляются старым сейвам сразу при загрузке и распределение навыков открывается заново (ждать нового уровня не нужно, повторных открытий нет). Снятие перка забирает его очки: если они потрачены, игрок сам выбирает навыки — суммарно не больше 2 (2 с одного или 1 с двух), минимумы 0/2 соблюдаются, «молчаливого» долга не остаётся | ✅ сделано | 552 |
+ 
++## Осталось после патча 554
++
++Патч 554 открыл релиз 5 и заменил заметки «Что нового»: вместо 150 патчевых
++строк — десять пунктов на языке игрока (комната с ведущим, состояние героя у
++Мастера, локации и переходы, запертые двери, взлом замков и терминалов, ключи,
++ворота, общий склад, добыча и торговцы). Внутренняя кухня в список не входит.
++Следующий шаг по слову владельца — раздел локаций и сундуков в пространстве
++Мастера; объём и место раздела ещё не подтверждены.
++
+ ## Осталось после патча 553
+ 
+ Патч 553 — только документы и приёмка. Вопрос владельца «в смысле короткая
+@@ -83,6 +92,7 @@
+ оружия с модами остаётся по правилу 551 (прицел дистанцию не меняет).
+ 
+ | 43 | **Пояснение шкалы дальности.** Исправлены таблицы «было/стало» в установках 551 и 552: мод +1 поднимает на одну соседнюю категорию («Средняя» → «Дальняя»), а не через категорию; при старом дефекте мод +1 показывал «Среднюю» и до «Дальней» не поднимал. Приёмка 551 закрепляет шаг шкалы и сочетание прицела (0) с длинным стволом (+1). Механика не менялась | ✅ сделано (документы) | 553 |
++| 44 | **Релиз 5 — заметки «Что нового».** Владелец: «нужен новый список, что вошло в релиз». Собрано по прошлому релизу, чейнджлогу и патчам: только созданное, без исправлений и внутренней кухни (лицензии, «канон хранилища», две панели, JSON, карточки ключей). Десять пунктов на языке игрока, парные ru/en; `release` 4 → 5, `version` 554 | ✅ сделано | 554 |
+ 
+ ## Осталось после патча 551
+ 
+@@ -333,6 +343,7 @@
+ - `docs/patch-547-install.md` — сигнал об успешном взломе (547).
+ - `docs/patch-552-install.md` — очки «Тренированного» у старых сейвов и снятие перка без долга (552).
+ - `docs/patch-553-install.md` — пояснение шкалы дальности, исправление таблиц (553).
++- `docs/patch-554-install.md` — установка релиза 5: новые заметки «Что нового» (554).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 68e8e50b..f4249eb5 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "553"
++  "baseline": "554"
+ }
+diff --git a/public/version.json b/public/version.json
+index d8201810..72055204 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,310 +1,30 @@
+ {
+-  "version": "553",
+-  "release": 4,
++  "version": "554",
++  "release": 5,
+   "notes": {
+     "ru-RU": [
+-      "Только документы и приёмка: исправлено описание дальности в таблицах «было/стало». Шкала дальности — соседние категории, шаг ровно один: «Средняя» + мод на +1 = «Дальняя», а «Близкая» + 1 = «Средняя». Раньше в документе у мода +1 в колонке «было» стояла «Близкая», из-за чего получалось, будто один шаг перепрыгивает категорию; на деле старый дефект показывал мод +1 как «Среднюю» (базовую), и до «Дальней» он не поднимал. Механика игры не менялась.",
+-      "Старые сохранения с «Тренированным» получают пропущенные очки навыков сразу при загрузке: распределение навыков открывается заново, ждать нового уровня не нужно. Снятие перка больше не оставляет долг: перк забирает свои очки, а если они уже потрачены, игрок сам выбирает, с каких навыков снять — суммарно не больше 2 (2 с одного навыка или 1 с двух), тегированные навыки не опускаются ниже 2. Дальность оружия с модами остаётся как в 551: прицел её не меняет, механику задаёт машинный код дистанции, а мод без изменения дальности её не трогает.",
+-      "Стрелки перемещения в админке снова работают: перетаскивание позиций в дереве локации начиналось только в «пузырьковой» фазе опроса жеста, а решение принималось раньше — в фазе перехвата, поэтому строка не двигалась никогда. Теперь захват строки происходит в обеих фазах, порядок меняется перетаскиванием, а простое нажатие на стрелку порядок не меняет. Попутно исправлено: после выдачи локации подпись замка Мастера больше не превращается в техническую строку — человеческий текст сохраняется, а уже испорченные подписи восстанавливаются при чтении.",
+-      "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
+-      "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
+-      "В дереве локаций у Мастера позиции можно менять местами перетаскиванием за стрелки: порядок сохраняется и у игрока отображается один в один — как в дереве Мастера, так и в списке мест внутри локации.",
+-      "Исправлено окно локаций у игрока: вложенная локация снова выглядит как локация (иконка карты и вход), а не как сундук; замок двери открывается мини-игрой взлома замка, а не терминалом. Содержимое дочерней локации не показывается, пока в неё не войдёшь и не пройдёшь преграду: сначала локация, затем замок, потом сундук, и только после открытия сундука — его содержимое. Сервер дополнительно запрещает забирать добычу и торговать через запертую родительскую локацию даже прямым запросом.",
+-      "Перекрытие проходов: Мастер закрывает локацию кнопкой «Блокировать» с причиной — игрок видит «Проход заблокирован» и не может войти ни с какой стороны; при блоке взлом не предлагается, снимает только Мастер.",
+-      "Хаб выдаётся целиком: граф собирается по связям и родительским локациям, поэтому Ниптон с вложенными локациями, терминалом и замком больше не рисует пустой экран. В окне игрока на верхнем уровне видны только прямые элементы — локации, сундуки, торговцы, а вложенные точки открываются после входа. Вход в запертую локацию сначала показывает только преграду (замок или терминал), после прохождения — содержимое. Замок стал частью локации, сундука или двери и больше не выдаётся отдельной точкой игрока. «Назад» возвращает в локацию, из которой игрок пришёл, а особый выход ведёт в указанную локацию.",
+-      "В дереве хаба настройки элемента открываются кнопкой «Параметры» в правой части строки названия — у локаций, сундуков, торговцев, терминалов, замков и ключей. Нажатие на название больше не открывает настройки. Отдельные области «Ключи и записки в локации», «Ворота между точками» и кнопка «Добавить контейнер / торговца» убраны с экрана локации. Установщик обновлён на ветку доставки 541.",
+-      "Вложенная локация теперь живёт только внутри родителя: положил папку в папку — она исчезла с корневого экрана и открывается из дерева. В дереве у локации видны её параметры: комнаты, сколько объектов и заперто, какой ключ нужен, что блокирует вход и куда выход. Вложенную локацию можно открыть кнопкой «Содержимое», а при удалении родителя она возвращается на корень и не теряется.",
+-      "Хаб теперь сам по себе папка с деревом: открываешь локацию и видишь вложенные локации-спойлеры, замки, терминалы и ключи, а пунктирные линии показывают, что от чего зависит. Родитель и выход выбираются выпадающим списком, локацию можно перенести в другую стрелками, как папку в папку. Ключ и замок/терминал — отдельные понятные поля; условие И/ИЛИ означает, что для входа нужно пройти обе преграды или одну из них.",
+-      "В админке появилась структура локаций: у локации теперь есть родительская локация и особый выход, чекбокс «Хаб» сразу после названия и дерево структуры, где видно, что за чем идёт, что чем заблокировано и что во что выходит. Требование доступа собирается кнопками «+» (И) и «/» (ИЛИ), а локацию можно вложить в другую локацию. Окно игрока появится позже.",
+-      "Готовим основу для многоуровневых локаций: деревни с домами, запертые двери и переходы между локациями, которые Мастер сможет перекрывать по сюжету. Пока без изменений в игре.",
+-      "В окне взлома замка правила и сведения теперь в двух отдельных блоках один под другим: сверху «Правила» с описанием мини-игры, под ними «Сведения» со сложностью и характеристиками персонажа.",
+-      "Счётчик заколок остаётся сверху заметным, а длинное описание правил по-прежнему переносится внутри окна и не уходит за его границы.",
+-      "Мастер может заблокировать замок и открыть его сам: «Открыть» сразу даёт доступ к точке, без мини-игры.",
+-      "Если ситуация спорная, игрок может попросить решения Мастера — вопрос «Да/Нет» всплывёт поверх любого экрана. Мастер видит, кто именно просит.",
+-      "Точки, доски мини-игр и журнал доступа теперь общие для всех привязанных комнат: игроки в разных комнатах видят один и тот же взлом.",
+-      "Автоматической блокировки замков после неудачи по-прежнему нет: точка закрывается только по явному решению Мастера.",
+-      "Длинное описание правил снова переносится внутри окна и не уходит одной строкой за его границы.",
+-      "Счётчик «Отгадано N из M» снова учитывает и зелёные, и серые ячейки: уже угаданные позиции остаются в прогрессе после поломки заколки.",
+-      "В окне завершённого подхода снова видно, сколько угаданных позиций сохранено; строки для русского и английского языков на месте.",
+-      "Подсказки о поломке заколки, серых стрелках и новом подходе снова описывают сохранение прогресса: взлом продолжается с первой неотгаданной ячейки.",
+-      "У кнопок со стрелками и области вокруг них вернулись рамки, скругления и привычный вид; иконки снова крупные, а пустышки в верхнем ряду выровнены по ним. Убрано только то, что мешало: лишнее сжатие кнопки, серый фон и жёсткие ширина с высотой.",
+-      "Вёрстка строки со счётчиком заколок и подсказкой вернулась к прежнему виду: новые правила ширины и переноса убраны. Длинная подсказка правил снова показывается как раньше.",
+-      "Счётчик «Отгадано N из M» снова считает только зелёные ячейки, а дополнительная строка про сохранённые позиции убрана из окна завершённого подхода.",
+-      "Подсказки о поломке заколки, серых стрелках и новом подходе снова звучат по-старому. Само запоминание угаданных позиций работает как прежде: прогресс не пропадает.",
+-      "Угаданные позиции замка теперь запоминаются: при поломке заколки курсор остаётся на первой неотгаданной ячейке, а уже найденные стрелки остаются серыми на доске — повторять всю последовательность не нужно.",
+-      "Прогресс взлома не слетает при «Ещё подход», когда закончились заколки, при закрытии и повторном открытии окна: купите заколки и продолжайте ту же комбинацию с того же места.",
+-      "Комбинация и угаданные позиции общие для всех игроков точки, включая привязанные комнаты: другой персонаж продолжает тот же взлом со своим листом.",
+-      "Доступ по-прежнему выдаётся только после полного взлома. Память позиций сбрасывается победой ACCESS GRANTED или повторной выдачей точки Мастером; подсказки обновлены.",
+-      "По зацепке владельца нашли причину «полос через центр»: стиль flex: 0 (в браузере flex: 0 1 0%) схлопывал кнопку стрелки. Убрали его вместе с собственным фоном, рамками и жёсткими width/height кнопки; фоном служит затемнённая область стрелок.",
+-      "Вернули начертание стрелок до светлой темы: иконки arrow-*-bold размера 22 с явным центрированием по обеим осям. Цветовая гамма осталась светлой — тёмная стрелка на светлой области, а не зелёная на тёмной.",
+-      "Починили перенос длинной подсказки о правилах: левая колонка строки статуса теперь сжимается до ширины карточки, текст переносится внутри модалки и не уходит за её границы одной строкой.",
+-      "Сохранили всё из 527–530: затемнённая область, увеличенный шаг между кнопками, прокрутка на телефоне, точный текст подсказки, команды списания, пауза красного «?» и семантика взлома локации/контейнера.",
+-      "Развели семантику взлома в иерархии пространств: взлом локации (узел с детьми) ВВОДИТ игрока внутрь, взлом контейнера показывает СОДЕРЖИМОЕ.",
+-      "Кнопки и подсказки теперь говорят прямо: «Взломать и войти» / «Взломать и открыть», а у вложенной локации вместо «Открыть» — «Войти».",
+-      "После ACCESS GRANTED исход применяется автоматически с небольшой паузой, чтобы игрок успел увидеть результат; переход адресный, каскада по графу нет.",
+-      "Если мини-игру закрыли, у выигранной точки остаётся отдельная кнопка «Войти»/«Открыть» — доступ к содержимому не теряется.",
+-      "Заведён закон снимка: сервер не трогает лист игрока. Любое изменение оформляется командой char.command, которую исполняет клиент штатными средствами, а затем сам публикует обновлённый снимок.",
+-      "Закон действует на всё пространство Мастера: списание заколок, эффект журнала «Программиста», директивы, добыча, переносы и торговля не правят снимок на сервере.",
+-      "Снимок остаётся каналом наблюдения за состоянием игрока без вмешательства: он виден Мастеру, когда ни одна сессия не открыта, и не очищается при открытии/закрытии локации.",
+-      "Команды стали универсальными (kind + payload), дедуплицируются по commandId и повторяются при переподключении; char.spend 528 остаётся совместимым алиасом.",
+-      "Сломанная заколка теперь списывается штатными средствами самого игрока: сервер больше не правит снимок чужого листа, а посылает команды «спиши предмет» и «обнови снимок».",
+-      "Сначала клиент списывает заколку из инвентаря и сохраняет лист, и только после этого публикует обновлённый снимок в комнату Мастера.",
+-      "Если на нажатии заколка сломалась, красный «?» остаётся видимым ещё мгновение и лишь потом гаснет; если заколка не сломалась, красный остаётся до следующего нажатия.",
+-      "Команды списания переживают переподключение вкладки и не списывают заколку дважды.",
+-      "Предмет для взлома по-русски теперь называется «Заколка» — не «шпилька», не «отмычка» и не «булавка». «Электронная отмычка» осталась отдельным предметом, а все подписи замка говорят про заколки.",
+-      "Область стрелок на компьютере и телефоне стала чуть темнее окна: стрелки крупнее и расставлены шире, линии их больше не пересекают. Под счётчиком заколок появилась точная подсказка про зелёный, красный и поломку заколки.",
+-      "Сломанная заколка теперь действительно исчезает из инвентаря персонажа: и из локального листа игрока, и из опубликованного снимка в комнате Мастера, а не только из счётчика мини-игры.",
+-      "Ошибочный знак «?» теперь явно красный и остаётся видимым даже на том нажатии, где сломалась заколка.",
+-      "Теперь игрок сам решает, сколько раз подходить к терминалу или замку: закрыл окно, купил новые заколки или прокачал восприятие — вернулся и начал новый подход.",
+-      "Терминал после провала по-прежнему ждёт решения Мастера «Да/Нет»; замки пока не блокируются. После победы игра больше не запускается сама.",
+-      "Отдельно выданный замок или терминал сначала открывает окно точки с кнопками «Взломать» и «Смотреть» — без «Покинуть локацию»; доска мини-игры появляется уже готовой после нажатия.",
+-      "Окно взлома замка перекрашено в светлую гамму модалок: светлые ячейки и стрелки вместо зелёного терминала.",
+-      "Взлом замка больше не выдаёт «Действие не выполнено» при первом нажатии: доска собирается с первого раза, заколки находятся в инвентаре, ячейки и стрелки сразу доступны.",
+-      "Окно локации больше не выглядывает из-под мини-игры: «Покинуть локацию» работает с первого нажатия, а отдельно выданный замок открывается сразу своей мини-игрой без лишней кнопки выхода.",
+-      "Локации и контейнеры теперь можно вкладывать друг в друга: граф пространств с циклами и несколькими родителями, замок скрывает всё внутри, а состояние локации общее для всех привязанных комнат.",
+-      "У Мастера появилась кнопка «Заблокировать всё» на любом узле с вложенными точками, а взлом стал адресным: открывается только та точка, которую взломали, без цепочки.",
+-      "В общем хранилище больше нет ограничений на вес и количество: можно положить сколько угодно вещей, а предметы с разными модами, зарядами и состоянием остаются отдельными строками.",
+-      "Предмет теперь одинаков в инвентаре, на складе и у торговца: модифицированное оружие сохраняет моды, прочность и заряды, а его цена и вес считаются с учётом установленных модов.",
+-      "В общем хранилище одинаковые предметы теперь складываются в одну строку, а переполнение склада показывает понятное сообщение вместо тихой потери вещей.",
+-      "Добавлена мини-игра взлома замков: заколки и ячейки по Восприятию, пятая карточка на сетке, отдельная выдача или вложенность в локацию. Терминал и замок в требованиях точки теперь работают через «ИЛИ» — достаточно любого взлома.",
+-      "Привязанный терминал больше не виден отдельной карточкой в локации: нажатие на запертый сундук открывает его мини-игру, а добыча становится доступна только после взлома или найденного ключа.",
+-      "Общее хранилище переделано: у Мастера отдельная карточка только для просмотра и выдачи ключей, у игрока двупанельное окно по дизайну торговца без цен. Предметы переносятся только после нажатия «Перенести».",
+-      "Ворота между точками: событие доступа теперь общее на комнату, ссылаться можно на любую точку, а Мастер видит связи на карточке и в локации. Цепочка ворот раскрывается сама.",
+-      "Теперь требуемый ключ проверяется сервером: найденная запись открывает точку без мини-игры, обязательный ключ закрывает доступ, а необязательный ждёт привязанного терминала. После создания точки экран остаётся на карточках.",
+-      "В форме создания точки требование «Обязателен» стало чекбоксом вместо двух кнопок, а поле описания перенесено в конец формы — после всех настроек.",
+-      "В карточках появились настройки доступа: требуемый ключ с полем «Обязателен?» и привязанная проверка терминалом. Ключ теперь вкладывается в локацию, контейнер или торговца и перетаскивается иконкой со стрелками. Заведён живой план оставшихся шагов.",
+-      "Зафиксирован порядок работы ключей: они выдаются только как часть локации, контейнера или торговца, все карточки перетаскиваются в локацию, а требование ключа бывает обязательным и необязательным. Поведение игры пока не менялось.",
+-      "Новые окна теперь собираются из готового каркаса соседних модалок: форма ключа и карточка на сетке используют те же размеры, поля, кнопки и меню, что контейнеры. Правило зафиксировано в документации.",
+-      "Ключи и записки теперь создаются карточкой на сетке «Добыча / Торговля»: плитка создания, форма в стиле контейнера и сохранённая карточка прямо на экране Мастера.",
+-      "Мастер может создавать ключи и записки: имя, описание с жирным текстом, курсивом и списками, предпросмотр перед сохранением.",
+-      "Найденная в контейнере запись или выданная Мастером карточка доступа попадает в общее хранилище и остаётся общей для всей группы.",
+-      "Ключи и записки видны отдельным списком: название можно прочитать с полным текстом, забрать запись в личный инвентарь нельзя.",
+-      "Ключи переносятся вместе со снимком хранилища, поэтому смена Мастера или сервера не теряет найденные записи.",
+-      "Снимок общего хранилища теперь синхронизируется из Google Drive в обе стороны: сейв Мастера приезжает на другое устройство и на другой платформе.",
+-      "И Мастер, и игрок могут выгрузить общее хранилище в JSON-файл и загрузить его обратно.",
+-      "Если ведущий перестал водить или сменился Мастер, импорт снимка наполняет хранилище нового сервера одним действием.",
+-      "Окно хранилища доступно Мастеру и игроку: экспорт и импорт работают на вебе и в нативном приложении через общий механизм файлов.",
+-      "Общее хранилище теперь принадлежит Мастеру: его сохранение лежит в локальной базе ведущего и уезжает в его Google Drive, а игрокам рассылается текущий снимок.",
+-      "Без Мастера в сети хранилище доступно только для просмотра: положить или забрать вещь нельзя, пока ведущий не подключится к комнате.",
+-      "При подключении к комнате игрок сразу получает актуальное состояние хранилища, а Мастер поднимает своё сохранение в комнату.",
+-      "Сервер больше не пишет файлы хранилища на диск: состояние комнаты живёт в памяти, все изменения происходят только пока Мастер и игрок в сети.",
+-      "В инвентаре появилось «Общее хранилище»: вещи группы лежат в одном месте, доступном каждому игроку комнаты, даже если положивший их персонаж выбыл из игры.",
+-      "Предмет можно положить в общее хранилище или забрать оттуда в свой инвентарь; количество меняется атомарно, поэтому двое не заберут одну и ту же вещь.",
+-      "Хранилище живёт на сервере и переживает перезапуск: при подключении к комнате игрок сразу получает актуальное содержимое.",
+-      "Ведущий может положить вещь в общее хранилище, но не может забрать уже добытое игроками; название хранилища не настраивается.",
+-      "Мастер теперь получает уведомление о взломанном терминале в любой вкладке браузера: владелец определяется по участнику комнаты, а не по переключателю режима интерфейса.",
+-      "Терминал нельзя открыть заново после первого взлома: доступ привязан к трансляции Мастера, поэтому закрытие окна больше не возвращает кнопку «Взломать».",
+-      "В окне локации рядом с «Свернуть» появилась кнопка «Покинуть локацию»: игрок отключается сам, а сцена остаётся открытой для остальных участников.",
+-      "После успеха, провала или закрытия терминала обе кнопки карточки блокируются с понятной отметкой состояния; новая трансляция Мастера снова открывает доступ.",
+-      "Теперь после удачного взлома доска не сбрасывается: надпись «ДОСТУП РАЗРЕШЁН» и все подсказки остаются на экране, пока ведущий не транслирует терминал заново.",
+-      "Ведущий получает уведомление «Терминал взломан» с именем оператора, даже если в этот момент открыт другой раздел приложения.",
+-      "Если попытки закончились, найденные подсказки вроде «5 из 7» больше не пропадают: они видны рядом с сообщением о провале.",
+-      "В карточке терминала у ведущего появилось состояние «Взломан» и кнопка повторной трансляции для новой партии.",
+-      "Доска взлома теперь собрана из трёх групп слов с общими окончаниями или приставками: сначала нужно понять верную группу, а затем верный вариант сочетания внутри неё. Логический разбор почти гарантирует победу, а слепой перебор остаётся ненадёжным.",
+-      "Если терминал открывает другой игрок, доска, число слов и скобки считаются по его листу персонажа; одновременно взламывает только один, остальные наблюдают.",
+-      "Полное восстановление попыток теперь может выпасть не более одного раза на доску. Подсказка в окне взлома показывает совпавшие буквы как «N из M».",
+-      "Исправлен взлом после импорта персонажа из файла: лист персонажа теперь находится в сейве любой вложенности, поэтому при Интеллекте 10 и Удаче 10 на пятой сложности будет 15 слов и 20 % шанс возврата попыток.",
+-      "Имя персонажа в окне взлома больше не пропадает при запуске партии напрямую.",
+-      "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
+-      "Наука, Удача и перк «Хакер» тоже берутся из листа персонажа: число скобок, шанс восстановления попыток и снижение сложности больше не сбрасываются к значениям новичка.",
+-      "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
+-      "На остальных сложностях доска тоже стала меньше на пять слов, поэтому взлом с высоким Интеллектом и Наукой перестал быть лотереей.",
+-      "Четыре скобки Науки 6 сохраняются даже на самой короткой доске; думающий игрок на пятой сложности выигрывает около 96–98 % партий.",
+-      "Скобки теперь двух сортов: одна убирает одно ложное слово, другая возвращает одну попытку. Одна скобка больше не делает и то, и другое сразу.",
+-      "Число скобок задаёт Наука на всех сложностях: 0, 1, 1, 2, 3, 3, 4 для Науки 0–6. Сложность на число скобок больше не влияет.",
+-      "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
+-      "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
+-      "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
+-      "Когда на терминале заканчиваются все попытки, ведущему сразу приходит вопрос «Разрешить повторный взлом?» с кнопками «Да» и «Нет» — он появляется поверх любого экрана, а после удачного взлома не задаётся.",
+-      "Четыре попытки на терминале снова канонические на всех шести сложностях. Скобки возвращают попытки, но никогда не поднимают их выше четырёх.",
+-      "Доска стала больше: число слов считается как 20 + 2·сложность − ИНТ. На пятой сложности это 26 слов при ИНТ 4 и 20 при ИНТ 10 — бонусы скобок больше не съедают доску.",
+-      "Слова на доске теперь почти одинаковые: те же буквы в другом порядке, отличаются парой букв. Пароль выбирается внутри набора, поэтому его нельзя найти простым «похоже на все остальные».",
+-      "Наука даёт понятные пакеты: убрать слова, вернуть попытку или и то и другое. Удача 4–10 даёт 5–20 % шанс полного восстановления попыток на каждую скобку.",
+-      "На сложностях 4 и 5 после любого первого неверного хода остаётся не меньше четырёх кандидатов: думать надо обязательно, а думающий игрок выигрывает примерно в 85–90 % случаев без бонусов.",
+-      "Скобочных пар больше на лёгких терминалах и меньше на сложных; при Науке 0 их нет вовсе. Очки удачи при взломе по-прежнему не расходуются.",
+-      "новое «Саммари v2» взлома. Число слов зависит от сложности и ИНТ: N = max(пол, база сложности − (ИНТ − 4)); на сложности 5 это 20 слов при ИНТ 4 и 14 при ИНТ 10.",
+-      "Попыток теперь 4 на сложностях 0–2 и 3 на сложностях 3–5. Скобочные пары — единственные подсказки: их число задаёт Наука (не больше 3 и не больше N−3), а эффект определяет бросок d20 по Удаче.",
+-      "Эффекты скобок: удалить пустышку, +1 попытка или полный сброс (один раз за терминал, повтор даёт +1). Сходство букв N/M узнаётся только тратой попытки; очки удачи не расходуются.",
+-      "Доска собирается из трёх буквенных групп (похожие / смешанные / непохожие), без кластеров с общим префиксом: ABS*, ABSENT, ABUSES больше не выдают пароль одной догадкой. Пароль больше не «самое центральное» слово.",
+-      "Баланс: бездумный перебор выигрывает примерно в 20–35 % партий на сложности 5, вдумчивый разбор по подсказкам — в 85–100 %, а удачный полный сброс доводит шанс думающего игрока до 100 %.",
+-      "В окне взлома показывается снижение сложности перком Хакер и результат нажатой скобки; точки попыток теперь растут вместе с бонусами.",
+-      "Словарь мини-игры собран из настоящих английских слов: шесть файлов по длине, всего 12 308 слов; соседние терминалы больше не повторяют одни и те же варианты.",
+-      "Взлом разделён на три рычага: ИНТ (4–10) задаёт число слов на доске (20 → 12), Наука (0–6) добавляет скобочные комбинации и с 4-го уровня открывает восстановление попыток, Удача (4–10) определяет шанс появления такой комбинации (10–80 %).",
+-      "На сложности 0 доска собирается из семей настоящих анаграмм (POST/SPOT/STOP…), а пароль — слово-выброс, почти не имеющее с ними общих букв; правильное слово больше не подчёркивается.",
+-      "Из окна взлома убрана служебная строка с внутренними порогами; в «О приложении» добавлены неофициальный статус проекта, права правообладателей, AGPL и дословные лицензии словарей.",
+-      "Скобка восстановления теперь даёт +1 попытку (не полный сброс до четырёх), а очки удачи при взломе не расходуются.",
+-      "Взлом терминалов стал сложнее: подсказка ограничена (на сложности 5 — не больше 2 совпадений из 9), слова на доске похожи, а ИНТ + Наука уменьшают число вариантов.",
+-      "Терминал в локации больше не превращается в сундук: при нажатии открывается окно взлома с мини-игрой, даже если сервер комнат ещё не обновлён.",
+-      "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
+-      "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
+-      "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
+-      "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
+-      "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
+-      "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
+-      "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
+-      "Категория «Самодельное снаряжение»: предметы из загруженных наборов собраны в отдельной категории со своими подразделами по типам оружия, робо-оружию и боеприпасам, а также доступны в лавке и окне модификации оружия.",
+-      "Комнаты мастера и «Экран администратора»: при включении опции в Настройках мастер создаёт сетевые комнаты с кодом приглашения и видит внутри комнаты карточки подключённых персонажей с обновлениями при сохранении.",
+-      "Подключение к комнате через пункт «Сервер» в меню персонажа: привязанный персонаж переподключается к своей комнате автоматически без повторного ввода кода, а перенос по личным папкам не сбрасывает привязку.",
+-      "Значок сети на карточке привязанного персонажа показывает статус связи (зелёный — мастер в сети и комната доступна, бледный — не в сети); личные персонажи и комнаты мастера строго разделены между режимами «Пользователь» и «Админ».",
+-      "Быстрый запуск веб-приложения: готовая сжатая сборка открывается за секунды, а во время обновления на экране сразу отображается живой индикатор запуска вместо пустого тёмного окна.",
+-      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша.",
+-      "Ответ «Да» мгновенно собирает новую доску по текущим настройкам терминала: новые слова, подсказки и скобки, снова четыре попытки, а характеристики выбравшего персонажа сохраняются.",
+-      "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
+-      "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
+-      "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
+-      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
++      "Игра в комнате с ведущим: вы подключаетесь к комнате, ваш лист уезжает ведущему, а его решения — эффект, урон, списание предмета — приходят прямо на лист и сохраняются.",
++      "Ведущий видит ваше состояние: ОЗ, радиация, условия и ключевые показатели — без просьб прислать скриншот.",
++      "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список.",
++      "Запертая дверь не пускает внутрь: пока замок не открыт, за дверью ничего не видно — сначала ключ или взлом.",
++      "Взлом замков: мини-игра с ячейками по восприятию и сложности, ограниченным числом попыток и выбором «ключом или взломом».",
++      "Взлом терминалов: четыре попытки, слова, скобки-подсказки и доска по интеллекту. После провала ведущий решает — дать ещё подход или закрыть терминал.",
++      "Ключи и записки: ключ можно найти, носить с собой или оставить на общем складе — и открыть им дверь или сундук.",
++      "Ворота: взлом одного терминала может открыть путь дальше — в соседнюю комнату или к другому сундуку.",
++      "Общий склад партии: добычу можно складывать вместе, положить и забрать может каждый, а ведущий видит, что где лежит.",
++      "Добыча и торговцы: ведущий выдаёт предметы, а у торговца можно купить или продать по его ценам и кассе."
+     ],
+     "en-EN": [
+-      "Docs and acceptance only: the range wording in the before/after tables is corrected. The range scale uses adjacent categories, exactly one step: Medium + a +1 mod = Long, while Close + 1 = Medium. The document previously showed Close in the \"before\" column for the +1 mod, as if one step skipped a category; in fact the old bug displayed the +1 mod as Medium (the base) and never raised it to Long. Game mechanics are unchanged.",
+-      "Old saves with the Trained perk now receive the missed skill points immediately on load: the skill distribution opens again, no need to wait for the next level. Removing the perk no longer leaves a debt: the perk takes its points back, and if they are already spent, the player chooses which skills to lower — 2 points in total at most (2 from one skill or 1 from two), tagged skills never drop below 2. Weapon range with mods stays as in 551: a scope does not change range, the machine range code drives the mechanics, and a mod without a range change leaves range untouched.",
+-      "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
+-      "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
+-      "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
+-      "In the Master's location tree, positions can be reordered by dragging the arrows: the order is saved and players see exactly the same order — both in the Master's tree and in the list of places inside a location.",
+-      "Fixed the player location window: a nested location looks like a location again (map icon and entry), not a chest; a door lock opens the lockpicking mini-game, not a terminal. A child location's contents stay hidden until you enter and pass the barrier: location first, then the lock, then the chest, and only after opening the chest its contents. The server also blocks taking loot and trading through a locked parent location even via a direct request.",
+-      "Passage blocking: the Master closes a location with a Block button and a reason — the player sees “Passage blocked” and cannot enter from any side; lockpicking is not offered while blocked, and only the Master can unblock.",
+-      "A hub now issues whole: the graph is built from links plus parent locations, so Nipton with nested locations, a terminal and a lock no longer renders an empty screen. The player's top level shows only direct elements — locations, chests, merchants — and nested points appear after you enter. Entering a locked location shows only the barrier (lock or terminal) first, and its contents once the check is passed. The lock is now part of a location, chest or door and is never issued as a standalone player point. Back returns only to the location you came through, and the special exit leads to its configured location.",
+-      "In the hub tree, an element’s settings open via a Parameters button on the right side of the name row — for locations, chests, merchants, terminals, locks and keys. Tapping the name no longer opens settings. The separate “Keys and notes in this location” and “Gates between points” areas and the “Add container / merchant” button are removed from the location screen. The installer now points at the delivery branch 541.",
+-      "A nested location now lives only inside its parent: put a folder into a folder and it disappears from the root screen, opening from the tree instead. In the tree a location shows its parameters: rooms, how many objects and locked, which key is needed, what blocks entry and where the exit leads. A nested location can be opened with the Contents button, and if its parent is deleted it returns to the root instead of being lost.",
+-      "The hub is now itself a folder with a tree: open a location to see nested location spoilers, locks, terminals and keys, with dashed lines showing what depends on what. Parent and exit are picked from a dropdown, and a location can be moved into another with the arrows, like a folder into a folder. The key and the lock/terminal are separate clear fields; the AND/OR condition means you must pass both obstacles or one of them to enter.",
+-      "The admin side now has location structure: a location has a parent location and a special exit, a Hub checkbox right after the name, and a structure tree showing what follows what, what is blocked by what, and what exits where. Access requirements are built with '+' (AND) and '/' (OR) buttons, and a location can be nested inside another location. The player window comes later.",
+-      "Preparing the foundation for multi-level locations: villages with houses, locked doors, and passages between locations that the Game Master can block to fit the story. No gameplay changes yet.",
+-      "In the lockpicking window, rules and details now live in two separate blocks stacked one under the other: \"Rules\" with the mini-game description on top, then \"Details\" with the difficulty and your character's stats.",
+-      "The bobby pin counter stays prominent at the top, and the long rules description still wraps inside the window instead of running past its edge.",
+-      "The Game Master can block a lock and open it themselves: Open grants access to the point right away, without a mini-game.",
+-      "When a situation is disputed, a player can ask for the Game Master decision — a Yes/No prompt appears above any screen, showing who asked.",
+-      "Points, mini-game boards and the access log are now shared across all bound rooms: players in different rooms see the same hack.",
+-      "Locks still are not blocked automatically after a failure: only an explicit Game Master decision closes a point.",
+-      "The long rules description wraps inside the window again instead of running off the edge in a single line.",
+-      "The «Solved N of M» counter counts green and grey cells again: positions already guessed stay in the progress after a bobby pin breaks.",
+-      "The finished-approach panel shows how many solved positions are kept again, with both Russian and English strings in place.",
+-      "The hints about a broken bobby pin, grey arrows and another attempt describe keeping progress again: the lock continues from the first unsolved cell.",
+-      "The arrow buttons and the area around them have their border, rounded corners and familiar look back; the icons are large again and the top-row spacers match them. Only the things that got in the way were removed: the squeezing rule, the grey background and the fixed width and height.",
+-      "The row with the bobby pin counter and the hint is back to its old layout: the extra width and wrapping rules are gone. The long rules hint is displayed the way it was before.",
+-      "The «Solved N of M» counter counts green cells only again, and the extra line about kept positions is gone from the finished-approach panel.",
+-      "The hints about a broken bobby pin, grey arrows and another attempt read the way they used to. Remembering solved positions still works: progress is not lost.",
+-      "Solved positions on a lock are now remembered: when a bobby pin breaks, the cursor stays on the first unsolved cell and the known arrows remain grey on the board — no need to repeat the whole sequence.",
+-      "Hack progress survives «Another attempt», running out of bobby pins, and closing or reopening the window: buy more pins and continue the same combination from the same spot.",
+-      "The combination and solved positions are shared by everyone on the point, including bound rooms: another character continues the same lock with their own sheet.",
+-      "Access is still granted only after the full hack. Solved positions reset on ACCESS GRANTED or when the Game Master reissues the point; hints were updated.",
+-      "The owner's clue found the cause of the stripes through the center: flex: 0 (rendered as flex: 0 1 0% in the browser) collapsed the arrow button. Removed it along with the button's own background, borders and fixed width/height; the darker arrow area is the background now.",
+-      "Restored the pre-light-theme arrow drawing: arrow-*-bold icons at size 22, explicitly centered on both axes. The palette stays light — a dark arrow on the light area instead of green on dark.",
+-      "Fixed wrapping of the long rules hint: the left column of the status row now shrinks to the card width, so the text wraps inside the modal instead of overflowing in a single line.",
+-      "Everything from 527–530 is preserved: the darker area, wider arrow spacing, phone scrolling, the exact hint text, spend commands, the red «?» pause and the location/container hack semantics.",
+-      "Split hacking semantics in the location hierarchy: hacking a location (a node with children) ENTERS it, hacking a container shows its CONTENTS.",
+-      "Buttons and hints now say it directly: «Hack & enter» / «Hack & open», and a nested location shows «Enter» instead of «Open».",
+-      "After ACCESS GRANTED the outcome is applied automatically after a short pause so the player sees the result; the transition is addressable, with no graph cascade.",
+-      "If the mini-game was closed, a won point keeps a separate «Enter»/«Open» button — access to the contents is never lost.",
+-      "Introduced the snapshot law: the server never edits a player's sheet. Every change is a char.command that the client executes with its standard tools, after which the client publishes the updated snapshot itself.",
+-      "The law covers the whole Game Master space: pin spending, the Programmer's Digest magazine effect, directives, loot, storage transfers and trading no longer mutate the snapshot on the server.",
+-      "The snapshot stays an observation channel for the player's state without interference: the GM sees it when no session is open, and it is not cleared when a location opens or closes.",
+-      "Commands are now generic (kind + payload), deduplicated by commandId and replayed on reconnect; the 528 char.spend remains a compatible alias.",
+-      "A broken bobby pin is now spent by the player's own standard inventory tools: the server no longer edits the published sheet, it sends a «spend item» command and then a «refresh snapshot» command.",
+-      "The client first removes the pin from the inventory and saves the sheet, and only then publishes the updated snapshot to the Game Master's room.",
+-      "When a pin breaks on a press, the red «?» stays visible for a short pause before the colours update; if the pin did not break, the red mark stays until the next press.",
+-      "Spend commands survive a tab reconnect and never deduct the same pin twice.",
+-      "The Russian name of the lockpicking item is now exactly «Заколка» — not «шпилька», «отмычка» or «булавка». The Electronic Lockpick remains a separate item, and every lock label now says «заколки».",
+-      "The arrow area is slightly darker than the window on desktop and phone: arrows are bolder and more widely spaced, no lines crossing them. An exact hint under the pin counter explains green, red and a broken bobby pin.",
+-      "A broken bobby pin now really leaves the character's inventory — both the local player sheet and the published snapshot in the Game Master's room — instead of only decrementing the mini-game counter.",
+-      "A wrong «?» is now clearly red and stays visible even on the press that breaks a bobby pin.",
+-      "Players now decide how many attempts to make at a terminal or lock: close the window, buy new bobby pins or improve Perception, then come back and start another attempt.",
+-      "A terminal still waits for the Game Master's Yes/No after a failure; locks are not blocked for now. A successful hack no longer restarts itself.",
+-      "A standalone lock or terminal now first opens a point window with «Hack» and «View» buttons — without «Leave location»; the fully loaded mini-game board appears right after the press.",
+-      "The lockpicking window now uses the light modal palette: light cells and arrows instead of the green terminal look.",
+-      "Picking a lock no longer shows «Action failed» on the first press: the board starts once, bobby pins are found in the inventory, and cells and arrows are ready immediately.",
+-      "The location window no longer shows through the mini-game: «Leave location» works on the first tap, and a standalone lock opens straight into its mini-game with no stray exit button.",
+-      "Locations and containers can now nest inside each other: a graph of spaces with cycles and multiple parents, a lock hides everything behind it, and location state is shared across all bound rooms.",
+-      "The Game Master now has a «Lock everything» action on any node with children, and hacking is addressable: only the hacked point opens, with no chain reaction.",
+-      "Shared storage no longer has any weight or quantity limits: deposit as many items as you like, while items with different mods, charges or condition stay in separate stacks.",
+-      "An item is now identical in your inventory, in storage and at a trader: a modified weapon keeps its mods, durability and charges, and its price and weight are calculated from the installed mods.",
+-      "The shared storage now stacks identical items into one row, and a full storage shows a clear message instead of silently losing items.",
+-      "Added the lockpicking mini-game: bobby pins and Perception-based cells, a fifth grid card, standalone or nested in a location. A terminal and a lock in a point requirements now act as OR — either hack is enough.",
+-      "A linked terminal no longer appears as a separate card in the location: tapping the locked chest opens its hacking mini-game, and loot becomes available only after the hack or a found key.",
+-      "Shared storage reworked: the GM gets a separate view-only card that can only issue keys, players get a two-panel window styled like the merchant without prices. Items move only after pressing \"Transfer\".",
+-      "Gates between points: access events are now shared by the whole room, any point can be the source, and the GM sees the links on the card and in the location. Gate chains resolve automatically.",
+-      "Required keys are now checked on the server: a found record opens the point without the mini-game, a mandatory key blocks access, and an optional one waits for the linked terminal. Creating a point now keeps you on the card grid.",
+-      "The \"Mandatory\" requirement in the point creation form is now a checkbox instead of two buttons, and the description field moved to the end of the form, after all settings.",
+-      "Cards now have access settings: a required key with a \"Mandatory?\" field and a linked terminal check. Keys can be placed inside a location, container or merchant and dragged with the arrow handle. A live roadmap of the remaining steps was added.",
+-      "The key rules are now written down: keys are issued only as part of a location, container or merchant, every card can be dragged into a location, and a key requirement can be mandatory or optional. Game behaviour is unchanged for now.",
+-      "New windows now reuse the nearest existing modal's layout: the key form and grid card share sizes, fields, buttons and menu with containers. The rule is written down in the docs.",
+-      "Keys and notes are now created as cards on the Loot / Trade grid: a creation tile, a container-style form, and a saved card right on the Game Master's screen.",
+-      "The GM can create keys and notes: a name, a description with bold, italics and lists, and a live preview before saving.",
+-      "A record found in a container or issued by the GM goes to shared storage and stays common to the whole group.",
+-      "Keys and notes have their own list: the full text can be read, but a record cannot be withdrawn into a personal inventory.",
+-      "Keys travel with the storage snapshot, so changing the GM or the server does not lose discovered records.",
+-      "Shared storage snapshots now sync from Google Drive in both directions, so the GM save arrives on another device and platform.",
+-      "Both the Game Master and players can export shared storage to a JSON file and import it back.",
+-      "If the GM steps down or the group changes its GM, importing a snapshot fills storage on the new server in one action.",
+-      "The storage window is available to both GM and players; export and import work on web and native through the shared file transfer layer.",
+-      "Shared storage now belongs to the Game Master: its save lives in the GM local database and syncs to their Google Drive, while players receive a current snapshot.",
+-      "Without the GM online the storage is read-only: items cannot be deposited or withdrawn until the GM connects to the room.",
+-      "Connecting to a room immediately delivers the current storage state, and the GM uploads their saved copy into the room.",
+-      "The server no longer writes storage files to disk: room state lives in memory and all changes happen only while the GM and player are online.",
+-      "Inventory now has \"Shared storage\": party items live in one place available to every player in the room, even if the character who deposited them leaves the game.",
+-      "Items can be deposited into shared storage or withdrawn into a personal inventory; quantities change atomically so two players cannot take the same item.",
+-      "Storage lives on the server and survives a restart: connecting to a room immediately delivers its current contents.",
+-      "The Game Master may deposit into shared storage but cannot take back what the players already own; the storage name is not customizable.",
+-      "The Game Master now receives the terminal-hacked notice in any browser tab: ownership is detected from the room member list rather than the interface mode switch.",
+-      "A terminal can no longer be opened again after the first hack: access is tied to the Game Master broadcast, so closing the window no longer restores the \"Hack\" button.",
+-      "The location window now has a \"Leave location\" button next to \"Minimize\": the player disconnects on their own while the scene stays open for everyone else.",
+-      "After a success, a failure or a closed terminal both card buttons are disabled with a clear state badge; a new broadcast by the Game Master restores access.",
+-      "After a successful hack the board no longer resets: «ACCESS GRANTED» and every hint stay on screen until the Game Master broadcasts the terminal again.",
+-      "The Game Master now receives a «Terminal hacked» notice with the operator name, even while viewing a different part of the app.",
+-      "When all attempts are used, discovered hints such as «5 of 7» remain visible next to the failure message.",
+-      "The terminal card for the Game Master now shows a «Hacked» state and a broadcast-again button for a new run.",
+-      "Hacking boards now use three word groups with shared endings or prefixes: first find the right group, then the right letter sequence inside it. Careful deduction almost guarantees success, while blind guessing stays unreliable.",
+-      "When another player opens a terminal, the board, word count and brackets are rebuilt from their character sheet; only one player hacks at a time and everyone else watches.",
+-      "A full attempt restore can now appear at most once per board. The hacking window shows matching letters as N out of M.",
+-      "Fixed hacking after importing a character from a file: the sheet is now found at any nesting depth, so Intellect 10 and Luck 10 give 15 words and a 20% attempt-recovery chance at difficulty 5.",
+-      "The character name no longer disappears from the hacking window when a round is started directly.",
+-      "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
+-      "Science, Luck and the Hacker perk also come from the character sheet: bracket counts, attempt-recovery odds and difficulty reduction no longer fall back to beginner values.",
+-      "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
+-      "Every other difficulty also lost five words, so hacking with a high Intellect and Science no longer feels like a lottery.",
+-      "Science 6 still grants four brackets even on the shortest board; a careful player wins about 96–98% of difficulty-5 runs.",
+-      "Brackets now come in two kinds: one removes a single wrong word, another restores a single attempt. A bracket no longer does both at once.",
+-      "Science alone sets the bracket count at every difficulty: 0, 1, 1, 2, 3, 3, 4 for Science 0–6. Difficulty no longer limits it.",
+-      "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
+-      "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
+-      "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
+-      "When all attempts on a terminal are used, the Game Master immediately gets an «Allow another hack?» prompt with «Yes» and «No» buttons — it appears over any screen and never shows after a successful hack.",
+-      "Four attempts are canonical again at every difficulty. Brackets restore attempts but never raise them above four.",
+-      "Boards are larger: word count is 20 + 2·difficulty − INT. At difficulty 5 that is 26 words at INT 4 and 20 at INT 10, so bracket bonuses no longer eat the board.",
+-      "Board words are now near-identical: the same letters in a different order, differing by a couple of letters. The password is picked inside the set, so it cannot be found by simply looking for the word similar to all others.",
+-      "Science now gives clear packages: remove words, restore an attempt, or both. Luck 4–10 gives a 5–20% chance of a full attempt restore on each bracket.",
+-      "At difficulties 4 and 5 at least four candidates survive any first wrong guess: thinking is mandatory, and a careful player wins roughly 85–90% without bonuses.",
+-      "There are more bracket pairs on easy terminals and fewer on hard ones; Science 0 gives none at all. Luck points are still never spent while hacking.",
+-      "new hacking balance summary v2. Board size depends on difficulty and INT: N = max(floor, difficulty base − (INT − 4)); at difficulty 5 that is 20 words at INT 4 and 14 at INT 10.",
+-      "Attempts are now 4 at difficulty 0–2 and 3 at difficulty 3–5. Bracket pairs are the only hints: Science sets their count (max 3, max N−3) and a d20 roll set by Luck decides the effect.",
+-      "Bracket effects: remove a dud, +1 attempt, or a full reset (once per terminal; a repeat gives +1). Letter likeness N/M is learned only by spending an attempt; luck points are never spent.",
+-      "Boards are built from three letter groups (similar / mixed / dissimilar) with no shared-prefix clusters: ABSURD, ABSENT, ABUSES no longer give the password away in one guess. The password is no longer the most 'central' word.",
+-      "Balance: blind guessing wins about 20–35% of difficulty-5 runs, a player who tracks the patterns wins 85–100%, and a lucky full reset takes the thinking player to 100%.",
+-      "The hacking window now shows the Hacker perk's difficulty reduction and the result of each bracket; attempt dots grow with bonus attempts.",
+-      "The hacking word list is now built from real English words: six files by word length, 12,308 words total, so consecutive terminals no longer repeat the same candidates.",
+-      "Hacking uses three separate levers: INT (4–10) sets the board size (20 → 12 words), Science (0–6) adds bracket combinations and unlocks attempt recovery at rank 4, and Luck (4–10) sets the chance that such a combination appears (10–80%).",
+-      "At difficulty 0 the board is built from real anagram families (POST/SPOT/STOP…) while the password is a maximal outlier; the correct word is no longer underlined.",
+-      "The internal thresholds line was removed from the hacking window; «About» now states the unofficial fan status, rights holders, the AGPL engine licence and verbatim word-list licences.",
+-      "A recovery bracket now grants +1 attempt instead of resetting all four, and luck points are never spent while hacking.",
+-      "Terminal hacking is harder now: hints are capped (at difficulty 5 — at most 2 of 9 matching letters), words on the board are similar, and INT + Science shrink the candidate list.",
+-      "A terminal inside a location no longer turns into a chest: tapping it opens the hacking mini-game in a modal, even if the room server has not been updated yet.",
+-      "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",
+-      "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",
+-      "App errors now display the React component stack to help identify the source of a crash.",
+-      "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
+-      "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
+-      "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
+-      "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
+-      "«Homebrew Equipment» category: items from loaded packs appear in their own category with subsections by weapon type, robot weapons, and ammo, and are available in the shop and weapon modification window.",
+-      "Game master rooms and «Admin screen»: when enabled in Settings, the GM can create online rooms with an invite code and view connected character cards inside the room with live updates on save.",
+-      "Connecting to a room via «Server» in the character menu: a bound character reconnects to its room automatically without re-entering the code, and moving it between personal folders keeps the binding intact.",
+-      "A network badge on a bound character card shows connection status (green when the GM is online and the room is active, dim when offline); personal characters and GM rooms stay strictly separated between «User» and «Admin» modes.",
+-      "Fast web app startup: the compressed build opens in seconds, and during an update a live startup indicator appears right away instead of a blank dark screen.",
+-      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing.",
+-      "Answering «Yes» instantly builds a fresh board from the current terminal settings: new words, hints and brackets, four attempts again, and the chosen character stats are preserved.",
+-      "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
+-      "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
+-      "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
+-      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
++      "Playing in a room with your GM: you join the room, your sheet goes to the GM, and their decisions — an effect, damage, a spent item — land on your sheet and are saved.",
++      "The GM sees your state: HP, radiation, conditions and key stats, with no need to ask for a screenshot.",
++      "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list.",
++      "A locked door keeps you out: until the lock is open you see nothing behind it — a key or a hack comes first.",
++      "Lockpicking: a mini-game with cells based on Perception and difficulty, a limited number of attempts, and sometimes a choice between a key and a hack.",
++      "Terminal hacking: four attempts, words, bracket hints and a board built from Intelligence. After a failure the GM decides whether to allow another approach or close the terminal.",
++      "Keys and notes: a key can be found, carried with you or left in the party storage — and used to open a door or a chest.",
++      "Gates: hacking one terminal can open the way further — into the next room or to another chest.",
++      "Party storage: loot can be pooled, anyone can put things in or take them out, and the GM sees what is stored where.",
++      "Loot and traders: the GM hands out items, and at a trader you can buy or sell at their prices and with their caps."
+     ]
+   }
+ }
