@@ -14,6 +14,14 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(__dirname, '../..');
+// Ветка сессии меняется от сессии к сессии. Тесты не пинят её имя: берут ту,
+// на которую указывает сам установщик (ARENA_BRANCH, с переопределением
+// APPLY_PATCH_BRANCH), и создают фейковый upstream с тем же именем.
+const INSTALLER = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
+const BRANCH = /^ARENA_BRANCH="\$\{APPLY_PATCH_BRANCH:-([^}]+)\}"/m.exec(INSTALLER)?.[1]
+  || /^ARENA_BRANCH="([^"]+)"/m.exec(INSTALLER)?.[1];
+if (!BRANCH) throw new Error('ARENA_BRANCH не найден в apply-patch.sh');
+
 
 const git = (cwd, args) =>
   execFileSync('git', args, {
@@ -36,7 +44,7 @@ describe('Патч 455: лаконичный отчёт apply-patch.sh и явн
 
     try {
       fs.mkdirSync(upstream, { recursive: true });
-      git(upstream, ['init', '-b', 'arena/f90c80d8-fallout-2d20-companion']);
+      git(upstream, ['init', '-b', BRANCH]);
       fs.mkdirSync(path.join(upstream, 'public'), { recursive: true });
       fs.mkdirSync(path.join(upstream, 'patchs'), { recursive: true });
       fs.copyFileSync(path.join(ROOT, 'apply-patch.sh'), path.join(upstream, 'apply-patch.sh'));
