@@ -44,7 +44,7 @@ usage() {
 
 Опции:
   --site <путь>       Каталог сайта NetAngels (например ~/positronium-engine.na4u.ru)
-  --branch <ветка>    Ветка Git для сборки (по умолчанию: main)
+  --branch <ветка>    Ветка Git для сборки (по умолчанию: текущая ветка сессии)
   --repo-url <url>    URL репозитория GitHub
   --patch <номер>     После обновления кода применить ./apply-patch.sh <номер>
   --skip-pull         Не обновлять локальный Git-репозиторий из сети
@@ -213,7 +213,11 @@ resolve_modern_node_bin() {
 
 main() {
   local site_arg=""
-  local branch="${POSITRONIUM_BRANCH:-main}"
+  # По умолчанию собираем ветку текущей сессии Arena (ту же, на которую
+  # указывает apply-patch.sh), а не main: main отстаёт от неё, и деплой
+  # молча выкладывал старую версию. Переопределяется --branch или
+  # переменной POSITRONIUM_BRANCH.
+  local branch="${POSITRONIUM_BRANCH:-arena/a97ebb5a-fallout-2d20-companion}"
   local repo_url="${POSITRONIUM_REPO_URL:-https://github.com/rpg-companios/Fallout-2d20-companion.git}"
   local target_patch="${POSITRONIUM_PATCH:-}"
   local skip_pull=0
