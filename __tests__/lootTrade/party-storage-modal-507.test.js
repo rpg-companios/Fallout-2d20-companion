@@ -16,9 +16,15 @@ vi.mock('react-native', () => {
     Text: mk('Text'),
     TouchableOpacity: mk('TouchableOpacity'),
     ScrollView: mk('ScrollView'),
+    TextInput: mk('TextInput'),
   };
 });
-vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
+// 562: строки берут имена модов из каталога, ему нужен getCurrentModuleLocale.
+vi.mock('../../i18n/locale', () => ({
+  useLocale: () => {},
+  getCurrentLocale: () => 'ru-RU',
+  getCurrentModuleLocale: () => 'ru-RU',
+}));
 vi.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', props),
 }));

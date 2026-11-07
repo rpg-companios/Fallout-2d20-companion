@@ -48,6 +48,9 @@ import { resolveItem, getItemPrice, getItemWeight } from '../../domain/resolveIt
 import itemStacking from '../../domain/itemStacking.js';
 import { getItemIcon } from './itemIcons';
 import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
+import TransferQuantityModal from './TransferQuantityModal';
+import { buildModsIndex } from '../../domain/itemNameParts';
+import ItemNameLines from './ItemNameLines';
 
 // Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
 // не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
@@ -77,6 +80,9 @@ const PartyStorageModal = ({
   onWithdrawLocal,
 }) => {
   useLocale();
+  // 562: имена показываем без обрезки — базовое имя целиком + моды отдельной
+  // строкой. У книг базового имени нет, поэтому идёт полное название.
+  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
   const { width: windowWidth } = useWindowDimensions();
   const isWideLayout = windowWidth >= 680;
   const rooms = useRoomStore((state) => state.rooms);
@@ -89,6 +95,8 @@ const PartyStorageModal = ({
   const [catalog, setCatalog] = useState([]);
   // Как в окне торговца: на узком экране панели показываются по одной.
   const [mobileTab, setMobileTab] = useState('player');
+  // 561: «сколько переместить?» — модалка по долгому нажатию на строку.
+  const [quantityModal, setQuantityModal] = useState(null);
   // Патч 557: у панели склада две вкладки на верхней границе — вещи и ключи.
   const [storageTab, setStorageTab] = useState('items');
 
@@ -272,7 +280,7 @@ const PartyStorageModal = ({
                 style={trade.bufferRow}
                 onPress={() => addTake(entryById(entryId), -1)}
               >
-                <Text style={trade.bufferItalicText} numberOfLines={1}>
+                <Text style={trade.bufferItalicText}>
                   {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
                 </Text>
                 <TouchableOpacity
@@ -305,35 +313,14 @@ const PartyStorageModal = ({
                 style={[trade.tradeRow, !writable && trade.disabledBtn]}
                 disabled={busy || !writable}
                 onPress={() => addGive(item)}
+                onLongPress={() => setQuantityModal({ kind: 'give', item, max: remaining })}
+                delayLongPress={400}
               >
                 <View style={trade.tradeRowInfo}>
-                  <Text style={trade.tradeRowName} numberOfLines={1}>
-                    {`${getItemIcon(item.itemType)} ${item.name} ×${remaining}`}
-                  </Text>
+                  <ItemNameLines item={item} modsIndex={modsIndex} />
                 </View>
-                <View style={trade.tradeRowBtns}>
-                  <TouchableOpacity
-                    testID={`storage-give-one-${id}`}
-                    style={trade.miniMoveBtn}
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      addGive(item);
-                    }}
-                  >
-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositOne')}</Text>
-                  </TouchableOpacity>
-                  {remaining > 1 && (
-                    <TouchableOpacity
-                      testID={`storage-give-all-${id}`}
-                      style={trade.miniMoveAllBtn}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        addGive(item, remaining);
-                      }}
-                    >
-                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositAll')}</Text>
-                    </TouchableOpacity>
-                  )}
+                <View style={localStyles.rowQtyBadge}>
+                  <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -401,7 +388,7 @@ const PartyStorageModal = ({
                 addGive(item, -1);
               }}
             >
-              <Text style={trade.bufferItalicText} numberOfLines={1}>
+              <Text style={trade.bufferItalicText}>
                 {`+ ${nameOfBufferedItem(id)} ×${qty}`}
               </Text>
               <TouchableOpacity
@@ -434,35 +421,14 @@ const PartyStorageModal = ({
               style={[trade.tradeRow, !writable && trade.disabledBtn]}
               disabled={busy || !writable}
               onPress={() => addTake(entry)}
+              onLongPress={() => setQuantityModal({ kind: 'take', item: entry, max: remaining })}
+              delayLongPress={400}
             >
               <View style={trade.tradeRowInfo}>
-                <Text style={trade.tradeRowName} numberOfLines={1}>
-                  {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
-                </Text>
+                <ItemNameLines item={entry} modsIndex={modsIndex} />
               </View>
-              <View style={trade.tradeRowBtns}>
-                <TouchableOpacity
-                  testID={`storage-take-one-${entry.entryId}`}
-                  style={trade.miniMoveBtn}
-                  onPress={(e) => {
-                    e?.stopPropagation?.();
-                    addTake(entry);
-                  }}
-                >
-                  <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
-                </TouchableOpacity>
-                {remaining > 1 && (
-                  <TouchableOpacity
-                    testID={`storage-take-all-${entry.entryId}`}
-                    style={trade.miniMoveAllBtn}
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      addTake(entry, remaining);
-                    }}
-                  >
-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
-                  </TouchableOpacity>
-                )}
+              <View style={localStyles.rowQtyBadge}>
+                <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -639,9 +605,7 @@ const PartyStorageModal = ({
                     style={trade.tradeRow}
                   >
                     <View style={trade.tradeRowInfo}>
-                      <Text style={trade.tradeRowName} numberOfLines={1}>
-                        {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
-                      </Text>
+                      <ItemNameLines item={entry} modsIndex={modsIndex} />
                     </View>
                   </View>
                 ))
@@ -707,6 +671,26 @@ const PartyStorageModal = ({
               )}
             </>
           )}
+
+          {/* 561: «сколько переместить?» — поверх окна склада. Значение уходит
+              в буфер; окончательный обмен — нижней кнопкой. */}
+          <TransferQuantityModal
+            visible={Boolean(quantityModal)}
+            itemName={quantityModal?.item?.name || ''}
+            directionLabel={quantityModal?.kind === 'give'
+              ? `${tInventory('screen.storage.yourItems')} → ${tInventory('screen.storage.title')}`
+              : `${tInventory('screen.storage.title')} → ${tInventory('screen.storage.yourItems')}`}
+            available={quantityModal?.max || 1}
+            max={quantityModal?.max || 1}
+            onCancel={() => setQuantityModal(null)}
+            onConfirm={(qty) => {
+              const target = quantityModal;
+              setQuantityModal(null);
+              if (!target) return;
+              if (target.kind === 'give') addGive(target.item, qty);
+              else addTake(target.item, qty);
+            }}
+          />
         </View>
       </View>
     </Modal>
@@ -717,6 +701,17 @@ const PartyStorageModal = ({
 // строки. Всё остальное — `tradeOverlayStyles`, чтобы окно склада не рисовало
 // «похожий, но другой» дизайн.
 const localStyles = StyleSheet.create({
+  // 561: количество — бейджем справа, а не частью названия.
+  rowQtyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    backgroundColor: '#1b1b1b',
+    marginLeft: 10,
+  },
+  rowQtyText: { color: '#d4af37', fontSize: 12, fontWeight: '700' },
   noRoom: { marginTop: 18, marginBottom: 18 },
   readOnly: { textAlign: 'center', marginTop: 10 },
   transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },

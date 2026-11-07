@@ -11,7 +11,10 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
 import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
-import { getItemIcon } from './itemIcons';
+import TransferQuantityModal from './TransferQuantityModal';
+import { buildModsIndex } from '../../domain/itemNameParts';
+import ItemNameLines from './ItemNameLines';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
@@ -108,6 +111,8 @@ export default function PlayerLootTradeOverlay() {
 
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
   const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
+  // 562: имя без обрезки — базовое имя целиком плюс моды отдельной строкой.
+  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
   const storeItems = useCharacterStore((s) => s.items);
   const playerCaps = useCharacterStore((s) => s.currency);
   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
@@ -121,6 +126,8 @@ export default function PlayerLootTradeOverlay() {
   const [parentStack, setParentStack] = useState([]);
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+  // 561: «сколько переместить?» — долгое нажатие по строке товара/вещи.
+  const [quantityModal, setQuantityModal] = useState(null);
   const [terminalSelection, setTerminalSelection] = useState(null);
   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
   // Патч 526: «билет на один взлом» убран. Владелец уточнил, что баг 506 был
@@ -1734,11 +1741,18 @@ export default function PlayerLootTradeOverlay() {
                   return (
                     <View key={entry.entryId} style={styles.lootRow}>
                       <View style={styles.lootRowInfo}>
-                        <IconText style={styles.lootRowTitle}>
-                          {isCaps
-                            ? formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })
-                            : `${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
-                        </IconText>
+                        {isCaps ? (
+                          <IconText style={styles.lootRowTitle}>
+                            {formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })}
+                          </IconText>
+                        ) : (
+                          <ItemNameLines
+                            item={entry}
+                            modsIndex={modsIndex}
+                            suffix={` ×${entry.quantity}`}
+                            nameStyle={styles.lootRowTitle}
+                          />
+                        )}
                         {!isCaps && entry.weight > 0 && (
                           <Text style={styles.lootRowSub}>
                             {formatLootTrade(tLootTrade('detail.weight'), {
@@ -1858,36 +1872,19 @@ export default function PlayerLootTradeOverlay() {
                 key={pItem.id}
                 style={styles.tradeRow}
                 onPress={() => addToSellBuffer(pItem, 1)}
+                onLongPress={() => setQuantityModal({
+                  kind: 'sell', item: pItem, max: remaining, unitPrice: sellUnitPrice,
+                })}
+                delayLongPress={400}
               >
                 <View style={styles.tradeRowInfo}>
-                  <Text style={styles.tradeRowName}>
-                    {getItemIcon(pItem.itemType)} {pItem.name}{durSuffix} ×{remaining}
-                  </Text>
+                  <ItemNameLines item={pItem} modsIndex={modsIndex} suffix={durSuffix} />
                   <IconText style={styles.tradeRowPrice}>
                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
                   </IconText>
                 </View>
-                <View style={styles.tradeRowBtns}>
-                  <TouchableOpacity
-                    style={styles.miniMoveBtn}
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      addToSellBuffer(pItem, 1);
-                    }}
-                  >
-                    <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveOne')}</Text>
-                  </TouchableOpacity>
-                  {remaining > 1 && (
-                    <TouchableOpacity
-                      style={styles.miniMoveAllBtn}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        addToSellBuffer(pItem, remaining);
-                      }}
-                    >
-                      <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveAll')}</Text>
-                    </TouchableOpacity>
-                  )}
+                <View style={styles.rowQtyBadge}>
+                  <Text style={styles.rowQtyBadgeText}>{`×${remaining}`}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -1963,39 +1960,25 @@ export default function PlayerLootTradeOverlay() {
                   key={entry.entryId}
                   style={styles.tradeRow}
                   onPress={() => addToBuyBuffer(entry, 1)}
+                  onLongPress={() => setQuantityModal({
+                    kind: 'buy', item: entry, max: remaining, unitPrice: buyUnitPrice,
+                  })}
+                  delayLongPress={400}
                 >
                   <View style={styles.tradeRowInfo}>
-                    <Text style={styles.tradeRowName}>
-                      {getItemIcon(entry.itemType)} {entry.name} ×{remaining}
-                    </Text>
+                    <ItemNameLines
+                      item={entry.itemSnapshot && entry.itemSnapshot.name ? entry.itemSnapshot : entry}
+                      modsIndex={modsIndex}
+                    />
                     {Boolean(basics) && (
-                      <IconText style={styles.tradeRowBasics} numberOfLines={2}>{basics}</IconText>
+                      <IconText style={styles.tradeRowBasics}>{basics}</IconText>
                     )}
                     <IconText style={styles.tradeRowPriceBuy}>
                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}
                     </IconText>
                   </View>
-                  <View style={styles.tradeRowBtns}>
-                    <TouchableOpacity
-                      style={styles.miniMoveBtn}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        addToBuyBuffer(entry, 1);
-                      }}
-                    >
-                      <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveOne')}</Text>
-                    </TouchableOpacity>
-                    {remaining > 1 && (
-                      <TouchableOpacity
-                        style={styles.miniMoveAllBtn}
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          addToBuyBuffer(entry, remaining);
-                        }}
-                      >
-                        <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveAll')}</Text>
-                      </TouchableOpacity>
-                    )}
+                  <View style={styles.rowQtyBadge}>
+                    <Text style={styles.rowQtyBadgeText}>{`×${remaining}`}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -2172,6 +2155,30 @@ export default function PlayerLootTradeOverlay() {
               </View>
             </View>
           )}
+
+          {/* 561: «сколько переместить?» — поверх окна торговца. Значение
+              уходит в буфер, окончательная сделка — нижней кнопкой. */}
+          <TransferQuantityModal
+            visible={Boolean(quantityModal)}
+            itemName={quantityModal?.item?.name || ''}
+            directionLabel={quantityModal?.kind === 'buy'
+              ? `${tLootTrade('player.merchantInventoryTab')} → ${tLootTrade('player.playerInventoryTab')}`
+              : `${tLootTrade('player.playerInventoryTab')} → ${tLootTrade('player.merchantInventoryTab')}`}
+            available={quantityModal?.max || 1}
+            max={quantityModal?.max || 1}
+            renderTotal={(qty) => {
+              const unit = Number(quantityModal?.unitPrice) || 0;
+              return formatLootTrade(tLootTrade('player.quantityTotal'), { total: unit * qty });
+            }}
+            onCancel={() => setQuantityModal(null)}
+            onConfirm={(qty) => {
+              const target = quantityModal;
+              setQuantityModal(null);
+              if (!target) return;
+              if (target.kind === 'buy') addToBuyBuffer(target.item, qty);
+              else addToSellBuffer(target.item, qty);
+            }}
+          />
         </View>
       </View>
     </Modal>

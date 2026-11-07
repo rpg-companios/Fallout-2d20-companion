@@ -1,0 +1,1234 @@
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+index c5f9d95..4c7c753 100644
+--- a/__tests__/lootTrade/party-storage-modal-507.test.js
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -16,6 +16,7 @@ vi.mock('react-native', () => {
+     Text: mk('Text'),
+     TouchableOpacity: mk('TouchableOpacity'),
+     ScrollView: mk('ScrollView'),
++    TextInput: mk('TextInput'),
+   };
+ });
+ vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 486067e..3216117 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('560');
++    expect(version.version).toBe('561');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('560');
++    expect(json('patchs/baseline.json').baseline).toBe('561');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **560**');
++    expect(roadmap).toContain('Текущая версия: **561**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 8e2289a..a8428a4 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('560');
++    expect(version.version).toBe('561');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('560');
++    expect(json('patchs/baseline.json').baseline).toBe('561');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **560**');
++    expect(roadmap).toContain('Текущая версия: **561**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/storage-pane-tabs-557.test.js b/__tests__/room/storage-pane-tabs-557.test.js
+index 957fb83..b8f82b5 100644
+--- a/__tests__/room/storage-pane-tabs-557.test.js
++++ b/__tests__/room/storage-pane-tabs-557.test.js
+@@ -35,6 +35,7 @@ vi.mock('react-native', () => {
+     Text: mk('Text'),
+     TouchableOpacity: mk('TouchableOpacity'),
+     ScrollView: mk('ScrollView'),
++    TextInput: mk('TextInput'),
+   };
+ });
+ 
+diff --git a/__tests__/room/storage-trader-parity-556.test.js b/__tests__/room/storage-trader-parity-556.test.js
+index 2549753..b0beed2 100644
+--- a/__tests__/room/storage-trader-parity-556.test.js
++++ b/__tests__/room/storage-trader-parity-556.test.js
+@@ -35,6 +35,7 @@ vi.mock('react-native', () => {
+     Text: mk('Text'),
+     TouchableOpacity: mk('TouchableOpacity'),
+     ScrollView: mk('ScrollView'),
++    TextInput: mk('TextInput'),
+   };
+ });
+ 
+@@ -166,8 +167,13 @@ describe('556: окно общего хранилища — как у торго
+     expect(treeText(renderer)).toContain('к себе: 1');
+     expect(treeText(renderer)).toContain('Забираю себе');
+ 
+-    // «Всё» на строке склада: остаток 2 из 3.
+-    await press(renderer.root.findAllByProps({ testID: 'storage-take-all-st_1' })[0]);
++    // 561: «сколько?» — по долгому нажатию. Остаток 2 из 3, берём оба.
++    await act(async () => {
++      renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0].props.onLongPress();
++    });
++    expect(renderer.root.findAllByProps({ testID: 'transfer-quantity-modal' }).length).toBeGreaterThan(0);
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-confirm' })[0]);
+     expect(treeText(renderer)).toContain('к себе: 3');
+ 
+     // До «Перенести» сервер не трогали.
+@@ -242,7 +248,11 @@ describe('556: окно общего хранилища — как у торго
+     expect(modal).toContain("import { tradeOverlayStyles as trade } from './tradeOverlayStyles'");
+     expect(modal).toContain('trade.pane');
+     expect(modal).toContain('trade.bufferBox');
+-    expect(modal).toContain('trade.miniMoveBtn');
++    // 561: построчных кнопок больше нет — количество спрашивается долгим
++    // нажатием, поэтому строку проверяем по бейджу и модалке.
++    expect(modal).toContain('localStyles.rowQtyBadge');
++    expect(modal).toContain('onLongPress={() => setQuantityModal(');
++    expect(modal).toContain('<TransferQuantityModal');
+     expect(modal).toContain('trade.barterFooter');
+   });
+ 
+diff --git a/__tests__/room/transfer-quantity-561.test.js b/__tests__/room/transfer-quantity-561.test.js
+new file mode 100644
+index 0000000..a7872d7
+--- /dev/null
++++ b/__tests__/room/transfer-quantity-561.test.js
+@@ -0,0 +1,187 @@
++// Патч 561 — «сколько переместить?» в складе и у торговца.
++//
++// Слово владельца: «тап по назначению или клик автоматически переносят предмет…
++// откроется модалка поверх и там будет заголовок: сколько переместить? А ниже
++// ячейка с числом. Ещё ниже ползунок… Ниже 2 кнопки "подтвердить" "отмена"».
++// И уточнение: «значение +, "−" появляется при количестве отданных более 1х».
++// И: «Торговец и склад работают по одному дизайну. Править их раздельно
++// бессмысленно».
++import { describe, expect, it, vi } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
++const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: { create: (s) => s, flatten: (s) => s || {} },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++  };
++});
++
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => 'ru-RU', getCurrentLocale: () => 'ru-RU', useModuleLocale: () => 'ru-RU' };
++});
++
++const TransferQuantityModal = (await import('../../components/lootTrade/TransferQuantityModal')).default;
++
++const mount = async (props) => {
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(TransferQuantityModal, {
++      visible: true,
++      itemName: 'Лабораторный халат',
++      directionLabel: 'склад → инвентарь',
++      available: 12,
++      max: 12,
++      ...props,
++    }));
++  });
++  return renderer;
++};
++
++const press = async (node) => {
++  await act(async () => { node.props.onPress(); });
++};
++
++const type = async (node, textValue) => {
++  await act(async () => { node.props.onChangeText(textValue); });
++};
++
++const has = (renderer, testID) => renderer.root.findAllByProps({ testID }).length > 0;
++const text = (renderer) => {
++  const out = [];
++  const walk = (node) => {
++    if (!node) return;
++    if (typeof node === 'string') { out.push(node); return; }
++    if (Array.isArray(node)) { node.forEach(walk); return; }
++    walk(node.children);
++  };
++  walk(renderer.toJSON());
++  return out.join(' ');
++};
++
++describe('Патч 561: окно «Сколько переместить?»', () => {
++  it('заголовок, предмет, направление и доступное количество на месте', async () => {
++    const renderer = await mount();
++    const all = text(renderer);
++    expect(all).toContain('Сколько переместить?');
++    expect(all).toContain('Лабораторный халат');
++    expect(all).toContain('склад → инвентарь');
++    expect(all).toContain('доступно 12');
++  });
++
++  it('«−» появляется только когда значение больше 1', async () => {
++    const renderer = await mount();
++    expect(has(renderer, 'transfer-quantity-minus')).toBe(false);
++
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
++    expect(has(renderer, 'transfer-quantity-minus')).toBe(true);
++    expect(renderer.root.findAllByProps({ testID: 'transfer-quantity-input' })[0].props.value).toBe('2');
++
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-minus' })[0]);
++    expect(has(renderer, 'transfer-quantity-minus')).toBe(false);
++    expect(renderer.root.findAllByProps({ testID: 'transfer-quantity-input' })[0].props.value).toBe('1');
++  });
++
++  it('ползунок есть только когда есть из чего выбирать', async () => {
++    const one = await mount({ max: 1, available: 1 });
++    expect(has(one, 'transfer-quantity-slider')).toBe(false);
++
++    const many = await mount();
++    expect(has(many, 'transfer-quantity-slider')).toBe(true);
++  });
++
++  it('значение не выходит за 1…доступно', async () => {
++    const renderer = await mount({ max: 3, available: 3 });
++    const input = () => renderer.root.findAllByProps({ testID: 'transfer-quantity-input' })[0];
++
++    await type(input(), '99');
++    expect(input().props.value).toBe('3');
++
++    await type(input(), '0');
++    expect(input().props.value).toBe('1');
++
++    await type(input(), '');
++    expect(input().props.value).toBe('');
++
++    // Подтверждаем — уходит валидное число.
++    await type(input(), '2');
++    expect(input().props.value).toBe('2');
++  });
++
++  it('«Подтвердить» отдаёт выбранное количество, «Отмена» — закрывает', async () => {
++    const onConfirm = vi.fn();
++    const onCancel = vi.fn();
++    const renderer = await mount({ onConfirm, onCancel });
++
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-confirm' })[0]);
++    expect(onConfirm).toHaveBeenCalledWith(3);
++
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-cancel' })[0]);
++    expect(onCancel).toHaveBeenCalled();
++  });
++
++  it('итог по деньгам считается от количества', async () => {
++    const renderer = await mount({
++      max: 10,
++      available: 10,
++      renderTotal: (qty) => `Итого: ${qty * 25}`,
++    });
++    expect(text(renderer)).toContain('Итого: 25');
++    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
++    expect(text(renderer)).toContain('Итого: 50');
++  });
++});
++
++describe('Патч 561: склад и торговец по одному дизайну', () => {
++  it('в складе: долгое нажатие открывает окно, построчных кнопок нет', () => {
++    const storage = read('components/lootTrade/PartyStorageModal.js');
++    expect(storage).toContain("import TransferQuantityModal from './TransferQuantityModal';");
++    expect(storage).toContain("onLongPress={() => setQuantityModal({ kind: 'give', item, max: remaining })}");
++    expect(storage).toContain("onLongPress={() => setQuantityModal({ kind: 'take', item: entry, max: remaining })}");
++    expect(storage).not.toContain('storage-give-one-');
++    expect(storage).not.toContain('storage-take-all-');
++    expect(storage).toContain('localStyles.rowQtyBadge');
++  });
++
++  it('у торговца тот же механизм: покупка и продажа', () => {
++    const trader = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(trader).toContain("import TransferQuantityModal from './TransferQuantityModal';");
++    expect(trader).toContain("kind: 'buy'");
++    expect(trader).toContain("kind: 'sell'");
++    expect(trader).toContain('<TransferQuantityModal');
++    expect(trader).toContain('styles.rowQtyBadge');
++  });
++
++  it('строка: количество бейджем, название до двух строк', () => {
++    const storage = read('components/lootTrade/PartyStorageModal.js');
++    expect(storage).toContain('numberOfLines={2}');
++    const trader = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(trader).toContain('rowQtyBadgeText');
++    const styles = read('components/lootTrade/tradeOverlayStyles.js');
++    expect(styles).toContain('rowQtyBadge');
++  });
++
++  it('ключи и вкладки склада не тронуты', () => {
++    const storage = read('components/lootTrade/PartyStorageModal.js');
++    expect(storage).toContain('storageTabs');
++    expect(storage).toContain('renderKeysContent');
++  });
++});
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index ad9f84f..fe1ee1f 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -48,6 +48,7 @@ import { resolveItem, getItemPrice, getItemWeight } from '../../domain/resolveIt
+ import itemStacking from '../../domain/itemStacking.js';
+ import { getItemIcon } from './itemIcons';
+ import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
++import TransferQuantityModal from './TransferQuantityModal';
+ 
+ // Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
+ // не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
+@@ -89,6 +90,8 @@ const PartyStorageModal = ({
+   const [catalog, setCatalog] = useState([]);
+   // Как в окне торговца: на узком экране панели показываются по одной.
+   const [mobileTab, setMobileTab] = useState('player');
++  // 561: «сколько переместить?» — модалка по долгому нажатию на строку.
++  const [quantityModal, setQuantityModal] = useState(null);
+   // Патч 557: у панели склада две вкладки на верхней границе — вещи и ключи.
+   const [storageTab, setStorageTab] = useState('items');
+ 
+@@ -305,35 +308,16 @@ const PartyStorageModal = ({
+                 style={[trade.tradeRow, !writable && trade.disabledBtn]}
+                 disabled={busy || !writable}
+                 onPress={() => addGive(item)}
++                onLongPress={() => setQuantityModal({ kind: 'give', item, max: remaining })}
++                delayLongPress={400}
+               >
+                 <View style={trade.tradeRowInfo}>
+-                  <Text style={trade.tradeRowName} numberOfLines={1}>
+-                    {`${getItemIcon(item.itemType)} ${item.name} ×${remaining}`}
++                  <Text style={trade.tradeRowName} numberOfLines={2}>
++                    {`${getItemIcon(item.itemType)} ${item.name}`}
+                   </Text>
+                 </View>
+-                <View style={trade.tradeRowBtns}>
+-                  <TouchableOpacity
+-                    testID={`storage-give-one-${id}`}
+-                    style={trade.miniMoveBtn}
+-                    onPress={(e) => {
+-                      e?.stopPropagation?.();
+-                      addGive(item);
+-                    }}
+-                  >
+-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositOne')}</Text>
+-                  </TouchableOpacity>
+-                  {remaining > 1 && (
+-                    <TouchableOpacity
+-                      testID={`storage-give-all-${id}`}
+-                      style={trade.miniMoveAllBtn}
+-                      onPress={(e) => {
+-                        e?.stopPropagation?.();
+-                        addGive(item, remaining);
+-                      }}
+-                    >
+-                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositAll')}</Text>
+-                    </TouchableOpacity>
+-                  )}
++                <View style={localStyles.rowQtyBadge}>
++                  <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
+                 </View>
+               </TouchableOpacity>
+             );
+@@ -434,35 +418,16 @@ const PartyStorageModal = ({
+               style={[trade.tradeRow, !writable && trade.disabledBtn]}
+               disabled={busy || !writable}
+               onPress={() => addTake(entry)}
++              onLongPress={() => setQuantityModal({ kind: 'take', item: entry, max: remaining })}
++              delayLongPress={400}
+             >
+               <View style={trade.tradeRowInfo}>
+-                <Text style={trade.tradeRowName} numberOfLines={1}>
+-                  {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
++                <Text style={trade.tradeRowName} numberOfLines={2}>
++                  {`${getItemIcon(entry.itemType)} ${entry.name}`}
+                 </Text>
+               </View>
+-              <View style={trade.tradeRowBtns}>
+-                <TouchableOpacity
+-                  testID={`storage-take-one-${entry.entryId}`}
+-                  style={trade.miniMoveBtn}
+-                  onPress={(e) => {
+-                    e?.stopPropagation?.();
+-                    addTake(entry);
+-                  }}
+-                >
+-                  <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
+-                </TouchableOpacity>
+-                {remaining > 1 && (
+-                  <TouchableOpacity
+-                    testID={`storage-take-all-${entry.entryId}`}
+-                    style={trade.miniMoveAllBtn}
+-                    onPress={(e) => {
+-                      e?.stopPropagation?.();
+-                      addTake(entry, remaining);
+-                    }}
+-                  >
+-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
+-                  </TouchableOpacity>
+-                )}
++              <View style={localStyles.rowQtyBadge}>
++                <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
+               </View>
+             </TouchableOpacity>
+           );
+@@ -707,6 +672,26 @@ const PartyStorageModal = ({
+               )}
+             </>
+           )}
++
++          {/* 561: «сколько переместить?» — поверх окна склада. Значение уходит
++              в буфер; окончательный обмен — нижней кнопкой. */}
++          <TransferQuantityModal
++            visible={Boolean(quantityModal)}
++            itemName={quantityModal?.item?.name || ''}
++            directionLabel={quantityModal?.kind === 'give'
++              ? `${tInventory('screen.storage.yourItems')} → ${tInventory('screen.storage.title')}`
++              : `${tInventory('screen.storage.title')} → ${tInventory('screen.storage.yourItems')}`}
++            available={quantityModal?.max || 1}
++            max={quantityModal?.max || 1}
++            onCancel={() => setQuantityModal(null)}
++            onConfirm={(qty) => {
++              const target = quantityModal;
++              setQuantityModal(null);
++              if (!target) return;
++              if (target.kind === 'give') addGive(target.item, qty);
++              else addTake(target.item, qty);
++            }}
++          />
+         </View>
+       </View>
+     </Modal>
+@@ -717,6 +702,17 @@ const PartyStorageModal = ({
+ // строки. Всё остальное — `tradeOverlayStyles`, чтобы окно склада не рисовало
+ // «похожий, но другой» дизайн.
+ const localStyles = StyleSheet.create({
++  // 561: количество — бейджем справа, а не частью названия.
++  rowQtyBadge: {
++    paddingHorizontal: 8,
++    paddingVertical: 3,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#4a4a4a',
++    backgroundColor: '#1b1b1b',
++    marginLeft: 10,
++  },
++  rowQtyText: { color: '#d4af37', fontSize: 12, fontWeight: '700' },
+   noRoom: { marginTop: 18, marginBottom: 18 },
+   readOnly: { textAlign: 'center', marginTop: 10 },
+   transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 9036bae..c0abc80 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -11,6 +11,7 @@ import {
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
+ import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
++import TransferQuantityModal from './TransferQuantityModal';
+ import { getItemIcon } from './itemIcons';
+ import * as db from '../../db';
+ import * as savesModule from '../../src/saves/characterSaves';
+@@ -121,6 +122,8 @@ export default function PlayerLootTradeOverlay() {
+   const [parentStack, setParentStack] = useState([]);
+   const [busy, setBusy] = useState(false);
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
++  // 561: «сколько переместить?» — долгое нажатие по строке товара/вещи.
++  const [quantityModal, setQuantityModal] = useState(null);
+   const [terminalSelection, setTerminalSelection] = useState(null);
+   const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
+   // Патч 526: «билет на один взлом» убран. Владелец уточнил, что баг 506 был
+@@ -1858,6 +1861,10 @@ export default function PlayerLootTradeOverlay() {
+                 key={pItem.id}
+                 style={styles.tradeRow}
+                 onPress={() => addToSellBuffer(pItem, 1)}
++                onLongPress={() => setQuantityModal({
++                  kind: 'sell', item: pItem, max: remaining, unitPrice: sellUnitPrice,
++                })}
++                delayLongPress={400}
+               >
+                 <View style={styles.tradeRowInfo}>
+                   <Text style={styles.tradeRowName}>
+@@ -1867,27 +1874,8 @@ export default function PlayerLootTradeOverlay() {
+                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
+                   </IconText>
+                 </View>
+-                <View style={styles.tradeRowBtns}>
+-                  <TouchableOpacity
+-                    style={styles.miniMoveBtn}
+-                    onPress={(e) => {
+-                      e?.stopPropagation?.();
+-                      addToSellBuffer(pItem, 1);
+-                    }}
+-                  >
+-                    <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveOne')}</Text>
+-                  </TouchableOpacity>
+-                  {remaining > 1 && (
+-                    <TouchableOpacity
+-                      style={styles.miniMoveAllBtn}
+-                      onPress={(e) => {
+-                        e?.stopPropagation?.();
+-                        addToSellBuffer(pItem, remaining);
+-                      }}
+-                    >
+-                      <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveAll')}</Text>
+-                    </TouchableOpacity>
+-                  )}
++                <View style={styles.rowQtyBadge}>
++                  <Text style={styles.rowQtyBadgeText}>{`×${remaining}`}</Text>
+                 </View>
+               </TouchableOpacity>
+             );
+@@ -1963,6 +1951,10 @@ export default function PlayerLootTradeOverlay() {
+                   key={entry.entryId}
+                   style={styles.tradeRow}
+                   onPress={() => addToBuyBuffer(entry, 1)}
++                  onLongPress={() => setQuantityModal({
++                    kind: 'buy', item: entry, max: remaining, unitPrice: buyUnitPrice,
++                  })}
++                  delayLongPress={400}
+                 >
+                   <View style={styles.tradeRowInfo}>
+                     <Text style={styles.tradeRowName}>
+@@ -1975,27 +1967,8 @@ export default function PlayerLootTradeOverlay() {
+                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}
+                     </IconText>
+                   </View>
+-                  <View style={styles.tradeRowBtns}>
+-                    <TouchableOpacity
+-                      style={styles.miniMoveBtn}
+-                      onPress={(e) => {
+-                        e?.stopPropagation?.();
+-                        addToBuyBuffer(entry, 1);
+-                      }}
+-                    >
+-                      <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveOne')}</Text>
+-                    </TouchableOpacity>
+-                    {remaining > 1 && (
+-                      <TouchableOpacity
+-                        style={styles.miniMoveAllBtn}
+-                        onPress={(e) => {
+-                          e?.stopPropagation?.();
+-                          addToBuyBuffer(entry, remaining);
+-                        }}
+-                      >
+-                        <Text style={styles.miniMoveBtnText}>{tLootTrade('player.giveAll')}</Text>
+-                      </TouchableOpacity>
+-                    )}
++                  <View style={styles.rowQtyBadge}>
++                    <Text style={styles.rowQtyBadgeText}>{`×${remaining}`}</Text>
+                   </View>
+                 </TouchableOpacity>
+               );
+@@ -2172,6 +2145,30 @@ export default function PlayerLootTradeOverlay() {
+               </View>
+             </View>
+           )}
++
++          {/* 561: «сколько переместить?» — поверх окна торговца. Значение
++              уходит в буфер, окончательная сделка — нижней кнопкой. */}
++          <TransferQuantityModal
++            visible={Boolean(quantityModal)}
++            itemName={quantityModal?.item?.name || ''}
++            directionLabel={quantityModal?.kind === 'buy'
++              ? `${tLootTrade('player.merchantInventoryTab')} → ${tLootTrade('player.playerInventoryTab')}`
++              : `${tLootTrade('player.playerInventoryTab')} → ${tLootTrade('player.merchantInventoryTab')}`}
++            available={quantityModal?.max || 1}
++            max={quantityModal?.max || 1}
++            renderTotal={(qty) => {
++              const unit = Number(quantityModal?.unitPrice) || 0;
++              return formatLootTrade(tLootTrade('player.quantityTotal'), { total: unit * qty });
++            }}
++            onCancel={() => setQuantityModal(null)}
++            onConfirm={(qty) => {
++              const target = quantityModal;
++              setQuantityModal(null);
++              if (!target) return;
++              if (target.kind === 'buy') addToBuyBuffer(target.item, qty);
++              else addToSellBuffer(target.item, qty);
++            }}
++          />
+         </View>
+       </View>
+     </Modal>
+diff --git a/components/lootTrade/TransferQuantityModal.js b/components/lootTrade/TransferQuantityModal.js
+new file mode 100644
+index 0000000..8eb2f5f
+--- /dev/null
++++ b/components/lootTrade/TransferQuantityModal.js
+@@ -0,0 +1,251 @@
++// components/lootTrade/TransferQuantityModal.js
++// Патч 561 — «сколько переместить?».
++//
++// Слово владельца: «тап по назначению или клик автоматически переносят предмет…
++// откроется ещё модалка поверх и там будет заголовок: сколько переместить? А
++// ниже ячейка с числом. Ещё ниже ползунок, который регулирует количество. Ниже
++// 2 кнопки "подтвердить" "отмена"». И уточнение: «Не просто "сколько", а как я и
++// говорил — значение +, "−" появляется при количестве отданных более 1».
++//
++// Одно окно на оба мира: склад и торговец. Количество всегда уходит в БУФЕР —
++// окончательный обмен делает нижняя кнопка окна («Перенести» / «Купить» /
++// «Продать»), поэтому «Отмена» здесь просто закрывает окно.
++
++import React, { useEffect, useMemo, useRef, useState } from 'react';
++import { Modal, View, Text, TextInput, TouchableOpacity } from 'react-native';
++import { formatLootTrade, tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
++
++const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
++
++export default function TransferQuantityModal({
++  visible = false,
++  itemName = '',
++  directionLabel = '',
++  available = 0,
++  max = 1,
++  renderTotal = null,
++  onCancel,
++  onConfirm,
++}) {
++  const t = (key) => tLootTrade(key);
++  const upper = Math.max(1, Number(max) || 1);
++  const [value, setValue] = useState(1);
++  const [draft, setDraft] = useState('1');
++  const [trackWidth, setTrackWidth] = useState(0);
++  const mountedRef = useRef(true);
++
++  useEffect(() => () => { mountedRef.current = false; }, []);
++
++  // Каждое открытие — с единицы.
++  useEffect(() => {
++    if (!visible) return;
++    setValue(1);
++    setDraft('1');
++  }, [visible, itemName, upper]);
++
++  const apply = (next) => {
++    const clamped = clamp(Math.round(Number(next) || 1), 1, upper);
++    setValue(clamped);
++    setDraft(String(clamped));
++  };
++
++  // 561: поле не показывает недопустимое значение — сразу приводим к 1…upper,
++  // пустую строку оставляем только на время набора.
++  const onDraftChange = (text) => {
++    const digits = String(text || '').replace(/[^\d]/g, '').slice(0, 6);
++    if (digits === '') {
++      setDraft('');
++      return;
++    }
++    const next = clamp(Number(digits) || 1, 1, upper);
++    setValue(next);
++    setDraft(String(next));
++  };
++
++  const onDraftBlur = () => setDraft(String(value));
++
++  const pct = upper > 1 ? ((value - 1) / (upper - 1)) * 100 : 0;
++
++  const updateFromX = (x) => {
++    if (!trackWidth || upper <= 1) return;
++    const ratio = clamp(Number(x) || 0, 0, trackWidth) / trackWidth;
++    apply(1 + ratio * (upper - 1));
++  };
++
++  const totalLine = useMemo(
++    () => (typeof renderTotal === 'function' ? renderTotal(value) : ''),
++    [renderTotal, value],
++  );
++
++  if (!visible) return null;
++
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
++      <View style={styles.overlay}>
++        <View style={styles.dialog} testID="transfer-quantity-modal">
++          <Text style={styles.title}>{t('player.quantityTitle')}</Text>
++          {Boolean(itemName) && (
++            <Text style={styles.item} numberOfLines={2}>{itemName}</Text>
++          )}
++          <Text style={styles.meta}>
++            {[directionLabel, formatLootTrade(t('player.quantityAvailable'), { count: available })]
++              .filter(Boolean)
++              .join(' · ')}
++          </Text>
++
++          <View style={styles.stepperRow}>
++            {/* 561 (слово владельца): «−» появляется, когда значение больше 1.
++                Место под неё резервируем, чтобы ячейка не прыгала. */}
++            {value > 1 ? (
++              <TouchableOpacity
++                testID="transfer-quantity-minus"
++                style={styles.stepBtn}
++                onPress={() => apply(value - 1)}
++              >
++                <Text style={styles.stepBtnText}>−</Text>
++              </TouchableOpacity>
++            ) : (
++              <View style={styles.stepBtnPlaceholder} />
++            )}
++
++            <TextInput
++              testID="transfer-quantity-input"
++              style={styles.valueCell}
++              value={draft}
++              onChangeText={onDraftChange}
++              onBlur={onDraftBlur}
++              onSubmitEditing={() => { setDraft(String(value)); }}
++              keyboardType="number-pad"
++              inputMode="numeric"
++              textAlign="center"
++              selectTextOnFocus
++              maxLength={6}
++            />
++
++            <TouchableOpacity
++              testID="transfer-quantity-plus"
++              style={styles.stepBtn}
++              onPress={() => apply(value + 1)}
++              disabled={value >= upper}
++            >
++              <Text style={[styles.stepBtnText, value >= upper && styles.stepBtnTextDisabled]}>+</Text>
++            </TouchableOpacity>
++          </View>
++
++          {upper > 1 && (
++            <View
++              testID="transfer-quantity-slider"
++              style={styles.sliderTrack}
++              onLayout={(event) => setTrackWidth(event?.nativeEvent?.layout?.width || 0)}
++              onStartShouldSetResponder={() => true}
++              onMoveShouldSetResponder={() => true}
++              onResponderGrant={(event) => updateFromX(event?.nativeEvent?.locationX ?? 0)}
++              onResponderMove={(event) => updateFromX(event?.nativeEvent?.locationX ?? 0)}
++            >
++              <View style={[styles.sliderFill, { width: `${pct}%` }]} />
++              <View style={[styles.sliderKnob, { left: `${pct}%` }]} />
++            </View>
++          )}
++
++          {Boolean(totalLine) && <Text style={styles.total}>{totalLine}</Text>}
++
++          <View style={styles.buttonsRow}>
++            <TouchableOpacity
++              testID="transfer-quantity-cancel"
++              style={styles.cancelBtn}
++              onPress={onCancel}
++            >
++              <Text style={styles.cancelText}>{t('player.quantityCancel')}</Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              testID="transfer-quantity-confirm"
++              style={styles.confirmBtn}
++              onPress={() => onConfirm?.(value)}
++            >
++              <Text style={styles.confirmText}>{t('player.quantityConfirm')}</Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++const styles = {
++  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++  dialog: {
++    backgroundColor: '#1f1f1f',
++    borderRadius: 6,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 20,
++    paddingVertical: 18,
++    width: '100%',
++    maxWidth: 360,
++  },
++  title: { color: '#f0e68c', fontSize: 16, fontWeight: '700', marginBottom: 8 },
++  item: { color: '#f0f0f0', fontSize: 14, fontWeight: '600', lineHeight: 19 },
++  meta: { color: '#a3a3a3', fontSize: 12, marginTop: 3, marginBottom: 14 },
++  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
++  stepBtn: {
++    width: 44,
++    height: 44,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: '#2b2b2b',
++  },
++  stepBtnPlaceholder: { width: 44, height: 44 },
++  stepBtnText: { color: '#f0e68c', fontSize: 20, fontWeight: '700', lineHeight: 22 },
++  stepBtnTextDisabled: { color: '#6b6b6b' },
++  valueCell: {
++    minWidth: 92,
++    height: 44,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    backgroundColor: '#141414',
++    color: '#f0f0f0',
++    fontSize: 20,
++    fontWeight: '700',
++    paddingHorizontal: 10,
++  },
++  sliderTrack: {
++    height: 28,
++    marginTop: 16,
++    borderRadius: 14,
++    backgroundColor: '#2b2b2b',
++    borderWidth: 1,
++    borderColor: '#4a4a4a',
++    justifyContent: 'center',
++    overflow: 'hidden',
++  },
++  sliderFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: '#4a4526' },
++  sliderKnob: {
++    position: 'absolute',
++    width: 18,
++    height: 18,
++    borderRadius: 9,
++    marginLeft: -9,
++    backgroundColor: '#f0e68c',
++  },
++  total: { color: '#a3a3a3', fontSize: 12, marginTop: 12 },
++  buttonsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
++  cancelBtn: {
++    paddingHorizontal: 16,
++    paddingVertical: 10,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: '#6b6b6b',
++  },
++  cancelText: { color: '#d4d4d4', fontSize: 13, fontWeight: '600' },
++  confirmBtn: {
++    paddingHorizontal: 18,
++    paddingVertical: 10,
++    borderRadius: 6,
++    backgroundColor: '#f0e68c',
++  },
++  confirmText: { color: '#1a1a1a', fontSize: 13, fontWeight: '700' },
++};
+diff --git a/components/lootTrade/tradeOverlayStyles.js b/components/lootTrade/tradeOverlayStyles.js
+index cf59e1d..643a667 100644
+--- a/components/lootTrade/tradeOverlayStyles.js
++++ b/components/lootTrade/tradeOverlayStyles.js
+@@ -404,6 +404,17 @@ export const tradeOverlayStyles = StyleSheet.create({
+     fontWeight: '700',
+     marginTop: 3,
+   },
++  // 561: количество — бейджем справа, а не частью названия.
++  rowQtyBadge: {
++    paddingHorizontal: 8,
++    paddingVertical: 3,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#4a4a4a',
++    backgroundColor: '#1b1b1b',
++    marginLeft: 10,
++  },
++  rowQtyBadgeText: { color: '#d4af37', fontSize: 12, fontWeight: '700' },
+   tradeRowBtns: {
+     flexDirection: 'row',
+     gap: 6,
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 17b36ab..5484703 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,31 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (561) — «сколько переместить?» в складе и у торговца
++
++Слово владельца: «Не просто "сколько", а как я и говорил — значение +, "−"
++появляется при количестве предметов отданных более 1х». «Торговец и склад
++работают по одному дизайну. Править их раздельно бессмысленно».
++
++- **Компонент.** `components/lootTrade/TransferQuantityModal.js` — заголовок,
++  предмет, направление + «доступно N», ячейка числа, `+` всегда, `−` при
++  значении > 1 (место зарезервировано плейсхолдером), кастомный ползунок
++  (responder на треке), «Подтвердить» / «Отмена». Ввод зажимается в 1…upper,
++  пустая строка допустима только во время набора. `renderTotal(qty)` — итог по
++  деньгам у торговца.
++- **Склад.** `PartyStorageModal`: `quantityModal` state; долгое нажатие на
++  строку «к складу»/«к себе» открывает окно; подтверждение кладёт выбранное в
++  буфер (`addGive` / `addTake`). Построчные кнопки удалены, количество —
++  бейдж `localStyles.rowQtyBadge`, название `numberOfLines={2}`.
++- **Торговец.** `PlayerLootTradeOverlay`: то же окно для покупки (`kind: 'buy'`)
++  и продажи (`kind: 'sell'`), итог считается от `unitPrice`. Построчные
++  `miniMoveBtn` убраны, бейдж `styles.rowQtyBadge` из `tradeOverlayStyles`.
++- **Не тронуто.** Буфер и нижние кнопки («Перенести» / «Купить» / «Продать»),
++  ключи и вкладки склада (557), протокол комнаты.
++- **Тесты.** Новый `transfer-quantity-561` (10 проверок); в
++  `storage-trader-parity-556` «Всё» заменено на долгое нажатие + окно количества,
++  в моках react-native добавлен `TextInput`.
++- **Отсечка.** `patchs/baseline.json` → 561; 535/532 — 561/5/10, roadmap `**561**`.
++
+ ## 2026-11-07 (560) — каждый персонаж видит свою трансляцию
+ 
+ Слово владельца (после 559, где я откатил трансляцию целиком): «Трансляция
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ac0c167..deb4654 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,31 @@
+ # Changelog
+ ---
+ 
++## "How many to move?" in storage and at the trader (patch 561)
++
++The owner's words: "a tap transfers the item… a modal opens on top: how many to
++move? Then a cell with the number. Below it a slider… and two buttons, confirm and
++cancel". And: "the minus appears once the given amount is more than 1". And:
++"trader and storage work by one design".
++
++- **One design for two windows.** The quantity window is one shared component,
++  `TransferQuantityModal`, identical in storage and at the trader.
++- **Tap and long press.** A tap puts one piece into the buffer (as before), a long
++  press opens the quantity window and buffers the chosen amount.
++- **The window.** Title "How many to move?", then the item, the direction and
++  "available N", the number cell, "+" always, "−" only once the value is above 1
++  (its slot is reserved), a slider below, then Confirm / Cancel. The field never
++  shows an invalid number and stays within 1…remaining.
++- **Money.** At the trader the window shows the total for the chosen amount.
++- **The buffer stays.** The final exchange is the bottom button — nothing is
++  written before it.
++- **A cleaner row.** Per-row buttons are gone, the name took their space and wraps
++  to two lines, the quantity became a `×N` badge.
++- **Acceptance.** New `transfer-quantity-561` (10 checks) plus rewritten storage
++  checks in 556.
++
++---
++
+ ## Every character sees its own transmission (patch 560)
+ 
+ The owner's words: "a transmission is only available to the character you are
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 45605c8..479bccf 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,32 @@
+ 
+ ---
+ 
++## «Сколько переместить?» в складе и у торговца (патч 561)
++
++Слово владельца: «тап по назначению… автоматически переносит предмет… откроется
++модалка поверх: сколько переместить? А ниже ячейка с числом. Ещё ниже ползунок…
++Ниже 2 кнопки "подтвердить" "отмена"». Уточнение: «"−" появляется при количестве
++отданных более 1х». И: «Торговец и склад работают по одному дизайну».
++
++- **Один дизайн на два окна.** Окно количества — общий компонент
++  `TransferQuantityModal`, одинаковый в складе и у торговца.
++- **Тап и долгое нажатие.** Тап по строке кладёт одну штуку в буфер (как и
++  раньше), долгое нажатие открывает окно количества и кладёт в буфер выбранное.
++- **Окно.** Заголовок «Сколько переместить?», под ним предмет, направление и
++  «доступно N», ячейка с числом, «+» всегда, «−» появляется только когда
++  значение больше 1 (место под неё зарезервировано), ниже ползунок, ниже
++  «Подтвердить» / «Отмена». Поле не показывает недопустимое число и не выходит
++  за 1…остаток.
++- **Деньги.** У торговца в окне считается итог от количества.
++- **Буфер остался.** Окончательный обмен — нижняя кнопка «Перенести» /
++  «Купить» / «Продать»; до неё ничего не списано.
++- **Строка стала чище.** Построчные кнопки «Положить»/«Всё» убраны — название
++  получило их место и переносится на две строки, количество стало бейджем `×N`.
++- **Приёмка.** Новый `transfer-quantity-561` (10 проверок) + переписанные
++  проверки окна склада в 556.
++
++---
++
+ ## Каждый персонаж видит свою трансляцию (патч 560)
+ 
+ Слово владельца: «Трансляция доступна только тому персонажу, за которого вошли.
+diff --git a/docs/design-storage-quantity-561.md b/docs/design-storage-quantity-561.md
+new file mode 100644
+index 0000000..51c7fed
+--- /dev/null
++++ b/docs/design-storage-quantity-561.md
+@@ -0,0 +1,83 @@
++# Дизайн: количество и читаемость в окне склада (патч 561)
++
++Статус: **обсуждение закрыто, код не начат**. Документ фиксирует, что решено
++словами владельца, чтобы следующая сессия не переспрашивала заново.
++
++## Слова владельца
++
++- «А окне общего склада (вероятно и торговца) плохо читаются названия.
++  Лаборотор… вместо лабороторный халат. Есть предложения по улучшению
++  читаемости? Сначала обсуждение и имей ввиду хороший тон построения ui. А не
++  сделать ради закрытия задачи».
++- «Как насчёт такого подхода: тап по назначению или клик автоматически переносят
++  предмет. Если предметов больше 4, то откроется ещё модалка поверх…»
++- «Я думал о том, что перемещается 1 шт, скажем так 5 раз тапнуть ок, а если 100?
++  2 тоже не сложно. Как вариант на мобильном модалку с количеством повесить на
++  долгий тап, а в ПК (если будет) на правую кнопку мыши?»
++- «Приблизительно то же самое. Кликнуть 5 раз не беда, а вот сотню уже сложно».
++- «Так хоть короткий, хоть долгий переносит вещь/вещи в буфер. Серый курсив
++  остаётся. Кнопки сброс и переместить/продать никуда не деваются. Они служат для
++  окончательного обмена/списания одним списком».
++- Панели на узком экране: «Оставить вкладки». На его устройствах по-разному:
++  телефон — вкладки, компьютер — обе панели.
++
++## Итоговая модель
++
++| Действие | Что происходит |
++| --- | --- |
++| Тап по строке | +1 шт в буфер |
++| Долгое нажатие (телефон) / правый клик (веб) | модалка «Сколько переместить?» → +N в буфер |
++| Строка буфера | `−1` и `✕` (как в 556) |
++| «Очистить» / «Перенести» («Купить» / «Продать») | окончательный обмен всем списком |
++
++Отдельной отмены нет: **буфер и есть отмена** — до «Перенести» ничего не
++списано. Порог «>4» отменён: количество спрашивается только по явному жесту.
++
++## Что это даёт читаемости
++
++Построчные кнопки «Положить» / «Положить всё» убираются (их заменяют тап и долгое
++нажатие) — это возвращает названию ~230 px. Строка становится:
++
++```
++[иконка 18px] Лабораторный халат                  ×2
++              Калиброванный · Дульный тормоз…   (только у модифицированного)
++```
++
++- Имя: 14 px, вес 600, `lineHeight: 19`, до 2 строк.
++- Моды: 12 px, `#a8a8a8`, порядок слотов фиксированный, разделитель «·».
++- `×N` — бейдж, не часть имени.
++- `minWidth: 0` на флекс-контейнере (веб-баг из 436).
++- `minHeight: 44` — палец попадает.
++
++Измерено по каталогу (1400 предметов): «Лабораторный халат» — 17 символов;
++худшие случаи — модифицированное оружие: трубчатый болтовой 177 символов,
++лазерный пистолет 174, штурмовая винтовка 164; книги/журналы до 87.
++
++## Модалка количества
++
++Заголовок «Сколько переместить?», подзаголовок «Лабораторный халат · склад →
++инвентарь · доступно 12». Поле числа крупное и редактируемое, `−` / `+` /
++«макс», ниже ползунок, синхронный с полем. Кнопки «Подтвердить» (золотая) и
++«Отмена». Enter подтверждает, Esc отменяет, поле в фокусе. Кламп 1…остаток;
++если остаток 1 — модалка не открывается. У торговца в модалке дополнительно
++`цена × кол-во = итог` и остаток крышек.
++
++## Осталось решить перед кодом (рекомендации)
++
++1. **Карточка предмета с полным именем** — отдельным патчем 562: на строке уже
++   два жеста (тап и долгое), третий конфликтует. Пока полное имя видно в
++   модалках покупки/продажи и в превью добавления.
++2. **«Сколько?» в строках буфера** — пока достаточно `−1` и `✕`.
++3. **Объём 561** — только окно склада; торговец следующим патчем тем же
++   механизмом.
++
++## Приёмка 561
++
++- Тап по строке добавляет ровно 1; долгое нажатие открывает модалку.
++- Модалка: кламп 1…остаток, «макс», ползунок синхронен с полем, Enter/Esc.
++- В буфере количество правится `−1` и `✕`, «Очистить» сбрасывает всё.
++- «Перенести» отправляет ровно то, что в буфере, атомарно.
++- На ширине 360 px «Лабораторный халат» виден целиком.
++- Модифицированное оружие: базовое имя в первой строке, моды токенами во второй.
++- Вкладки на < 680 остаются; на ≥ 680 обе панели рядом.
++- Ключи и вкладки склада (557) не затронуты.
+diff --git a/docs/patch-561-install.md b/docs/patch-561-install.md
+new file mode 100644
+index 0000000..c641d76
+--- /dev/null
++++ b/docs/patch-561-install.md
+@@ -0,0 +1,58 @@
++# Установка патча 561: «Сколько переместить?» в складе и у торговца
++
++Патч подготовлен от состояния **версии 560**. Файл установки:
++`patchs/561-transfer-quantity.patch`.
++
++> **Слова владельца:** «тап по назначению или клик автоматически переносят
++> предмет… откроется модалка поверх: сколько переместить? А ниже ячейка с
++> числом. Ещё ниже ползунок… Ниже 2 кнопки "подтвердить" "отмена"».
++> «"−" появляется при количестве предметов отданных более 1х».
++> «Торговец и склад работают по одному дизайну. Править их раздельно
++> бессмысленно».
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/lootTrade/TransferQuantityModal.js` | **новый.** Одно окно на склад и торговца: заголовок «Сколько переместить?», предмет, направление и «доступно N», ячейка с числом, `+` всегда, `−` только при значении больше 1 (место под неё зарезервировано), ползунок, «Подтвердить» / «Отмена». Ввод зажимается в 1…остаток |
++| `components/lootTrade/PartyStorageModal.js` | долгое нажатие на строку открывает окно количества и кладёт выбранное в буфер; построчные кнопки «Положить»/«Все»/«Забрать» убраны; название до двух строк, количество — бейджем `×N` |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | то же окно у торговца для покупки и продажи; итог считается от цены; построчные кнопки убраны, количество бейджем |
++| `components/lootTrade/tradeOverlayStyles.js` | стили бейджа количества |
++| `i18n/ru-RU|en-EN/screens/lootTrade/screen.json` | подписи окна: заголовок, «доступно», «Подтвердить», «Отмена», «Итого» |
++| `__tests__/room/transfer-quantity-561.test.js` | **новая приёмка** (10 проверок) |
++| `__tests__/room/storage-trader-parity-556.test.js` | «Всё» заменено на долгое нажатие + окно количества; в мок react-native добавлен `TextInput` |
++| `__tests__/lootTrade/party-storage-modal-507.test.js`, `__tests__/room/storage-pane-tabs-557.test.js` | в моки добавлен `TextInput` |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 561 / `baseline` 561 / roadmap `**561**` |
++| `patchs/baseline.json`, `public/version.json` | отсечка и версия 561 |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md`, `docs/design-storage-quantity-561.md` | записи патча, тезис 49, документ обсуждения |
++
++## Как это работает
++
++1. Тап по строке — одна штука уходит в буфер (как раньше).
++2. Долгое нажатие — окно «Сколько переместить?»: ячейка с числом, `+`, `−`
++   появляется с двойки, ползунок, «Подтвердить» / «Отмена».
++3. Выбранное количество добавляется в буфер; в буфере по-прежнему `−1` и `✕`.
++4. Окончательный обмен — нижняя кнопка «Перенести» (у торговца «Купить» /
++   «Продать»). До неё ничего не списано.
++5. У торговца в окне видно итог по деньгам от выбранного количества.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 561
++```
++
++После установки: `git add -A && git commit -m "Патч 561"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/transfer-quantity-561.test.js \
++  __tests__/room/storage-trader-parity-556.test.js \
++  __tests__/room/storage-pane-tabs-557.test.js \
++  __tests__/lootTrade/party-storage-modal-507.test.js
++npm run typecheck
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 459d6ac..2c79405 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **560**.
++Дата ревизии: 2026-11-07. Текущая версия: **561**.
+ 
+ ## Тезисы
+ 
+@@ -68,6 +68,16 @@
+ 
+ | 48 | **Каждый персонаж видит свою трансляцию.** Трансляция (локация, торговец, терминал) доступна только тому персонажу, за которого вошли: два персонажа в двух комнатах видят каждый свою, пока не войдёшь другим — не увидишь. Стиль плашки и окна не менялся. Синяя иконка сервера в списке — общий сигнал: и присланный эффект, и новая трансляция этого персонажа; просмотр своей трансляции гасит сигнал | ✅ сделано | **560** |
+ 
++| 49 | **«Сколько переместить?» в складе и у торговца.** Один дизайн на оба окна: тап по строке кладёт одну штуку в буфер, долгое нажатие открывает окно количества — ячейка с числом, «+» всегда, «−» появляется только когда значение больше 1, ниже ползунок, ниже «Подтвердить» / «Отмена». Значение уходит в буфер, окончательный обмен делает нижняя кнопка. Построчные кнопки убраны — название получило их место, количество стало бейджем | ✅ сделано | **561** |
++
++## Осталось после патча 561
++
++Патч 561 убрал построчные кнопки «Положить»/«Всё» в складе и у торговца: тап
++кладёт одну штуку в буфер, долгое нажатие спрашивает количество. Название стало
++длиннее, количество — бейджем. Следующий шаг по слову владельца — раздел
++локаций и сундуков в пространстве Мастера; объём и место раздела ещё не
++подтверждены.
++
+ ## Осталось после патча 560
+ 
+ Патч 560 собрал два требования владельца вместе: стиль трансляции не менялся,
+@@ -411,6 +421,8 @@
+ - `docs/patch-558-install.md` — сообщения Мастера приходят лично персонажу (558).
+ - `docs/patch-559-install.md` — трансляция как раньше, эффекты окном при входе (559).
+ - `docs/patch-560-install.md` — трансляция личная для персонажа, сигнал — синяя иконка (560).
++- `docs/patch-561-install.md` — «сколько переместить?» в складе и у торговца (561).
++- `docs/design-storage-quantity-561.md` — обсуждение количества и читаемости строк (561).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 35d47e6..b8f07a4 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -327,7 +327,13 @@
+     "hackContainerHint": "Hacking unlocks the contents",
+     "gateAnd": "and",
+     "exitToLocation": "Exit → {name}",
+-    "passageBlocked": "Passage blocked"
++    "passageBlocked": "Passage blocked",
++    "quantityTitle": "How many to move?",
++    "quantityAvailable": "available {count}",
++    "quantityConfirm": "Confirm",
++    "quantityCancel": "Cancel",
++    "quantityTotal": "Total: {total}",
++    "quantityLeft": "{caps} left"
+   },
+   "keyItems": {
+     "title": "Keys and notes",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index ef1db7f..c221ef8 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -328,7 +328,13 @@
+     "hackContainerHint": "Взлом откроет содержимое",
+     "gateAnd": "и",
+     "exitToLocation": "Выход → {name}",
+-    "passageBlocked": "Проход заблокирован"
++    "passageBlocked": "Проход заблокирован",
++    "quantityTitle": "Сколько переместить?",
++    "quantityAvailable": "доступно {count}",
++    "quantityConfirm": "Подтвердить",
++    "quantityCancel": "Отмена",
++    "quantityTotal": "Итого: {total}",
++    "quantityLeft": "останется {caps}"
+   },
+   "keyItems": {
+     "title": "Ключи и записки",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 325b1b4..70ff1fe 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "560"
++  "baseline": "561"
+ }
+diff --git a/public/version.json b/public/version.json
+index 20b46c2..2cb17ad 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "560",
++  "version": "561",
+   "release": 5,
+   "notes": {
+     "ru-RU": [

@@ -1,0 +1,973 @@
+diff --git a/__tests__/lootTrade/item-name-parts-562.test.js b/__tests__/lootTrade/item-name-parts-562.test.js
+new file mode 100644
+index 0000000..da3bd8a
+--- /dev/null
++++ b/__tests__/lootTrade/item-name-parts-562.test.js
+@@ -0,0 +1,161 @@
++// __tests__/lootTrade/item-name-parts-562.test.js
++// Патч 562: «Длинные названия должны читаться целиком. Обрати внимание на
++// базовые имена из 2х слов, по типу боевой карабин, двуствольный дробовик и т.п».
++//
++// Проверяем не косметику, а контракт разбора имени:
++//   • базовое имя из двух слов остаётся целым;
++//   • качества и переименование прикладом не теряются;
++//   • инвариант «title + mods = исходное имя, слово в слово» на ВСЁМ каталоге
++//     оружия (включая максимально обвешанные стволы — их владелец и имел в виду);
++//   • оба окна (склад и торговец) рисуют имя одной разметкой и ничего не режут.
++import { describe, it, expect } from 'vitest';
++import fs from 'fs';
++import path from 'path';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { enrichWeaponItem } from '../../domain/enrichItem';
++import { getItemNameParts, buildModsIndex, formatItemNameLine } from '../../domain/itemNameParts';
++
++const read = (rel) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
++const qualityName = (catalog, id) => (catalog.qualities || []).find((q) => q.id === id)?.name || '';
++
++// Максимально обвешанный предмет: по одному моду в каждый слот, плюс качество.
++const maxModded = (catalog, weaponId, { qualities = 1 } = {}) => {
++  const weapon = catalog.weapons.find((w) => w.id === weaponId);
++  const slots = {};
++  for (const mod of catalog.weaponMods || []) {
++    if (!(mod.applies_to_ids || []).includes(weaponId)) continue;
++    if (mod.slot && !slots[mod.slot]) slots[mod.slot] = mod.id;
++  }
++  const uniqQualities = (weapon.qualities || []).map((q) => q.qualityId).slice(0, qualities);
++  const enriched = enrichWeaponItem(
++    { weaponId, appliedMods: slots, uniqQualities },
++    catalog,
++    { qualityNameById: (id) => qualityName(catalog, id) },
++  );
++  return { weapon, enriched, parts: getItemNameParts(enriched, buildModsIndex(catalog)) };
++};
++
++describe('562 — имя предмета читается целиком', () => {
++  const catalog = getEquipmentCatalog();
++  const modsIndex = buildModsIndex(catalog);
++
++  it('базовое имя из двух слов не разрезается', () => {
++    for (const id of ['weapon_combat_rifle', 'weapon_double_barrel_shotgun', 'weapon_pipe_bolt_action']) {
++      const { weapon, parts } = maxModded(catalog, id);
++      expect(parts.mods.length).toBeGreaterThan(0);
++      expect(parts.title).toContain(weapon.name);
++      expect(parts.title.split(/\s+/)).toEqual(expect.arrayContaining(weapon.name.split(/\s+/)));
++    }
++  });
++
++  it('качество и переименование прикладом остаются в имени', () => {
++    // Laser Pistol + приклад = Laser Rifle, качество «Close Quarters» — оба слова
++    // обязаны остаться в заголовке: раньше брали baseWeaponName и теряли их.
++    const { weapon, parts } = maxModded(catalog, 'weapon_laser_gun');
++    const renamed = weapon.stockNames?.with;
++    expect(renamed).toBeTruthy();
++    expect(parts.title).toContain(renamed);
++    expect(parts.title).not.toContain(weapon.name); // имя ДО приклада не врёт
++    const quality = qualityName(catalog, weapon.qualities[0].qualityId);
++    expect(quality).toBeTruthy();
++    expect(parts.title).toContain(quality);
++  });
++
++  it('инвариант: ни одного слова не теряется (весь каталог оружия)', () => {
++    const words = (s) => String(s).split(/\s+/).filter(Boolean);
++    let checked = 0;
++    for (const weapon of catalog.weapons) {
++      const hasMods = (catalog.weaponMods || []).some((m) => (m.applies_to_ids || []).includes(weapon.id));
++      if (!hasMods) continue;
++      const { enriched, parts } = maxModded(catalog, weapon.id);
++      checked += 1;
++      const shown = new Set(words([parts.title, ...parts.mods].join(' ')));
++      // 1. Заголовок не выдумывает слов: всё, что в нём есть, есть в имени.
++      const source = new Set(words(enriched.name));
++      for (const word of words(parts.title)) {
++        expect(source.has(word), `${weapon.id}: лишнее слово «${word}» в заголовке`).toBe(true);
++      }
++      // 2. Ни одно слово имени не пропало — ни в заголовке, ни в строке модов.
++      for (const word of source) {
++        expect(shown.has(word), `${weapon.id}: потеряно слово «${word}»`).toBe(true);
++      }
++      // 3. Заголовок по-прежнему содержит базовое имя (или переименованное
++      //    прикладом) целиком — это и есть «читается целиком».
++      const expectedBase = weapon.stockNames?.with || weapon.name;
++      expect(parts.title).toContain(expectedBase);
++    }
++    expect(checked).toBeGreaterThan(80);
++  });
++
++  it('максимально обвешанный ствол делится на короткий заголовок и строку модов', () => {
++    const { enriched, parts } = maxModded(catalog, 'weapon_pipe_bolt_action');
++    expect(parts.mods.length).toBeGreaterThanOrEqual(6);
++    // Заголовок — качества + базовое имя, а не вся склейка.
++    expect(parts.title.length).toBeLessThan(enriched.name.length / 2);
++    // Строка модов — полные имена, каждое читается отдельно.
++    expect(parts.mods.every((name) => name.length > 1)).toBe(true);
++    expect(formatItemNameLine(parts)).toContain(parts.title);
++  });
++
++  it('префиксы снимаются в порядке склейки, а не по длине', () => {
++    // Реальные данные: у мода есть короткий prefix («Long») и читаемое name
++    // («Long Barrel»). Склеивается prefix. Снимаем ровно его, а показываем name.
++    const index = {
++      m_scope: { name: 'Long Night Vision Scope', token: 'Long Night Vision Scope' },
++      m_long: { name: 'Long Barrel', token: 'Long' },
++    };
++    const item = {
++      name: 'Long Night Vision Scope Long Pipe Pistol',
++      appliedMods: { Barrel: 'm_scope', Muzzle: 'm_long' },
++    };
++    const parts = getItemNameParts(item, index);
++    expect(parts.title).toBe('Pipe Pistol');
++    expect(parts.mods).toEqual(['Long Night Vision Scope', 'Long Barrel']);
++  });
++
++  it('без модов имя показывается целиком, а непустых частей не выдумываем', () => {
++    const plain = { name: 'Лабораторный халат', itemType: 'clothing' };
++    expect(getItemNameParts(plain, modsIndex)).toEqual({ title: 'Лабораторный халат', mods: [] });
++    // Мод, которого нет в каталоге, — имя не трогаем (не режем вслепую).
++    const unknown = { name: 'Странный ствол', appliedMods: { Barrel: 'mod_нет_такого' } };
++    expect(getItemNameParts(unknown, modsIndex)).toEqual({ title: 'Странный ствол', mods: [] });
++    // Пустой предмет не должен ронять рендер.
++    expect(getItemNameParts(null, modsIndex)).toEqual({ title: '', mods: [] });
++  });
++
++  it('одинаковые имена разных слотов не дублируются в строке модов', () => {
++    const duo = {
++      name: 'Beam Focuser Beam Focuser Pipe Pistol',
++      appliedMods: { Barrel: 'mod_same', Muzzle: 'mod_same_2' },
++    };
++    const index = {
++      mod_same: { name: 'Beam Focuser', token: 'Beam Focuser' },
++      mod_same_2: { name: 'Beam Focuser', token: 'Beam Focuser' },
++    };
++    expect(getItemNameParts(duo, index).mods).toEqual(['Beam Focuser']);
++  });
++
++  it('склад и торговец рисуют имя одной разметкой и ничего не режут', () => {
++    const lines = read('components/lootTrade/ItemNameLines.js');
++    expect(lines).not.toContain('numberOfLines');
++    expect(lines).toContain('tradeRowName');
++    expect(lines).toContain('tradeRowMods');
++
++    const storage = read('components/lootTrade/PartyStorageModal.js');
++    const overlay = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    for (const src of [storage, overlay]) {
++      expect(src).toContain("from './ItemNameLines'");
++      expect(src).not.toMatch(/tradeRowName[\s\S]{0,120}numberOfLines/);
++    }
++    // Склад: выдача, приём и панель Мастера. Торговец: продажа, покупка, лут.
++    expect(storage.match(/<ItemNameLines/g)).toHaveLength(3);
++    expect(overlay.match(/<ItemNameLines/g)).toHaveLength(3);
++  });
++
++  it('стили имени: моды отдельной серой строкой, флекс сжимается', () => {
++    const styles = read('components/lootTrade/tradeOverlayStyles.js');
++    expect(styles).toContain('tradeRowMods:');
++    expect(styles).toMatch(/tradeRowInfo:\s*\{[^}]*minWidth: 0/);
++    expect(styles).toMatch(/lootRowInfo:\s*\{[^}]*minWidth: 0/);
++  });
++});
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+index 4c7c753..cde0361 100644
+--- a/__tests__/lootTrade/party-storage-modal-507.test.js
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -19,7 +19,12 @@ vi.mock('react-native', () => {
+     TextInput: mk('TextInput'),
+   };
+ });
+-vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
++// 562: строки берут имена модов из каталога, ему нужен getCurrentModuleLocale.
++vi.mock('../../i18n/locale', () => ({
++  useLocale: () => {},
++  getCurrentLocale: () => 'ru-RU',
++  getCurrentModuleLocale: () => 'ru-RU',
++}));
+ vi.mock('@expo/vector-icons', () => ({
+   MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', props),
+ }));
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 3216117..fff3ed7 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('561');
++    expect(version.version).toBe('562');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('561');
++    expect(json('patchs/baseline.json').baseline).toBe('562');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **561**');
++    expect(roadmap).toContain('Текущая версия: **562**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index a8428a4..1335ca8 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('561');
++    expect(version.version).toBe('562');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('561');
++    expect(json('patchs/baseline.json').baseline).toBe('562');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **561**');
++    expect(roadmap).toContain('Текущая версия: **562**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/transfer-quantity-561.test.js b/__tests__/room/transfer-quantity-561.test.js
+index a7872d7..411e581 100644
+--- a/__tests__/room/transfer-quantity-561.test.js
++++ b/__tests__/room/transfer-quantity-561.test.js
+@@ -170,9 +170,11 @@ describe('Патч 561: склад и торговец по одному диз
+     expect(trader).toContain('styles.rowQtyBadge');
+   });
+ 
+-  it('строка: количество бейджем, название до двух строк', () => {
++  it('строка: количество бейджем, название без обрезки (562)', () => {
+     const storage = read('components/lootTrade/PartyStorageModal.js');
+-    expect(storage).toContain('numberOfLines={2}');
++    // 562: имя рисует общий ItemNameLines (заголовок + строка модов), обрезки нет.
++    expect(storage).not.toContain('tradeRowName} numberOfLines');
++    expect(storage).toContain('ItemNameLines');
+     const trader = read('components/lootTrade/PlayerLootTradeOverlay.js');
+     expect(trader).toContain('rowQtyBadgeText');
+     const styles = read('components/lootTrade/tradeOverlayStyles.js');
+diff --git a/components/lootTrade/ItemNameLines.js b/components/lootTrade/ItemNameLines.js
+new file mode 100644
+index 0000000..a06d63f
+--- /dev/null
++++ b/components/lootTrade/ItemNameLines.js
+@@ -0,0 +1,36 @@
++// components/lootTrade/ItemNameLines.js
++// Патч 562: имя предмета в списке — ДВЕ читаемые строки, без обрезки.
++//
++//   [иконка] Базовое имя целиком  ← 14px, светлое; переносится, ничего не режем
++//            мод · мод · мод      ← 12px, серое; отдельная строка
++//
++// Одна точка правды для склада и торговца: владелец сказал «Править их
++// раздельно бессмысленно», поэтому и разметка имени одна на оба окна.
++// Разбор имени — в domain/itemNameParts (title + mods = исходное имя).
++import React from 'react';
++import { Text } from 'react-native';
++import { getItemNameParts } from '../../domain/itemNameParts';
++import { getItemIcon } from './itemIcons';
++import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
++
++const ItemNameLines = ({
++  item,
++  modsIndex,
++  suffix = '',
++  showIcon = true,
++  nameStyle = trade.tradeRowName,
++  modsStyle = trade.tradeRowMods,
++}) => {
++  const parts = getItemNameParts(item, modsIndex);
++  const icon = showIcon ? `${getItemIcon(item?.itemType)} ` : '';
++  return (
++    <>
++      <Text style={nameStyle}>{`${icon}${parts.title}${suffix}`}</Text>
++      {parts.mods.length > 0 && (
++        <Text style={modsStyle}>{parts.mods.join(' · ')}</Text>
++      )}
++    </>
++  );
++};
++
++export default ItemNameLines;
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index fe1ee1f..81c9b71 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -49,6 +49,8 @@ import itemStacking from '../../domain/itemStacking.js';
+ import { getItemIcon } from './itemIcons';
+ import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
+ import TransferQuantityModal from './TransferQuantityModal';
++import { buildModsIndex } from '../../domain/itemNameParts';
++import ItemNameLines from './ItemNameLines';
+ 
+ // Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
+ // не обрезаются: моды, заряды, прочность, уникальные качества, id экземпляра и
+@@ -78,6 +80,9 @@ const PartyStorageModal = ({
+   onWithdrawLocal,
+ }) => {
+   useLocale();
++  // 562: имена показываем без обрезки — базовое имя целиком + моды отдельной
++  // строкой. У книг базового имени нет, поэтому идёт полное название.
++  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
+   const { width: windowWidth } = useWindowDimensions();
+   const isWideLayout = windowWidth >= 680;
+   const rooms = useRoomStore((state) => state.rooms);
+@@ -275,7 +280,7 @@ const PartyStorageModal = ({
+                 style={trade.bufferRow}
+                 onPress={() => addTake(entryById(entryId), -1)}
+               >
+-                <Text style={trade.bufferItalicText} numberOfLines={1}>
++                <Text style={trade.bufferItalicText}>
+                   {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
+                 </Text>
+                 <TouchableOpacity
+@@ -312,9 +317,7 @@ const PartyStorageModal = ({
+                 delayLongPress={400}
+               >
+                 <View style={trade.tradeRowInfo}>
+-                  <Text style={trade.tradeRowName} numberOfLines={2}>
+-                    {`${getItemIcon(item.itemType)} ${item.name}`}
+-                  </Text>
++                  <ItemNameLines item={item} modsIndex={modsIndex} />
+                 </View>
+                 <View style={localStyles.rowQtyBadge}>
+                   <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
+@@ -385,7 +388,7 @@ const PartyStorageModal = ({
+                 addGive(item, -1);
+               }}
+             >
+-              <Text style={trade.bufferItalicText} numberOfLines={1}>
++              <Text style={trade.bufferItalicText}>
+                 {`+ ${nameOfBufferedItem(id)} ×${qty}`}
+               </Text>
+               <TouchableOpacity
+@@ -422,9 +425,7 @@ const PartyStorageModal = ({
+               delayLongPress={400}
+             >
+               <View style={trade.tradeRowInfo}>
+-                <Text style={trade.tradeRowName} numberOfLines={2}>
+-                  {`${getItemIcon(entry.itemType)} ${entry.name}`}
+-                </Text>
++                <ItemNameLines item={entry} modsIndex={modsIndex} />
+               </View>
+               <View style={localStyles.rowQtyBadge}>
+                 <Text style={localStyles.rowQtyText}>{`×${remaining}`}</Text>
+@@ -604,9 +605,7 @@ const PartyStorageModal = ({
+                     style={trade.tradeRow}
+                   >
+                     <View style={trade.tradeRowInfo}>
+-                      <Text style={trade.tradeRowName} numberOfLines={1}>
+-                        {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
+-                      </Text>
++                      <ItemNameLines item={entry} modsIndex={modsIndex} />
+                     </View>
+                   </View>
+                 ))
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index c0abc80..5838f28 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -12,7 +12,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
+ import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
+ import TransferQuantityModal from './TransferQuantityModal';
+-import { getItemIcon } from './itemIcons';
++import { buildModsIndex } from '../../domain/itemNameParts';
++import ItemNameLines from './ItemNameLines';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import * as db from '../../db';
+ import * as savesModule from '../../src/saves/characterSaves';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -109,6 +111,8 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
+   const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
++  // 562: имя без обрезки — базовое имя целиком плюс моды отдельной строкой.
++  const modsIndex = useMemo(() => buildModsIndex(getEquipmentCatalog()), []);
+   const storeItems = useCharacterStore((s) => s.items);
+   const playerCaps = useCharacterStore((s) => s.currency);
+   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
+@@ -1737,11 +1741,18 @@ export default function PlayerLootTradeOverlay() {
+                   return (
+                     <View key={entry.entryId} style={styles.lootRow}>
+                       <View style={styles.lootRowInfo}>
+-                        <IconText style={styles.lootRowTitle}>
+-                          {isCaps
+-                            ? formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })
+-                            : `${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
+-                        </IconText>
++                        {isCaps ? (
++                          <IconText style={styles.lootRowTitle}>
++                            {formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })}
++                          </IconText>
++                        ) : (
++                          <ItemNameLines
++                            item={entry}
++                            modsIndex={modsIndex}
++                            suffix={` ×${entry.quantity}`}
++                            nameStyle={styles.lootRowTitle}
++                          />
++                        )}
+                         {!isCaps && entry.weight > 0 && (
+                           <Text style={styles.lootRowSub}>
+                             {formatLootTrade(tLootTrade('detail.weight'), {
+@@ -1867,9 +1878,7 @@ export default function PlayerLootTradeOverlay() {
+                 delayLongPress={400}
+               >
+                 <View style={styles.tradeRowInfo}>
+-                  <Text style={styles.tradeRowName}>
+-                    {getItemIcon(pItem.itemType)} {pItem.name}{durSuffix} ×{remaining}
+-                  </Text>
++                  <ItemNameLines item={pItem} modsIndex={modsIndex} suffix={durSuffix} />
+                   <IconText style={styles.tradeRowPrice}>
+                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
+                   </IconText>
+@@ -1957,11 +1966,12 @@ export default function PlayerLootTradeOverlay() {
+                   delayLongPress={400}
+                 >
+                   <View style={styles.tradeRowInfo}>
+-                    <Text style={styles.tradeRowName}>
+-                      {getItemIcon(entry.itemType)} {entry.name} ×{remaining}
+-                    </Text>
++                    <ItemNameLines
++                      item={entry.itemSnapshot && entry.itemSnapshot.name ? entry.itemSnapshot : entry}
++                      modsIndex={modsIndex}
++                    />
+                     {Boolean(basics) && (
+-                      <IconText style={styles.tradeRowBasics} numberOfLines={2}>{basics}</IconText>
++                      <IconText style={styles.tradeRowBasics}>{basics}</IconText>
+                     )}
+                     <IconText style={styles.tradeRowPriceBuy}>
+                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}
+diff --git a/components/lootTrade/tradeOverlayStyles.js b/components/lootTrade/tradeOverlayStyles.js
+index 643a667..445377a 100644
+--- a/components/lootTrade/tradeOverlayStyles.js
++++ b/components/lootTrade/tradeOverlayStyles.js
+@@ -185,6 +185,9 @@ export const tradeOverlayStyles = StyleSheet.create({
+   },
+   lootRowInfo: {
+     flex: 1,
++    // 562: та же веб-флекс-ловушка, что в tradeRowInfo — без minWidth: 0
++    // длинное имя выпирает вместо переноса.
++    minWidth: 0,
+     paddingRight: 8,
+   },
+   lootRowTitle: {
+@@ -380,12 +383,23 @@ export const tradeOverlayStyles = StyleSheet.create({
+   },
+   tradeRowInfo: {
+     flex: 1,
++    // 562: без minWidth: 0 веб-флекс не сжимает текст (тот же баг, что в 436),
++    // и длинное название выпирает вместо переноса.
++    minWidth: 0,
+     paddingRight: 10,
+   },
+   tradeRowName: {
+     color: '#f0f0f0',
+-    fontSize: 13,
+-    fontWeight: '700',
++    fontSize: 14,
++    fontWeight: '600',
++    lineHeight: 19,
++  },
++  // 562: моды — отдельной строкой, тоже без обрезки.
++  tradeRowMods: {
++    color: '#a8a8a8',
++    fontSize: 12,
++    lineHeight: 16,
++    marginTop: 2,
+   },
+   tradeRowBasics: {
+     color: '#a8a8a8',
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 5484703..6c13347 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,33 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (562) — длинные названия читаются целиком
++
++Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
++базовые имена из 2х слов, по типу боевой карабин, двуствольный дробовик и т.п».
++
++- **Разбор имени.** `domain/itemNameParts.js` (новый): `buildModsIndex`,
++  `getItemNameParts(item, modsById)` → `{ title, mods }`, `formatItemNameLine`.
++  Из имени предмета снимаются ровно те префиксы модов, которые показываются
++  второй строкой (в порядке склейки, а не по длине: у мода есть короткий
++  `prefix` «Long» и читаемое `name` «Long Barrel»). Остаток — качества,
++  переименование прикладом и базовое имя целиком. Ни одного потерянного слова.
++- **Почему не `baseWeaponName`.** Первая версия брала это поле и врала: у
++  пистолета с прикладом показывала «Laser Pistol» вместо «Laser Rifle», а
++  качества («Unreliable», «Two-Handed», «Close Quarters») пропадали совсем.
++- **Разметка.** `components/lootTrade/ItemNameLines.js` (новый) — одна точка
++  правды для склада и торговца: `tradeRowName` (14px, 600) + `tradeRowMods`
++  (12px, `#a8a8a8`). Пять мест: выдача, приём, панель Мастера, продажа,
++  покупка; шестое — список лута (`lootRowTitle` через `nameStyle`).
++- **Обрезка.** `numberOfLines` убран и с имён, и с буферных курсивных строк, и с
++  `tradeRowBasics` у торговца. `tradeRowInfo` / `lootRowInfo` получили
++  `minWidth: 0` — иначе веб-флекс не сжимает текст (урок 436).
++- **Тесты.** Новый `__tests__/lootTrade/item-name-parts-562.test.js` (9
++  проверок), включая инвариант на всём каталоге: для каждого оружия с модами ни
++  одно слово имени не теряется, в заголовке нет лишних слов, заголовок содержит
++  базовое имя (или переименованное прикладом). `transfer-quantity-561` перестал
++  искать `getItemNameParts` в самом окне склада — имя теперь в `ItemNameLines`.
++- **Отсечка.** `patchs/baseline.json` → 562; 535/532 — 562/5/10, roadmap `**562**`.
++
+ ## 2026-11-07 (561) — «сколько переместить?» в складе и у торговца
+ 
+ Слово владельца: «Не просто "сколько", а как я и говорил — значение +, "−"
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index deb4654..1fdf1c9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,30 @@
+ # Changelog
+ ---
+ 
++## "Long names read in full" (patch 562)
++
++The owner's words: "Long names must read in full. Pay attention to two-word base
++names, like combat rifle, double-barrel shotgun and so on".
++
++- **Where the length comes from.** A weapon's name is glued together from mod
++  prefixes, unique qualities and the base name — for a fully modded gun that is
++  up to 129 characters in one line, which reads badly in a list either way.
++- **Two levels instead of clipping.** On top the title: qualities and the base
++  name in full, including two-word ones ("Combat Rifle", "Double-Barrel
++  Shotgun"), plus a stock rename. Below, the full mod names in grey 12px. No
++  mods — no second line, the name simply wraps.
++- **Parsed from the real name.** Exactly the prefixes shown on the second line
++  are taken off the item's name; everything else stays in the title. No word is
++  lost, and the title never lies: a pistol with a stock reads as the rifle it is.
++- **One layout for both windows.** The new `ItemNameLines` renders the name the
++  same way in storage (give, take, GM pane), at the trader (sell, buy) and in the
++  loot list. `numberOfLines` is gone from every item name.
++- **Acceptance.** New `item-name-parts-562` (9 checks), including an invariant
++  over the whole weapon catalog: not a single lost word, and the title always
++  contains the base name.
++
++---
++
+ ## "How many to move?" in storage and at the trader (patch 561)
+ 
+ The owner's words: "a tap transfers the item… a modal opens on top: how many to
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 479bccf..b31b453 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,32 @@
+ 
+ ---
+ 
++## «Длинные названия читаются целиком» (патч 562)
++
++Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
++базовые имена из 2х слов, по типу боевой карабин, двуствольный дробовик и т.п».
++
++- **Откуда длина.** Имя оружия склеивается из префиксов модов, уникальных
++  качеств и базового имени по правилу владельца
++  «[префиксы][качества][базовое имя]». У полностью обвешанного ствола это до 129
++  знаков одной строкой — в списке такое не читается ни в одну, ни в две строки.
++- **Два уровня вместо обрезки.** Сверху — заголовок: качества и базовое имя
++  целиком, в том числе из двух слов («Боевой карабин», «Двуствольный дробовик»),
++  вместе с переименованием прикладом. Снизу — полные имена установленных модов,
++  серым, 12px. Нет модов — нет второй строки, имя просто переносится.
++- **Разбор по настоящему имени.** Из имени предмета снимаются ровно те префиксы,
++  которые показываются второй строкой; всё остальное остаётся в заголовке.
++  Поэтому ни одно слово не теряется, а заголовок не врёт: у пистолета с
++  прикладом он читается как винтовка, а не как пистолет.
++- **Одна разметка на два окна.** Новый `ItemNameLines` рисует имя одинаково в
++  складе (выдача, приём, панель Мастера), у торговца (продажа, покупка) и в
++  списке лута. `numberOfLines` с имён убран полностью.
++- **Приёмка.** Новый `item-name-parts-562` (9 проверок), включая инвариант на
++  всём каталоге оружия: ни одного потерянного слова, заголовок всегда содержит
++  базовое имя.
++
++---
++
+ ## «Сколько переместить?» в складе и у торговца (патч 561)
+ 
+ Слово владельца: «тап по назначению… автоматически переносит предмет… откроется
+diff --git a/docs/design-item-name-562.md b/docs/design-item-name-562.md
+new file mode 100644
+index 0000000..2fb6a8b
+--- /dev/null
++++ b/docs/design-item-name-562.md
+@@ -0,0 +1,76 @@
++# Обсуждение 562: как читать длинные названия предметов
++
++Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
++базовые имена из 2х слов, по типу боевой карабин, двуствольный дробовик и т.п».
++
++## Что именно ломается
++
++`enrichItem` собирает имя оружия по правилу владельца
++`[префиксы модов][уникальные качества][базовое имя]` в ОДНУ строку. Замеры по
++каталогу (максимально обвешанный ствол, по одному моду в слот):
++
++| Оружие | Знаков в имени | Пример имени |
++| --- | --- | --- |
++| Laser Gun | 129 | `Automatic Barrel Beam Focuser Beam Focuser Beta Wave Tuner Long Night Vision Scope Sharpshooter's Grip Close Quarters Laser Rifle` |
++| Pipe Bolt-Action | 125 | `.38 Receiver Bayonet Finned Full Stock Large Magazine Long Night Vision Scope Sharpshooter's Grip Unreliable Pipe Bolt-Action` |
++| Laser Musket | 123 | `Bayonet Beam Focuser Bracketed Short Barrel Five-Crank Capacitor Full Stock Long Night Vision Scope Two-Handed Laser Musket` |
++| Pipe Revolver | 118 | `.308 Receiver Bayonet Finned Long Night Vision Scope Marksman's Stock Sharpshooter's Grip Close Quarters Pipe Revolver` |
++
++Книги, броня и расходники до 87 знаков, «Лабораторный халат» — 17. То есть
++проблема не в «длинных словах», а в СКЛЕЙКЕ: в одной строке лежат две разные
++сущности — сам предмет и его обвес.
++
++## Варианты и почему выбран последний
++
++1. **Обрезка в две строки (`numberOfLines={2}`).** Так было до 562. Побеждает
++   всегда мод, а имя предмета уезжает за многоточие — то есть ровно то, на что
++   владелец и жалуется. Двухсловные базы («Боевой карабин») страдают первыми:
++   они стоят в конце строки.
++2. **Карточка с полным именем по нажатию.** Отклонено владельцем: непонятно,
++   что за карточка, и лишнее движение ради того, что должно читаться сразу.
++3. **Взять `baseWeaponName` из обогащённого предмета.** Реализовано первым и
++   проверено на каталоге — оказалось враньём в двух местах:
++   - качества терялись совсем: `Unreliable`, `Two-Handed`, `Close Quarters`
++     есть в имени, но не в `baseWeaponName`;
++   - приклад переименовывает ствол (`Laser Pistol` → `Laser Rifle`), а
++     `baseWeaponName` остаётся домиграционным, и строка показывала пистолет для
++     винтовки.
++4. **Разобрать настоящее имя (выбрано).** Из имени снимаются ровно те префиксы,
++   которые мы показываем второй строкой, остаток остаётся заголовком. Плюсы:
++   - инвариант «title + mods = исходное имя» проверяется тестом на всём каталоге;
++   - двухсловная база не разрезается — она просто остаётся;
++   - качества и переименование прикладом остаются в заголовке;
++   - нет модов (книга, броня) — нет второй строки, имя целиком.
++
++## Тонкости, которые пришлось учесть
++
++- **Порядок снятия — порядок склейки, не длина.** У мода есть короткий `prefix`
++  («Long») и читаемое `name` («Long Barrel»); склеивается prefix. Поэтому идём
++  по `appliedMods` в том же порядке, в котором шёл `enrichItem`, и снимаем
++  `prefix`, а показываем `name`. «Сначала самое длинное» ломается: «Long» съест
++  начало «Long Night Vision Scope».
++- **Мод, которого в начале имени нет** (приклад с переименованием, качество),
++  просто пропускается: его слова остаются в заголовке, а не изобретаются.
++- **Одинаковые имена разных слотов** (Barrel и Muzzle «Beam Focuser») читаем
++  один раз — иначе строка модов похожа на ошибку.
++- **Порядок модов на экране** — по слотам (`Receiver → Barrel → … → Stock`),
++  чтобы строки не «прыгали» между предметами.
++
++## Как это выглядит в строке
++
++```
++🔫 Unreliable Pipe Bolt-Action                    ×3
++   .38 Receiver · Finned · Bayonet · Large Magazine ·
++   Long Night Vision Scope · Sharpshooter's Grip · Full Stock
++```
++
++Одна разметка (`components/lootTrade/ItemNameLines.js`) на шесть мест: выдача,
++приём, панель Мастера, продажа, покупка, список лута. Склад и торговец правились
++вместе — «Править их раздельно бессмысленно».
++
++## Что осталось за кадром
++
++- Имена в данных не менялись: `enrichItem` по-прежнему склеивает строку, её
++  читают карточки оружия, и переписывать правило склейки ради списков нельзя.
++- Ключи (`keyName`, одна строка) не трогали: их имена короткие, а вкладка ключей
++  заперта проверками 557/518.
+diff --git a/docs/patch-562-install.md b/docs/patch-562-install.md
+new file mode 100644
+index 0000000..88c7132
+--- /dev/null
++++ b/docs/patch-562-install.md
+@@ -0,0 +1,68 @@
++# Установка патча 562: длинные названия читаются целиком
++
++Патч подготовлен от состояния **версии 561**. Файл установки:
++`patchs/562-item-name-parts.patch`.
++
++> **Слова владельца:** «Длинные названия должны читаться целиком. Обрати
++> внимание на базовые имена из 2х слов, по типу боевой карабин, двуствольный
++> дробовик и т.п».
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `domain/itemNameParts.js` | **новый.** `getItemNameParts(item, modsById)` → `{ title, mods }`: из настоящего имени предмета снимаются префиксы установленных модов (в порядке склейки), остаток — качества, переименование прикладом и базовое имя целиком. `buildModsIndex(catalog)` — индекс «id мода → имя и префикс» |
++| `components/lootTrade/ItemNameLines.js` | **новый.** Одна разметка имени на склад и торговца: заголовок 14px/600 + строка модов 12px серым. Никакого `numberOfLines` |
++| `components/lootTrade/PartyStorageModal.js` | имя в трёх местах (выдача, приём, панель Мастера) рисует `ItemNameLines`; `modsIndex` считается один раз на окно |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | то же у торговца (продажа, покупка) и в списке лута; с `tradeRowBasics` снят `numberOfLines` |
++| `components/lootTrade/tradeOverlayStyles.js` | `tradeRowName` 14px/600, новый `tradeRowMods`, `minWidth: 0` у `tradeRowInfo` и `lootRowInfo` |
++| `__tests__/lootTrade/item-name-parts-562.test.js` | **новая приёмка** (9 проверок), включая инвариант на всём каталоге оружия |
++| `__tests__/room/transfer-quantity-561.test.js` | проверка строки теперь смотрит на `ItemNameLines`, а не на разбор внутри окна склада |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 562 / `baseline` 562 / roadmap `**562**` |
++| `patchs/baseline.json`, `public/version.json` | отсечка и версия 562 |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md`, `docs/design-item-name-562.md` | записи патча, тезис 50, документ обсуждения |
++
++## Как это выглядит
++
++```
++🔫 Unreliable Pipe Bolt-Action
++   .38 Receiver · Finned · Bayonet · Large Magazine ·
++   Long Night Vision Scope · Sharpshooter's Grip · Full Stock
++```
++
++Заголовок — то, что игрок называет предметом (качества + имя целиком, включая
++двухсловные «Боевой карабин» и «Двуствольный дробовик», и переименование
++прикладом). Строка ниже — моды, каждый читается отдельно. Ни одна строка не
++обрезается: она переносится, и строка предмета растёт.
++
++## Что НЕ менялось
++
++- Сами имена в данных и правило склейки `enrichItem` — нетронуты.
++- Количество, буфер и нижние кнопки (561), ключи и вкладки склада (557),
++  протокол комнаты, транзакции.
++- Цены, наценки, касса торговца.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 562
++```
++
++После установки: `git add -A && git commit -m "Патч 562"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/lootTrade/item-name-parts-562.test.js \
++  __tests__/lootTrade/party-storage-modal-507.test.js \
++  __tests__/room/transfer-quantity-561.test.js \
++  __tests__/room/storage-trader-parity-556.test.js
++npm run typecheck
++```
++
++Глазами: открыть склад и торговца, найти оружие с модами — заголовок читается
++целиком, моды идут отдельной серой строкой, многоточий нет; книга или броня
++показываются полным названием без второй строки.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 2c79405..5adf526 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **561**.
++Дата ревизии: 2026-11-07. Текущая версия: **562**.
+ 
+ ## Тезисы
+ 
+@@ -70,6 +70,15 @@
+ 
+ | 49 | **«Сколько переместить?» в складе и у торговца.** Один дизайн на оба окна: тап по строке кладёт одну штуку в буфер, долгое нажатие открывает окно количества — ячейка с числом, «+» всегда, «−» появляется только когда значение больше 1, ниже ползунок, ниже «Подтвердить» / «Отмена». Значение уходит в буфер, окончательный обмен делает нижняя кнопка. Построчные кнопки убраны — название получило их место, количество стало бейджем | ✅ сделано | **561** |
+ 
++| 50 | **Длинные названия читаются целиком.** Строка предмета в складе и у торговца стала двухуровневой: сверху базовое имя целиком — включая двухсловные «Боевой карабин» и «Двуствольный дробовик», вместе с качествами и переименованием прикладом, — снизу полные имена установленных модов серым. Ничего не обрезается: строка переносится, многоточия нет. Разбор идёт по настоящему имени предмета, поэтому ни одно слово не теряется и подпись не врёт | ✅ сделано | **562** |
++
++## Осталось после патча 562
++
++Патч 562 сделал имена в складе, у торговца и в списке лута читаемыми без
++обрезки: базовое имя целиком плюс моды отдельной строкой, разбор — по
++настоящему имени предмета. Следующий шаг по слову владельца — раздел локаций и
++сундуков в пространстве Мастера; объём и место раздела ещё не подтверждены.
++
+ ## Осталось после патча 561
+ 
+ Патч 561 убрал построчные кнопки «Положить»/«Всё» в складе и у торговца: тап
+@@ -422,6 +431,8 @@
+ - `docs/patch-559-install.md` — трансляция как раньше, эффекты окном при входе (559).
+ - `docs/patch-560-install.md` — трансляция личная для персонажа, сигнал — синяя иконка (560).
+ - `docs/patch-561-install.md` — «сколько переместить?» в складе и у торговца (561).
++- `docs/patch-562-install.md` — длинные названия читаются целиком (562).
++- `docs/design-item-name-562.md` — разбор имени предмета: что и почему не режем (562).
+ - `docs/design-storage-quantity-561.md` — обсуждение количества и читаемости строк (561).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+diff --git a/domain/itemNameParts.js b/domain/itemNameParts.js
+new file mode 100644
+index 0000000..6810fa7
+--- /dev/null
++++ b/domain/itemNameParts.js
+@@ -0,0 +1,154 @@
++// domain/itemNameParts.js
++// Патч 562 — «длинные названия должны читаться целиком».
++//
++// Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
++// базовые имена из 2х слов, по типу боевой карабин, двуствольный дробовик и т.п».
++//
++// Откуда длина: `enrichItem` склеивает имя оружия в одну строку по правилу
++// владельца — «[префиксы модов] [качества] [базовое имя]». У полностью
++// обвешанного оружия это до 129 символов, и в списке строка превращается в кашу.
++//
++// Решение — не резать и не додумывать, а РАЗОБРАТЬ то же имя, что видит игрок:
++//   mods  — имена модов, которые стоят В НАЧАЛЕ имени (их и выносим отдельной
++//           строкой);
++//   title  — всё, что осталось, БЕЗ обрезки: уникальные качества («Unreliable»,
++//           «Two-Handed»), переименование прикладом («Laser Pistol» → «Laser
++//           Rifle») и базовое имя целиком, в том числе из двух слов
++//           («Combat Rifle», «Double-Barrel Shotgun»).
++//
++// Почему не «взять baseWeaponName»: это поле — имя ДО модов, оно теряет качества
++// и врёт про приклад (у винтовки с прикладом показывает пистолет). Поэтому
++// единственный надёжный источник — само имя предмета; мы снимаем с него ровно те
++// слова, которые показываем во второй строке, и ничего больше.
++//
++// Инвариант (проверяется тестом): title + mods = исходное имя, слово в слово.
++
++/** Порядок слотов оружия — стабильный, чтобы строки не «прыгали». */
++export const WEAPON_MOD_SLOT_ORDER = Object.freeze([
++  'Receiver',
++  'Barrel',
++  'Muzzle',
++  'Magazine',
++  'Sight',
++  'Grip',
++  'Stock',
++]);
++
++const slotRank = (slot) => {
++  const index = WEAPON_MOD_SLOT_ORDER.indexOf(slot);
++  return index === -1 ? WEAPON_MOD_SLOT_ORDER.length : index;
++};
++
++const text = (value) => String(value ?? '').trim();
++
++/**
++ * Индекс «id мода → как он записан в имени и как его читать» из каталога.
++ * Имя в склейке — это `prefix || name` (правило 382 из enrichItem), а читаем мы
++ * всегда полное `name`: префиксов в данных нет, но контракт сохраняем.
++ *
++ * @param {object} catalog — getEquipmentCatalog()
++ * @returns {Object<string, {name: string, token: string}>}
++ */
++export const buildModsIndex = (catalog) => {
++  const mods = Array.isArray(catalog?.weaponMods) ? catalog.weaponMods : [];
++  const byId = {};
++  for (const mod of mods) {
++    if (!mod?.id) continue;
++    const name = text(mod.name) || text(mod.prefix);
++    const token = text(mod.prefix) || name;
++    if (name) byId[mod.id] = { name, token };
++  }
++  return byId;
++};
++
++/**
++ * Моды предмета: { key, name, token, rank }.
++ *
++ * Порядок — ТОТ ЖЕ, в котором `enrichItem` склеил имя (порядок ключей
++ * appliedMods), иначе снятие префиксов поедет: «Long» съест начало
++ * «Long Night Vision Scope». Порядок слотов (rank) нужен только для показа.
++ *
++ * Ключ — слот + id: два разных слота могут носить моды с одинаковым именем
++ * (Barrel и Muzzle «Beam Focuser»), и это должны быть две записи.
++ */
++const collectMods = (item, modsById) => {
++  const applied = item?.appliedMods && typeof item.appliedMods === 'object' ? item.appliedMods : {};
++  return Object.keys(applied)
++    .filter((slot) => applied[slot])
++    .map((slot) => {
++      const mod = modsById?.[applied[slot]];
++      if (!mod) return null;
++      const name = mod.name || mod.token;
++      return {
++        key: `${slot}:${applied[slot]}`,
++        name,
++        token: mod.token || name,
++        rank: slotRank(slot),
++      };
++    })
++    .filter(Boolean);
++};
++
++/** Одинаковые имена разных слотов («Beam Focuser») читаем один раз. */
++const uniqueNames = (mods) => {
++  const seen = new Set();
++  const out = [];
++  for (const mod of mods) {
++    if (seen.has(mod.name)) continue;
++    seen.add(mod.name);
++    out.push(mod.name);
++  }
++  return out;
++};
++
++/**
++ * Разбирает имя предмета на читаемые части.
++ *
++ * Предмет без модов (книга, броня, расходник) — имя целиком: строка просто
++ * переносится, ничего не отбрасывается.
++ *
++ * @param {object} item — предмет или снимок предмета (name — как его видит игрок)
++ * @param {object} modsById — см. buildModsIndex
++ * @returns {{ title: string, mods: string[] }}
++ */
++export const getItemNameParts = (item, modsById = {}) => {
++  const full = text(item?.name) || text(item?.displayName);
++  if (!full) return { title: '', mods: [] };
++
++  const candidates = collectMods(item, modsById);
++  if (candidates.length === 0) return { title: full, mods: [] };
++
++  // Снимаем префиксы модов с НАЧАЛА имени, в порядке склейки. Мод, которого в
++  // начале нет (приклад с переименованием, качество), просто пропускаем — его
++  // слова остаются в заголовке вместе с базовым именем.
++  const taken = new Set();
++  let rest = full;
++  for (const mod of candidates) {
++    if (rest === mod.token) {
++      taken.add(mod.key);
++      rest = '';
++      continue;
++    }
++    if (rest.startsWith(`${mod.token} `)) {
++      taken.add(mod.key);
++      rest = rest.slice(mod.token.length + 1).trim();
++    }
++  }
++
++  const mods = candidates
++    .filter((mod) => taken.has(mod.key))
++    .sort((a, b) => a.rank - b.rank);
++  if (mods.length === 0) return { title: full, mods: [] };
++
++  // Остаток — качества и базовое имя. Пусто быть не может, но если имя состояло
++  // из одних модов, лучше показать исходное имя, чем пустую строку.
++  const title = rest || full;
++  return { title, mods: uniqueNames(mods) };
++};
++
++/** Совмещённая строка для буферов и подсказок: «Имя · мод · мод». */
++export const formatItemNameLine = ({ title = '', mods = [] } = {}) => (
++  [title, ...(Array.isArray(mods) ? mods : [])].filter(Boolean).join(' · ')
++);
++
++export default getItemNameParts;
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 70ff1fe..2e42001 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "561"
++  "baseline": "562"
+ }
+diff --git a/public/version.json b/public/version.json
+index 2cb17ad..ff4cd13 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "561",
++  "version": "562",
+   "release": 5,
+   "notes": {
+     "ru-RU": [

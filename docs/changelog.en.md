@@ -1,6 +1,55 @@
 # Changelog
 ---
 
+## "Long names read in full" (patch 562)
+
+The owner's words: "Long names must read in full. Pay attention to two-word base
+names, like combat rifle, double-barrel shotgun and so on".
+
+- **Where the length comes from.** A weapon's name is glued together from mod
+  prefixes, unique qualities and the base name — for a fully modded gun that is
+  up to 129 characters in one line, which reads badly in a list either way.
+- **Two levels instead of clipping.** On top the title: qualities and the base
+  name in full, including two-word ones ("Combat Rifle", "Double-Barrel
+  Shotgun"), plus a stock rename. Below, the full mod names in grey 12px. No
+  mods — no second line, the name simply wraps.
+- **Parsed from the real name.** Exactly the prefixes shown on the second line
+  are taken off the item's name; everything else stays in the title. No word is
+  lost, and the title never lies: a pistol with a stock reads as the rifle it is.
+- **One layout for both windows.** The new `ItemNameLines` renders the name the
+  same way in storage (give, take, GM pane), at the trader (sell, buy) and in the
+  loot list. `numberOfLines` is gone from every item name.
+- **Acceptance.** New `item-name-parts-562` (9 checks), including an invariant
+  over the whole weapon catalog: not a single lost word, and the title always
+  contains the base name.
+
+---
+
+## "How many to move?" in storage and at the trader (patch 561)
+
+The owner's words: "a tap transfers the item… a modal opens on top: how many to
+move? Then a cell with the number. Below it a slider… and two buttons, confirm and
+cancel". And: "the minus appears once the given amount is more than 1". And:
+"trader and storage work by one design".
+
+- **One design for two windows.** The quantity window is one shared component,
+  `TransferQuantityModal`, identical in storage and at the trader.
+- **Tap and long press.** A tap puts one piece into the buffer (as before), a long
+  press opens the quantity window and buffers the chosen amount.
+- **The window.** Title "How many to move?", then the item, the direction and
+  "available N", the number cell, "+" always, "−" only once the value is above 1
+  (its slot is reserved), a slider below, then Confirm / Cancel. The field never
+  shows an invalid number and stays within 1…remaining.
+- **Money.** At the trader the window shows the total for the chosen amount.
+- **The buffer stays.** The final exchange is the bottom button — nothing is
+  written before it.
+- **A cleaner row.** Per-row buttons are gone, the name took their space and wraps
+  to two lines, the quantity became a `×N` badge.
+- **Acceptance.** New `transfer-quantity-561` (10 checks) plus rewritten storage
+  checks in 556.
+
+---
+
 ## Every character sees its own transmission (patch 560)
 
 The owner's words: "a transmission is only available to the character you are

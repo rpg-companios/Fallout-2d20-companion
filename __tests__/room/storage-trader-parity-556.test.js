@@ -35,6 +35,7 @@ vi.mock('react-native', () => {
     Text: mk('Text'),
     TouchableOpacity: mk('TouchableOpacity'),
     ScrollView: mk('ScrollView'),
+    TextInput: mk('TextInput'),
   };
 });
 
@@ -166,8 +167,13 @@ describe('556: окно общего хранилища — как у торго
     expect(treeText(renderer)).toContain('к себе: 1');
     expect(treeText(renderer)).toContain('Забираю себе');
 
-    // «Всё» на строке склада: остаток 2 из 3.
-    await press(renderer.root.findAllByProps({ testID: 'storage-take-all-st_1' })[0]);
+    // 561: «сколько?» — по долгому нажатию. Остаток 2 из 3, берём оба.
+    await act(async () => {
+      renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0].props.onLongPress();
+    });
+    expect(renderer.root.findAllByProps({ testID: 'transfer-quantity-modal' }).length).toBeGreaterThan(0);
+    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-plus' })[0]);
+    await press(renderer.root.findAllByProps({ testID: 'transfer-quantity-confirm' })[0]);
     expect(treeText(renderer)).toContain('к себе: 3');
 
     // До «Перенести» сервер не трогали.
@@ -242,7 +248,11 @@ describe('556: окно общего хранилища — как у торго
     expect(modal).toContain("import { tradeOverlayStyles as trade } from './tradeOverlayStyles'");
     expect(modal).toContain('trade.pane');
     expect(modal).toContain('trade.bufferBox');
-    expect(modal).toContain('trade.miniMoveBtn');
+    // 561: построчных кнопок больше нет — количество спрашивается долгим
+    // нажатием, поэтому строку проверяем по бейджу и модалке.
+    expect(modal).toContain('localStyles.rowQtyBadge');
+    expect(modal).toContain('onLongPress={() => setQuantityModal(');
+    expect(modal).toContain('<TransferQuantityModal');
     expect(modal).toContain('trade.barterFooter');
   });
 
