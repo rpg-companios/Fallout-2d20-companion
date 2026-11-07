@@ -35,7 +35,7 @@ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
   getRemainingAttributePoints,
-  getSkillPoints,
+  getSkillPointsAvailable,
   calculateSkillPointsUsed,
   getLuckPoints,
   getMaxSelectableSkills,
@@ -589,8 +589,10 @@ export default function CharacterScreen() {
     : remainingInitialPoints;
 
   const canDistributeSkills = attributesSaved && !skillsSaved;
+  // Пул = база уровня + очки перков («Тренированный»: +2 за ранг). Перк
+  // пересчитывается в perkBonuses при любом изменении выбора перков.
   const skillPointsAvailable = attributesSaved
-    ? getSkillPoints(attributes, level)
+    ? getSkillPointsAvailable(attributes, level, storePerkBonuses)
     : 0;
   const skillPointsUsed = calculateSkillPointsUsed(
     skills,

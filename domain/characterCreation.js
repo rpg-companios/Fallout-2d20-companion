@@ -179,6 +179,16 @@ export function getSkillPoints(attributes, level = 1) {
     return intAttr + 9 + (level > 1 ? level - 1 : 0);
 }
 
+/**
+ * Пул очков навыков с учётом перк-бонусов (perkBonuses.skillPoints).
+ * Базовый пул — INT + 9 + (level-1); перки («Тренированный») добавляют свои
+ * очки сверху. Потолок ранга навыка (`canChangeSkillValue`) не меняется.
+ */
+export function getSkillPointsAvailable(attributes, level = 1, perkBonuses = {}) {
+  const perkPoints = Number(perkBonuses?.skillPoints) || 0;
+  return getSkillPoints(attributes, level) + Math.max(0, perkPoints);
+}
+
 export function calculateSkillPointsUsed(skills, selectedSkills, extraTaggedSkills = []) {
     let total = 0;
     for (const skill of skills) {

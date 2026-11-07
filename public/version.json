@@ -1,5 +1,5 @@
 {
-  "version": "550",
+  "version": "551",
   "release": 4,
   "notes": {
     "ru-RU": [
@@ -151,7 +151,8 @@
       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
       "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку.",
-      "Если заколок не хватает, взлом останавливается без расхода: одна заколка списывается ровно как одна, остаток больше не доедается — правило действует и по команде ведущего."
+      "Если заколок не хватает, взлом останавливается без расхода: одна заколка списывается ровно как одна, остаток больше не доедается — правило действует и по команде ведущего.",
+      "«Тренированный» снова даёт очки навыков: каждый ранг перка добавляет +2 очка к пулу распределения (INT + 9 + уровень), поэтому «+1 ранг двум навыкам или +2 ранга одному» работает, а потолок 6-го ранга не меняется. Заодно исправлена дистанция оружия с модами: «Короткий оптический» на охотничьей винтовке больше не понижает «Среднюю» до «Близкой» — механика читает машинный код дальности, а не локализованную подпись, и мод без изменения дальности её не трогает."
     ],
     "en-EN": [
       "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
@@ -302,7 +303,8 @@
       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
       "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
       "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder.",
-      "When there are not enough bobby pins, picking stops without spending anything: one pin is spent exactly as one, the remainder is no longer partially consumed — the rule also applies to Game Master commands."
+      "When there are not enough bobby pins, picking stops without spending anything: one pin is spent exactly as one, the remainder is no longer partially consumed — the rule also applies to Game Master commands.",
+      "Trained now grants skill points again: every rank of the perk adds +2 points to the distribution pool (INT + 9 + level), so +1 rank to two skills or +2 ranks to one works, and the rank-6 ceiling is unchanged. Weapon range with mods is fixed as well: the Short Scope on the hunting rifle no longer drops Medium to Close — the mechanics read the machine range code instead of the localized label, and a mod without a range change leaves range untouched."
     ]
   }
 }

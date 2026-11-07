@@ -85,18 +85,45 @@ export const shiftRange = (value, steps = 0) => {
 };
 
 /**
+ * Base (unmodified) range index of a weapon-like object.
+ *
+ * Only MECHANICAL sources are read, in this order:
+ *   1. `range` — catalog code 'C' | 'M' | 'L' | 'E' (single letter);
+ *   2. `range_name` / `rangeName` — canonical English key ('Close' … 'Extreme');
+ *   3. `range_index` — number (a resolved value; may already include mod shifts,
+ *      therefore it is only a last resort).
+ *
+ * Localized display text is NOT mechanical: i18n weapon catalogs carry
+ * `rangeName: "Средняя"` / `"Близкая"`, and parsing it as a range used to
+ * collapse the range to Close (bug: «Короткий оптический» on the hunting
+ * rifle lowered «Средняя» to «Близкая»). Such strings simply do not match.
+ *
+ * Returns null when the object has no mechanical range (e.g. melee weapons).
+ */
+export const baseRangeIndex = (weapon = {}) => {
+  if (!weapon || typeof weapon !== 'object') return null;
+  const fromCode = rangeToIndex(weapon.range);
+  if (fromCode != null) return fromCode;
+  const fromName = rangeToIndex(weapon.range_name ?? weapon.rangeName);
+  if (fromName != null) return fromName;
+  return rangeToIndex(weapon.range_index);
+};
+
+/**
  * Normalize a weapon-like object so it carries consistent range fields:
  *   range_index (number) and range_name (canonical key).
  * Does NOT mutate the input; returns a shallow patch object.
  * Safe for catalog weapons (range: 'C') and already-resolved weapons.
  */
 export const resolveWeaponRangeFields = (weapon = {}) => {
-  // Prefer an explicit index if present, else fall back to range_name, else letter.
+  // An explicit resolved index wins. Otherwise read mechanical sources in
+  // baseRangeIndex order — the letter comes BEFORE rangeName, because the
+  // i18n catalog's rangeName is localized display text («Средняя»).
   let idx = null;
   if (weapon.range_index != null && weapon.range_index !== '') {
     idx = clampRangeIndex(weapon.range_index);
   } else {
-    idx = rangeToIndex(weapon.range_name ?? weapon.rangeName ?? weapon.range);
+    idx = baseRangeIndex(weapon);
   }
 
   if (idx == null) {

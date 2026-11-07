@@ -1,6 +1,29 @@
 # Changelog
 ---
 
+## Trained perk and weapon range (patch 551)
+
+The owner found two bugs on the character sheet.
+
+- **Trained grants skill points.** The perk returned a fixed 2 points regardless of
+  rank, and the character screen never read them — the perk was dead. Now every rank
+  adds +2 points to the distribution pool (INT + 9 + level): "+1 rank to two skills or
+  +2 ranks to one" works, and the rank-6 ceiling is unchanged. Only active ranks count:
+  a perk switched off by the book grants nothing, and removing the perk returns the
+  pool to its base.
+- **A mod no longer lowers range.** The Short Scope on the hunting rifle turned Medium
+  into Close. The catalog stores range twice: as a machine letter (`M`) and as a
+  localized label ("Средняя"), and the mod pipeline read the label before the letter,
+  replacing an unrecognized string with zero — Close. Now the mechanics read only
+  machine sources, a mod without a range change leaves range untouched, and melee
+  weapons no longer get an invented range.
+- **Acceptance.** `educated-skill-points-551` (7) and `weapon-range-mod-steps-551` (8):
+  perk ranks and the pool, dormant/removed perk, store; range before and after the
+  scope, every hunting-rifle mod without `rangeModifier`, a one-step shift, localized
+  labels, melee. Total: 284 files, 2617 checks, all green.
+
+---
+
 ## Not enough bobby pins — stop (patch 550)
 
 The owner's ruling on the question surfaced by patch 549 acceptance: **"when bobby

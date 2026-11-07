@@ -38,7 +38,9 @@
 `apply(ctx) → bonuses`. Агрегация: `calculatePerkEffects` →
 `perkBonuses` в сторе → влито в `calculateDerivedStats` как слой эффектов.
 
-Реализовано 3 из 94: `intenseTraining`, `educated` (каркасно), `snakeater`.
+Реализовано 3 из 94: `intenseTraining`, `educated`, `snakeater`.
+`educated` (551): +2 очка навыков за КАЖДЫЙ ранг в `perkBonuses.skillPoints`,
+экран персонажа прибавляет их к пулу распределения (`getSkillPointsAvailable`).
 Остальное — флаги-лейблы: UI показывает текст без механики (как
 `effects` у черт, см. `07-trait-debt.md`).
 
@@ -51,7 +53,7 @@ JSON**. Форма JSON-контракта — отдельное обсужде
 | Перк | id | Рангов | Механика | Куда садится |
 |---|---|---|---|---|
 | Интенсивные Тренировки | `intenseTraining` | 10 | +1 к любому S.P.E.C.I.A.L. за ранг | **реализован** (`domain/perks/intenseTraining.js`) |
-| Тренированный | `educated` | 10 | +2 очка навыков (1+1 или 2) | **реализован каркасно** (`educated.js` → `skillPoints`); выбор навыков — отдельный вопрос UI |
+| Тренированный | `educated` | 10 | +2 очка навыков за ранг (1+1 или 2) | **реализован** (`educated.js` → `perkBonuses.skillPoints` → пул распределения, 551); потолок 6-го ранга общий |
 | Пожиратель Змей | `snakeater` | 1 | +2 СУ яду | **реализован** (`domain/perks/snakeater.js`) |
 | Дающий Жизнь | `lifeGiver` | 5 | +ВЫН к макс. ОЗ за ранг | садится в `maxHealth` (calculateDerivedStats) |
 | Крепкий Хребет | `strongBack` | 3 | +25 фнт. переносимого веса за ранг | садится в `carryWeight` |

@@ -24,7 +24,7 @@
 //   - базовое имя: baseName варианта → stockNames.with (stock-мод) →
 //     stockNames.without → каталожное имя.
 
-import { clampRangeIndex, indexToRangeName, rangeToIndex } from './range.js';
+import { clampRangeIndex, indexToRangeName, baseRangeIndex } from './range.js';
 
 const toNumber = (value) => {
   const n = Number(String(value ?? 0).replace(',', '.'));
@@ -145,10 +145,13 @@ export const applyWeaponMods = (baseWeapon, mods = []) => {
     if (mod.ammoPerShotDelta != null) ammoPerShot += toNumber(mod.ammoPerShotDelta);
   }
 
-  const baseRangeIndex = result.range_index != null && result.range_index !== ''
-    ? clampRangeIndex(toNumber(result.range_index))
-    : (rangeToIndex(result.range_name || result.rangeName || result.range) ?? 0);
-  const rangeIndex = clampRangeIndex(baseRangeIndex + rangeShift);
+  // База — МЕХАНИЧЕСКАЯ дальность: буква каталога 'C'|'M'|'L'|'E' важнее
+  // rangeName, потому что в i18n-каталоге rangeName локализован («Средняя»).
+  // Раньше локализованная строка не распознавалась и `?? 0` молча превращал
+  // любую дальность в «Близкую» при установке ЛЮБОГО мода (репорт владельца:
+  // «Короткий оптический» на охотничьей винтовке снижал дистанцию).
+  const baseIdx = baseRangeIndex(result);
+  const rangeIndex = baseIdx == null ? null : clampRangeIndex(baseIdx + rangeShift);
 
   return {
     ...result,
@@ -161,8 +164,10 @@ export const applyWeaponMods = (baseWeapon, mods = []) => {
     damageType,
     qualities: [...qualities.values()],
     effects: [...effects.values()],
-    range_index: rangeIndex,
-    range_name: indexToRangeName(rangeIndex),
+    // У оружия без механики дальности (ближний бой) индекс не выдумываем:
+    // пустое значение честнее «Близкой».
+    range_index: rangeIndex ?? undefined,
+    range_name: rangeIndex == null ? undefined : indexToRangeName(rangeIndex),
   };
 };
 
