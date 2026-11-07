@@ -101,7 +101,13 @@
     "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
     "issueKey": "Add to storage",
     "issuedKey": "Record added to shared storage",
-    "noKeyItems": "No keys yet"
+    "noKeyItems": "No keys yet",
+    "depositOne": "Deposit",
+    "depositAll": "Deposit all",
+    "withdrawOne": "Withdraw",
+    "withdrawAll": "Withdraw all",
+    "exchangeSummary": "To storage: {give} · to me: {take}",
+    "exchangeEven": "A trade without money: pick items and press \"Transfer\""
   },
   "labels": {
     "leftArm": "Left bracer",

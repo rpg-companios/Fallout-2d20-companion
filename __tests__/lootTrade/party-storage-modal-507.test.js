@@ -9,6 +9,8 @@ vi.mock('react-native', () => {
   return {
     Platform: { OS: 'web' },
     StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
+    // Патч 556: окно склада, как у торговца, выбирает показ панелей по ширине.
+    useWindowDimensions: () => ({ width: 1200, height: 900 }),
     Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
     View: mk('View'),
     Text: mk('Text'),
@@ -17,6 +19,9 @@ vi.mock('react-native', () => {
   };
 });
 vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
+vi.mock('@expo/vector-icons', () => ({
+  MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', props),
+}));
 vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
 // Патч 509: модалка теперь работает с файлами и локальной БД; в рендер-тесте
 // достаточно заглушек, реальный IO проверяют тесты формата.

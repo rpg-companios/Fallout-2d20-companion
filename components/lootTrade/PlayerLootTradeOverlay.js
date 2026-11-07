@@ -11,6 +11,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
 import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
+import { getItemIcon } from './itemIcons';
 import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
@@ -88,21 +89,6 @@ const roomCheckPassed = (room, checkId, roomCode = '') => {
   return hasLocalCheckAccess({ roomCode, containerId: id });
 };
 
-const getItemIcon = (itemType) => {
-  if (itemType === 'caps') return '💰';
-  if (itemType === 'weapon') return '🔫';
-  if (itemType === 'armor') return '🛡️';
-  if (itemType === 'powerArmor') return '⚡';
-  if (itemType === 'clothing' || itemType === 'outfit') return '👕';
-  if (itemType === 'ammo') return '🔹';
-  if (itemType === 'chem' || itemType === 'chems') return '💊';
-  if (itemType === 'drinks') return '🥤';
-  if (itemType === 'food') return '🍖';
-  if (itemType === 'magazine') return '📖';
-  if (itemType === 'junk') return '🗑️';
-  if (itemType === 'materials') return '🧰';
-  return '📦';
-};
 
 export default function PlayerLootTradeOverlay() {
   useLocale();

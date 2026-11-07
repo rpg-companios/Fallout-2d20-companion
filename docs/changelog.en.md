@@ -1,6 +1,35 @@
 # Changelog
 ---
 
+## Shared storage window built like the trader screen (patch 556)
+
+The owner's words: "About the shared storage window. It should have looked and
+worked like the trader screen. Only without price and caps tracking. That is, an
+exchange without money."
+
+- **Same frame.** The storage window no longer draws its own green box: header
+  with an icon and a "Close" button, two panes, a buffer inside each pane, a
+  bottom bar with "Clear" and "Transfer" — all from the shared trader stylesheet
+  (`tradeOverlayStyles`). On a phone the panes switch via tabs, just like the
+  trader window.
+- **Same exchange.** A row can be put into storage or taken from it with
+  "Deposit" / "Deposit all" and "Withdraw" / "Withdraw all". Picked items first
+  go into a grey buffer: a click on a buffer row removes one item, the cross
+  removes the whole row. Until "Transfer" is pressed neither the storage nor the
+  inventory changes; afterwards a single atomic request goes to the server.
+- **No money.** No prices, markups, cash or deal balance: instead of
+  "you owe / you receive" the bottom bar shows how many items go to storage and
+  how many are taken. The item-type icon is the same as the trader's
+  (`components/lootTrade/itemIcons.js`, shared by both windows).
+- **Game Master.** For the GM the storage stays a read-only view plus key
+  broadcasting; the window got the same header and panes, and has no transfer
+  buttons.
+- **Untouched.** Server, protocol, store, limits and transfer atomicity did not
+  change — this patch is about the window. JSON export/import and keys remain.
+- **Acceptance.** New `storage-trader-parity-556` (7 checks, the window is really
+  mounted): trader frame, two-way buffer, "all at once", no transfer before the
+  button, cross and "Clear", phone tabs, absence of money and paired labels.
+
 ## PC mode for room cards (patch 555)
 
 The owner's words: "The switch will live in the room view. Do patch 555." Before

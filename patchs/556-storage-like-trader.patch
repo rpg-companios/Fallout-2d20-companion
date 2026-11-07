@@ -1,0 +1,1547 @@
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+index b6ae7b4..6ec205f 100644
+--- a/__tests__/lootTrade/party-storage-modal-507.test.js
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -9,6 +9,8 @@ vi.mock('react-native', () => {
+   return {
+     Platform: { OS: 'web' },
+     StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
++    // Патч 556: окно склада, как у торговца, выбирает показ панелей по ширине.
++    useWindowDimensions: () => ({ width: 1200, height: 900 }),
+     Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
+     View: mk('View'),
+     Text: mk('Text'),
+@@ -17,6 +19,9 @@ vi.mock('react-native', () => {
+   };
+ });
+ vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', props),
++}));
+ vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
+ // Патч 509: модалка теперь работает с файлами и локальной БД; в рендер-тесте
+ // достаточно заглушек, реальный IO проверяют тесты формата.
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 58e5644..68b19e6 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('555');
++    expect(version.version).toBe('556');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('555');
++    expect(json('patchs/baseline.json').baseline).toBe('556');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **555**');
++    expect(roadmap).toContain('Текущая версия: **556**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 9f85bf4..7ab9a80 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('555');
++    expect(version.version).toBe('556');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('555');
++    expect(json('patchs/baseline.json').baseline).toBe('556');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **555**');
++    expect(roadmap).toContain('Текущая версия: **556**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/storage-trader-parity-556.test.js b/__tests__/room/storage-trader-parity-556.test.js
+new file mode 100644
+index 0000000..5b53f6a
+--- /dev/null
++++ b/__tests__/room/storage-trader-parity-556.test.js
+@@ -0,0 +1,260 @@
++// ПРИЁМОЧНЫЙ (патч 556): слово владельца — «Насчёт окна общего хранилища.
++// Оно должно было выглядеть и работать по аналогии с экраном торговца. Только
++// без функций отслеживания цен и крышек. Т.е обмен без денег».
++//
++// Поэтому окно склада проверяется поведением (настоящее монтирование), а не
++// чтением исходника:
++//   1) каркас тот же, что у торговца: шапка, две панели, буфер внутри панели,
++//      нижняя полоса с «Очистить» и «Перенести»;
++//   2) обмен двусторонний: положить и забрать, по одной вещи или всё сразу;
++//   3) до «Перенести» ничего не переносится, после — одна атомарная операция;
++//   4) на телефоне панели переключаются вкладками, как у торговца;
++//   5) денег нет: ни цен, ни крышек, ни баланса сделки — только вещи.
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++import { readFileSync } from 'node:fs';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const h = vi.hoisted(() => ({
++  width: 1200,
++  rooms: {},
++  transfer: null,
++}));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
++    useWindowDimensions: () => ({ width: h.width, height: 900 }),
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => {
++  const React = require('react');
++  return {
++    MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', props),
++  };
++});
++
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return {
++    ...actual,
++    useLocale: () => {},
++    getCurrentLocale: () => 'ru-RU',
++  };
++});
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../db', () => ({
++  saveRoomStorage: vi.fn(async () => null),
++  getRoomStorage: vi.fn(async () => null),
++  getAllRoomStorages: vi.fn(async () => []),
++  getGmKeyItems: vi.fn(async () => []),
++}));
++vi.mock('../../src/utils/characterFileTransfer', () => ({
++  saveCharacter: vi.fn(async () => ({ success: true })),
++  loadCharacter: vi.fn(async () => null),
++}));
++vi.mock('../../src/room/roomStore', () => {
++  const hook = (selector) => selector({ rooms: h.rooms });
++  hook.getState = () => ({
++    rooms: h.rooms,
++    transferPartyStorage: h.transfer,
++    addKeyItemToStorage: vi.fn(async () => ({})),
++    restorePartyStorage: vi.fn(async () => ({})),
++  });
++  return { default: hook };
++});
++
++import PartyStorageModal from '../../components/lootTrade/PartyStorageModal';
++import { tradeOverlayStyles } from '../../components/lootTrade/tradeOverlayStyles';
++
++const read = (rel) => readFileSync(rel, 'utf8');
++const treeText = (renderer) => JSON.stringify(renderer.toJSON());
++
++const baseRooms = () => ({
++  ROOM1: {
++    code: 'ROOM1',
++    role: 'player',
++    partyStorage: {
++      revision: 1,
++      gmOnline: true,
++      entries: [{
++        entryId: 'st_1',
++        item: { id: 'w1', name: 'Пулемёт', itemType: 'weapon' },
++        name: 'Пулемёт',
++        itemType: 'weapon',
++        quantity: 3,
++      }],
++    },
++  },
++});
++
++const mount = async ({ width = 1200, props = {} } = {}) => {
++  h.width = width;
++  let renderer = null;
++  await act(async () => {
++    renderer = create(
++      <PartyStorageModal
++        visible
++        inventoryItems={[{ id: 'i1', name: 'Аптечка', itemType: 'chem', quantity: 2 }]}
++        onClose={() => {}}
++        onDepositLocal={props.onDepositLocal || (() => {})}
++        onWithdrawLocal={props.onWithdrawLocal || (() => {})}
++      />,
++    );
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const press = async (node) => {
++  await act(async () => {
++    node.props.onPress?.({ stopPropagation: () => {} });
++    await Promise.resolve();
++  });
++};
++
++describe('556: окно общего хранилища — как у торговца, но без денег', () => {
++  beforeEach(() => {
++    h.width = 1200;
++    h.rooms = baseRooms();
++    h.transfer = vi.fn(async () => ({}));
++  });
++
++  it('каркас взят у торговца: шапка, две панели, буфер в панели, нижняя полоса', async () => {
++    const renderer = await mount();
++    const text = treeText(renderer);
++
++    expect(text).toContain('Общее хранилище');
++    // Панели: свои вещи и склад.
++    expect(text).toContain('Предметы персонажа');
++    expect(text).toContain('Аптечка');
++    expect(text).toContain('Пулемёт');
++    // Буфер внутри каждой панели, как у торговца (забираю / отдаю).
++    expect(text).toContain('Забираю себе');
++    expect(text).toContain('Отдаю на склад');
++    // Нижняя полоса: очистка и перенос.
++    expect(text).toContain('Перенести');
++    expect(renderer.root.findAllByProps({ testID: 'storage-commit-button' }).length).toBeGreaterThan(0);
++    // Обе панели видны рядом на широком экране.
++    const halfPanes = renderer.root.findAll((node) => (
++      Array.isArray(node.props?.style) && node.props.style.includes(tradeOverlayStyles.paneHalf)
++    ));
++    expect(halfPanes.length).toBeGreaterThanOrEqual(2);
++  });
++
++  it('обмен двусторонний: положить, забрать, всё сразу — в буфере до нажатия', async () => {
++    const renderer = await mount();
++
++    const giveRow = renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0];
++    await press(giveRow);
++    expect(treeText(renderer)).toContain('К складу: 1');
++
++    const takeRow = renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0];
++    await press(takeRow);
++    expect(treeText(renderer)).toContain('к себе: 1');
++
++    // «Всё» на строке склада: остаток 2 из 3.
++    await press(renderer.root.findAllByProps({ testID: 'storage-take-all-st_1' })[0]);
++    expect(treeText(renderer)).toContain('к себе: 3');
++
++    // До «Перенести» сервер не трогали.
++    expect(h.transfer).not.toHaveBeenCalled();
++  });
++
++  it('«Перенести» отправляет одну атомарную операцию и меняет инвентарь после ответа', async () => {
++    const onDepositLocal = vi.fn();
++    const onWithdrawLocal = vi.fn();
++    const renderer = await mount({ props: { onDepositLocal, onWithdrawLocal } });
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0]);
++    await press(renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0]);
++    expect(onDepositLocal).not.toHaveBeenCalled();
++    expect(onWithdrawLocal).not.toHaveBeenCalled();
++
++    await act(async () => {
++      renderer.root.findAllByProps({ testID: 'storage-commit-button' })[0].props.onPress();
++      await Promise.resolve();
++      await Promise.resolve();
++    });
++
++    expect(h.transfer).toHaveBeenCalledTimes(1);
++    const payload = h.transfer.mock.calls[0][0];
++    expect(payload.code).toBe('ROOM1');
++    expect(payload.deposits).toHaveLength(1);
++    expect(payload.deposits[0]).toMatchObject({ quantity: 1, name: 'Аптечка' });
++    expect(payload.withdrawals).toEqual([{ entryId: 'st_1', quantity: 1 }]);
++    expect(onDepositLocal).toHaveBeenCalledWith('i1', 1);
++    expect(onWithdrawLocal).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }), 1);
++  });
++
++  it('крестик в буфере снимает строку, «Очистить» убирает весь буфер', async () => {
++    const renderer = await mount();
++    await press(renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0]);
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-buffer-clear-give-i1' })[0]);
++    expect(treeText(renderer)).not.toContain('К складу: 1');
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0]);
++    const clearAllBtn = renderer.root.findAllByProps({ testID: 'storage-clear-buffer-button' })[0];
++    await press(clearAllBtn);
++    expect(treeText(renderer)).not.toContain('К складу: 1');
++    expect(h.transfer).not.toHaveBeenCalled();
++  });
++
++  it('на телефоне панели переключаются вкладками, как у торговца', async () => {
++    const renderer = await mount({ width: 420 });
++    expect(treeText(renderer)).toContain('Предметы персонажа');
++    expect(treeText(renderer)).not.toContain('Пулемёт');
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-tab-storage' })[0]);
++    expect(treeText(renderer)).toContain('Пулемёт');
++    expect(treeText(renderer)).not.toContain('💊 Аптечка');
++  });
++
++  it('денег нет: ни цен, ни крышек, ни наценок — только вещи', () => {
++    const modal = read('components/lootTrade/PartyStorageModal.js');
++    for (const forbidden of [
++      'saleMarkupPercent',
++      'buyDepreciationPercent',
++      'markupPercent',
++      'caps',
++      'playerCaps',
++      'merchantCaps',
++      'unitPrice',
++      '{CAP}',
++    ]) {
++      expect(modal).not.toContain(forbidden);
++    }
++    // Общий каркас строк действительно импортирован из торговца.
++    expect(modal).toContain("import { tradeOverlayStyles as trade } from './tradeOverlayStyles'");
++    expect(modal).toContain('trade.pane');
++    expect(modal).toContain('trade.bufferBox');
++    expect(modal).toContain('trade.miniMoveBtn');
++    expect(modal).toContain('trade.barterFooter');
++  });
++
++  it('подписи обмена есть в обоих языках и не говорят о деньгах', () => {
++    const keys = ['depositOne', 'depositAll', 'withdrawOne', 'withdrawAll', 'exchangeSummary', 'exchangeEven'];
++    for (const loc of ['ru-RU', 'en-EN']) {
++      const storage = JSON.parse(read(`i18n/${loc}/screens/inventory/screen.json`)).storage;
++      for (const key of keys) {
++        expect(storage[key], `${loc}.${key}`).toBeTruthy();
++      }
++    }
++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json')).storage;
++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json')).storage;
++    expect(ru.exchangeEven).not.toMatch(/крышк|цен/i);
++    expect(en.exchangeEven).not.toMatch(/caps|price/i);
++  });
++});
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 3da9ee0..85f3ebd 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -9,9 +9,14 @@
+  * и к себе предметы, списания по кнопке, аналогично торговцу. Пока кнопка не
+  * нажата, товары не перенесены».
+  *
+- * Каркас строк, буфера и кнопки подтверждения импортируется из
+- * `PlayerLootTradeOverlay` (правило `docs/ui-modals-rules.md`): двухпанельное
+- * окно склада не рисует «похожий, но другой» дизайн.
++ * Патч 556 — уточнение владельца: «Оно должно было выглядеть и работать по
++ * аналогии с экраном торговца. Только без функций отслеживания цен и крышек.
++ * Т.е обмен без денег». Поэтому окно игрока собрано из ТЕХ ЖЕ каркасов, что
++ * двухпанельное окно торговца (`PlayerLootTradeOverlay`): шапка с иконкой и
++ * кнопкой «Закрыть», переключатель панелей на телефоне, две панели с буфером
++ * внутри каждой, нижняя полоса с «Очистить» и «Перенести». Цены, наценки и
++ * касса не показываются и не считаются — только вещи, которые переходят из
++ * рук в руки. Пока не нажата «Перенести», ни сервер, ни инвентарь не меняются.
+  */
+ 
+ import React, { useEffect, useMemo, useState } from 'react';
+@@ -22,8 +27,9 @@ import {
+   TouchableOpacity,
+   ScrollView,
+   StyleSheet,
+-  Platform,
++  useWindowDimensions,
+ } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import useRoomStore from '../../src/room/roomStore';
+ import * as db from '../../db';
+ import { saveCharacter, loadCharacter } from '../../src/utils/characterFileTransfer';
+@@ -32,7 +38,7 @@ import {
+   parseStorageImportPayload,
+   storageExportFileName,
+ } from '../../domain/partyStorageTransfer';
+-import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
++import { tInventory, formatInventoryText } from '../screens/InventoryScreen/logic/inventoryI18n';
+ import { renderTextWithIcons } from '../../modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+ import { showRawAlert } from '../alerts/alertService';
+ import { tLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
+@@ -40,6 +46,7 @@ import { useLocale } from '../../i18n/locale';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../domain/resolveItem';
+ import itemStacking from '../../domain/itemStacking.js';
++import { getItemIcon } from './itemIcons';
+ import { tradeOverlayStyles as trade } from './tradeOverlayStyles';
+ 
+ // Патч 522: предмет на складе — ТОТ ЖЕ предмет, что в инвентаре. Поля больше
+@@ -70,14 +77,18 @@ const PartyStorageModal = ({
+   onWithdrawLocal,
+ }) => {
+   useLocale();
++  const { width: windowWidth } = useWindowDimensions();
++  const isWideLayout = windowWidth >= 680;
+   const rooms = useRoomStore((state) => state.rooms);
+   const [busy, setBusy] = useState(false);
+   const [selectedKeyId, setSelectedKeyId] = useState(null);
+-  // Патч 518: отложенные операции. Пока не нажата «Перенести», сервер и
+-  // локальный инвентарь не меняются.
++  // Отложенные операции. Пока не нажата «Перенести», сервер и локальный
++  // инвентарь не меняются.
+   const [giveBuffer, setGiveBuffer] = useState({}); // { [itemId]: qty }
+   const [takeBuffer, setTakeBuffer] = useState({}); // { [entryId]: qty }
+   const [catalog, setCatalog] = useState([]);
++  // Как в окне торговца: на узком экране панели показываются по одной.
++  const [mobileTab, setMobileTab] = useState('player');
+ 
+   const room = useMemo(() => {
+     const candidates = Object.entries(rooms || {}).filter(([, value]) => value?.partyStorage);
+@@ -104,34 +115,49 @@ const PartyStorageModal = ({
+     setGiveBuffer({});
+     setTakeBuffer({});
+     setSelectedKeyId(null);
++    setMobileTab('player');
+     if (isGm) {
+       void db.getGmKeyItems().then((list) => setCatalog(list || [])).catch(() => setCatalog([]));
+     }
+   }, [visible, isGm]);
+ 
+-  const addGive = (item) => {
+-    if (!writable || busy) return;
+-    const id = String(item?.id || item?.name || '');
+-    if (!id) return;
+-    const max = Math.max(1, Number(item?.quantity) || 1);
+-    setGiveBuffer((prev) => ({ ...prev, [id]: Math.min(max, (prev[id] || 0) + 1) }));
++  const itemIdOf = (item, index = 0) => String(item?.id || item?.name || index);
++  const entryById = (entryId) => entries.find((entry) => entry.entryId === entryId) || null;
++  const nameOfBufferedItem = (id) => (inventoryItems || [])
++    .find((it) => itemIdOf(it) === id)?.name || id;
++  const quantityOf = (item) => Math.max(1, Number(item?.quantity) || 1);
++
++  const addGive = (item, delta = 1) => {
++    if (!writable || busy || !item) return;
++    const id = itemIdOf(item);
++    const max = quantityOf(item);
++    setGiveBuffer((prev) => {
++      const next = Math.min(max, Math.max(0, (prev[id] || 0) + delta));
++      return { ...prev, [id]: next };
++    });
+   };
+ 
+-  const addTake = (entry) => {
+-    if (!writable || busy || entry?.kind === 'keyItem') return;
+-    const max = Math.max(1, Number(entry?.quantity) || 1);
+-    setTakeBuffer((prev) => ({ ...prev, [entry.entryId]: Math.min(max, (prev[entry.entryId] || 0) + 1) }));
++  const addTake = (entry, delta = 1) => {
++    if (!writable || busy || !entry || entry.kind === 'keyItem') return;
++    const max = Math.max(1, Number(entry.quantity) || 1);
++    setTakeBuffer((prev) => {
++      const next = Math.min(max, Math.max(0, (prev[entry.entryId] || 0) + delta));
++      return { ...prev, [entry.entryId]: next };
++    });
+   };
+ 
+-  const bufferCount = Object.values(giveBuffer).reduce((a, b) => a + b, 0)
+-    + Object.values(takeBuffer).reduce((a, b) => a + b, 0);
++  const giveLines = Object.entries(giveBuffer).filter(([, qty]) => qty > 0);
++  const takeLines = Object.entries(takeBuffer).filter(([, qty]) => qty > 0);
++  const giveCount = giveLines.reduce((sum, [, qty]) => sum + qty, 0);
++  const takeCount = takeLines.reduce((sum, [, qty]) => sum + qty, 0);
++  const bufferCount = giveCount + takeCount;
+   const canCommit = writable && !busy && bufferCount > 0;
+ 
+   const commit = async () => {
+     if (!room || !canCommit) return;
+     const deposits = Object.entries(giveBuffer)
+       .map(([id, qty]) => {
+-        const item = (inventoryItems || []).find((it) => String(it?.id || it?.name || '') === id);
++        const item = (inventoryItems || []).find((it) => itemIdOf(it) === id);
+         return item ? { item: pickItemSnapshot(item), quantity: qty, name: item.name } : null;
+       })
+       .filter(Boolean);
+@@ -222,275 +248,495 @@ const PartyStorageModal = ({
+ 
+   if (!visible) return null;
+ 
+-  const bufferedGive = Object.entries(giveBuffer).filter(([, qty]) => qty > 0);
+-  const bufferedTake = Object.entries(takeBuffer).filter(([, qty]) => qty > 0);
++  // ── Панель «Предметы персонажа»: что можно положить на склад ──
+ 
+-  return (
+-    <Modal visible transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={onClose}>
+-      <View style={styles.backdrop}>
+-        <View style={styles.window}>
+-          <View style={styles.header}>
+-            <Text style={styles.title}>
+-              {tInventory(isGm ? 'screen.storage.gmTitle' : 'screen.storage.title')}
+-            </Text>
+-            <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={onClose}>
+-              <Text style={styles.closeText}>×</Text>
++  const renderPlayerPane = () => (
++    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++      <View style={trade.paneHeader}>
++        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.yourItems')}</Text>
++      </View>
++
++      <ScrollView style={trade.paneScroll}>
++        {/* Серый курсив: уже отложено к себе со склада (снимется по «Перенести») */}
++        <View style={trade.bufferBox}>
++          <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
++          {takeLines.length === 0 ? (
++            <Text style={trade.emptyText}>—</Text>
++          ) : takeLines.map(([entryId, qty]) => (
++            <TouchableOpacity
++              key={`buf-take-${entryId}`}
++              testID={`storage-buffer-take-${entryId}`}
++              style={trade.bufferRow}
++              onPress={() => addTake(entryById(entryId), -1)}
++            >
++              <Text style={trade.bufferItalicText} numberOfLines={1}>
++                {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
++              </Text>
++              <TouchableOpacity
++                testID={`storage-buffer-clear-take-${entryId}`}
++                style={trade.bufferClearAllBtn}
++                onPress={(e) => {
++                  e?.stopPropagation?.();
++                  addTake(entryById(entryId), -qty);
++                }}
++              >
++                <Text style={trade.bufferClearAllText}>✕</Text>
++              </TouchableOpacity>
+             </TouchableOpacity>
+-          </View>
++          ))}
++        </View>
+ 
+-          {!room ? (
+-            <Text style={styles.hint}>{tInventory('screen.storage.noRoom')}</Text>
+-          ) : isGm ? (
+-            <>
+-              {/* Мастер: список как в инвентаре, но БЕЗ кнопок и параметров. */}
+-              <ScrollView style={localStyles.gmList}>
+-                {items.length === 0
+-                  ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
+-                  : items.map((entry) => (
+-                    <View key={entry.entryId} testID={`gm-storage-item-${entry.entryId}`} style={localStyles.gmRow}>
+-                      <Text style={localStyles.gmRowName} numberOfLines={1}>
+-                        {`${entry.name} × ${entry.quantity}`}
+-                      </Text>
+-                    </View>
+-                  ))}
+-              </ScrollView>
+-              <Text style={styles.hint}>{tInventory('screen.storage.gmNoActions')}</Text>
+-
+-              <Text style={styles.keysTitle}>{tLootTrade('keyItems.title')}</Text>
+-              {keys.length === 0
+-                ? <Text style={styles.hint}>{tInventory('screen.storage.noKeyItems')}</Text>
+-                : keys.map((key) => (
++        {(inventoryItems || []).length === 0 ? (
++          <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
++        ) : (
++          (inventoryItems || []).map((item, index) => {
++            const id = itemIdOf(item, index);
++            const buffered = giveBuffer[id] || 0;
++            const remaining = quantityOf(item) - buffered;
++            if (remaining <= 0) return null;
++            return (
++              <TouchableOpacity
++                key={id}
++                testID={`storage-give-${id}`}
++                style={[trade.tradeRow, !writable && trade.disabledBtn]}
++                disabled={busy || !writable}
++                onPress={() => addGive(item)}
++              >
++                <View style={trade.tradeRowInfo}>
++                  <Text style={trade.tradeRowName} numberOfLines={1}>
++                    {`${getItemIcon(item.itemType)} ${item.name} ×${remaining}`}
++                  </Text>
++                </View>
++                <View style={trade.tradeRowBtns}>
+                   <TouchableOpacity
+-                    key={key.entryId}
+-                    testID={`storage-key-${key.keyItemId}`}
+-                    style={styles.keyRow}
+-                    onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
++                    testID={`storage-give-one-${id}`}
++                    style={trade.miniMoveBtn}
++                    onPress={(e) => {
++                      e?.stopPropagation?.();
++                      addGive(item);
++                    }}
+                   >
+-                    <Text style={styles.rowName}>{key.name}</Text>
+-                    <Text style={styles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
++                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositOne')}</Text>
+                   </TouchableOpacity>
+-                ))}
+-              {selectedKey && (
+-                <View style={styles.keyCard}>
+-                  <Text style={styles.keyCardTitle}>{selectedKey.name}</Text>
+-                  {renderTextWithIcons(
+-                    selectedKey.description || tLootTrade('keyItems.previewEmpty'),
+-                    styles.keyCardText,
++                  {remaining > 1 && (
++                    <TouchableOpacity
++                      testID={`storage-give-all-${id}`}
++                      style={trade.miniMoveAllBtn}
++                      onPress={(e) => {
++                        e?.stopPropagation?.();
++                        addGive(item, remaining);
++                      }}
++                    >
++                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.depositAll')}</Text>
++                    </TouchableOpacity>
+                   )}
+                 </View>
+-              )}
++              </TouchableOpacity>
++            );
++          })
++        )}
++      </ScrollView>
++    </View>
++  );
+ 
+-              {/* Трансляция ключей — единственное действие Мастера со складом. */}
+-              <Text style={styles.keysTitle}>{tInventory('screen.storage.issueKey')}</Text>
+-              <ScrollView style={localStyles.gmKeyCatalog}>
+-                {catalog.length === 0
+-                  ? <Text style={styles.hint}>{tInventory('screen.storage.noKeyItems')}</Text>
+-                  : catalog.map((record) => (
+-                    <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
+-                      <Text style={localStyles.gmRowName} numberOfLines={1}>{record.name}</Text>
+-                      <TouchableOpacity
+-                        style={localStyles.issueBtn}
+-                        disabled={busy || !room.storage.gmOnline}
+-                        onPress={() => void issueKey(record)}
+-                      >
+-                        <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
+-                      </TouchableOpacity>
+-                    </View>
+-                  ))}
+-              </ScrollView>
+-            </>
+-          ) : (
+-            <>
+-              {/* Игрок: двупанельный обмен по дизайну торговца, без цен и настроек. */}
+-              <View style={styles.columns}>
+-                <View style={styles.column}>
+-                  <Text style={styles.columnTitle}>{tInventory('screen.storage.yourItems')}</Text>
+-                  <ScrollView style={styles.list}>
+-                    {(inventoryItems || []).length === 0
+-                      ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
+-                      : (inventoryItems || []).map((item, index) => {
+-                        const id = String(item?.id || item?.name || index);
+-                        const buffered = giveBuffer[id] || 0;
+-                        return (
+-                          <TouchableOpacity
+-                            key={id}
+-                            testID={`storage-give-${id}`}
+-                            style={[trade.tradeRow, !writable && trade.disabledBtn]}
+-                            disabled={busy || !writable}
+-                            onPress={() => addGive(item)}
+-                          >
+-                            <Text style={trade.tradeRowName} numberOfLines={1}>
+-                              {`${item.name}${buffered ? ` · ${buffered}` : ''}`}
+-                            </Text>
+-                            <Text style={styles.rowAction}>{tInventory('screen.storage.bufferGive')}</Text>
+-                          </TouchableOpacity>
+-                        );
+-                      })}
+-                  </ScrollView>
+-                </View>
++  // ── Панель «Общее хранилище»: что можно забрать ──
+ 
+-                <View style={styles.column}>
+-                  <Text style={styles.columnTitle}>{tInventory('screen.storage.title')}</Text>
+-                  <ScrollView style={styles.list}>
+-                    {items.length === 0
+-                      ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
+-                      : items.map((entry) => {
+-                        const buffered = takeBuffer[entry.entryId] || 0;
+-                        return (
+-                          <TouchableOpacity
+-                            key={entry.entryId}
+-                            testID={`storage-take-${entry.entryId}`}
+-                            style={[trade.tradeRow, !writable && trade.disabledBtn]}
+-                            disabled={busy || !writable}
+-                            onPress={() => addTake(entry)}
+-                          >
+-                            <Text style={trade.tradeRowName} numberOfLines={1}>
+-                              {`${entry.name} × ${entry.quantity}${buffered ? ` · ${buffered}` : ''}`}
+-                            </Text>
+-                            <Text style={styles.rowAction}>{tInventory('screen.storage.bufferTake')}</Text>
+-                          </TouchableOpacity>
+-                        );
+-                      })}
+-                  </ScrollView>
+-                </View>
+-              </View>
++  const renderStoragePane = () => (
++    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++      <View style={trade.paneHeader}>
++        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
++      </View>
+ 
+-              {/* Буфер: клик по строке возвращает предмет, как у торговца. */}
+-              <View style={localStyles.bufferBox}>
+-                <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferGive')}</Text>
+-                {bufferedGive.length === 0
+-                  ? <Text style={styles.hint}>—</Text>
+-                  : bufferedGive.map(([id, qty]) => (
+-                    <TouchableOpacity
+-                      key={id}
+-                      testID={`storage-buffer-give-${id}`}
+-                      style={trade.bufferRow}
+-                      onPress={() => setGiveBuffer((prev) => ({ ...prev, [id]: 0 }))}
+-                    >
+-                      <Text style={trade.bufferItalicText} numberOfLines={1}>
+-                        {(inventoryItems || []).find((it) => String(it?.id || it?.name || '') === id)?.name || id}
+-                        {` × ${qty}`}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  ))}
+-                <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
+-                {bufferedTake.length === 0
+-                  ? <Text style={styles.hint}>—</Text>
+-                  : bufferedTake.map(([entryId, qty]) => (
++      <ScrollView style={trade.paneScroll}>
++        {/* Серый курсив: уже отложено на склад (снимется по «Перенести») */}
++        <View style={trade.bufferBox}>
++          <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferGive')}</Text>
++          {giveLines.length === 0 ? (
++            <Text style={trade.emptyText}>—</Text>
++          ) : giveLines.map(([id, qty]) => (
++            <TouchableOpacity
++              key={`buf-give-${id}`}
++              testID={`storage-buffer-give-${id}`}
++              style={trade.bufferRow}
++              onPress={() => {
++                const item = (inventoryItems || []).find((it) => itemIdOf(it) === id);
++                addGive(item, -1);
++              }}
++            >
++              <Text style={trade.bufferItalicText} numberOfLines={1}>
++                {`+ ${nameOfBufferedItem(id)} ×${qty}`}
++              </Text>
++              <TouchableOpacity
++                testID={`storage-buffer-clear-give-${id}`}
++                style={trade.bufferClearAllBtn}
++                onPress={(e) => {
++                  e?.stopPropagation?.();
++                  const item = (inventoryItems || []).find((it) => itemIdOf(it) === id);
++                  addGive(item, -qty);
++                }}
++              >
++                <Text style={trade.bufferClearAllText}>✕</Text>
++              </TouchableOpacity>
++            </TouchableOpacity>
++          ))}
++        </View>
++
++        {items.length === 0 ? (
++          <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
++        ) : (
++          items.map((entry) => {
++            const buffered = takeBuffer[entry.entryId] || 0;
++            const remaining = Math.max(1, Number(entry.quantity) || 1) - buffered;
++            if (remaining <= 0) return null;
++            return (
++              <TouchableOpacity
++                key={entry.entryId}
++                testID={`storage-take-${entry.entryId}`}
++                style={[trade.tradeRow, !writable && trade.disabledBtn]}
++                disabled={busy || !writable}
++                onPress={() => addTake(entry)}
++              >
++                <View style={trade.tradeRowInfo}>
++                  <Text style={trade.tradeRowName} numberOfLines={1}>
++                    {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
++                  </Text>
++                </View>
++                <View style={trade.tradeRowBtns}>
++                  <TouchableOpacity
++                    testID={`storage-take-one-${entry.entryId}`}
++                    style={trade.miniMoveBtn}
++                    onPress={(e) => {
++                      e?.stopPropagation?.();
++                      addTake(entry);
++                    }}
++                  >
++                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
++                  </TouchableOpacity>
++                  {remaining > 1 && (
+                     <TouchableOpacity
+-                      key={entryId}
+-                      testID={`storage-buffer-take-${entryId}`}
+-                      style={trade.bufferRow}
+-                      onPress={() => setTakeBuffer((prev) => ({ ...prev, [entryId]: 0 }))}
++                      testID={`storage-take-all-${entry.entryId}`}
++                      style={trade.miniMoveAllBtn}
++                      onPress={(e) => {
++                        e?.stopPropagation?.();
++                        addTake(entry, remaining);
++                      }}
+                     >
+-                      <Text style={trade.bufferItalicText} numberOfLines={1}>
+-                        {`${entries.find((e) => e.entryId === entryId)?.name || entryId} × ${qty}`}
+-                      </Text>
++                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
+                     </TouchableOpacity>
+-                  ))}
+-              </View>
++                  )}
++                </View>
++              </TouchableOpacity>
++            );
++          })
++        )}
++      </ScrollView>
++    </View>
++  );
+ 
+-              <Text style={styles.hint}>{tInventory('screen.storage.pendingHint')}</Text>
+-              <View style={localStyles.commitRow}>
+-                <TouchableOpacity
+-                  testID="storage-commit-button"
+-                  style={[trade.commitTradeBtn, !canCommit && trade.disabledBtn]}
+-                  disabled={!canCommit}
+-                  onPress={() => void commit()}
++  // ── Ключи: запись остаётся общей, забрать её нельзя ──
++
++  const renderKeysBlock = () => (
++    <View style={localStyles.keysBox}>
++      <Text style={[trade.paneHeaderTitle, localStyles.keysTitle]}>
++        {tLootTrade('keyItems.title')}
++      </Text>
++      {keys.length === 0
++        ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
++        : keys.map((key) => (
++          <TouchableOpacity
++            key={key.entryId}
++            testID={`storage-key-${key.keyItemId}`}
++            style={localStyles.keyRow}
++            onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
++          >
++            <Text style={localStyles.keyName}>{key.name}</Text>
++            <Text style={localStyles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
++          </TouchableOpacity>
++        ))}
++      {selectedKey && (
++        <View style={localStyles.keyCard}>
++          <Text style={localStyles.keyCardTitle}>{selectedKey.name}</Text>
++          {renderTextWithIcons(
++            selectedKey.description || tLootTrade('keyItems.previewEmpty'),
++            localStyles.keyCardText,
++          )}
++          <Text style={localStyles.keyStays}>{tInventory('screen.storage.keyStays')}</Text>
++        </View>
++      )}
++    </View>
++  );
++
++  // ── Окно игрока: обмен без денег ──
++
++  const renderPlayerBody = () => (
++    <>
++      {!isWideLayout && (
++        <View style={trade.mobileTabSwitch}>
++          <TouchableOpacity
++            testID="storage-tab-player"
++            style={[trade.mobileTabBtn, mobileTab === 'player' && trade.mobileTabBtnActive]}
++            onPress={() => setMobileTab('player')}
++          >
++            <Text style={[trade.mobileTabText, mobileTab === 'player' && trade.mobileTabTextActive]}>
++              {`${tInventory('screen.storage.yourItems')}${giveCount ? ` +${giveCount}` : ''}`}
++            </Text>
++          </TouchableOpacity>
++          <TouchableOpacity
++            testID="storage-tab-storage"
++            style={[trade.mobileTabBtn, mobileTab === 'storage' && trade.mobileTabBtnActive]}
++            onPress={() => setMobileTab('storage')}
++          >
++            <Text style={[trade.mobileTabText, mobileTab === 'storage' && trade.mobileTabTextActive]}>
++              {`${tInventory('screen.storage.title')}${takeCount ? ` +${takeCount}` : ''}`}
++            </Text>
++          </TouchableOpacity>
++        </View>
++      )}
++
++      <View style={trade.twoPanesContainer}>
++        {isWideLayout ? (
++          <>
++            {renderPlayerPane()}
++            {renderStoragePane()}
++          </>
++        ) : (
++          mobileTab === 'player' ? renderPlayerPane() : renderStoragePane()
++        )}
++      </View>
++
++      {renderKeysBlock()}
++
++      <View style={trade.barterFooter}>
++        <View style={trade.barterBalanceCol}>
++          <Text style={trade.barterBalanceText}>
++            {bufferCount > 0
++              ? formatInventoryText(tInventory('screen.storage.exchangeSummary'), {
++                give: giveCount,
++                take: takeCount,
++              })
++              : tInventory('screen.storage.exchangeEven')}
++          </Text>
++          <Text style={trade.barterWarnText}>
++            {tInventory('screen.storage.pendingHint')}
++          </Text>
++        </View>
++
++        <View style={trade.barterFooterBtns}>
++          {bufferCount > 0 && (
++            <TouchableOpacity
++              testID="storage-clear-buffer-button"
++              style={trade.clearBufBtn}
++              disabled={busy}
++              onPress={() => { setGiveBuffer({}); setTakeBuffer({}); }}
++            >
++              <Text style={trade.clearBufBtnText}>{tInventory('screen.storage.clearBuffer')}</Text>
++            </TouchableOpacity>
++          )}
++          <TouchableOpacity
++            testID="storage-commit-button"
++            style={[trade.commitTradeBtn, !canCommit && trade.disabledBtn]}
++            disabled={!canCommit}
++            onPress={() => void commit()}
++          >
++            <Text style={trade.commitTradeBtnText}>{tInventory('screen.storage.commit')}</Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </>
++  );
++
++  // ── Окно Мастера: только просмотр состава и трансляция ключей ──
++
++  const renderGmBody = () => (
++    <>
++      <Text style={trade.modalDesc}>{tInventory('screen.storage.gmNoActions')}</Text>
++
++      <View style={trade.twoPanesContainer}>
++        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++          <View style={trade.paneHeader}>
++            <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
++          </View>
++          <ScrollView style={trade.paneScroll}>
++            {items.length === 0 ? (
++              <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
++            ) : (
++              items.map((entry) => (
++                <View
++                  key={entry.entryId}
++                  testID={`gm-storage-item-${entry.entryId}`}
++                  style={trade.tradeRow}
+                 >
+-                  <Text style={trade.commitTradeBtnText}>{tInventory('screen.storage.commit')}</Text>
+-                </TouchableOpacity>
++                  <View style={trade.tradeRowInfo}>
++                    <Text style={trade.tradeRowName} numberOfLines={1}>
++                      {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
++                    </Text>
++                  </View>
++                </View>
++              ))
++            )}
++          </ScrollView>
++        </View>
++
++        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++          <View style={trade.paneHeader}>
++            <Text style={trade.paneHeaderTitle}>{tLootTrade('keyItems.title')}</Text>
++          </View>
++          <ScrollView style={trade.paneScroll}>
++            {keys.length === 0
++              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
++              : keys.map((key) => (
+                 <TouchableOpacity
+-                  testID="storage-clear-buffer-button"
+-                  style={localStyles.clearBtn}
+-                  disabled={busy || bufferCount === 0}
+-                  onPress={() => { setGiveBuffer({}); setTakeBuffer({}); }}
++                  key={key.entryId}
++                  testID={`storage-key-${key.keyItemId}`}
++                  style={localStyles.keyRow}
++                  onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
+                 >
+-                  <Text style={styles.transferButtonText}>{tInventory('screen.storage.clearBuffer')}</Text>
++                  <Text style={localStyles.keyName}>{key.name}</Text>
++                  <Text style={localStyles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
+                 </TouchableOpacity>
++              ))}
++            {selectedKey && (
++              <View style={localStyles.keyCard}>
++                <Text style={localStyles.keyCardTitle}>{selectedKey.name}</Text>
++                {renderTextWithIcons(
++                  selectedKey.description || tLootTrade('keyItems.previewEmpty'),
++                  localStyles.keyCardText,
++                )}
+               </View>
++            )}
+ 
+-              <Text style={styles.keysTitle}>{tLootTrade('keyItems.title')}</Text>
+-              {keys.length === 0
+-                ? <Text style={styles.hint}>{tInventory('screen.storage.empty')}</Text>
+-                : keys.map((key) => (
++            {/* Трансляция ключей — единственное действие Мастера со складом. */}
++            <Text style={[localStyles.keysTitle, { marginTop: 10 }]}>
++              {tInventory('screen.storage.issueKey')}
++            </Text>
++            {catalog.length === 0
++              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
++              : catalog.map((record) => (
++                <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
++                  <Text style={localStyles.keyName} numberOfLines={1}>{record.name}</Text>
+                   <TouchableOpacity
+-                    key={key.entryId}
+-                    testID={`storage-key-${key.keyItemId}`}
+-                    style={styles.keyRow}
+-                    onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
++                    style={localStyles.issueBtn}
++                    disabled={busy || !room.storage.gmOnline}
++                    onPress={() => void issueKey(record)}
+                   >
+-                    <Text style={styles.rowName}>{key.name}</Text>
+-                    <Text style={styles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
++                    <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
+                   </TouchableOpacity>
+-                ))}
+-              {selectedKey && (
+-                <View style={styles.keyCard}>
+-                  <Text style={styles.keyCardTitle}>{selectedKey.name}</Text>
+-                  {renderTextWithIcons(
+-                    selectedKey.description || tLootTrade('keyItems.previewEmpty'),
+-                    styles.keyCardText,
+-                  )}
+-                  <Text style={styles.hint}>{tInventory('screen.storage.keyStays')}</Text>
+                 </View>
++              ))}
++          </ScrollView>
++        </View>
++      </View>
++    </>
++  );
++
++  return (
++    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
++      <View style={[trade.modalBackdrop, isWideLayout && trade.backdropWide]}>
++        <View style={trade.merchantModalCard}>
++          <View style={trade.modalHeader}>
++            <View style={trade.modalTitleRow}>
++              <MaterialCommunityIcons name="warehouse" size={23} color="#f0e68c" />
++              <Text style={trade.modalTitle}>
++                {tInventory(isGm ? 'screen.storage.gmTitle' : 'screen.storage.title')}
++              </Text>
++            </View>
++            <View style={trade.headerActionsRow}>
++              <TouchableOpacity
++                testID="storage-close-button"
++                style={trade.closeContainerBtn}
++                onPress={onClose}
++              >
++                <Text style={trade.closeContainerBtnText}>{tLootTrade('player.close')}</Text>
++              </TouchableOpacity>
++            </View>
++          </View>
++
++          {!room ? (
++            <Text style={[trade.emptyText, localStyles.noRoom]}>
++              {tInventory('screen.storage.noRoom')}
++            </Text>
++          ) : (
++            <>
++              {isGm ? renderGmBody() : renderPlayerBody()}
++
++              <View style={localStyles.transferRow}>
++                <TouchableOpacity
++                  testID="storage-export-button"
++                  style={trade.clearBufBtn}
++                  onPress={() => { void exportJson(); }}
++                >
++                  <Text style={trade.clearBufBtnText}>{tInventory('screen.storage.export')}</Text>
++                </TouchableOpacity>
++                <TouchableOpacity
++                  testID="storage-import-button"
++                  style={trade.clearBufBtn}
++                  onPress={() => { void importJson(); }}
++                >
++                  <Text style={trade.clearBufBtnText}>{tInventory('screen.storage.import')}</Text>
++                </TouchableOpacity>
++              </View>
++
++              {!room?.storage?.gmOnline && (
++                <Text style={[trade.barterErrorText, localStyles.readOnly]}>
++                  {tInventory('screen.storage.readOnly')}
++                </Text>
+               )}
+             </>
+           )}
+-
+-          <View style={styles.transferRow}>
+-            <TouchableOpacity testID="storage-export-button" style={styles.transferButton} onPress={() => { void exportJson(); }}>
+-              <Text style={styles.transferButtonText}>{tInventory('screen.storage.export')}</Text>
+-            </TouchableOpacity>
+-            <TouchableOpacity testID="storage-import-button" style={styles.transferButton} onPress={() => { void importJson(); }}>
+-              <Text style={styles.transferButtonText}>{tInventory('screen.storage.import')}</Text>
+-            </TouchableOpacity>
+-          </View>
+-          {!room?.storage?.gmOnline && <Text style={styles.readOnly}>{tInventory('screen.storage.readOnly')}</Text>}
+         </View>
+       </View>
+     </Modal>
+   );
+ };
+ 
+-const styles = StyleSheet.create({
+-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+-  window: { width: '100%', maxWidth: 760, maxHeight: '90%', backgroundColor: '#0b140d', borderWidth: 1.5, borderColor: '#42784a', borderRadius: 6, padding: 14 },
+-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: '#29482d', paddingBottom: 9, marginBottom: 10 },
+-  title: { color: '#93d17a', fontSize: 16, fontWeight: '800' },
+-  closeButton: { paddingHorizontal: 10, paddingVertical: 2 },
+-  closeText: { color: '#bdc8b7', fontSize: 22 },
+-  columns: { flexDirection: 'row', gap: 10, minHeight: 180 },
+-  column: { flex: 1, borderWidth: 1, borderColor: '#29482d', borderRadius: 5, padding: 8 },
+-  columnTitle: { color: '#8da38b', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, fontFamily: 'monospace' },
+-  list: { maxHeight: 240 },
+-  rowAction: { color: '#93d17a', fontSize: 11, fontWeight: '700' },
+-  rowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
+-  hint: { color: '#97a392', fontSize: 11, textAlign: 'center', marginTop: 8 },
++// Только то, чего нет в общем каркасе торговца: блок ключей и вспомогательные
++// строки. Всё остальное — `tradeOverlayStyles`, чтобы окно склада не рисовало
++// «похожий, но другой» дизайн.
++const localStyles = StyleSheet.create({
++  noRoom: { marginTop: 18, marginBottom: 18 },
++  readOnly: { textAlign: 'center', marginTop: 10 },
+   transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+-  transferButton: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 4, borderWidth: 1, borderColor: '#58875d', backgroundColor: '#213028' },
+-  transferButtonText: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
+-  readOnly: { color: '#e2a3a3', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+-  keysTitle: { color: '#8da38b', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginTop: 10, fontFamily: 'monospace' },
+-  keyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderColor: '#1c2d20' },
++  keysBox: {
++    borderWidth: 1,
++    borderColor: '#29482d',
++    borderRadius: 5,
++    paddingHorizontal: 12,
++    paddingVertical: 8,
++    marginTop: 10,
++    maxHeight: 190,
++  },
++  keysTitle: { marginBottom: 6 },
++  keyRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingVertical: 7,
++    borderBottomWidth: 1,
++    borderColor: '#1c2d20',
++  },
++  keyName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
+   keyRead: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
+   keyCard: { borderWidth: 1, borderColor: '#29482d', borderRadius: 4, padding: 9, marginTop: 6 },
+   keyCardTitle: { color: '#93d17a', fontSize: 13, fontWeight: '800', marginBottom: 5 },
+   keyCardText: { color: '#c8d4b1', fontSize: 12 },
+-});
+-
+-// Только уникальные для склада мелочи; строки, буфер и кнопка «Перенести»
+-// приходят из tradeOverlayStyles.
+-const localStyles = StyleSheet.create({
+-  gmList: { maxHeight: 240 },
+-  gmKeyCatalog: { maxHeight: 150 },
+-  gmRow: { paddingVertical: 7, borderBottomWidth: 1, borderColor: '#1c2d20' },
+-  gmRowName: { flex: 1, color: '#d8e4cc', fontSize: 12 },
+-  issueRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderColor: '#1c2d20' },
+-  issueBtn: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 4, borderWidth: 1, borderColor: '#58875d', backgroundColor: '#213028' },
++  keyStays: { color: '#97a392', fontSize: 11, marginTop: 6 },
++  issueRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    paddingVertical: 6,
++    borderBottomWidth: 1,
++    borderColor: '#1c2d20',
++  },
++  issueBtn: {
++    paddingHorizontal: 9,
++    paddingVertical: 5,
++    borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#58875d',
++    backgroundColor: '#213028',
++  },
+   issueBtnText: { color: '#a4cb77', fontSize: 11, fontWeight: '700' },
+-  bufferBox: { borderWidth: 1, borderColor: '#29482d', borderRadius: 5, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, maxHeight: 160 },
+-  commitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+-  clearBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: '#58875d' },
+ });
+ 
+ export default PartyStorageModal;
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 4a77c36..4a5520b 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -11,6 +11,7 @@ import {
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
+ import { tradeOverlayStyles as styles } from './tradeOverlayStyles';
++import { getItemIcon } from './itemIcons';
+ import * as db from '../../db';
+ import * as savesModule from '../../src/saves/characterSaves';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -88,21 +89,6 @@ const roomCheckPassed = (room, checkId, roomCode = '') => {
+   return hasLocalCheckAccess({ roomCode, containerId: id });
+ };
+ 
+-const getItemIcon = (itemType) => {
+-  if (itemType === 'caps') return '💰';
+-  if (itemType === 'weapon') return '🔫';
+-  if (itemType === 'armor') return '🛡️';
+-  if (itemType === 'powerArmor') return '⚡';
+-  if (itemType === 'clothing' || itemType === 'outfit') return '👕';
+-  if (itemType === 'ammo') return '🔹';
+-  if (itemType === 'chem' || itemType === 'chems') return '💊';
+-  if (itemType === 'drinks') return '🥤';
+-  if (itemType === 'food') return '🍖';
+-  if (itemType === 'magazine') return '📖';
+-  if (itemType === 'junk') return '🗑️';
+-  if (itemType === 'materials') return '🧰';
+-  return '📦';
+-};
+ 
+ export default function PlayerLootTradeOverlay() {
+   useLocale();
+diff --git a/components/lootTrade/itemIcons.js b/components/lootTrade/itemIcons.js
+new file mode 100644
+index 0000000..e8c0535
+--- /dev/null
++++ b/components/lootTrade/itemIcons.js
+@@ -0,0 +1,21 @@
++// components/lootTrade/itemIcons.js
++// Один значок на тип предмета для всех окон обмена (торговец, общий склад).
++// Раньше функция жила копией в двух файлах — теперь импортируется.
++
++export const getItemIcon = (itemType) => {
++  if (itemType === 'caps') return '💰';
++  if (itemType === 'weapon') return '🔫';
++  if (itemType === 'armor') return '🛡️';
++  if (itemType === 'powerArmor') return '⚡';
++  if (itemType === 'clothing' || itemType === 'outfit') return '👕';
++  if (itemType === 'ammo') return '🔹';
++  if (itemType === 'chem' || itemType === 'chems') return '💊';
++  if (itemType === 'drinks') return '🥤';
++  if (itemType === 'food') return '🍖';
++  if (itemType === 'magazine') return '📖';
++  if (itemType === 'junk') return '🗑️';
++  if (itemType === 'materials') return '🧰';
++  return '📦';
++};
++
++export default getItemIcon;
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1963a97..691d978 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,30 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (556) — окно общего хранилища как у торговца, без денег
++
++Слово владельца: «Оно должно было выглядеть и работать по аналогии с экраном
++торговца. Только без функций отслеживания цен и крышек. Т.е обмен без денег».
++
++- **Файл окна.** `components/lootTrade/PartyStorageModal.js` переписан на общий
++  каркас торговца: `tradeOverlayStyles` (`modalBackdrop`/`merchantModalCard`,
++  `pane`/`paneHalf`, `paneHeader`, `bufferBox`, `tradeRow`, `miniMoveBtn`,
++  `barterFooter`, `mobileTabSwitch`). Свой зелёный `StyleSheet` оставлен только
++  под блок ключей и вспомогательные строки.
++- **Поведение.** Двусторонний буфер: «Положить»/«Положить всё» и
++  «Забрать»/«Забрать всё»; строки буфера снимаются кликом (−1) и крестиком
++  (вся строка); «Очистить» и «Перенести» в нижней полосе; до «Перенести» ни
++  сервер, ни локальный инвентарь не меняются (атомарный
++  `transferPartyStorage`). На узком экране — вкладки панелей, как у торговца.
++- **Деньги убраны.** Нет цен, наценок, кассы и баланса: вместо них счётчики
++  «к складу / к себе». 518-я защёлка (в исходнике окна нет слова `caps`)
++  проходит.
++- **Общая иконка типа предмета** вынесена в `components/lootTrade/itemIcons.js`;
++  её используют и `PlayerLootTradeOverlay`, и склад.
++- **Тесты.** Новый `storage-trader-parity-556` (7 проверок, монтирование);
++  в `party-storage-modal-507` добавлены `useWindowDimensions` и мок иконок.
++- **Отсечка.** `patchs/baseline.json` → 556; защёлки 535/532 — 556/5/10,
++  roadmap `**556**`.
++
+ ## 2026-11-07 (555) — ПК-режим карточек в окне комнаты Мастера
+ 
+ Слово владельца: «Переключатель будет в окне просмотра комнаты. Делай 555».
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 56cdddf..4d52d0e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,35 @@
+ # Changelog
+ ---
+ 
++## Shared storage window built like the trader screen (patch 556)
++
++The owner's words: "About the shared storage window. It should have looked and
++worked like the trader screen. Only without price and caps tracking. That is, an
++exchange without money."
++
++- **Same frame.** The storage window no longer draws its own green box: header
++  with an icon and a "Close" button, two panes, a buffer inside each pane, a
++  bottom bar with "Clear" and "Transfer" — all from the shared trader stylesheet
++  (`tradeOverlayStyles`). On a phone the panes switch via tabs, just like the
++  trader window.
++- **Same exchange.** A row can be put into storage or taken from it with
++  "Deposit" / "Deposit all" and "Withdraw" / "Withdraw all". Picked items first
++  go into a grey buffer: a click on a buffer row removes one item, the cross
++  removes the whole row. Until "Transfer" is pressed neither the storage nor the
++  inventory changes; afterwards a single atomic request goes to the server.
++- **No money.** No prices, markups, cash or deal balance: instead of
++  "you owe / you receive" the bottom bar shows how many items go to storage and
++  how many are taken. The item-type icon is the same as the trader's
++  (`components/lootTrade/itemIcons.js`, shared by both windows).
++- **Game Master.** For the GM the storage stays a read-only view plus key
++  broadcasting; the window got the same header and panes, and has no transfer
++  buttons.
++- **Untouched.** Server, protocol, store, limits and transfer atomicity did not
++  change — this patch is about the window. JSON export/import and keys remain.
++- **Acceptance.** New `storage-trader-parity-556` (7 checks, the window is really
++  mounted): trader frame, two-way buffer, "all at once", no transfer before the
++  button, cross and "Clear", phone tabs, absence of money and paired labels.
++
+ ## PC mode for room cards (patch 555)
+ 
+ The owner's words: "The switch will live in the room view. Do patch 555." Before
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c4de6d4..4e0d2ca 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Окно общего хранилища по образцу торговца (патч 556)
++
++Слово владельца: «Насчёт окна общего хранилища. Оно должно было выглядеть и
++работать по аналогии с экраном торговца. Только без функций отслеживания цен и
++крышек. Т.е обмен без денег».
++
++- **Тот же каркас.** Окно склада больше не рисует собственный зелёный домик:
++  шапка с иконкой и кнопкой «Закрыть», две панели, буфер внутри каждой панели,
++  нижняя полоса с «Очистить» и «Перенести» — всё из общего файла стилей
++  торговца (`tradeOverlayStyles`). На телефоне панели переключаются вкладками,
++  как у торговца.
++- **Тот же обмен.** Строку можно положить на склад или забрать со склада,
++  кнопками «Положить» / «Положить всё» и «Забрать» / «Забрать всё». Взятое
++  сначала попадает в серый буфер: клик по строке буфера снимает одну вещь,
++  крестик — всю строку. До нажатия «Перенести» ни склад, ни инвентарь не
++  меняются, после — одна атомарная операция на сервер.
++- **Без денег.** Ни цен, ни наценок, ни кассы, ни баланса сделки: в нижней
++  полосе вместо «должен/получишь» написано, сколько вещей идёт на склад и
++  сколько забирается. Иконка типа предмета — та же, что у торговца
++  (`components/lootTrade/itemIcons.js`, общий на два окна).
++- **Мастер.** У Мастера склад остаётся просмотром состава и трансляцией ключей;
++  окно получило ту же шапку и панели, кнопок переноса у него нет.
++- **Что не тронуто.** Сервер, протокол, стор, лимиты и атомарность переноса не
++  менялись — патч про окно. Экспорт/импорт JSON и ключи на месте.
++- **Приёмка.** Новый `storage-trader-parity-556` (7 проверок, окно монтируется
++  по-настоящему): каркас торговца, двусторонний буфер, «всё сразу», отсутствие
++  переноса до кнопки, крестик и «Очистить», вкладки на телефоне, отсутствие
++  денег и парные подписи.
++
+ ## ПК-режим карточек в окне комнаты (патч 555)
+ 
+ Слово владельца: «Переключатель будет в окне просмотра комнаты. Делай 555».
+diff --git a/docs/patch-556-install.md b/docs/patch-556-install.md
+new file mode 100644
+index 0000000..4acffba
+--- /dev/null
++++ b/docs/patch-556-install.md
+@@ -0,0 +1,67 @@
++# Установка патча 556: окно общего хранилища по образцу торговца
++
++Патч подготовлен от состояния **версии 555**. Файл установки:
++`patchs/556-storage-like-trader.patch`.
++
++> **Слово владельца:** «Насчёт окна общего хранилища. Оно должно было выглядеть
++> и работать по аналогии с экраном торговца. Только без функций отслеживания
++> цен и крышек. Т.е обмен без денег».
++
++## Что меняется
++
++Только окно склада (и общая иконка типа предмета). Сервер, протокол, стор,
++лимиты и атомарность переноса не менялись.
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/lootTrade/PartyStorageModal.js` | окно собрано из каркаса торговца: шапка с иконкой и «Закрыть», две панели, буфер внутри каждой панели, нижняя полоса «Очистить» / «Перенести»; на телефоне — вкладки панелей. Кнопки переноса: «Положить» / «Положить всё», «Забрать» / «Забрать всё». Цен, наценок, кассы и баланса нет |
++| `components/lootTrade/itemIcons.js` | новый общий модуль иконки типа предмета (торговец + склад) |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | берёт иконку из общего модуля вместо локальной копии |
++| `i18n/ru-RU/screens/inventory/screen.json`, `i18n/en-EN/screens/inventory/screen.json` | подписи обмена: «Положить (всё)», «Забрать (всё)», строка «К складу: N · к себе: M», подсказка «Обмен без денег» |
++| `__tests__/room/storage-trader-parity-556.test.js` | новая приёмка: каркас торговца, двусторонний буфер, «всё сразу», отсутствие переноса до кнопки, крестик и «Очистить», вкладки на телефоне, отсутствие денег, парные подписи (7 проверок) |
++| `__tests__/lootTrade/party-storage-modal-507.test.js` | в рендер-мок добавлены `useWindowDimensions` и мок иконок |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 556 / `baseline` 556 / roadmap `**556**` |
++| `patchs/baseline.json` | отсечка 556 |
++| `public/version.json` | `version: 556`, релиз и заметки «Что нового» не менялись |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md` | запись патча 556, тезис 44 |
++
++## Как это выглядит и работает
++
++1. Игрок открывает «Общее хранилище» из инвентаря. Окно — как у торговца:
++   шапка с иконкой, две панели, внизу полоса с «Очистить» и «Перенести».
++2. Слева «Предметы персонажа»: строку можно отправить на склад кнопкой
++   «Положить» или «Положить всё». Справа «Общее хранилище»: «Забрать» или
++   «Забрать всё».
++3. Выбранное сначала лежит в сером буфере внутри панели. Клик по строке буфера
++   снимает одну вещь, крестик убирает строку целиком; «Очистить» сбрасывает
++   весь буфер.
++4. Ничего не переносится, пока не нажата «Перенести»; после нажатия уходит одна
++   атомарная операция, и только по ответу сервера меняется инвентарь.
++5. На телефоне панели переключаются вкладками, как в окне торговца.
++6. У Мастера — просмотр состава склада и трансляция ключей; кнопок переноса у
++   него нет.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 556
++```
++
++После установки: `git add -A && git commit -m "Патч 556"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/storage-trader-parity-556.test.js \
++  __tests__/lootTrade/party-storage-modal-507.test.js \
++  __tests__/room/storage-two-panel-518.test.js \
++  __tests__/room/party-storage-transfer-509.test.js \
++  __tests__/room/item-stacking-522.test.js
++npm run typecheck
++```
++
++Ожидаемо: 556 в `public/version.json` и `patchs/baseline.json`, 7 проверок нового
++файла зелёные, старые приёмки склада проходят без правок поведения.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 7bc1b56..3cd8149 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **555**.
++Дата ревизии: 2026-11-07. Текущая версия: **556**.
+ 
+ ## Тезисы
+ 
+@@ -58,6 +58,16 @@
+ 
+ | 43 | **ПК-режим карточек в окне комнаты.** Переключатель «ПК-режим» стоит в панели комнаты, выбор явный и сохраняется настройкой `gmPcMode` (не по ширине окна). Включённый режим разворачивает широкую центрированную колонку карточек (до 960 px), все четыре раздела открыты, перки показаны строками с текстом эффекта текущего ранга | ✅ сделано | **555** |
+ 
++| 44 | **Окно общего хранилища — как у торговца, но без денег.** Окно склада собрано из тех же каркасов, что двупанельное окно торговца: шапка с иконкой и «Закрыть», переключатель панелей на телефоне, две панели с буфером внутри каждой, нижняя полоса «Очистить» / «Перенести». Обмен двусторонний: положить и забрать, по одной вещи или всё сразу; цены, наценки и касса не показываются и не считаются | ✅ сделано | **556** |
++
++## Осталось после патча 556
++
++Патч 556 привёл окно общего хранилища к виду экрана торговца: те же панели,
++буфер и кнопка «Перенести», но без цен и крышек — обмен без денег. Перенос
++по-прежнему атомарный: до нажатия кнопки ни склад, ни инвентарь не меняются.
++Следующий шаг по слову владельца — раздел локаций и сундуков в пространстве
++Мастера; объём и место раздела ещё не подтверждены.
++
+ ## Осталось после патча 555
+ 
+ Патч 555 добавил ПК-режим в окно комнаты Мастера: переключатель в панели
+@@ -354,6 +364,7 @@
+ - `docs/patch-553-install.md` — пояснение шкалы дальности, исправление таблиц (553).
+ - `docs/patch-554-install.md` — установка релиза 5: новые заметки «Что нового» (554).
+ - `docs/patch-555-install.md` — ПК-режим карточек в окне комнаты Мастера (555).
++- `docs/patch-556-install.md` — окно общего хранилища по образцу торговца, без денег (556).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 90b8eb8..96cfcfc 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -101,7 +101,13 @@
+     "gmNoActions": "The GM can view the storage but cannot deposit or withdraw items",
+     "issueKey": "Add to storage",
+     "issuedKey": "Record added to shared storage",
+-    "noKeyItems": "No keys yet"
++    "noKeyItems": "No keys yet",
++    "depositOne": "Deposit",
++    "depositAll": "Deposit all",
++    "withdrawOne": "Withdraw",
++    "withdrawAll": "Withdraw all",
++    "exchangeSummary": "To storage: {give} · to me: {take}",
++    "exchangeEven": "A trade without money: pick items and press \"Transfer\""
+   },
+   "labels": {
+     "leftArm": "Left bracer",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 150388d..7da1404 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -101,7 +101,13 @@
+     "gmNoActions": "Мастер смотрит состав склада, но не вносит и не забирает предметы",
+     "issueKey": "Выдать на склад",
+     "issuedKey": "Запись выдана в общее хранилище",
+-    "noKeyItems": "Ключей пока нет"
++    "noKeyItems": "Ключей пока нет",
++    "depositOne": "Положить",
++    "depositAll": "Положить всё",
++    "withdrawOne": "Забрать",
++    "withdrawAll": "Забрать всё",
++    "exchangeSummary": "К складу: {give} · к себе: {take}",
++    "exchangeEven": "Обмен без денег: выберите вещи и нажмите «Перенести»"
+   },
+   "labels": {
+     "leftArm": "Левый наруч",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index de19886..e502d03 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "555"
++  "baseline": "556"
+ }
+diff --git a/public/version.json b/public/version.json
+index 75e20d3..f543e8c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "555",
++  "version": "556",
+   "release": 5,
+   "notes": {
+     "ru-RU": [
