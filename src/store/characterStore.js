@@ -88,7 +88,12 @@ import { isRobotCharacter } from '../../domain/origins';
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
 // в CharacterContext.
 import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
-import { selectLegacyAttributes } from './selectors.js';
+import { selectLegacyAttributes, selectLegacySkills } from './selectors.js';
+// 552: очки навыков от перков — общая арифметика снятия/долга (domain).
+import {
+  pendingSkillPoints,
+  shouldUnlockSkillDistribution,
+} from '../../domain/skillPoints.js';
 import { createStateExtensionFields, notifyTimeTick } from './stateExtensions.js';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
@@ -1603,6 +1608,36 @@ const useCharacterStore = create(withDerivedCascade(devtools(
       setAttributesSaved: (value) => set({ attributesSaved: Boolean(value) }),
       /** Флаг «навыки сохранены» (UI создания). */
       setSkillsSaved: (value) => set({ skillsSaved: Boolean(value) }),
+
+      /**
+       * 552: старые сейвы, где «Тренированный» был взят до 551.
+       * Перк уже даёт очки в пул (551), но у завершённого персонажа
+       * распределение скрыто — очки некуда потратить. При загрузке
+       * открываем распределение заново, если в пуле есть нераспределённые
+       * очки. Идемпотентно: после первого открытия skillsSaved = false,
+       * повторные загрузки ничего не меняют (цикла и повторных алертов нет).
+       *
+       * @returns {{unlocked: boolean, points: number, pending: number}}
+       */
+      unlockSkillDistributionIfPointsPending: () => {
+        const state = get();
+        const pending = pendingSkillPoints({
+          attributes: selectLegacyAttributes({ attributes: state.attributes }),
+          level: state.level,
+          perkBonuses: state.perkBonuses,
+          skills: selectLegacySkills({ skills: state.skills }),
+          selectedSkills: state.selectedSkills || [],
+          extraTaggedSkills: state.extraTaggedSkills || [],
+        });
+        const unlocked = shouldUnlockSkillDistribution({
+          attributesSaved: state.attributesSaved,
+          skillsSaved: state.skillsSaved,
+          pending,
+        });
+        if (!unlocked) return { unlocked: false, points: 0, pending };
+        set({ skillsSaved: false });
+        return { unlocked: true, points: pending, pending };
+      },
       /** Текущие очки удачи (current; потолок — производная, не персистится). */
       setLuckPoints: (updater) => set((state) => ({
         luckPoints: typeof updater === 'function' ? updater(state.luckPoints) : updater,
@@ -2109,6 +2144,9 @@ const useCharacterStore = create(withDerivedCascade(devtools(
             // 411: мигратор перков («книга приоритетнее») — до пересчёта,
             // чтобы производные считались уже по сверенному списку.
             state.reconcilePerksAtLoad?.();
+            // 552: старый сейв с «Тренированным» — очки уже в пуле, но
+            // распределение было закрыто. Открываем его один раз.
+            state.unlockSkillDistributionIfPointsPending?.();
             state.recalculateAll();
           } catch (error) {
             debugLog('characterStore.rehydrate.recalculateFailed', {

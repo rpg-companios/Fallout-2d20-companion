@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ�
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('551');
+    expect(version.version).toBe('552');
     expect(version.release).toBe(4);
     expect(version.notes['ru-RU']).toHaveLength(150);
     expect(version.notes['en-EN']).toHaveLength(150);
-    expect(json('patchs/baseline.json').baseline).toBe('551');
+    expect(json('patchs/baseline.json').baseline).toBe('552');
     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
@@ -277,15 +277,16 @@ describe('535: протокол, клиент, строки и документ�
     expect(read('patchs/549-shared-drag-hook.patch')).toContain('useDragResponder');
     expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
     expect(read('patchs/551-educated-and-range.patch')).toContain('getSkillPointsAvailable');
+    expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **551**');
+    expect(roadmap).toContain('Текущая версия: **552**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');
     expect(roadmap).toContain('| 31 |');
     expect(roadmap).toContain('| 32 |');
     expect(roadmap).toContain('| 33 |');
-    expect(roadmap).toContain('Осталось после патча 551');
+    expect(roadmap).toContain('Осталось после патча 552');
     expect(read('docs/patch-540-install.md')).toContain('540');
     expect(read('docs/patch-541-install.md')).toContain('541');
     expect(read('docs/patch-542-install.md')).toContain('542');
@@ -298,6 +299,7 @@ describe('535: протокол, клиент, строки и документ�
     expect(read('docs/patch-549-install.md')).toContain('549');
     expect(read('docs/patch-550-install.md')).toContain('550');
     expect(read('docs/patch-551-install.md')).toContain('551');
+    expect(read('docs/patch-552-install.md')).toContain('552');
     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });

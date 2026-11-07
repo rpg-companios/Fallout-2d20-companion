@@ -1,5 +1,31 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-11-07 (552) — очки «Тренированного» у старых сейвов и снятие перка без долга
+
+Владелец принял два решения по следствиям 551: старым сейвам открывать
+распределение сразу; при снятии перка игрок сам выбирает навыки, суммарно не
+больше 2 очков (2×1 или 1×2). Моды/дальность — поведение 551 не менялось.
+
+- **Старые сейвы.** Новый `domain/skillPoints.js`: `pendingSkillPoints`
+  (пул `getSkillPointsAvailable` − `calculateSkillPointsUsed`) и
+  `shouldUnlockSkillDistribution` (атрибуты и навыки сохранены + есть очки).
+  Стор-экшен `unlockSkillDistributionIfPointsPending` снимает `skillsSaved=false`;
+  вызывается в `characterSaves.loadCharacter` (с уведомлением
+  `alerts.skillPointsUnlocked*`) и в `onRehydrateStorage`. Идемпотентно: пока
+  распределение открыто, повторной загрузке открывать нечего — цикла нет.
+- **Снятие перка.** `perkRemovalRefund` = grant − нераспределённые (не больше
+  grant); `planPerkRemovalSkillRefund` проверяет запас навыков до минимумов
+  (0 обычный, 2 тегированный); `applySkillRefund` пишет абсолютные значения.
+  Экран перков: `handleRemovePerk` считает grant как разницу `selectPerkBonuses`
+  до/после, при остатке открывает `SkillRefundModal` (список навыков со запасом,
+  «−1»/«Вернуть», подтверждение только при нулевом остатке), подтверждение
+  вызывает `setBaseSkills` и затем снимает перк. Недостаточный запас — отказ с
+  объяснением, «молчаливого» долга нет.
+- **i18n.** `refund.*` и `alerts.skillPointsUnlocked*`/`refundImpossible*` в
+  `modules/fallout/i18n/{ru-RU,en-EN}/screens/perksAndTraits/screen.json`.
+- **Приёмка:** `educated-skill-debt-552` (19). Итог: **285 файлов / 2639
+  проверок, exit 0**; typecheck — успешно.
+
 ## 2026-11-07 (551) — «Тренированный» даёт очки навыков; дальность с модами не падает
 
 Жалоба владельца: «не работает перк тренированный, он должен давать очки навыков.

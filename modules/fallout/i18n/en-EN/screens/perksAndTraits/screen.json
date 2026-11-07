@@ -22,7 +22,11 @@
     "perkMissingIdTitle": "Unknown perk in the save",
     "perkMissingIdMessage": "These perks were not found in the catalog and were removed: {perks}.",
     "dormantPerksTitle": "Perks that are not active yet",
-    "dormantPerksMessage": "By the book rules these are not working right now: {perks}. They will come back once you meet the requirements — or replace them with the «Replace» button in the perk list."
+    "dormantPerksMessage": "By the book rules these are not working right now: {perks}. They will come back once you meet the requirements — or replace them with the «Replace» button in the perk list.",
+    "skillPointsUnlockedTitle": "Skill points from a perk",
+    "skillPointsUnlockedMessage": "The Educated perk grants skill points that are not spent yet: {points}. Open the Character tab and distribute them — the perk is already counted.",
+    "refundImpossibleTitle": "The perk cannot be removed",
+    "refundImpossibleMessage": "Removing the perk requires taking skill points back: {points}. There is no such reserve above the minimum — free up skill points first."
   },
   "dormant": {
     "prefix": "Not active",
@@ -31,5 +35,15 @@
     "robot": "perk is unavailable to robots",
     "excluded": "conflicts with «{perk}» — the two are mutually exclusive",
     "rankLimit": "no such rank in the book — the rank can be replaced"
+  },
+  "refund": {
+    "title": "Remove the perk “{perk}”",
+    "message": "The perk granted skill points: {points}. Choose which skills to take them from — {points} in total at most.",
+    "remaining": "Still to remove: {remaining}",
+    "taggedHint": "Tagged skills cannot go below 2, regular skills below 0.",
+    "decrease": "−1",
+    "undo": "Give back",
+    "cancel": "Cancel",
+    "confirm": "Remove perk"
   }
 }

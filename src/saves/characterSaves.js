@@ -534,6 +534,17 @@ const hydrateStoreFromRow = async (
     );
   }
 
+  // 552: «Тренированный», взятый до 551, уже льёт очки в пул, но у
+  // завершённого персонажа распределение навыков было закрыто. Открываем
+  // его заново и объясняем игроку, откуда взялись очки.
+  const skillPointsUnlock = useCharacterStore.getState().unlockSkillDistributionIfPointsPending?.();
+  if (allowNightkinMutation && skillPointsUnlock?.unlocked) {
+    paAlert(
+      tPerkAlert('skillPointsUnlockedTitle'),
+      tPerkAlert('skillPointsUnlockedMessage').replace('{points}', skillPointsUnlock.points),
+    );
+  }
+
   if (allowNightkinMutation && data.nightkinKitPending && data.equipment?.id === 'nightkin') {
     try {
       const catalog = getEquipmentCatalog();

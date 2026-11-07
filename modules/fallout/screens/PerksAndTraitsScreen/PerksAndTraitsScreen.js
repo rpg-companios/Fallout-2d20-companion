@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import useCharacterStore from '../../../../src/store/characterStore';
-import { selectLegacyAttributes } from '../../../../src/store/selectors';
+import { selectLegacyAttributes, selectLegacySkills } from '../../../../src/store/selectors';
 import { showRawAlert } from '../../../../components/alerts/alertService';
 import { getTraitI18nById } from '../../../../domain/traits';
 import {
@@ -12,12 +12,19 @@ import {
   getPerkMaxRanks,
   getPerkSelectionCount,
   removeSelectedPerkAt,
+  selectPerkBonuses,
   withAssignedPerkRanks,
 } from '../../../../domain/perks';
+import {
+  applySkillRefund,
+  pendingSkillPoints,
+  planPerkRemovalSkillRefund,
+} from '../../../../domain/skillPoints';
 import { isRobotCharacter } from '../../../../domain/origins';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import perksData from '../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
+import SkillRefundModal from './SkillRefundModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
 import styles from '../../styles/PerksAndTraitsScreen.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
@@ -43,11 +50,24 @@ const PerksAndTraitsScreen = () => {
   const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
   const attributesSaved = useCharacterStore((s) => s.attributesSaved);
   const addPerkAttributePoints = useCharacterStore((s) => s.addPerkAttributePoints);
+  // 552: навыки и теги — чтобы при снятии перка вернуть его очки в пул
+  // (игрок сам выбирает, с каких навыков снять; суммарно не больше 2).
+  const storeSkills = useCharacterStore((s) => s.skills);
+  const selectedSkills = useCharacterStore((s) => s.selectedSkills);
+  const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
+  const setBaseSkills = useCharacterStore((s) => s.setBaseSkills);
+  const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
+  const taggedSkills = useMemo(
+    () => [...(selectedSkills || []), ...(extraTaggedSkills || [])],
+    [selectedSkills, extraTaggedSkills],
+  );
   useLocale();
   const moduleLocale = useModuleLocale();
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
   const [replacingIndex, setReplacingIndex] = useState(null);
   const [openSpoilers, setOpenSpoilers] = useState({});
+  // 552: план снятия перка, чьи очки уже потрачены ({index, points, perkName}).
+  const [refundPlan, setRefundPlan] = useState(null);
   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
   const perkLimit = level + extraPerkSlots;
   const rankedPerks = useMemo(() => withAssignedPerkRanks(selectedPerks), [selectedPerks]);
@@ -220,13 +240,71 @@ const PerksAndTraitsScreen = () => {
     closePerkModal();
   };
 
-  const handleRemovePerk = () => {
-    if (replacingIndex == null) return;
-    const previousPerk = selectedPerks[replacingIndex];
+  const finalizePerkRemoval = (index) => {
+    const previousPerk = selectedPerks[index];
     applyIntenseTrainingDelta(previousPerk, null);
-    setSelectedPerks(removeSelectedPerkAt(selectedPerks, replacingIndex));
+    setSelectedPerks(removeSelectedPerkAt(selectedPerks, index));
     closePerkModal();
   };
+
+  /**
+   * 552 (слово владельца): снятие перка забирает его очки навыков. Если очки
+   * уже потрачены — игрок сам выбирает, с каких навыков снять, суммарно не
+   * больше 2 (2 с одного или 1 с двух). Нераспределённые очки «съедаются»
+   * первыми; недостаточный запас навыков — отказ с объяснением.
+   */
+  const handleRemovePerk = () => {
+    if (replacingIndex == null) return;
+    const state = useCharacterStore.getState();
+    const nextPerks = removeSelectedPerkAt(selectedPerks, replacingIndex);
+    const nextBonuses = selectPerkBonuses({ ...state, selectedPerks: nextPerks }, perksData);
+    const grantedPoints = Math.max(
+      0,
+      (Number(state.perkBonuses?.skillPoints) || 0) - (Number(nextBonuses?.skillPoints) || 0),
+    );
+    const pending = pendingSkillPoints({
+      attributes,
+      level,
+      perkBonuses: state.perkBonuses,
+      skills,
+      selectedSkills,
+      extraTaggedSkills,
+    });
+    const plan = planPerkRemovalSkillRefund({
+      grantedPoints,
+      pending,
+      skills,
+      taggedSkills,
+    });
+
+    if (!plan.possible) {
+      showAlert(
+        tPerksAndTraits('alerts.refundImpossibleTitle'),
+        tPerksAndTraits('alerts.refundImpossibleMessage').replace('{points}', String(plan.refund)),
+      );
+      return;
+    }
+    if (plan.refund <= 0) {
+      finalizePerkRemoval(replacingIndex);
+      return;
+    }
+
+    setRefundPlan({
+      index: replacingIndex,
+      points: plan.refund,
+      perkName: getPerkSheetDisplay(selectedPerks[replacingIndex]).name,
+    });
+    closePerkModal();
+  };
+
+  const handleConfirmRefund = (refunds) => {
+    if (!refundPlan) return;
+    setBaseSkills(applySkillRefund(skills, taggedSkills, refunds));
+    finalizePerkRemoval(refundPlan.index);
+    setRefundPlan(null);
+  };
+
+  const handleCancelRefund = () => setRefundPlan(null);
 
   const renderSpoiler = ({ spoilerKey, title, rankLabel, description, onChange, inactive, inactiveNote }) => {
     const open = openSpoilers[spoilerKey] === true;
@@ -307,6 +385,16 @@ const PerksAndTraitsScreen = () => {
         onChoosePerk={handleChoosePerk}
         onRemovePerk={replacingIndex != null ? handleRemovePerk : undefined}
         title={replacingIndex != null ? tPerksAndTraits('modal.replaceTitle') : tPerksAndTraits('modal.title')}
+      />
+
+      <SkillRefundModal
+        visible={refundPlan != null}
+        perkName={refundPlan?.perkName}
+        points={refundPlan?.points ?? 0}
+        skills={skills}
+        taggedSkills={taggedSkills}
+        onCancel={handleCancelRefund}
+        onConfirm={handleConfirmRefund}
       />
     </View>
   );
