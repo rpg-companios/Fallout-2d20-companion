@@ -1,6 +1,28 @@
 # Changelog
 ---
 
+## Every character sees its own transmission (patch 560)
+
+The owner's words: "a transmission is only available to the character you are
+playing. If 2 characters in 2 server rooms receive 2 transmissions, each sees its
+own… until you enter the other one you see nothing. And the signal of a new
+transmission or effect is the colour of the server icon."
+
+- **Style untouched.** The pill and the location/trader/terminal window look and
+  behave as before.
+- **Addressed to the open character only.** The window shows the session that
+  belongs to the character being played; another character's transmission is not
+  shown to this one. Two characters in two rooms each see their own.
+- **Quiet on the list.** No pills, no windows.
+- **One signal — a blue icon.** It lights for a sent effect and for a new
+  transmission of this character (a session they have not seen yet).
+- **Seeing clears it.** Enter the character and see your location — the icon goes
+  back to green/grey.
+- **Acceptance.** New `transmission-per-character-560` (7 checks, real mount with
+  two characters in two rooms).
+
+---
+
 ## Transmissions untouched, effects shown on entry (patch 559)
 
 The owner's words: "can we leave the transmission as it is? It does not work

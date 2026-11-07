@@ -1,11 +1,11 @@
 {
-  "version": "559",
+  "version": "560",
   "release": 5,
   "notes": {
     "ru-RU": [
       "Игра в комнате с ведущим: вы подключаетесь к комнате, ваш лист уезжает ведущему, а его решения — эффект, урон, списание предмета — приходят прямо на лист и сохраняются.",
-      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а при входе в этого персонажа открывается окно в стиле «Что нового» со списком того, что ведущий сделал.",
-      "В окне только эффекты — уровень, крышки, лечение, увечья, медикаменты от другого игрока. Локации и торговцы работают как раньше, плашкой. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки — доставку разбирают за столом.",
+      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а при входе в этого персонажа открывается окно в стиле «Что нового» со списком того, что ведущий сделал, и его локация.",
+      "Трансляция доступна только тому персонажу, за которого вошли: два персонажа в двух комнатах видят каждый свою, пока не войдёшь другим — не увидишь. Синяя иконка сервера сигналит и о новой трансляции, и о присланном эффекте. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки.",
       "Ведущий видит ваше состояние: ОЗ, радиация, условия и ключевые показатели — без просьб прислать скриншот.",
       "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список. Запертая дверь не пускает внутрь, пока замок не открыт.",
       "Взлом замков: мини-игра с ячейками по восприятию и сложности, ограниченным числом попыток и выбором «ключом или взломом».",
@@ -16,8 +16,8 @@
     ],
     "en-EN": [
       "Playing in a room with your GM: you join the room, your sheet goes to the GM, and their decisions — an effect, damage, a spent item — land on your sheet and are saved.",
-      "GM messages arrive personally: the character card in the list shows a blue server icon, and when you enter that character a window in the \"What's new\" style lists what the GM has done.",
-      "The window holds effects only — level, caps, healing, injuries, a peer's first aid. Locations and traders work as before, through the pill. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent — delivery is settled at the table.",
+      "GM messages arrive personally: the character card in the list shows a blue server icon, and when you enter that character a window in the \"What's new\" style lists what the GM has done, plus their location.",
+      "A transmission is only available to the character you are playing: two characters in two rooms each see their own, and until you enter the other one you see nothing. The blue server icon signals both a new transmission and a sent effect. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent.",
       "The GM sees your state: HP, radiation, conditions and key stats, with no need to ask for a screenshot.",
       "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list. A locked door keeps you out until the lock is open.",
       "Lockpicking: a mini-game with cells based on Perception and difficulty, a limited number of attempts, and sometimes a choice between a key and a hack.",

@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ�
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('559');
+    expect(version.version).toBe('560');
     expect(version.release).toBe(5);
     expect(version.notes['ru-RU']).toHaveLength(10);
     expect(version.notes['en-EN']).toHaveLength(10);
-    expect(json('patchs/baseline.json').baseline).toBe('559');
+    expect(json('patchs/baseline.json').baseline).toBe('560');
     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ�
     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **559**');
+    expect(roadmap).toContain('Текущая версия: **560**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');

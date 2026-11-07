@@ -183,17 +183,13 @@ describe('Патч 559: трансляция как раньше, эффекты
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it('трансляция не тронута: окно локации/торговца работает как до 558', () => {
+  it('трансляция в склад уведомлений не пишется: у неё свой канал', () => {
     const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
-    // Никакой привязки к фокусу игрока и никаких записей в список уведомлений.
-    expect(overlaySrc).not.toContain('playerFocusStore');
+    // Стиль плашки и окна локации не менялся; в список эффектов трансляция
+    // не попадает (патч 559).
     expect(overlaySrc).not.toContain('playerNoticesStore');
-    expect(overlaySrc).not.toContain('homeFocused');
-    expect(overlaySrc).not.toContain('focusedBindings');
-    // Прежний отбор сессии по привязкам на месте.
+    // Прежний отбор сессии по привязкам на месте (адресат — патч 560).
     expect(overlaySrc).toContain("if (session.targetType === 'room' || session.targetCharacterId === bind.characterId)");
-    const baseline = read('patchs/baseline.json');
-    expect(baseline).toContain('"559"');
   });
 
   it('команды Мастера не всплывают поверх списка, а ложатся в окно персонажа', () => {
@@ -205,7 +201,7 @@ describe('Патч 559: трансляция как раньше, эффекты
     expect(homeSrc).toContain(
       "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
     );
-    expect(homeSrc).toContain('noticesCount={unreadNoticeCountFor(notices, item.id)}');
+    expect(homeSrc).toContain('noticesCount={signalCount}');
   });
 
   it('у Мастера только факт отправки: «Доставлено» из интерфейса ушло', () => {

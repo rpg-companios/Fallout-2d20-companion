@@ -95,6 +95,7 @@ import useRoomStore from '../../../src/room/roomStore';
 import useUiModeStore from '../../../src/room/uiModeStore';
 import usePlayerNoticesStore, { unreadNoticeCountFor } from '../../../src/room/playerNoticesStore';
 import usePlayerFocusStore from '../../../src/room/playerFocusStore';
+import useTransmissionSeenStore, { hasUnseenTransmission } from '../../../src/room/transmissionSeenStore';
 import { isRoomServerConfigured } from '../../../src/room/roomClient';
 import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 import {
@@ -513,6 +514,10 @@ export default function HomeScreen({ navigation }) {
   const notices = usePlayerNoticesStore((state) => state.notices);
   const hydrateNotices = usePlayerNoticesStore((state) => state.hydrate);
   const setHomeFocused = usePlayerFocusStore((state) => state.setHomeFocused);
+  // 560: синяя иконка сервера — общий сигнал: и присланный эффект, и новая
+  // трансляция (локация/торговец/терминал) этого персонажа.
+  const seenTransmissions = useTransmissionSeenStore((state) => state.seen);
+  const hydrateTransmissions = useTransmissionSeenStore((state) => state.hydrate);
 
   const storeUiMode = useAppSettingsStore(selectUiMode);
   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
@@ -698,10 +703,11 @@ export default function HomeScreen({ navigation }) {
     useCallback(() => {
       useUiModeStore.getState().setGmInspectingCharacter(false);
       void hydrateNotices();
+      void hydrateTransmissions();
       setHomeFocused(true);
       loadList();
       return () => setHomeFocused(false);
-    }, [loadList, hydrateNotices, setHomeFocused])
+    }, [loadList, hydrateNotices, hydrateTransmissions, setHomeFocused])
   );
 
   // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
@@ -1622,6 +1628,11 @@ export default function HomeScreen({ navigation }) {
                 const isBoundOnline = boundCode
                   ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
                   : false;
+                // 560: сигнал = непрочитанный эффект ИЛИ новая трансляция
+                // именно этого персонажа (пока он не открыл свою — иконка синяя).
+                const hasUnseen = Boolean(boundCode)
+                  && hasUnseenTransmission(seenTransmissions, roomRooms[boundCode], item.id);
+                const signalCount = unreadNoticeCountFor(notices, item.id) + (hasUnseen ? 1 : 0);
                 return (
                   <CharacterCell
                     key={item.id}
@@ -1635,7 +1646,7 @@ export default function HomeScreen({ navigation }) {
                     serverAvailable={roomServerAvailable && !isGmMode}
                     serverBound={Boolean(boundCode)}
                     serverOnline={isBoundOnline}
-                    noticesCount={unreadNoticeCountFor(notices, item.id)}
+                    noticesCount={signalCount}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}

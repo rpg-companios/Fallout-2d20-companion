@@ -1,0 +1,812 @@
+diff --git a/__tests__/room/effects-window-559.test.js b/__tests__/room/effects-window-559.test.js
+index 6de02a8..4b6f500 100644
+--- a/__tests__/room/effects-window-559.test.js
++++ b/__tests__/room/effects-window-559.test.js
+@@ -183,17 +183,13 @@ describe('Патч 559: трансляция как раньше, эффекты
+     expect(renderer.toJSON()).toBeNull();
+   });
+ 
+-  it('трансляция не тронута: окно локации/торговца работает как до 558', () => {
++  it('трансляция в склад уведомлений не пишется: у неё свой канал', () => {
+     const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
+-    // Никакой привязки к фокусу игрока и никаких записей в список уведомлений.
+-    expect(overlaySrc).not.toContain('playerFocusStore');
++    // Стиль плашки и окна локации не менялся; в список эффектов трансляция
++    // не попадает (патч 559).
+     expect(overlaySrc).not.toContain('playerNoticesStore');
+-    expect(overlaySrc).not.toContain('homeFocused');
+-    expect(overlaySrc).not.toContain('focusedBindings');
+-    // Прежний отбор сессии по привязкам на месте.
++    // Прежний отбор сессии по привязкам на месте (адресат — патч 560).
+     expect(overlaySrc).toContain("if (session.targetType === 'room' || session.targetCharacterId === bind.characterId)");
+-    const baseline = read('patchs/baseline.json');
+-    expect(baseline).toContain('"559"');
+   });
+ 
+   it('команды Мастера не всплывают поверх списка, а ложатся в окно персонажа', () => {
+@@ -205,7 +201,7 @@ describe('Патч 559: трансляция как раньше, эффекты
+     expect(homeSrc).toContain(
+       "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
+     );
+-    expect(homeSrc).toContain('noticesCount={unreadNoticeCountFor(notices, item.id)}');
++    expect(homeSrc).toContain('noticesCount={signalCount}');
+   });
+ 
+   it('у Мастера только факт отправки: «Доставлено» из интерфейса ушло', () => {
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 2cf8408..486067e 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('559');
++    expect(version.version).toBe('560');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('559');
++    expect(json('patchs/baseline.json').baseline).toBe('560');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **559**');
++    expect(roadmap).toContain('Текущая версия: **560**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index e8ff83c..8e2289a 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('559');
++    expect(version.version).toBe('560');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('559');
++    expect(json('patchs/baseline.json').baseline).toBe('560');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **559**');
++    expect(roadmap).toContain('Текущая версия: **560**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/transmission-per-character-560.test.js b/__tests__/room/transmission-per-character-560.test.js
+new file mode 100644
+index 0000000..8c5183a
+--- /dev/null
++++ b/__tests__/room/transmission-per-character-560.test.js
+@@ -0,0 +1,237 @@
++// Патч 560 — «каждый персонаж видит свою трансляцию».
++//
++// Слово владельца: «Трансляция доступна только тому персонажу, за которого
++// вошли. Если 2 персонажа в 2 серверных комнатах получают 2 трансляции, каждый
++// персонаж видит свою… пока не войдёшь другим — ничего не увидишь. А сигнал о
++// новой трансляции или эффекте — цвет иконки сервера».
++//
++// Здесь проверяем само поведение окна: два персонажа в двух комнатах, открыт
++// один — видно только его трансляцию; и что просмотр гасит сигнал на карточке.
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++    Image: host('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [
++    { character_id: 'char_a', code: 'ROOM1' },
++    { character_id: 'char_b', code: 'ROOM2' },
++  ]),
++  // Имена нужны оверлею: привязка без имени персонажа в списке не участвует.
++  getCharactersList: vi.fn(async () => [
++    { id: 'char_a', name: 'Пайпер' },
++    { id: 'char_b', name: 'Ник' },
++  ]),
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({
++  loadCharacter: vi.fn(async () => true),
++  saveCharacter: vi.fn(async () => true),
++}));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/LockPickingModal', () => ({
++  default: () => React.createElement('LockPickingModal', { mock: true }),
++}));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: () => React.createElement('TerminalHackingModal', { mock: true }),
++}));
++vi.mock('../../components/lootTrade/StandaloneCheckModal', () => ({
++  default: () => React.createElement('StandaloneCheckModal', { mock: true }),
++}));
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return {
++    ...actual,
++    useLocale: () => 'ru-RU',
++    getCurrentLocale: () => 'ru-RU',
++    useModuleLocale: () => 'ru-RU',
++  };
++});
++
++const { default: PlayerLootTradeOverlay } = await import('../../components/lootTrade/PlayerLootTradeOverlay');
++const { default: useCharacterStore } = await import('../../src/store/characterStore');
++const { default: useRoomStore } = await import('../../src/room/roomStore');
++const { default: useUiModeStore } = await import('../../src/room/uiModeStore');
++const { default: usePlayerFocusStore } = await import('../../src/room/playerFocusStore');
++const transmissionSeen = await import('../../src/room/transmissionSeenStore');
++const useTransmissionSeenStore = transmissionSeen.default;
++const { hasUnseenTransmission, sessionTargetsCharacter } = transmissionSeen;
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++
++const session = (id, name, nodeName) => ({
++  sessionId: id,
++  containerId: `${id}-root`,
++  kind: 'hub',
++  name,
++  targetType: 'character',
++  targetCharacterId: id === 'sess-a' ? 'char_a' : 'char_b',
++  nodes: [
++    {
++      containerId: `${id}-node`,
++      kind: 'loot',
++      name: nodeName,
++      parentIds: [`${id}-root`],
++      childIds: [],
++      items: [],
++    },
++  ],
++});
++
++const SESSION_A = session('sess-a', 'Убежище Пайпер', 'Дом у дороги');
++const SESSION_B = session('sess-b', 'Склад Ника', 'Ящик в подвале');
++
++const mount = async ({ currentCharacterId, homeFocused = false, rooms }) => {
++  useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++  usePlayerFocusStore.setState({ homeFocused });
++  useCharacterStore.setState({ currentCharacterId, characterName: 'Кто-то', items: {}, currency: 0 });
++  useRoomStore.setState({
++    clientId: 'player-client',
++    status: 'online',
++    rooms,
++  });
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerLootTradeOverlay));
++    await new Promise((resolve) => setTimeout(resolve, 0));
++  });
++  await act(async () => {
++    await new Promise((resolve) => setTimeout(resolve, 0));
++  });
++  return renderer;
++};
++
++const allText = (renderer) => {
++  const out = [];
++  const walk = (node) => {
++    if (!node) return;
++    if (typeof node === 'string') { out.push(node); return; }
++    if (Array.isArray(node)) { node.forEach(walk); return; }
++    walk(node.children);
++  };
++  walk(renderer.toJSON());
++  return out.join(' ');
++};
++
++const room = (sessionPayload) => ({
++  joined: true,
++  members: [{ clientId: 'player-client', role: 'player' }],
++  capabilities: { terminalHacking: true, lockPicking: true },
++  activeSession: sessionPayload,
++  terminalStates: {},
++});
++
++describe('Патч 560: трансляция — только тому персонажу, за которого вошли', () => {
++  beforeEach(async () => {
++    await useTransmissionSeenStore.getState().resetForTests();
++    usePlayerFocusStore.getState().resetForTests();
++  });
++
++  it('персонаж A видит свою трансляцию и не видит трансляцию персонажа B', async () => {
++    const renderer = await mount({
++      currentCharacterId: 'char_a',
++      rooms: { ROOM1: room(SESSION_A), ROOM2: room(SESSION_B) },
++    });
++    const text = allText(renderer);
++    expect(text).toContain('Дом у дороги');
++    expect(text).not.toContain('Ящик в подвале');
++  });
++
++  it('персонаж B видит свою и не видит чужую', async () => {
++    const renderer = await mount({
++      currentCharacterId: 'char_b',
++      rooms: { ROOM1: room(SESSION_A), ROOM2: room(SESSION_B) },
++    });
++    const text = allText(renderer);
++    expect(text).toContain('Ящик в подвале');
++    expect(text).not.toContain('Дом у дороги');
++  });
++
++  it('на списке персонажей плашки нет вовсе', async () => {
++    const renderer = await mount({
++      currentCharacterId: 'char_a',
++      homeFocused: true,
++      rooms: { ROOM1: room(SESSION_A), ROOM2: room(SESSION_B) },
++    });
++    const text = allText(renderer);
++    expect(text).not.toContain('Дом у дороги');
++    expect(text).not.toContain('Ящик в подвале');
++  });
++
++  it('просмотр своей трансляции гасит сигнал на карточке этого персонажа', async () => {
++    const store = useTransmissionSeenStore.getState();
++    expect(hasUnseenTransmission(store.seen, room(SESSION_A), 'char_a')).toBe(true);
++    expect(hasUnseenTransmission(store.seen, room(SESSION_A), 'char_b')).toBe(false);
++
++    await mount({
++      currentCharacterId: 'char_a',
++      rooms: { ROOM1: room(SESSION_A), ROOM2: room(SESSION_B) },
++    });
++
++    const seen = useTransmissionSeenStore.getState().seen;
++    expect(seen.char_a).toBe('sess-a');
++    // Чужая трансляция так и остаётся непросмотренной — персонаж B её ещё не видел.
++    expect(hasUnseenTransmission(seen, room(SESSION_B), 'char_b')).toBe(true);
++    expect(hasUnseenTransmission(seen, room(SESSION_A), 'char_a')).toBe(false);
++  });
++
++  it('адресат сессии: комната целиком или конкретный персонаж', () => {
++    expect(sessionTargetsCharacter({ targetType: 'room' }, 'char_a')).toBe(true);
++    expect(sessionTargetsCharacter({ targetType: 'character', targetCharacterId: 'char_a' }, 'char_a')).toBe(true);
++    expect(sessionTargetsCharacter({ targetType: 'character', targetCharacterId: 'char_b' }, 'char_a')).toBe(false);
++    expect(sessionTargetsCharacter(null, 'char_a')).toBe(false);
++  });
++
++  it('карточка в списке сигналит синёй иконкой и на трансляцию, и на эффект', () => {
++    const homeSrc = read('components/screens/HomeScreen/HomeScreen.js');
++    expect(homeSrc).toContain('hasUnseenTransmission(seenTransmissions, roomRooms[boundCode], item.id)');
++    expect(homeSrc).toContain('const signalCount = unreadNoticeCountFor(notices, item.id) + (hasUnseen ? 1 : 0);');
++    expect(homeSrc).toContain('noticesCount={signalCount}');
++    expect(homeSrc).toContain(
++      "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
++    );
++  });
++
++  it('окно локации не менялось: отбор сессии по адресату прежний', () => {
++    const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlaySrc).toContain("if (session.targetType === 'room' || session.targetCharacterId === bind.characterId)");
++    expect(overlaySrc).toContain('return bindings.filter((bind) => bind.characterId === currentCharacterId);');
++    expect(overlaySrc).toContain('useTransmissionSeenStore.getState().markSeen(');
++  });
++});
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 4a5520b..9036bae 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -18,6 +18,8 @@ import useCharacterStore from '../../src/store/characterStore';
+ import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
+ import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
++import usePlayerFocusStore from '../../src/room/playerFocusStore';
++import useTransmissionSeenStore from '../../src/room/transmissionSeenStore';
+ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
+ import { useLocale, useModuleLocale } from '../../i18n/locale';
+ import {
+@@ -105,6 +107,7 @@ export default function PlayerLootTradeOverlay() {
+   const myClientId = useRoomStore((s) => s.clientId);
+ 
+   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
++  const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
+   const storeItems = useCharacterStore((s) => s.items);
+   const playerCaps = useCharacterStore((s) => s.currency);
+   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
+@@ -162,16 +165,20 @@ export default function PlayerLootTradeOverlay() {
+     refreshBindings();
+   }, [refreshBindings, currentCharacterId, roomStatus, rooms]);
+ 
+-  // Находим активную сессию комнаты, подходящую привязанному персонажу игрока
++  // 560 (слово владельца): «Трансляция доступна только тому персонажу, за
++  // которого вошли. Пока не войдёшь другим — ничего не увидишь». Поэтому
++  // смотрим только привязки ОТКРЫТОГО персонажа; на списке персонажей плашки
++  // нет вовсе — там сигналит только синяя иконка сервера.
++  const focusedBindings = useMemo(() => {
++    if (!currentCharacterId) return [];
++    return bindings.filter((bind) => bind.characterId === currentCharacterId);
++  }, [bindings, currentCharacterId]);
++
++  // Находим активную сессию комнаты, подходящую открытому персонажу игрока
+   const matchedContext = useMemo(() => {
+-    if (isGmMode || bindings.length === 0) return null;
++    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
+ 
+-    // Сначала приоритет — персонажу, который уже открыт прямо сейчас
+-    const ordered = [...bindings].sort((a, b) => {
+-      if (a.characterId === currentCharacterId) return -1;
+-      if (b.characterId === currentCharacterId) return 1;
+-      return 0;
+-    });
++    const ordered = focusedBindings;
+ 
+     for (const bind of ordered) {
+       const room = rooms[bind.code];
+@@ -196,15 +203,11 @@ export default function PlayerLootTradeOverlay() {
+       }
+     }
+     return null;
+-  }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
++  }, [isGmMode, homeFocused, focusedBindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+ 
+   const directTerminalContext = useMemo(() => {
+-    if (isGmMode || bindings.length === 0) return null;
+-    const ordered = [...bindings].sort((a, b) => {
+-      if (a.characterId === currentCharacterId) return -1;
+-      if (b.characterId === currentCharacterId) return 1;
+-      return 0;
+-    });
++    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
++    const ordered = focusedBindings;
+     for (const bind of ordered) {
+       const states = Object.values(rooms[bind.code]?.terminalStates || {});
+       // Патч 542: замок не бывает самостоятельной точкой игрока.
+@@ -214,9 +217,16 @@ export default function PlayerLootTradeOverlay() {
+       if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
+     }
+     return null;
+-  }, [isGmMode, bindings, currentCharacterId, rooms]);
++  }, [isGmMode, homeFocused, focusedBindings, currentCharacterId, rooms]);
+ 
+   const activeSession = matchedContext?.session || null;
++
++  // 560: как только персонаж увидел свою трансляцию — гасим сигнал на карточке
++  // (синюю иконку сервера в списке персонажей).
++  useEffect(() => {
++    if (!activeSession || !matchedContext) return;
++    useTransmissionSeenStore.getState().markSeen(matchedContext.characterId, activeSession.sessionId);
++  }, [activeSession?.sessionId, matchedContext?.characterId]);
+   // Патч 544: восстанавливаем тип/рёбра локаций после старого сервера комнат.
+   // Дальше окно работает только с этим списком, а не с сырым activeSession.nodes.
+   const sessionNodes = useMemo(
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 5e4763e..67d8d30 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -95,6 +95,7 @@ import useRoomStore from '../../../src/room/roomStore';
+ import useUiModeStore from '../../../src/room/uiModeStore';
+ import usePlayerNoticesStore, { unreadNoticeCountFor } from '../../../src/room/playerNoticesStore';
+ import usePlayerFocusStore from '../../../src/room/playerFocusStore';
++import useTransmissionSeenStore, { hasUnseenTransmission } from '../../../src/room/transmissionSeenStore';
+ import { isRoomServerConfigured } from '../../../src/room/roomClient';
+ import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
+ import {
+@@ -513,6 +514,10 @@ export default function HomeScreen({ navigation }) {
+   const notices = usePlayerNoticesStore((state) => state.notices);
+   const hydrateNotices = usePlayerNoticesStore((state) => state.hydrate);
+   const setHomeFocused = usePlayerFocusStore((state) => state.setHomeFocused);
++  // 560: синяя иконка сервера — общий сигнал: и присланный эффект, и новая
++  // трансляция (локация/торговец/терминал) этого персонажа.
++  const seenTransmissions = useTransmissionSeenStore((state) => state.seen);
++  const hydrateTransmissions = useTransmissionSeenStore((state) => state.hydrate);
+ 
+   const storeUiMode = useAppSettingsStore(selectUiMode);
+   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
+@@ -698,10 +703,11 @@ export default function HomeScreen({ navigation }) {
+     useCallback(() => {
+       useUiModeStore.getState().setGmInspectingCharacter(false);
+       void hydrateNotices();
++      void hydrateTransmissions();
+       setHomeFocused(true);
+       loadList();
+       return () => setHomeFocused(false);
+-    }, [loadList, hydrateNotices, setHomeFocused])
++    }, [loadList, hydrateNotices, hydrateTransmissions, setHomeFocused])
+   );
+ 
+   // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
+@@ -1622,6 +1628,11 @@ export default function HomeScreen({ navigation }) {
+                 const isBoundOnline = boundCode
+                   ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
+                   : false;
++                // 560: сигнал = непрочитанный эффект ИЛИ новая трансляция
++                // именно этого персонажа (пока он не открыл свою — иконка синяя).
++                const hasUnseen = Boolean(boundCode)
++                  && hasUnseenTransmission(seenTransmissions, roomRooms[boundCode], item.id);
++                const signalCount = unreadNoticeCountFor(notices, item.id) + (hasUnseen ? 1 : 0);
+                 return (
+                   <CharacterCell
+                     key={item.id}
+@@ -1635,7 +1646,7 @@ export default function HomeScreen({ navigation }) {
+                     serverAvailable={roomServerAvailable && !isGmMode}
+                     serverBound={Boolean(boundCode)}
+                     serverOnline={isBoundOnline}
+-                    noticesCount={unreadNoticeCountFor(notices, item.id)}
++                    noticesCount={signalCount}
+                     onDragStart={handleDragStart}
+                     onDragMove={handleDragMove}
+                     onDragEnd={handleDragEnd}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 0e22db2..17b36ab 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,35 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (560) — каждый персонаж видит свою трансляцию
++
++Слово владельца (после 559, где я откатил трансляцию целиком): «Трансляция
++доступна только тому персонажу, за которого вошли. Если 2 персонажа в 2
++серверных комнатах получают 2 трансляции, каждый персонаж видит свою… пока не
++войдёшь другим — ничего не увидишь. А сигнал о новой трансляции или эффекте —
++цвет иконки сервера». Урок: «оставить стиль трансляции как есть» = не менять
++ВИД, а не «откатить привязку к персонажу».
++
++- **Окно трансляции — личное.** `components/lootTrade/PlayerLootTradeOverlay.js`:
++  `focusedBindings` = привязки только `currentCharacterId`; при
++  `homeFocused === true` (список персонажей) контекст не строится. Вид плашки и
++  окна локации не менялся.
++- **Сигнал.** Новый `src/room/transmissionSeenStore.js`: `{ [characterId]:
++  sessionId }` в AsyncStorage (`positronium_transmission_seen_v1`),
++  `markSeen`, хелперы `sessionTargetsCharacter` (правило 506/544: `targetType ===
++  'room'` или `targetCharacterId`) и `hasUnseenTransmission`.
++- **Кто гасит сигнал.** Оверлей, показав свою сессию открытому персонажу,
++  зовёт `markSeen(characterId, sessionId)`.
++- **Список персонажей.** `HomeScreen`: `hasUnseen` (трансляция) складывается с
++  непрочитанными эффектами в `signalCount` → `noticesCount` → синяя иконка
++  `#3b82f6`.
++- **Тесты.** Новый `transmission-per-character-560` (7 проверок: настоящий
++  монтаж окна с двумя персонажами в двух комнатах, «своя видна — чужая нет»,
++  тишина на списке, гашение сигнала, хелперы, исходники). В `effects-window-559`
++  блок про трансляцию переписан: она не пишется в склад уведомлений.
++- **Важно для тестов оверлея.** Привязка без имени в `getCharactersList`
++  отбрасывается — мок обязан возвращать персонажей, иначе окно рендерит `null`.
++- **Отсечка.** `patchs/baseline.json` → 560; 535/532 — 560/5/10, roadmap `**560**`.
++
+ ## 2026-11-07 (559) — трансляция как раньше, эффекты окном при входе
+ 
+ Слово владельца: «А мы можем трансляцию оставить как есть. Она оффлайн не
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4071b5f..ac0c167 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,28 @@
+ # Changelog
+ ---
+ 
++## Every character sees its own transmission (patch 560)
++
++The owner's words: "a transmission is only available to the character you are
++playing. If 2 characters in 2 server rooms receive 2 transmissions, each sees its
++own… until you enter the other one you see nothing. And the signal of a new
++transmission or effect is the colour of the server icon."
++
++- **Style untouched.** The pill and the location/trader/terminal window look and
++  behave as before.
++- **Addressed to the open character only.** The window shows the session that
++  belongs to the character being played; another character's transmission is not
++  shown to this one. Two characters in two rooms each see their own.
++- **Quiet on the list.** No pills, no windows.
++- **One signal — a blue icon.** It lights for a sent effect and for a new
++  transmission of this character (a session they have not seen yet).
++- **Seeing clears it.** Enter the character and see your location — the icon goes
++  back to green/grey.
++- **Acceptance.** New `transmission-per-character-560` (7 checks, real mount with
++  two characters in two rooms).
++
++---
++
+ ## Transmissions untouched, effects shown on entry (patch 559)
+ 
+ The owner's words: "can we leave the transmission as it is? It does not work
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index efaeb9f..45605c8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,28 @@
+ 
+ ---
+ 
++## Каждый персонаж видит свою трансляцию (патч 560)
++
++Слово владельца: «Трансляция доступна только тому персонажу, за которого вошли.
++Если 2 персонажа в 2 серверных комнатах получают 2 трансляции, каждый персонаж
++видит свою… пока не войдёшь другим — ничего не увидишь. А сигнал о новой
++трансляции или эффекте — цвет иконки сервера».
++
++- **Стиль не менялся.** Плашка и окно локации/торговца/терминала выглядят и
++  работают как раньше.
++- **Адресат — только открытый персонаж.** Окно показывает сессию, которая
++  адресована тому, за кого играют; чужая трансляция этому персонажу не видна.
++  Два персонажа в двух комнатах видят каждый свою.
++- **На списке — тишина.** Ни плашек, ни окон.
++- **Один сигнал — синяя иконка.** Она загорается и на присланный эффект, и на
++  новую трансляцию этого персонажа (сессия, которую он ещё не видел).
++- **Просмотр гасит сигнал.** Открыли персонажа и увидели свою локацию — иконка
++  возвращается к зелёной/серой.
++- **Приёмка.** Новый `transmission-per-character-560` (7 проверок, настоящий
++  монтаж окна с двумя персонажами в двух комнатах).
++
++---
++
+ ## Трансляция как раньше, эффекты — окном при входе (патч 559)
+ 
+ Слово владельца: «А мы можем трансляцию оставить как есть. Она оффлайн не
+diff --git a/docs/patch-560-install.md b/docs/patch-560-install.md
+new file mode 100644
+index 0000000..53714ad
+--- /dev/null
++++ b/docs/patch-560-install.md
+@@ -0,0 +1,58 @@
++# Установка патча 560: каждый персонаж видит свою трансляцию
++
++Патч подготовлен от состояния **версии 559**. Файл установки:
++`patchs/560-transmission-per-character.patch`.
++
++> **Слово владельца:** «Трансляция доступна только тому персонажу, за которого
++> вошли. Если 2 персонажа в 2 серверных комнатах получают 2 трансляции, каждый
++> персонаж видит свою… пока не войдёшь другим — ничего не увидишь. А сигнал о
++> новой трансляции или эффекте — цвет иконки сервера».
++
++## Что меняется
++
++Вид плашки и окна локации/торговца не менялся — меняется только адресат и
++сигнал на карточке в списке.
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | окно показывает сессию, адресованную **только открытому** персонажу (`focusedBindings`); на списке персонажей плашки нет. Показав свою сессию, окно помечает её просмотренной |
++| `src/room/transmissionSeenStore.js` | **новый.** Память «персонаж → последняя показанная сессия» (AsyncStorage `positronium_transmission_seen_v1`), хелперы `sessionTargetsCharacter` и `hasUnseenTransmission` |
++| `components/screens/HomeScreen/HomeScreen.js` | сигнал на карточке = непрочитанный эффект **или** новая трансляция этого персонажа (`signalCount` → синяя иконка `#3b82f6`) |
++| `__tests__/room/transmission-per-character-560.test.js` | **новая приёмка** (7 проверок): настоящий монтаж окна с двумя персонажами в двух комнатах — своя трансляция видна, чужая нет; на списке тишина; просмотр гасит сигнал; хелперы адресата |
++| `__tests__/room/effects-window-559.test.js` | блок про трансляцию переписан: в склад эффектов она не пишется (адресат — 560) |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 560 / `baseline` 560 / roadmap `**560**` |
++| `patchs/baseline.json`, `public/version.json` | отсечка и версия 560, заметки релиза 5 поправлены |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md` | запись патча 560, тезис 48 |
++
++## Как это выглядит
++
++1. У игрока два персонажа в двух комнатах; Мастер открыл локацию Нику.
++2. Пайпер играет — её окно чистое, чужой локации она не видит.
++3. В списке персонажей у карточки Ника **синяя** иконка сервера, у Пайпер
++   обычная (зелёная в сети / серая не в сети).
++4. Вошли за Ника — открылась его локация, иконка погасла.
++5. Присланный эффект (уровень, крышки, лечение, увечья) сигналит той же синей
++   иконкой и показывается окном «Что прислал Мастер» при входе в персонажа.
++6. Вид плашки и окна локации — как раньше.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 560
++```
++
++После установки: `git add -A && git commit -m "Патч 560"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/transmission-per-character-560.test.js \
++  __tests__/room/effects-window-559.test.js \
++  __tests__/room/hub-player-window-542.test.js \
++  __tests__/room/player-lock-overlay-524.test.js \
++  __tests__/room/room-character-sync-456.test.js
++npm run typecheck
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index ace14ac..459d6ac 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **559**.
++Дата ревизии: 2026-11-07. Текущая версия: **560**.
+ 
+ ## Тезисы
+ 
+@@ -66,6 +66,17 @@
+ 
+ | 47 | **Трансляция — как раньше, эффекты — окном при входе.** Уточнение владельца: трансляцию (локации, торговцы, терминалы) не трогаем — она и так не работает оффлайн; плашка и окно остались точно такими, как до 558, без привязки к открытому персонажу. В окно «Что нового» при входе в персонажа попадают только применённые эффекты: уровень, крышки, лечение, увечья, медикаменты. На списке — по-прежнему только синяя иконка сервера и никаких окон | ✅ сделано | **559** |
+ 
++| 48 | **Каждый персонаж видит свою трансляцию.** Трансляция (локация, торговец, терминал) доступна только тому персонажу, за которого вошли: два персонажа в двух комнатах видят каждый свою, пока не войдёшь другим — не увидишь. Стиль плашки и окна не менялся. Синяя иконка сервера в списке — общий сигнал: и присланный эффект, и новая трансляция этого персонажа; просмотр своей трансляции гасит сигнал | ✅ сделано | **560** |
++
++## Осталось после патча 560
++
++Патч 560 собрал два требования владельца вместе: стиль трансляции не менялся,
++но она стала личной — доступна только тому персонажу, за которого вошли. Сигнал
++один и тот же: синяя иконка сервера в списке (эффект или новая трансляция), окно
++«Что нового» при входе показывает присланные эффекты. Следующий шаг по слову
++владельца — раздел локаций и сундуков в пространстве Мастера; объём и место
++раздела ещё не подтверждены.
++
+ ## Осталось после патча 559
+ 
+ Патч 559 уточнил 558 по слову владельца: трансляция не тронута (плашка и окно
+@@ -399,6 +410,7 @@
+ - `docs/patch-557-install.md` — две вкладки на панели склада: вещи и ключи (557).
+ - `docs/patch-558-install.md` — сообщения Мастера приходят лично персонажу (558).
+ - `docs/patch-559-install.md` — трансляция как раньше, эффекты окном при входе (559).
++- `docs/patch-560-install.md` — трансляция личная для персонажа, сигнал — синяя иконка (560).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 98345f1..325b1b4 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "559"
++  "baseline": "560"
+ }
+diff --git a/public/version.json b/public/version.json
+index d97e761..20b46c2 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "559",
++  "version": "560",
+   "release": 5,
+   "notes": {
+     "ru-RU": [
+       "Игра в комнате с ведущим: вы подключаетесь к комнате, ваш лист уезжает ведущему, а его решения — эффект, урон, списание предмета — приходят прямо на лист и сохраняются.",
+-      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а при входе в этого персонажа открывается окно в стиле «Что нового» со списком того, что ведущий сделал.",
+-      "В окне только эффекты — уровень, крышки, лечение, увечья, медикаменты от другого игрока. Локации и торговцы работают как раньше, плашкой. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки — доставку разбирают за столом.",
++      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а при входе в этого персонажа открывается окно в стиле «Что нового» со списком того, что ведущий сделал, и его локация.",
++      "Трансляция доступна только тому персонажу, за которого вошли: два персонажа в двух комнатах видят каждый свою, пока не войдёшь другим — не увидишь. Синяя иконка сервера сигналит и о новой трансляции, и о присланном эффекте. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки.",
+       "Ведущий видит ваше состояние: ОЗ, радиация, условия и ключевые показатели — без просьб прислать скриншот.",
+       "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список. Запертая дверь не пускает внутрь, пока замок не открыт.",
+       "Взлом замков: мини-игра с ячейками по восприятию и сложности, ограниченным числом попыток и выбором «ключом или взломом».",
+@@ -16,8 +16,8 @@
+     ],
+     "en-EN": [
+       "Playing in a room with your GM: you join the room, your sheet goes to the GM, and their decisions — an effect, damage, a spent item — land on your sheet and are saved.",
+-      "GM messages arrive personally: the character card in the list shows a blue server icon, and when you enter that character a window in the \"What's new\" style lists what the GM has done.",
+-      "The window holds effects only — level, caps, healing, injuries, a peer's first aid. Locations and traders work as before, through the pill. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent — delivery is settled at the table.",
++      "GM messages arrive personally: the character card in the list shows a blue server icon, and when you enter that character a window in the \"What's new\" style lists what the GM has done, plus their location.",
++      "A transmission is only available to the character you are playing: two characters in two rooms each see their own, and until you enter the other one you see nothing. The blue server icon signals both a new transmission and a sent effect. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent.",
+       "The GM sees your state: HP, radiation, conditions and key stats, with no need to ask for a screenshot.",
+       "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list. A locked door keeps you out until the lock is open.",
+       "Lockpicking: a mini-game with cells based on Perception and difficulty, a limited number of attempts, and sometimes a choice between a key and a hack.",
+diff --git a/src/room/transmissionSeenStore.js b/src/room/transmissionSeenStore.js
+new file mode 100644
+index 0000000..6def0a3
+--- /dev/null
++++ b/src/room/transmissionSeenStore.js
+@@ -0,0 +1,82 @@
++// src/room/transmissionSeenStore.js
++// Патч 560 — «сигнал о новой трансляции — цвет иконки сервера».
++//
++// Слово владельца: «Трансляция доступна только тому персонажу, за которого
++// вошли. Если 2 персонажа в 2 серверных комнатах получают 2 трансляции, каждый
++// персонаж видит свою… пока не войдёшь другим — ничего не увидишь. А сигнал о
++// новой трансляции или эффекте — цвет иконки сервера».
++//
++// Значит, на карточке в списке нужно помнить, ЧЬЮ трансляцию игрок уже видел.
++// Храним пару «персонаж → последняя показанная сессия». Пока сессия в комнате
++// другая, чем запомненная, иконка сервера синяя.
++
++import { create } from 'zustand';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++const STORAGE_KEY = 'positronium_transmission_seen_v1';
++
++let hydrating = null;
++
++const persist = (seen) => {
++  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(seen)).catch(() => {});
++};
++
++const useTransmissionSeenStore = create((set, get) => ({
++  // { [characterId]: sessionId }
++  seen: {},
++  hydrated: false,
++
++  hydrate: async () => {
++    if (get().hydrated) return;
++    if (hydrating) return hydrating;
++    hydrating = (async () => {
++      let parsed = {};
++      try {
++        const raw = await AsyncStorage.getItem(STORAGE_KEY);
++        const data = raw ? JSON.parse(raw) : {};
++        parsed = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
++      } catch {
++        parsed = {};
++      }
++      set({ seen: parsed, hydrated: true });
++      hydrating = null;
++    })();
++    return hydrating;
++  },
++
++  markSeen: (characterId, sessionId) => {
++    const id = String(characterId || '').trim();
++    const session = String(sessionId || '').trim();
++    if (!id || !session) return;
++    if (get().seen[id] === session) return;
++    const seen = { ...get().seen, [id]: session };
++    set({ seen });
++    persist(seen);
++  },
++
++  resetForTests: async () => {
++    hydrating = null;
++    set({ seen: {}, hydrated: false });
++    try {
++      await AsyncStorage.removeItem(STORAGE_KEY);
++    } catch {
++      // ignore
++    }
++  },
++}));
++
++/** Сессия комнаты адресована этому персонажу? (правило 506/544 не меняем) */
++export const sessionTargetsCharacter = (session, characterId) => {
++  if (!session || !characterId) return false;
++  if (session.targetType === 'room') return true;
++  return session.targetCharacterId === characterId;
++};
++
++/** Есть активная трансляция для персонажа, которую он ещё не видел. */
++export const hasUnseenTransmission = (seen, room, characterId) => {
++  const session = room?.activeSession;
++  if (!sessionTargetsCharacter(session, characterId)) return false;
++  return seen?.[characterId] !== session.sessionId;
++};
++
++export default useTransmissionSeenStore;
