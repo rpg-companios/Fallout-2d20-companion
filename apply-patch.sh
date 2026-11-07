@@ -643,7 +643,11 @@ if [[ "$MODE" == "status" ]]; then
         will_apply+=("$name")
         ;;
       conflict)
-        if is_confirmed "$name" "${STANDING[@]}"; then
+        if [[ -n "${BASELINE_NUM:-}" && "$(patch_number "$name")" == "$BASELINE_NUM" ]]; then
+          # Ключевой патч проверяется не по одному, а приведением дерева к его
+          # состоянию из истории — вердикт «разошлось» к нему неприменим.
+          printf '  [ключевой]  %s\n' "$name"
+        elif is_confirmed "$name" "${STANDING[@]}"; then
           printf '  [перекрыт]  %s\n' "$name"
           confirmed=$((confirmed + 1))
         else
@@ -663,10 +667,9 @@ if [[ "$MODE" == "status" ]]; then
   echo
   if [[ -n "${BASELINE_NUM:-}" ]] \
     && { [[ -z "$TOP_APPLIED_NUMBER" ]] || number_lt "$TOP_APPLIED_NUMBER" "$BASELINE_NUM"; }; then
-    echo "Свежий ключевой патч ставится одним шагом:  ./apply-patch.sh $BASELINE_NUM"
-    echo
-  fi
-  if [[ ${#will_apply[@]} -gt 0 ]]; then
+    echo "Поставить свежий ключевой патч одним шагом:  ./apply-patch.sh $BASELINE_NUM"
+    echo "  (до него патчи по одному не применяются — дерево приводится к состоянию №$BASELINE_NUM)"
+  elif [[ ${#will_apply[@]} -gt 0 ]]; then
     last="${will_apply[${#will_apply[@]} - 1]}"
     echo "Поставить всё недостающее:  ./apply-patch.sh $(patch_number "$last")"
   elif [[ ${#diverged[@]} -eq 0 ]]; then
