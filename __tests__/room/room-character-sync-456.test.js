@@ -226,7 +226,12 @@ describe('Патч 456: отображение подключённых перс
       path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'),
       'utf8',
     );
-    expect(homeSrc).toContain("color={serverOnline ? '#16a34a' : '#9ca3af'}");
+    // Патч 558: цвет иконки сервера теперь трёхзначный — синий сообщает
+    // «Мастер прислал этому персонажу сообщение», зелёный/серый как раньше.
+    expect(homeSrc).toContain(
+      "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
+    );
+    expect(homeSrc).toContain('color={serverIconColor}');
     expect(homeSrc).toContain('const displayedCharacters = isGmMode');
 
     // moveCharacterToFolder в обеих реализациях БД меняет только членство в папке, не трогая character_room_bindings

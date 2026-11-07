@@ -1,6 +1,80 @@
 # Changelog
 ---
 
+## Every character sees its own transmission (patch 560)
+
+The owner's words: "a transmission is only available to the character you are
+playing. If 2 characters in 2 server rooms receive 2 transmissions, each sees its
+own… until you enter the other one you see nothing. And the signal of a new
+transmission or effect is the colour of the server icon."
+
+- **Style untouched.** The pill and the location/trader/terminal window look and
+  behave as before.
+- **Addressed to the open character only.** The window shows the session that
+  belongs to the character being played; another character's transmission is not
+  shown to this one. Two characters in two rooms each see their own.
+- **Quiet on the list.** No pills, no windows.
+- **One signal — a blue icon.** It lights for a sent effect and for a new
+  transmission of this character (a session they have not seen yet).
+- **Seeing clears it.** Enter the character and see your location — the icon goes
+  back to green/grey.
+- **Acceptance.** New `transmission-per-character-560` (7 checks, real mount with
+  two characters in two rooms).
+
+---
+
+## Transmissions untouched, effects shown on entry (patch 559)
+
+The owner's words: "can we leave the transmission as it is? It does not work
+offline. And the sent effects in the 'what's new' style on entry."
+
+- **Transmissions untouched.** A location, trader or terminal opens through the
+  pill and its window exactly as before 558: no binding to the open character and
+  no entries in the list. It cannot work offline, so nothing can pile up.
+- **Effects only in the window.** On entering a character a window in the "What's
+  new" style — "What the GM sent" — lists what the GM applied: level, caps,
+  healing, injuries, a peer's first aid. The lines are the usual ones, with the
+  room name.
+- **Character list.** No windows: the card of the character that received
+  something shows a blue server icon. "Got it" in the window clears it.
+- **No sections.** Since the window now holds effects only, splitting it into
+  "Transmissions" and "One-off commands" has nothing left to split.
+- **Everything else as in 558:** notices bound to the character, "Sent: N" for
+  the GM instead of "Delivered", keys and storage untouched.
+- **Acceptance.** New `effects-window-559` (8 checks).
+
+---
+
+## GM messages arrive personally (patch 558)
+
+The owner's words: "nothing pops up over the character list — change the colour
+of the server icon (blue, for example). A list of what happened. Split
+transmissions from one-off commands: if the GM granted a level, show a
+release-style window with an OK button. A transmission never yields
+'delivered'. Keys stay as they are."
+
+- **Character list.** No pop-ups. On the card of the character that received
+  something the server icon turns blue (`#3b82f6`); green means online, grey
+  offline, as before.
+- **A list of what happened.** When the player sits down as that character one
+  window opens in the "What's new" style: a "Transmissions" section (locations,
+  traders, terminals) and a "One-off commands" section (level, caps, healing,
+  injuries). "Got it" marks everything read and clears the blue icon.
+- **Only its own character.** Every notice is stored on the client together with
+  its `characterId`. With several characters bound to different GMs each one sees
+  only its own messages.
+- **Transmissions.** The location/trader pill works as before but is shown only
+  to the open character and never over the character list.
+- **No "delivered".** The GM room bar shows the fact of sending — "Sent: N" —
+  instead of a delivery counter. Actual delivery is settled at the table.
+- **Keys and storage** are untouched.
+- **Acceptance.** New `player-notices-558` (9 checks): notice store, no window
+  over the list, both sections inside the character, "Got it", another character
+  sees nothing, blue icon, transmission only for the open character, fact of
+  sending for the GM, storage untouched.
+
+---
+
 ## Two tabs on the storage pane (patch 557)
 
 The owner's words: "the storage holds two tabs on its top edge with a 'bag' and

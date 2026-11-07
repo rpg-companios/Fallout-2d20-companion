@@ -93,6 +93,9 @@ import * as avatarCache from '../../../db/avatarCache';
 // Комнаты мастера (gm-rooms, этапы 0–3): стор соединения + адреса комнат + синхронизация.
 import useRoomStore from '../../../src/room/roomStore';
 import useUiModeStore from '../../../src/room/uiModeStore';
+import usePlayerNoticesStore, { unreadNoticeCountFor } from '../../../src/room/playerNoticesStore';
+import usePlayerFocusStore from '../../../src/room/playerFocusStore';
+import useTransmissionSeenStore, { hasUnseenTransmission } from '../../../src/room/transmissionSeenStore';
 import { isRoomServerConfigured } from '../../../src/room/roomClient';
 import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 import {
@@ -153,11 +156,16 @@ const CharacterCell = ({
   serverAvailable = false,
   serverBound = false,
   serverOnline = false,
+  // 558: сколько Мастер прислал этому персонажу непрочитанного. Синяя
+  // иконка сервера — «есть сообщение»; никаких всплывающих окон в списке.
+  noticesCount = 0,
   readOnlyRoomCard = false,
   onDragStart,
   onDragMove,
   onDragEnd,
 }) => {
+  const hasNotices = Number(noticesCount) > 0;
+  const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');
   const originImage = getOriginImage(character.originName);
   const [customImageUrl, setCustomImageUrl] = useState(character?.avatarDataUrl || null);
 
@@ -217,7 +225,7 @@ const CharacterCell = ({
             <MaterialCommunityIcons
               name="server-network"
               size={17}
-              color={serverOnline ? '#16a34a' : '#9ca3af'}
+              color={serverIconColor}
             />
           </View>
         ) : (
@@ -233,7 +241,7 @@ const CharacterCell = ({
             <MaterialCommunityIcons
               name="server-network"
               size={17}
-              color={serverOnline ? '#16a34a' : '#9ca3af'}
+              color={serverIconColor}
             />
           </TouchableOpacity>
         )
@@ -501,6 +509,16 @@ export default function HomeScreen({ navigation }) {
   // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9).
   // На web режим дополнительно изолирован по вкладкам (sessionStorage), чтобы
   // открытые рядом вкладки «Админ» и «Пользователь» не перетирали друг друга.
+  // 558: уведомления Мастера привязаны к персонажу. На списке ничего не
+  // всплывает — только синяя иконка сервера на карточке того персонажа.
+  const notices = usePlayerNoticesStore((state) => state.notices);
+  const hydrateNotices = usePlayerNoticesStore((state) => state.hydrate);
+  const setHomeFocused = usePlayerFocusStore((state) => state.setHomeFocused);
+  // 560: синяя иконка сервера — общий сигнал: и присланный эффект, и новая
+  // трансляция (локация/торговец/терминал) этого персонажа.
+  const seenTransmissions = useTransmissionSeenStore((state) => state.seen);
+  const hydrateTransmissions = useTransmissionSeenStore((state) => state.hydrate);
+
   const storeUiMode = useAppSettingsStore(selectUiMode);
   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
   const setSharedTabUiMode = useUiModeStore((state) => state.setTabUiMode);
@@ -684,8 +702,12 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       useUiModeStore.getState().setGmInspectingCharacter(false);
+      void hydrateNotices();
+      void hydrateTransmissions();
+      setHomeFocused(true);
       loadList();
-    }, [loadList])
+      return () => setHomeFocused(false);
+    }, [loadList, hydrateNotices, hydrateTransmissions, setHomeFocused])
   );
 
   // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
@@ -1500,25 +1522,17 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
 
               {latestGmDirective ? (() => {
+                // 558 (слово владельца): «Трансляция не даёт "доставлено", а вот
+                // поднятие уровня — можно писать факт отправки». Поэтому здесь
+                // только факт отправки; доставку разбирают за столом.
                 const total = Array.isArray(latestGmDirective.targetCharacterIds)
                   ? latestGmDirective.targetCharacterIds.length
-                  : 0;
-                const acked = Array.isArray(latestGmDirective.ackedByCharacterIds)
-                  ? latestGmDirective.ackedByCharacterIds.length
-                  : 0;
-                const done = total > 0 && acked >= total;
+                  : (latestGmDirective.targetType === 'character' ? 1 : 0);
                 return (
-                  <View style={[styles.gmDeliveryPill, done && styles.gmDeliveryPillDone]}>
-                    <MaterialCommunityIcons
-                      name={done ? 'check-circle-outline' : 'clock-outline'}
-                      size={13}
-                      color={done ? '#4ade80' : '#f0e68c'}
-                    />
-                    <Text style={[styles.gmDeliveryPillText, done && styles.gmDeliveryPillTextDone]}>
-                      {formatGm(
-                        tGm(done ? 'roomBar.deliveryDone' : 'roomBar.deliveryBadge', locale),
-                        { acked, total },
-                      )}
+                  <View style={styles.gmDeliveryPill}>
+                    <MaterialCommunityIcons name="send" size={13} color="#f0e68c" />
+                    <Text style={styles.gmDeliveryPillText}>
+                      {formatGm(tGm('roomBar.sentBadge', locale), { total })}
                     </Text>
                   </View>
                 );
@@ -1614,6 +1628,11 @@ export default function HomeScreen({ navigation }) {
                 const isBoundOnline = boundCode
                   ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
                   : false;
+                // 560: сигнал = непрочитанный эффект ИЛИ новая трансляция
+                // именно этого персонажа (пока он не открыл свою — иконка синяя).
+                const hasUnseen = Boolean(boundCode)
+                  && hasUnseenTransmission(seenTransmissions, roomRooms[boundCode], item.id);
+                const signalCount = unreadNoticeCountFor(notices, item.id) + (hasUnseen ? 1 : 0);
                 return (
                   <CharacterCell
                     key={item.id}
@@ -1627,6 +1646,7 @@ export default function HomeScreen({ navigation }) {
                     serverAvailable={roomServerAvailable && !isGmMode}
                     serverBound={Boolean(boundCode)}
                     serverOnline={isBoundOnline}
+                    noticesCount={signalCount}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}

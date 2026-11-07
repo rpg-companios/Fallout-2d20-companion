@@ -1,28 +1,28 @@
 {
-  "version": "557",
+  "version": "560",
   "release": 5,
   "notes": {
     "ru-RU": [
       "Игра в комнате с ведущим: вы подключаетесь к комнате, ваш лист уезжает ведущему, а его решения — эффект, урон, списание предмета — приходят прямо на лист и сохраняются.",
+      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а при входе в этого персонажа открывается окно в стиле «Что нового» со списком того, что ведущий сделал, и его локация.",
+      "Трансляция доступна только тому персонажу, за которого вошли: два персонажа в двух комнатах видят каждый свою, пока не войдёшь другим — не увидишь. Синяя иконка сервера сигналит и о новой трансляции, и о присланном эффекте. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки.",
       "Ведущий видит ваше состояние: ОЗ, радиация, условия и ключевые показатели — без просьб прислать скриншот.",
-      "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список.",
-      "Запертая дверь не пускает внутрь: пока замок не открыт, за дверью ничего не видно — сначала ключ или взлом.",
+      "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список. Запертая дверь не пускает внутрь, пока замок не открыт.",
       "Взлом замков: мини-игра с ячейками по восприятию и сложности, ограниченным числом попыток и выбором «ключом или взломом».",
-      "Взлом терминалов: четыре попытки, слова, скобки-подсказки и доска по интеллекту. После провала ведущий решает — дать ещё подход или закрыть терминал.",
-      "Ключи и записки: ключ можно найти, носить с собой или оставить на общем складе — и открыть им дверь или сундук.",
-      "Ворота: взлом одного терминала может открыть путь дальше — в соседнюю комнату или к другому сундуку.",
+      "Взлом терминалов: четыре попытки, слова, скобки-подсказки и доска по интеллекту. Ворота: взлом одного терминала открывает путь дальше — в соседнюю комнату или к другому сундуку.",
+      "Ключи и записки: ключ можно найти, носить с собой или оставить на складе — и открыть им дверь или сундук.",
       "Общий склад партии: добычу можно складывать вместе, положить и забрать может каждый, а ведущий видит, что где лежит.",
       "Добыча и торговцы: ведущий выдаёт предметы, а у торговца можно купить или продать по его ценам и кассе."
     ],
     "en-EN": [
       "Playing in a room with your GM: you join the room, your sheet goes to the GM, and their decisions — an effect, damage, a spent item — land on your sheet and are saved.",
+      "GM messages arrive personally: the character card in the list shows a blue server icon, and when you enter that character a window in the \"What's new\" style lists what the GM has done, plus their location.",
+      "A transmission is only available to the character you are playing: two characters in two rooms each see their own, and until you enter the other one you see nothing. The blue server icon signals both a new transmission and a sent effect. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent.",
       "The GM sees your state: HP, radiation, conditions and key stats, with no need to ask for a screenshot.",
-      "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list.",
-      "A locked door keeps you out: until the lock is open you see nothing behind it — a key or a hack comes first.",
+      "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list. A locked door keeps you out until the lock is open.",
       "Lockpicking: a mini-game with cells based on Perception and difficulty, a limited number of attempts, and sometimes a choice between a key and a hack.",
-      "Terminal hacking: four attempts, words, bracket hints and a board built from Intelligence. After a failure the GM decides whether to allow another approach or close the terminal.",
-      "Keys and notes: a key can be found, carried with you or left in the party storage — and used to open a door or a chest.",
-      "Gates: hacking one terminal can open the way further — into the next room or to another chest.",
+      "Terminal hacking: four attempts, words, bracket hints and a board built from Intelligence. Gates: hacking one terminal opens the way further — into the next room or to another chest.",
+      "Keys and notes: a key can be found, carried with you or left in the storage — and used to open a door or a chest.",
       "Party storage: loot can be pooled, anyone can put things in or take them out, and the GM sees what is stored where.",
       "Loot and traders: the GM hands out items, and at a trader you can buy or sell at their prices and with their caps."
     ]

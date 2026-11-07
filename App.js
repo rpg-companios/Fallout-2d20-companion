@@ -39,6 +39,7 @@ import InventoryScreen from './components/screens/InventoryScreen/InventoryScree
 import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
 import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
 import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
+import PlayerNoticesModal from './components/gm/PlayerNoticesModal';
 import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
 import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
 import { startPartyStoragePersistence, restoreMasterStorage } from './src/lootTrade/partyStoragePersistence';
@@ -367,6 +368,7 @@ function App() {
           <FusionCoreChoiceModal />
           <PlayerLootTradeOverlay />
           <PlayerDirectiveOverlay />
+          <PlayerNoticesModal />
           {/* Патч 506: «Что нового» рисуется ДО диалогов, иначе окно обновления
               перекрывало уведомление Мастера о взломе терминала. */}
           <UpdateNoticeModal />

@@ -18,6 +18,8 @@ import useCharacterStore from '../../src/store/characterStore';
 import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
 import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
+import usePlayerFocusStore from '../../src/room/playerFocusStore';
+import useTransmissionSeenStore from '../../src/room/transmissionSeenStore';
 import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
 import { useLocale, useModuleLocale } from '../../i18n/locale';
 import {
@@ -105,6 +107,7 @@ export default function PlayerLootTradeOverlay() {
   const myClientId = useRoomStore((s) => s.clientId);
 
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
+  const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
   const storeItems = useCharacterStore((s) => s.items);
   const playerCaps = useCharacterStore((s) => s.currency);
   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
@@ -162,16 +165,20 @@ export default function PlayerLootTradeOverlay() {
     refreshBindings();
   }, [refreshBindings, currentCharacterId, roomStatus, rooms]);
 
-  // Находим активную сессию комнаты, подходящую привязанному персонажу игрока
-  const matchedContext = useMemo(() => {
-    if (isGmMode || bindings.length === 0) return null;
+  // 560 (слово владельца): «Трансляция доступна только тому персонажу, за
+  // которого вошли. Пока не войдёшь другим — ничего не увидишь». Поэтому
+  // смотрим только привязки ОТКРЫТОГО персонажа; на списке персонажей плашки
+  // нет вовсе — там сигналит только синяя иконка сервера.
+  const focusedBindings = useMemo(() => {
+    if (!currentCharacterId) return [];
+    return bindings.filter((bind) => bind.characterId === currentCharacterId);
+  }, [bindings, currentCharacterId]);
 
-    // Сначала приоритет — персонажу, который уже открыт прямо сейчас
-    const ordered = [...bindings].sort((a, b) => {
-      if (a.characterId === currentCharacterId) return -1;
-      if (b.characterId === currentCharacterId) return 1;
-      return 0;
-    });
+  // Находим активную сессию комнаты, подходящую открытому персонажу игрока
+  const matchedContext = useMemo(() => {
+    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
+
+    const ordered = focusedBindings;
 
     for (const bind of ordered) {
       const room = rooms[bind.code];
@@ -196,15 +203,11 @@ export default function PlayerLootTradeOverlay() {
       }
     }
     return null;
-  }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+  }, [isGmMode, homeFocused, focusedBindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
 
   const directTerminalContext = useMemo(() => {
-    if (isGmMode || bindings.length === 0) return null;
-    const ordered = [...bindings].sort((a, b) => {
-      if (a.characterId === currentCharacterId) return -1;
-      if (b.characterId === currentCharacterId) return 1;
-      return 0;
-    });
+    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
+    const ordered = focusedBindings;
     for (const bind of ordered) {
       const states = Object.values(rooms[bind.code]?.terminalStates || {});
       // Патч 542: замок не бывает самостоятельной точкой игрока.
@@ -214,9 +217,16 @@ export default function PlayerLootTradeOverlay() {
       if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
     }
     return null;
-  }, [isGmMode, bindings, currentCharacterId, rooms]);
+  }, [isGmMode, homeFocused, focusedBindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
+
+  // 560: как только персонаж увидел свою трансляцию — гасим сигнал на карточке
+  // (синюю иконку сервера в списке персонажей).
+  useEffect(() => {
+    if (!activeSession || !matchedContext) return;
+    useTransmissionSeenStore.getState().markSeen(matchedContext.characterId, activeSession.sessionId);
+  }, [activeSession?.sessionId, matchedContext?.characterId]);
   // Патч 544: восстанавливаем тип/рёбра локаций после старого сервера комнат.
   // Дальше окно работает только с этим списком, а не с сырым activeSession.nodes.
   const sessionNodes = useMemo(

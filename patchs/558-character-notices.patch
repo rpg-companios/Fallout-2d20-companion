@@ -1,0 +1,1269 @@
+diff --git a/App.js b/App.js
+index dfdeac0..dee8a50 100644
+--- a/App.js
++++ b/App.js
+@@ -39,6 +39,7 @@ import InventoryScreen from './components/screens/InventoryScreen/InventoryScree
+ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+ import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
+ import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
++import PlayerNoticesModal from './components/gm/PlayerNoticesModal';
+ import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
+ import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
+ import { startPartyStoragePersistence, restoreMasterStorage } from './src/lootTrade/partyStoragePersistence';
+@@ -367,6 +368,7 @@ function App() {
+           <FusionCoreChoiceModal />
+           <PlayerLootTradeOverlay />
+           <PlayerDirectiveOverlay />
++          <PlayerNoticesModal />
+           {/* Патч 506: «Что нового» рисуется ДО диалогов, иначе окно обновления
+               перекрывало уведомление Мастера о взломе терминала. */}
+           <UpdateNoticeModal />
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index e1eeeed..202a182 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('557');
++    expect(version.version).toBe('558');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('557');
++    expect(json('patchs/baseline.json').baseline).toBe('558');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **557**');
++    expect(roadmap).toContain('Текущая версия: **558**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/gm-navbar2-spoilers-directives-481.test.js b/__tests__/room/gm-navbar2-spoilers-directives-481.test.js
+index d0ea2d3..94a9c3d 100644
+--- a/__tests__/room/gm-navbar2-spoilers-directives-481.test.js
++++ b/__tests__/room/gm-navbar2-spoilers-directives-481.test.js
+@@ -62,6 +62,7 @@ import useRoomStore, {
+   setRoomClientFactoryForTests,
+ } from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
++import usePlayerNoticesStore from '../../src/room/playerNoticesStore';
+ import useCharacterStore from '../../src/store/characterStore';
+ import { extractGmCharacterSummary } from '../../modules/fallout/gm/gmCharacterSummary';
+ import { GM_DIRECTIVE_KIND } from '../../modules/fallout/gm/gmDirectives';
+@@ -112,6 +113,7 @@ describe('Патч 481: отдельный навигатор Мастера (na
+ 
+   beforeEach(async () => {
+     alertsLog.length = 0;
++    await usePlayerNoticesStore.getState().resetForTests();
+     if (typeof window !== 'undefined' && window.localStorage) {
+       window.localStorage.clear();
+     }
+@@ -414,7 +416,19 @@ describe('Патч 481: отдельный навигатор Мастера (na
+     expect(appliedOnline).toHaveLength(1);
+     expect(useCharacterStore.getState().level).toBe(3);
+     expect(useCharacterStore.getState().skillsSaved).toBe(false);
+-    expect(alertsLog.some((a) => String(a.message || '').includes('3') && String(a.message || '').includes('За спасение каравана'))).toBe(true);
++    // 558: команда не всплывает окном, а ложится в список уведомлений ИМЕННО
++    // ЭТОГО персонажа — на карточке в списке горит синяя иконка сервера.
++    const notices = usePlayerNoticesStore.getState().notices;
++    expect(alertsLog).toHaveLength(0);
++    expect(notices).toHaveLength(1);
++    expect(notices[0]).toMatchObject({
++      characterId: 'char_online_1',
++      roomCode,
++      kind: 'command',
++      read: false,
++    });
++    expect(notices[0].text).toContain('3');
++    expect(notices[0].text).toContain('За спасение каравана');
+ 
+     // Повторный вызов НЕ применяет команду второй раз (дедупликация!)
+     const duplicateTry = await processPendingDirectivesForPlayer();
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index a2bf1c1..4f7a581 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('557');
++    expect(version.version).toBe('558');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('557');
++    expect(json('patchs/baseline.json').baseline).toBe('558');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **557**');
++    expect(roadmap).toContain('Текущая версия: **558**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/player-notices-558.test.js b/__tests__/room/player-notices-558.test.js
+new file mode 100644
+index 0000000..155c132
+--- /dev/null
++++ b/__tests__/room/player-notices-558.test.js
+@@ -0,0 +1,233 @@
++// Патч 558 — «что Мастер прислал» приходит ЛИЧНО персонажу.
++//
++// Слово владельца:
++//   1) На списке персонажей ничего не всплывает — меняется цвет иконки
++//      сервера (синий) на карточке того персонажа, кому пришло.
++//   2) Списком, что происходит: трансляции отдельно от разовых команд.
++//      Уровень и т.п. — окно по типу релиза с кнопкой ОК.
++//   3) Трансляция не даёт «доставлено»; у разовой команды — факт отправки.
++//   4) Ключи/склад не трогаем.
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
++const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: host('View'),
++    Text: host('Text'),
++    TouchableOpacity: host('TouchableOpacity'),
++    ScrollView: host('ScrollView'),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++// Частичный мок локали — как в остальных render-тестах репозитория.
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return {
++    ...actual,
++    useLocale: () => 'ru-RU',
++    getCurrentLocale: () => 'ru-RU',
++    useModuleLocale: () => 'ru-RU',
++  };
++});
++
++vi.mock('../../src/store/appSettingsStore', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, default: Object.assign(() => 'user', { getState: () => ({ uiMode: 'user' }) }), selectUiMode: () => 'user' };
++});
++
++vi.mock('../../src/room/uiModeStore', () => {
++  const state = { tabUiMode: 'user' };
++  const hook = (selector) => selector(state);
++  hook.getState = () => state;
++  hook.setState = (patch) => Object.assign(state, patch);
++  return { default: hook, useUiModeStore: hook };
++});
++
++const usePlayerNoticesStore = (await import('../../src/room/playerNoticesStore')).default;
++const { PLAYER_NOTICE_KIND } = await import('../../src/room/playerNoticesStore');
++const usePlayerFocusStore = (await import('../../src/room/playerFocusStore')).default;
++const useCharacterStore = (await import('../../src/store/characterStore')).default;
++const PlayerNoticesModal = (await import('../../components/gm/PlayerNoticesModal')).default;
++
++const allText = (renderer) => {
++  const out = [];
++  const walk = (node) => {
++    if (!node) return;
++    if (typeof node === 'string') { out.push(node); return; }
++    if (Array.isArray(node)) { node.forEach(walk); return; }
++    walk(node.children);
++  };
++  walk(renderer.toJSON());
++  return out.join(' ');
++};
++
++const mount = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(PlayerNoticesModal));
++  });
++  return renderer;
++};
++
++const seed = () => {
++  const store = usePlayerNoticesStore.getState();
++  store.addNotice({
++    id: 'ROOM1:dir_1:char_a',
++    characterId: 'char_a',
++    roomCode: 'ROOM1',
++    roomName: 'Тапхаус',
++    kind: PLAYER_NOTICE_KIND.COMMAND,
++    text: 'Пайпер: +1 уровень (ур. 3)',
++  });
++  store.addNotice({
++    id: 'ROOM1:session:sess_1:char_a',
++    characterId: 'char_a',
++    roomCode: 'ROOM1',
++    roomName: 'Тапхаус',
++    kind: PLAYER_NOTICE_KIND.TRANSLATION,
++    text: 'Дом у дороги',
++  });
++};
++
++describe('Патч 558: уведомления Мастера привязаны к персонажу', () => {
++  beforeEach(async () => {
++    await usePlayerNoticesStore.getState().resetForTests();
++    usePlayerFocusStore.getState().resetForTests();
++    useCharacterStore.getState().resetCharacterStore();
++    useCharacterStore.setState({ currentCharacterId: 'char_a', characterName: 'Пайпер' });
++  });
++
++  it('склад уведомлений помнит персонажа, не дублирует и считает непрочитанное', () => {
++    seed();
++    usePlayerNoticesStore.getState().addNotice({
++      id: 'ROOM1:dir_1:char_a',
++      characterId: 'char_a',
++      kind: PLAYER_NOTICE_KIND.COMMAND,
++      text: 'дубль',
++    });
++    usePlayerNoticesStore.getState().addNotice({
++      id: 'ROOM1:dir_9:char_b',
++      characterId: 'char_b',
++      kind: PLAYER_NOTICE_KIND.COMMAND,
++      text: 'чужое',
++    });
++
++    const { notices } = usePlayerNoticesStore.getState();
++    expect(notices).toHaveLength(3); // дубль не добавился, чужое — добавилось своему
++    const mine = notices.filter((n) => n.characterId === 'char_a');
++    expect(mine).toHaveLength(2);
++    expect(mine.every((n) => n.read === false)).toBe(true);
++
++    usePlayerNoticesStore.getState().markReadForCharacter('char_a');
++    const after = usePlayerNoticesStore.getState().notices;
++    expect(after.filter((n) => n.characterId === 'char_a').every((n) => n.read)).toBe(true);
++    // Чужой персонаж не затронут.
++    expect(after.find((n) => n.characterId === 'char_b').read).toBe(false);
++  });
++
++  it('на списке персонажей окно не всплывает, внутри персонажа — показывает оба раздела', async () => {
++    seed();
++
++    usePlayerFocusStore.getState().setHomeFocused(true);
++    const onList = await mount();
++    expect(onList.toJSON()).toBeNull();
++
++    usePlayerFocusStore.getState().setHomeFocused(false);
++    const inside = await mount();
++    const text = allText(inside);
++    expect(text).toContain('Сообщения Мастера');
++    expect(text).toContain('Трансляции');
++    expect(text).toContain('Мастер открыл: Дом у дороги');
++    expect(text).toContain('Разовые команды');
++    expect(text).toContain('+1 уровень');
++    expect(inside.root.findByProps({ testID: 'player-notices-ok' })).toBeTruthy();
++  });
++
++  it('«Понятно» гасит уведомления этого персонажа и убирает окно', async () => {
++    seed();
++    usePlayerFocusStore.getState().setHomeFocused(false);
++    const renderer = await mount();
++    const ok = renderer.root.findByProps({ testID: 'player-notices-ok' });
++
++    await act(async () => {
++      ok.props.onPress();
++    });
++
++    expect(usePlayerNoticesStore.getState().notices.every((n) => n.read)).toBe(true);
++    expect(renderer.toJSON()).toBeNull();
++  });
++
++  it('чужие уведомления не показываются тому, кто сидит за другим персонажем', async () => {
++    seed();
++    useCharacterStore.setState({ currentCharacterId: 'char_b', characterName: 'Ник' });
++    usePlayerFocusStore.getState().setHomeFocused(false);
++    const renderer = await mount();
++    expect(renderer.toJSON()).toBeNull();
++  });
++
++  it('карточка в списке: синяя иконка сервера вместо всплывающего окна', () => {
++    const homeSrc = read('components/screens/HomeScreen/HomeScreen.js');
++    expect(homeSrc).toContain(
++      "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
++    );
++    expect(homeSrc).toContain('noticesCount={unreadNoticeCountFor(notices, item.id)}');
++    // В списке персонажей окно Мастера больше не всплывает: о пришедшем
++    // сообщает только цвет иконки.
++    expect(homeSrc).not.toContain('subscribePlayerDirectiveApplied(() => {\n      showRawAlert');
++  });
++
++  it('трансляция идёт только открытому персонажу и не всплывает на списке', () => {
++    const overlaySrc = read('components/lootTrade/PlayerLootTradeOverlay.js');
++    expect(overlaySrc).toContain('const homeFocused = usePlayerFocusStore((s) => s.homeFocused);');
++    expect(overlaySrc).toContain('const focusedBindings = useMemo(');
++    expect(overlaySrc).toContain('return bindings.filter((bind) => bind.characterId === currentCharacterId);');
++    expect(overlaySrc.match(/if \(isGmMode \|\| homeFocused === true \|\| focusedBindings\.length === 0\) return null;/g))
++      .toHaveLength(2);
++    expect(overlaySrc).toContain('PLAYER_NOTICE_KIND.TRANSLATION');
++  });
++
++  it('команды Мастера больше не всплывают поверх списка, а ложатся в список персонажа', () => {
++    const overlaySrc = read('components/gm/PlayerDirectiveOverlay.js');
++    expect(overlaySrc).not.toContain('showRawAlert');
++    expect(overlaySrc).toContain('usePlayerNoticesStore.getState().addNotice({');
++    expect(overlaySrc).toContain('characterId,');
++    expect(overlaySrc).toContain('PLAYER_NOTICE_KIND.COMMAND');
++  });
++
++  it('у Мастера только факт отправки: «Доставлено» из интерфейса ушло', () => {
++    const gmI18n = read('modules/fallout/gm/gmI18n.js');
++    expect(gmI18n).not.toContain('deliveryDone');
++    expect(gmI18n).toContain("sentBadge: 'Отправлено: {total}'");
++    expect(gmI18n).toContain("sentBadge: 'Sent: {total}'");
++    const homeSrc = read('components/screens/HomeScreen/HomeScreen.js');
++    expect(homeSrc).toContain("tGm('roomBar.sentBadge', locale)");
++    expect(homeSrc).not.toContain('acked >= total');
++  });
++
++  it('ключи и склад патч не трогает', () => {
++    const storage = read('components/lootTrade/PartyStorageModal.js');
++    expect(storage).toContain('storageTabs');
++    expect(storage).not.toContain('playerNotices');
++  });
++});
+diff --git a/__tests__/room/room-character-sync-456.test.js b/__tests__/room/room-character-sync-456.test.js
+index a9fdeda..68e926c 100644
+--- a/__tests__/room/room-character-sync-456.test.js
++++ b/__tests__/room/room-character-sync-456.test.js
+@@ -226,7 +226,12 @@ describe('Патч 456: отображение подключённых перс
+       path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'),
+       'utf8',
+     );
+-    expect(homeSrc).toContain("color={serverOnline ? '#16a34a' : '#9ca3af'}");
++    // Патч 558: цвет иконки сервера теперь трёхзначный — синий сообщает
++    // «Мастер прислал этому персонажу сообщение», зелёный/серый как раньше.
++    expect(homeSrc).toContain(
++      "const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');",
++    );
++    expect(homeSrc).toContain('color={serverIconColor}');
+     expect(homeSrc).toContain('const displayedCharacters = isGmMode');
+ 
+     // moveCharacterToFolder в обеих реализациях БД меняет только членство в папке, не трогая character_room_bindings
+diff --git a/components/gm/PlayerDirectiveOverlay.js b/components/gm/PlayerDirectiveOverlay.js
+index b3661a6..dea2f19 100644
+--- a/components/gm/PlayerDirectiveOverlay.js
++++ b/components/gm/PlayerDirectiveOverlay.js
+@@ -8,7 +8,7 @@ import useUiModeStore from '../../src/room/uiModeStore';
+ import useRoomStore, { onRoomDirective } from '../../src/room/roomStore';
+ import { syncBoundCharacterToRoom } from '../../src/room/roomCharacterSync';
+ import { syncCharacterToCloudIfEnabled } from '../cloudSync/googleDriveSync';
+-import { showRawAlert } from '../alerts/alertService';
++import usePlayerNoticesStore, { PLAYER_NOTICE_KIND } from '../../src/room/playerNoticesStore';
+ import { getCurrentLocale } from '../../i18n/locale';
+ import {
+   applyDirectiveToLiveCharacterStore,
+@@ -167,16 +167,26 @@ export const processPendingDirectivesForPlayer = async () => {
+         debugLog('gmDirective.syncSnapshot:failed', { message: syncErr?.message });
+       }
+ 
++      // 558 (слово владельца): команда Мастера не всплывает поверх списка
++      // персонажей. Она ложится в список уведомлений ИМЕННО ЭТОГО персонажа —
++      // на карточке в списке загорается синяя иконка, а окно со списком
++      // показывается, когда игрок садится за этого персонажа.
+       if (summaryLine) {
+         const noteBlock = directive.note
+-          ? `\n\n${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
++          ? ` ${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
+           : '';
+-        const alertTitle = directive.originRole === 'peer' || directive.kind === 'peer.consumable'
++        const fromPeer = directive.originRole === 'peer' || directive.kind === 'peer.consumable';
++        const text = fromPeer
+           ? formatGm(tGm('envCombat.firstAid.peerReceivedTitle', locale), { from: directive.fromName || '—' })
+-          : formatGm(tGm('commands.playerAlert.title', locale), { character: characterName });
+-        showRawAlert({
+-          title: alertTitle,
+-          message: `${summaryLine}${noteBlock}`,
++          : `${summaryLine}${noteBlock}`;
++        usePlayerNoticesStore.getState().addNotice({
++          id: dedupeKey,
++          characterId,
++          roomCode,
++          roomName: room?.name || roomCode,
++          kind: PLAYER_NOTICE_KIND.COMMAND,
++          text,
++          at: Number(directive.createdAt) || Date.now(),
+         });
+       }
+ 
+diff --git a/components/gm/PlayerNoticesModal.js b/components/gm/PlayerNoticesModal.js
+new file mode 100644
+index 0000000..56640d4
+--- /dev/null
++++ b/components/gm/PlayerNoticesModal.js
+@@ -0,0 +1,110 @@
++// components/gm/PlayerNoticesModal.js
++// Патч 558 — список того, что Мастер прислал ИГРАЮЩЕМУ персонажу.
++//
++// Слово владельца:
++//   «На списке персонажей ничего не всплывает — меняется цвет иконки сервера
++//    (например, синий). Списком, что происходит. Трансляции и разовые команды
++//    разделить: если мастер прислал уровень — окно по типу релиза с кнопкой ОК.
++//    Трансляция не даёт "доставлено".»
++//
++// Значит: над списком персонажей не висит ни одного окна (этим занимается
++// флаг homeFocused), а когда игрок открыл конкретного персонажа — показывается
++// одно окно со списком: раздел «Трансляции» и раздел «Разовые команды».
++// «Понятно» помечает всё прочитанным для этого персонажа и гасит синюю иконку.
++
++import React, { useEffect, useMemo } from 'react';
++import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import usePlayerNoticesStore, {
++  PLAYER_NOTICE_KIND,
++  unreadNoticesFor,
++} from '../../src/room/playerNoticesStore';
++import usePlayerFocusStore from '../../src/room/playerFocusStore';
++import { useLocale } from '../../i18n/locale';
++import { formatGm, tGm } from '../../modules/fallout/gm/gmI18n';
++
++export default function PlayerNoticesModal() {
++  const locale = useLocale();
++  const notices = usePlayerNoticesStore((s) => s.notices);
++  const hydrate = usePlayerNoticesStore((s) => s.hydrate);
++  const markReadForCharacter = usePlayerNoticesStore((s) => s.markReadForCharacter);
++  const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
++  const characterName = useCharacterStore((s) => s.characterName);
++  const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
++  const storeUiMode = useAppSettingsStore(selectUiMode);
++  const tabUiMode = useUiModeStore((s) => s.tabUiMode);
++  const isGmMode = (tabUiMode || storeUiMode) === 'gm';
++
++  useEffect(() => {
++    void hydrate();
++  }, [hydrate]);
++
++  const unread = useMemo(
++    () => unreadNoticesFor(notices, currentCharacterId),
++    [notices, currentCharacterId],
++  );
++
++  // На списке персонажей ничего не всплывает — там только синяя иконка.
++  // Только когда игрок действительно сидит за персонажем: homeFocused === false.
++  if (isGmMode || homeFocused !== false || !currentCharacterId || unread.length === 0) return null;
++
++  const translations = unread.filter((item) => item.kind === PLAYER_NOTICE_KIND.TRANSLATION);
++  const commands = unread.filter((item) => item.kind === PLAYER_NOTICE_KIND.COMMAND);
++
++  const renderSection = (title, items) => {
++    if (items.length === 0) return null;
++    return (
++      <View style={styles.section} key={title}>
++        <Text style={styles.sectionTitle}>{title}</Text>
++        {items.map((item) => (
++          <Text key={item.id} style={styles.line}>
++            • {item.kind === PLAYER_NOTICE_KIND.TRANSLATION
++              ? formatGm(tGm('notices.translationLine', locale), { name: item.text || '—' })
++              : item.text}
++            {item.roomName ? (
++              <Text style={styles.lineMeta}>{` (${item.roomName})`}</Text>
++            ) : null}
++          </Text>
++        ))}
++      </View>
++    );
++  };
++
++  const close = () => markReadForCharacter(currentCharacterId);
++
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={close}>
++      <View style={styles.overlay}>
++        <View style={styles.dialog} testID="player-notices-modal">
++          <Text style={styles.title}>{tGm('notices.title', locale)}</Text>
++          <Text style={styles.subtitle}>
++            {formatGm(tGm('notices.subtitle', locale), { character: characterName || '—' })}
++          </Text>
++          <ScrollView style={styles.scroll} nestedScrollEnabled>
++            {renderSection(tGm('notices.sectionTranslations', locale), translations)}
++            {renderSection(tGm('notices.sectionCommands', locale), commands)}
++          </ScrollView>
++          <TouchableOpacity style={styles.closeBtn} onPress={close} testID="player-notices-ok">
++            <Text style={styles.closeText}>{tGm('notices.ok', locale)}</Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++const styles = {
++  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420, maxHeight: '85%' },
++  scroll: { flexShrink: 1 },
++  title: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginBottom: 4 },
++  subtitle: { color: '#9ca88f', fontSize: 12, marginBottom: 10 },
++  section: { marginBottom: 12 },
++  sectionTitle: { color: '#c9d2bd', fontSize: 12, fontWeight: '700', letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
++  line: { color: '#e8e6d9', fontSize: 13, lineHeight: 19, marginBottom: 6 },
++  lineMeta: { color: '#9ca88f', fontSize: 12 },
++  closeBtn: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 14 },
++  closeText: { color: '#f0e68c', fontSize: 14, fontWeight: '700' },
++};
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 4a5520b..68ef751 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -18,6 +18,8 @@ import useCharacterStore from '../../src/store/characterStore';
+ import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
+ import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
+ import useUiModeStore from '../../src/room/uiModeStore';
++import usePlayerFocusStore from '../../src/room/playerFocusStore';
++import usePlayerNoticesStore, { PLAYER_NOTICE_KIND } from '../../src/room/playerNoticesStore';
+ import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
+ import { useLocale, useModuleLocale } from '../../i18n/locale';
+ import {
+@@ -105,6 +107,7 @@ export default function PlayerLootTradeOverlay() {
+   const myClientId = useRoomStore((s) => s.clientId);
+ 
+   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
++  const homeFocused = usePlayerFocusStore((s) => s.homeFocused);
+   const storeItems = useCharacterStore((s) => s.items);
+   const playerCaps = useCharacterStore((s) => s.currency);
+   const perkBonuses = useCharacterStore((s) => s.perkBonuses);
+@@ -162,16 +165,19 @@ export default function PlayerLootTradeOverlay() {
+     refreshBindings();
+   }, [refreshBindings, currentCharacterId, roomStatus, rooms]);
+ 
+-  // Находим активную сессию комнаты, подходящую привязанному персонажу игрока
++  // 558: трансляция (локация, торговец, терминал) — только ТОМУ персонажу,
++  // за которого игрок сейчас сидит. На списке персонажей плашка не висит:
++  // там сигналит только синяя иконка сервера на карточке.
++  const focusedBindings = useMemo(() => {
++    if (!currentCharacterId) return [];
++    return bindings.filter((bind) => bind.characterId === currentCharacterId);
++  }, [bindings, currentCharacterId]);
++
++  // Находим активную сессию комнаты, подходящую открытому персонажу игрока
+   const matchedContext = useMemo(() => {
+-    if (isGmMode || bindings.length === 0) return null;
++    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
+ 
+-    // Сначала приоритет — персонажу, который уже открыт прямо сейчас
+-    const ordered = [...bindings].sort((a, b) => {
+-      if (a.characterId === currentCharacterId) return -1;
+-      if (b.characterId === currentCharacterId) return 1;
+-      return 0;
+-    });
++    const ordered = focusedBindings;
+ 
+     for (const bind of ordered) {
+       const room = rooms[bind.code];
+@@ -196,15 +202,11 @@ export default function PlayerLootTradeOverlay() {
+       }
+     }
+     return null;
+-  }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
++  }, [isGmMode, homeFocused, focusedBindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+ 
+   const directTerminalContext = useMemo(() => {
+-    if (isGmMode || bindings.length === 0) return null;
+-    const ordered = [...bindings].sort((a, b) => {
+-      if (a.characterId === currentCharacterId) return -1;
+-      if (b.characterId === currentCharacterId) return 1;
+-      return 0;
+-    });
++    if (isGmMode || homeFocused === true || focusedBindings.length === 0) return null;
++    const ordered = focusedBindings;
+     for (const bind of ordered) {
+       const states = Object.values(rooms[bind.code]?.terminalStates || {});
+       // Патч 542: замок не бывает самостоятельной точкой игрока.
+@@ -214,9 +216,30 @@ export default function PlayerLootTradeOverlay() {
+       if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
+     }
+     return null;
+-  }, [isGmMode, bindings, currentCharacterId, rooms]);
++  }, [isGmMode, homeFocused, focusedBindings, currentCharacterId, rooms]);
+ 
+   const activeSession = matchedContext?.session || null;
++
++  // 558: трансляция попадает в список «что прислал Мастер» тому персонажу,
++  // к которому она адресована. Плашка при этом работает как раньше —
++  // «как сейчас, но только конкретному персонажу».
++  useEffect(() => {
++    if (!activeSession || !matchedContext) return;
++    usePlayerNoticesStore.getState().addNotice({
++      id: `${matchedContext.roomCode}:session:${activeSession.sessionId}:${matchedContext.characterId}`,
++      characterId: matchedContext.characterId,
++      roomCode: matchedContext.roomCode,
++      roomName: rooms?.[matchedContext.roomCode]?.name || matchedContext.roomCode,
++      kind: PLAYER_NOTICE_KIND.TRANSLATION,
++      text: activeSession.name || activeSession.containerId || '',
++    });
++  }, [
++    activeSession?.sessionId,
++    activeSession?.name,
++    matchedContext?.characterId,
++    matchedContext?.roomCode,
++    rooms,
++  ]);
+   // Патч 544: восстанавливаем тип/рёбра локаций после старого сервера комнат.
+   // Дальше окно работает только с этим списком, а не с сырым activeSession.nodes.
+   const sessionNodes = useMemo(
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index abb409f..5e4763e 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -93,6 +93,8 @@ import * as avatarCache from '../../../db/avatarCache';
+ // Комнаты мастера (gm-rooms, этапы 0–3): стор соединения + адреса комнат + синхронизация.
+ import useRoomStore from '../../../src/room/roomStore';
+ import useUiModeStore from '../../../src/room/uiModeStore';
++import usePlayerNoticesStore, { unreadNoticeCountFor } from '../../../src/room/playerNoticesStore';
++import usePlayerFocusStore from '../../../src/room/playerFocusStore';
+ import { isRoomServerConfigured } from '../../../src/room/roomClient';
+ import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
+ import {
+@@ -153,11 +155,16 @@ const CharacterCell = ({
+   serverAvailable = false,
+   serverBound = false,
+   serverOnline = false,
++  // 558: сколько Мастер прислал этому персонажу непрочитанного. Синяя
++  // иконка сервера — «есть сообщение»; никаких всплывающих окон в списке.
++  noticesCount = 0,
+   readOnlyRoomCard = false,
+   onDragStart,
+   onDragMove,
+   onDragEnd,
+ }) => {
++  const hasNotices = Number(noticesCount) > 0;
++  const serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af');
+   const originImage = getOriginImage(character.originName);
+   const [customImageUrl, setCustomImageUrl] = useState(character?.avatarDataUrl || null);
+ 
+@@ -217,7 +224,7 @@ const CharacterCell = ({
+             <MaterialCommunityIcons
+               name="server-network"
+               size={17}
+-              color={serverOnline ? '#16a34a' : '#9ca3af'}
++              color={serverIconColor}
+             />
+           </View>
+         ) : (
+@@ -233,7 +240,7 @@ const CharacterCell = ({
+             <MaterialCommunityIcons
+               name="server-network"
+               size={17}
+-              color={serverOnline ? '#16a34a' : '#9ca3af'}
++              color={serverIconColor}
+             />
+           </TouchableOpacity>
+         )
+@@ -501,6 +508,12 @@ export default function HomeScreen({ navigation }) {
+   // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9).
+   // На web режим дополнительно изолирован по вкладкам (sessionStorage), чтобы
+   // открытые рядом вкладки «Админ» и «Пользователь» не перетирали друг друга.
++  // 558: уведомления Мастера привязаны к персонажу. На списке ничего не
++  // всплывает — только синяя иконка сервера на карточке того персонажа.
++  const notices = usePlayerNoticesStore((state) => state.notices);
++  const hydrateNotices = usePlayerNoticesStore((state) => state.hydrate);
++  const setHomeFocused = usePlayerFocusStore((state) => state.setHomeFocused);
++
+   const storeUiMode = useAppSettingsStore(selectUiMode);
+   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
+   const setSharedTabUiMode = useUiModeStore((state) => state.setTabUiMode);
+@@ -684,8 +697,11 @@ export default function HomeScreen({ navigation }) {
+   useFocusEffect(
+     useCallback(() => {
+       useUiModeStore.getState().setGmInspectingCharacter(false);
++      void hydrateNotices();
++      setHomeFocused(true);
+       loadList();
+-    }, [loadList])
++      return () => setHomeFocused(false);
++    }, [loadList, hydrateNotices, setHomeFocused])
+   );
+ 
+   // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
+@@ -1500,25 +1516,17 @@ export default function HomeScreen({ navigation }) {
+               </TouchableOpacity>
+ 
+               {latestGmDirective ? (() => {
++                // 558 (слово владельца): «Трансляция не даёт "доставлено", а вот
++                // поднятие уровня — можно писать факт отправки». Поэтому здесь
++                // только факт отправки; доставку разбирают за столом.
+                 const total = Array.isArray(latestGmDirective.targetCharacterIds)
+                   ? latestGmDirective.targetCharacterIds.length
+-                  : 0;
+-                const acked = Array.isArray(latestGmDirective.ackedByCharacterIds)
+-                  ? latestGmDirective.ackedByCharacterIds.length
+-                  : 0;
+-                const done = total > 0 && acked >= total;
++                  : (latestGmDirective.targetType === 'character' ? 1 : 0);
+                 return (
+-                  <View style={[styles.gmDeliveryPill, done && styles.gmDeliveryPillDone]}>
+-                    <MaterialCommunityIcons
+-                      name={done ? 'check-circle-outline' : 'clock-outline'}
+-                      size={13}
+-                      color={done ? '#4ade80' : '#f0e68c'}
+-                    />
+-                    <Text style={[styles.gmDeliveryPillText, done && styles.gmDeliveryPillTextDone]}>
+-                      {formatGm(
+-                        tGm(done ? 'roomBar.deliveryDone' : 'roomBar.deliveryBadge', locale),
+-                        { acked, total },
+-                      )}
++                  <View style={styles.gmDeliveryPill}>
++                    <MaterialCommunityIcons name="send" size={13} color="#f0e68c" />
++                    <Text style={styles.gmDeliveryPillText}>
++                      {formatGm(tGm('roomBar.sentBadge', locale), { total })}
+                     </Text>
+                   </View>
+                 );
+@@ -1627,6 +1635,7 @@ export default function HomeScreen({ navigation }) {
+                     serverAvailable={roomServerAvailable && !isGmMode}
+                     serverBound={Boolean(boundCode)}
+                     serverOnline={isBoundOnline}
++                    noticesCount={unreadNoticeCountFor(notices, item.id)}
+                     onDragStart={handleDragStart}
+                     onDragMove={handleDragMove}
+                     onDragEnd={handleDragEnd}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 996de67..d5c3217 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,44 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (558) — сообщения Мастера приходят лично персонажу
++
++Слово владельца (четыре ответа на вопросы обсуждения): «На списке персонажей
++ничего не всплывает — меняется цвет иконки сервера (например, синий)»;
++«Списком, что происходит. Трансляции и разовые команды. Если мастер прислал
++уровень — окно по типу релиза с кнопкой ок, а трансляцию держать, как сейчас,
++но только конкретному персонажу»; «Трансляция не даёт "доставлено", у поднятия
++уровня — факт отправки»; «Ключи не трогаем».
++
++- **Склад уведомлений.** Новый `src/room/playerNoticesStore.js`: записи
++  `{ id, characterId, roomCode, roomName, kind, text, read, at }` в
++  AsyncStorage (`positronium_player_notices_v1`), дедупликация по `id`,
++  `addNotice` / `markReadForCharacter` / `hydrate`, хелперы
++  `unreadNoticesFor` / `unreadNoticeCountFor`. Вид: `translation` | `command`.
++- **Фокус игрока.** Новый `src/room/playerFocusStore.js`: `homeFocused`
++  (`null` — неизвестно, `true` — на списке, `false` — внутри персонажа).
++  `HomeScreen` ставит его в `useFocusEffect` (true при фокусе, false в cleanup).
++- **Команды.** `PlayerDirectiveOverlay` больше не зовёт `showRawAlert`:
++  применяет команду как раньше, ack и снапшот не тронуты, а факт кладёт в
++  `addNotice({ kind: 'command' })` с id = прежний ключ дедупликации
++  `roomCode:directiveId:characterId`.
++- **Трансляции.** `PlayerLootTradeOverlay`: `focusedBindings` =
++  привязки только открытого персонажа; при `homeFocused === true` плашки не
++  строятся; новая сессия пишет `addNotice({ kind: 'translation' })` с именем
++  локации/торговца (`roomCode:session:sessionId:characterId`).
++- **Окно-список.** Новый `components/gm/PlayerNoticesModal.js` (каркас
++  «Что нового»): заголовок, подпись с именем персонажа, разделы «Трансляции» и
++  «Разовые команды», кнопка «Понятно» = `markReadForCharacter`. Показывается
++  только при `homeFocused === false` и наличии непрочитанного у открытого
++  персонажа; смонтирован в `App.js` рядом с оверлеями.
++- **Список персонажей.** `CharacterCell` получил `noticesCount`; цвет иконки
++  `serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af')`.
++- **Мастер.** Панель комнаты: вместо «Доставлено (x/y)» — «Отправлено: N»
++  (`roomBar.sentBadge`), `ackedByCharacterIds` остался в протоколе.
++- **Тесты.** Новый `player-notices-558` (9 проверок); 481 проверяет уведомление
++  вместо алерта (`alertsLog` пуст); 456 — трёхзначный цвет иконки.
++- **Отсечка.** `patchs/baseline.json` → 558; 535/532 — 558/5/10, roadmap `**558**`.
++- **Не тронуто.** Ключи и склад (557), протокол комнаты, ack-очередь, `charCommands`.
++
+ ## 2026-11-07 (557) — две вкладки на панели склада: вещи и ключи
+ 
+ Слово владельца: «склад держит две вкладки на верхней границе с иконкой
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 20caa8d..f710191 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,36 @@
+ # Changelog
+ ---
+ 
++## GM messages arrive personally (patch 558)
++
++The owner's words: "nothing pops up over the character list — change the colour
++of the server icon (blue, for example). A list of what happened. Split
++transmissions from one-off commands: if the GM granted a level, show a
++release-style window with an OK button. A transmission never yields
++'delivered'. Keys stay as they are."
++
++- **Character list.** No pop-ups. On the card of the character that received
++  something the server icon turns blue (`#3b82f6`); green means online, grey
++  offline, as before.
++- **A list of what happened.** When the player sits down as that character one
++  window opens in the "What's new" style: a "Transmissions" section (locations,
++  traders, terminals) and a "One-off commands" section (level, caps, healing,
++  injuries). "Got it" marks everything read and clears the blue icon.
++- **Only its own character.** Every notice is stored on the client together with
++  its `characterId`. With several characters bound to different GMs each one sees
++  only its own messages.
++- **Transmissions.** The location/trader pill works as before but is shown only
++  to the open character and never over the character list.
++- **No "delivered".** The GM room bar shows the fact of sending — "Sent: N" —
++  instead of a delivery counter. Actual delivery is settled at the table.
++- **Keys and storage** are untouched.
++- **Acceptance.** New `player-notices-558` (9 checks): notice store, no window
++  over the list, both sections inside the character, "Got it", another character
++  sees nothing, blue icon, transmission only for the open character, fact of
++  sending for the GM, storage untouched.
++
++---
++
+ ## Two tabs on the storage pane (patch 557)
+ 
+ The owner's words: "the storage holds two tabs on its top edge with a 'bag' and
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d9fb57c..6e00ea9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Сообщения Мастера — лично персонажу (патч 558)
++
++Слово владельца: «На списке персонажей ничего не всплывает — меняется цвет
++иконки сервера (например, синий). Списком, что происходит. Трансляции и разовые
++команды разделить: если мастер прислал уровень — окно по типу релиза с кнопкой
++ок. Трансляция не даёт "доставлено". Ключи не трогаем».
++
++- **Список персонажей.** Никаких всплывающих окон. У карточки персонажа, кому
++  что-то пришло, иконка сервера становится синей (`#3b82f6`); зелёная — в сети,
++  серая — не в сети, как раньше.
++- **Список того, что произошло.** Когда игрок садится за этого персонажа,
++  открывается одно окно в стиле «Что нового»: раздел «Трансляции» (локации,
++  торговцы, терминалы) и раздел «Разовые команды» (уровень, крышки, лечение,
++  увечья). Кнопка «Понятно» помечает всё прочитанным и гасит синюю иконку.
++- **Только своему персонажу.** Каждое уведомление лежит в клиентском складе
++  вместе с `characterId`. Если у игрока несколько персонажей у разных Мастеров,
++  каждый видит только своё.
++- **Трансляции.** Плашка локации/торговца работает как раньше, но показывается
++  только открытому персонажу и не висит на списке персонажей.
++- **Без «доставлено».** У Мастера в панели комнаты вместо счётчика доставки —
++  факт отправки: «Отправлено: N». Фактическая доставка разбирается за столом.
++- **Ключи и склад** не тронуты.
++- **Приёмка.** Новый `player-notices-558` (9 проверок): склад уведомлений,
++  окно на списке не всплывает, оба раздела внутри персонажа, «Понятно»,
++  чужой персонаж ничего не видит, синяя иконка, трансляция только открытому,
++  факт отправки у Мастера, склад не тронут.
++
++---
++
+ ## Две вкладки на панели склада (патч 557)
+ 
+ Слово владельца: «склад держит две вкладки на верхней границе с иконкой
+diff --git a/docs/patch-558-install.md b/docs/patch-558-install.md
+new file mode 100644
+index 0000000..6eeb359
+--- /dev/null
++++ b/docs/patch-558-install.md
+@@ -0,0 +1,73 @@
++# Установка патча 558: сообщения Мастера приходят лично персонажу
++
++Патч подготовлен от состояния **версии 557**. Файл установки:
++`patchs/558-character-notices.patch`.
++
++> **Слово владельца (четыре ответа на вопросы обсуждения):**
++> 1. «На списке персонажей ничего не всплывает — меняется цвет иконки сервера
++>    (например, синий)».
++> 2. «Списком, что происходит. Трансляции и разовые команды. Если мастер прислал
++>    уровень — окно по типу релиза с кнопкой ок, а трансляцию держать, как
++>    сейчас, но только конкретному персонажу».
++> 3. «Трансляция не даёт "доставлено", у поднятия уровня — факт отправки.
++>    Фактическая доставка — за столом».
++> 4. «Ключи не трогаем».
++
++## Что меняется
++
++Только показ результатов Мастера у игрока и подпись в панели комнаты. Протокол
++комнаты, ack-очередь, склад и ключи не трогались.
++
++| Файл | Что сделано |
++| --- | --- |
++| `src/room/playerNoticesStore.js` | **новый.** Клиентский склад уведомлений: `{ id, characterId, roomCode, roomName, kind, text, read, at }` в AsyncStorage (`positronium_player_notices_v1`), дедупликация по `id`, `addNotice` / `markReadForCharacter` / `hydrate`, хелперы `unreadNoticesFor` и `unreadNoticeCountFor`. Вид записи: `translation` (локация/торговец) или `command` (разовая команда) |
++| `src/room/playerFocusStore.js` | **новый.** `homeFocused`: `null` — неизвестно, `true` — игрок на списке персонажей, `false` — внутри персонажа |
++| `components/gm/PlayerNoticesModal.js` | **новый.** Окно-список в стиле «Что нового»: заголовок «Сообщения Мастера», подпись с именем персонажа, раздел «Трансляции», раздел «Разовые команды», кнопка «Понятно» (= всё прочитано). Показывается только когда игрок внутри персонажа и есть непрочитанное именно у него |
++| `components/gm/PlayerDirectiveOverlay.js` | команда больше не всплывает окном (`showRawAlert` убран): применяется как раньше, ack и снапшот остались, а факт ложится в уведомление **этого** персонажа. Ключ дедупликации прежний — `roomCode:directiveId:characterId` |
++| `components/lootTrade/PlayerLootTradeOverlay.js` | трансляция адресуется только открытому персонажу (`focusedBindings`) и не висит на списке; новая сессия пишет уведомление «Мастер открыл: …» |
++| `components/gm/gmI18n.js` | блок `notices` (ru/en); в панели комнаты вместо `deliveryBadge`/`deliveryDone` — `sentBadge` («Отправлено: N» / «Sent: N») и `sentHint` |
++| `components/screens/HomeScreen/HomeScreen.js` | у карточки — `noticesCount`; цвет иконки сервера `#3b82f6` (синий) при непрочитанном, иначе прежние зелёный/серый. На фокусе списка поднимается `homeFocused`. В панели комнаты — «Отправлено: N» вместо счётчика доставки |
++| `styles/HomeScreen.styles.js` | убраны стили «доставлено» (`gmDeliveryPillDone`, `gmDeliveryPillTextDone`) |
++| `App.js` | `<PlayerNoticesModal />` рядом с оверлеями |
++| `__tests__/room/player-notices-558.test.js` | **новая приёмка** (9 проверок) |
++| `__tests__/room/gm-navbar2-spoilers-directives-481.test.js` | вместо алерта проверяется уведомление персонажа (`alertsLog` пуст) |
++| `__tests__/room/room-character-sync-456.test.js` | защёлка трёхзначного цвета иконки |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 558 / `baseline` 558 / roadmap `**558**` |
++| `patchs/baseline.json`, `public/version.json` | отсечка и версия 558, заметки релиза 5 обновлены |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md` | запись патча 558, тезис 46 |
++
++## Как это выглядит
++
++1. Игрок на списке персонажей. Никаких окон: у карточки, кому что-то пришло,
++   иконка сервера **синяя**. Зелёная — в сети, серая — не в сети.
++2. Игрок открыл этого персонажа — сверху одно окно «Сообщения Мастера» с его
++   именем и двумя разделами: «Трансляции» (Мастер открыл локацию/торговца) и
++   «Разовые команды» (уровень, крышки, лечение, увечья), строки с названием
++   комнаты.
++3. «Понятно» закрывает окно и гасит синюю иконку.
++4. Локация или торговец по-прежнему открываются плашкой — но только у того
++   персонажа, за которого играют; на списке плашки нет.
++5. У Мастера в панели комнаты — «Отправлено: N». Счётчика «Доставлено» больше
++   нет: доставку разбирают за столом.
++6. Ключи и склад работают точно как после 557.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 558
++```
++
++После установки: `git add -A && git commit -m "Патч 558"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/player-notices-558.test.js \
++  __tests__/room/gm-navbar2-spoilers-directives-481.test.js \
++  __tests__/room/room-character-sync-456.test.js \
++  __tests__/room/storage-pane-tabs-557.test.js
++npm run typecheck
++```
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index f4c385c..0e1c851 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **557**.
++Дата ревизии: 2026-11-07. Текущая версия: **558**.
+ 
+ ## Тезисы
+ 
+@@ -62,6 +62,17 @@
+ 
+ | 45 | **Панель склада с двумя вкладками.** На верхней границе панели склада — два таба ровно на её ширину (по половине каждый): «мешочек» = вещи, «ключ» = записки и ключи. Вид панелей не меняется, меняется только содержимое панели склада; ключи больше не занимают место под панелями. У Мастера те же две вкладки, в «ключах» — выдача на склад. Пустой буфер в панели не рисуется | ✅ сделано | **557** |
+ 
++| 46 | **Сообщения Мастера — лично персонажу.** В списке персонажей ничего не всплывает: у карточки, которой пришло сообщение, синяя иконка сервера (зелёная — в сети, серая — офлайн). Когда игрок садится за этого персонажа, открывается окно-список в стиле релиза: «Трансляции» (локации, торговцы, терминалы) отдельно от «Разовых команд» (уровень, крышки, лечение, увечья), закрывается кнопкой «Понятно». Трансляция по-прежнему работает плашкой и адресуется только открытому персонажу; «доставлено» она не даёт, у разовой команды у Мастера только факт отправки. Ключи и склад не меняются | ✅ сделано | **558** |
++
++## Осталось после патча 558
++
++Патч 558 развёл каналы Мастера: в списке персонажей — только цвет иконки
++сервера, а всё, что пришло, лежит списком у самого персонажа и делится на
++трансляции и разовые команды. «Доставлено» из интерфейса убрано: у Мастера
++виден факт отправки, доставку разбирают за столом. Следующий шаг по слову
++владельца — раздел локаций и сундуков в пространстве Мастера; объём и место
++раздела ещё не подтверждены.
++
+ ## Осталось после патча 557
+ 
+ Патч 557 убрал блок ключей из-под панелей: у панели склада появились две
+@@ -376,6 +387,7 @@
+ - `docs/patch-555-install.md` — ПК-режим карточек в окне комнаты Мастера (555).
+ - `docs/patch-556-install.md` — окно общего хранилища по образцу торговца, без денег (556).
+ - `docs/patch-557-install.md` — две вкладки на панели склада: вещи и ключи (557).
++- `docs/patch-558-install.md` — сообщения Мастера приходят лично персонажу (558).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/modules/fallout/gm/gmI18n.js b/modules/fallout/gm/gmI18n.js
+index 3ffb8b7..3f15dd8 100644
+--- a/modules/fallout/gm/gmI18n.js
++++ b/modules/fallout/gm/gmI18n.js
+@@ -8,12 +8,22 @@ export const GM_DICTIONARIES = {
+   'ru-RU': {
+     roomBar: {
+       groupCommand: 'Команда группе',
+-      deliveryBadge: 'Команда: {acked}/{total}',
+-      deliveryDone: 'Доставлено ({acked}/{total})',
++      sentBadge: 'Отправлено: {total}',
++      // 558: трансляция не даёт «доставлено» — у разовой команды пишем только
++      // факт отправки, фактическую доставку разбирают за столом.
++      sentHint: 'Фактическая доставка — за столом.',
+       readonlyHint: 'Только просмотр · влияние на персонажей через команды и добычу',
+       pcMode: 'ПК-режим',
+       emptyPlayers: 'В этой комнате пока нет подключённых персонажей. Передайте адрес комнаты игрокам — их карточки со сводкой появятся здесь автоматически.',
+     },
++    notices: {
++      title: 'Сообщения Мастера',
++      subtitle: 'Персонаж: {character}',
++      sectionTranslations: 'Трансляции',
++      sectionCommands: 'Разовые команды',
++      translationLine: 'Мастер открыл: {name}',
++      ok: 'Понятно',
++    },
+     card: {
+       levelShort: 'Ур. {level}',
+       online: 'В сети',
+@@ -415,12 +425,20 @@ export const GM_DICTIONARIES = {
+   'en-EN': {
+     roomBar: {
+       groupCommand: 'Party Command',
+-      deliveryBadge: 'Command: {acked}/{total}',
+-      deliveryDone: 'Delivered ({acked}/{total})',
++      sentBadge: 'Sent: {total}',
++      sentHint: 'Actual delivery is settled at the table.',
+       readonlyHint: 'Read-only view · affect characters via commands and loot/trade',
+       pcMode: 'PC mode',
+       emptyPlayers: 'No characters are connected to this room yet. Share the room code with your players — their live summary cards will appear here automatically.',
+     },
++    notices: {
++      title: 'Messages from the GM',
++      subtitle: 'Character: {character}',
++      sectionTranslations: 'Transmissions',
++      sectionCommands: 'One-off commands',
++      translationLine: 'GM opened: {name}',
++      ok: 'Got it',
++    },
+     card: {
+       levelShort: 'Lv. {level}',
+       online: 'Online',
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 223870a..548208f 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "557"
++  "baseline": "558"
+ }
+diff --git a/public/version.json b/public/version.json
+index 6814fe0..9ac1a78 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,28 +1,28 @@
+ {
+-  "version": "557",
++  "version": "558",
+   "release": 5,
+   "notes": {
+     "ru-RU": [
+       "Игра в комнате с ведущим: вы подключаетесь к комнате, ваш лист уезжает ведущему, а его решения — эффект, урон, списание предмета — приходят прямо на лист и сохраняются.",
++      "Сообщения ведущего приходят лично персонажу: на карточке в списке загорается синяя иконка сервера, а когда вы садитесь за этого персонажа — открывается список того, что произошло.",
++      "Список разделён на трансляции (локации, торговцы, терминалы) и разовые команды (уровень, крышки, лечение, увечья); «Понятно» закрывает его. У нескольких персонажей у разных ведущих каждый видит только своё, а ведущий видит факт отправки — доставку разбирают за столом.",
+       "Ведущий видит ваше состояние: ОЗ, радиация, условия и ключевые показатели — без просьб прислать скриншот.",
+-      "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список.",
+-      "Запертая дверь не пускает внутрь: пока замок не открыт, за дверью ничего не видно — сначала ключ или взлом.",
++      "Локации с комнатами и переходами: можно войти в здание, спуститься в подвал, найти сундук — вы двигаетесь по местам, а не листаете один длинный список. Запертая дверь не пускает внутрь, пока замок не открыт.",
+       "Взлом замков: мини-игра с ячейками по восприятию и сложности, ограниченным числом попыток и выбором «ключом или взломом».",
+-      "Взлом терминалов: четыре попытки, слова, скобки-подсказки и доска по интеллекту. После провала ведущий решает — дать ещё подход или закрыть терминал.",
+-      "Ключи и записки: ключ можно найти, носить с собой или оставить на общем складе — и открыть им дверь или сундук.",
+-      "Ворота: взлом одного терминала может открыть путь дальше — в соседнюю комнату или к другому сундуку.",
++      "Взлом терминалов: четыре попытки, слова, скобки-подсказки и доска по интеллекту. Ворота: взлом одного терминала открывает путь дальше — в соседнюю комнату или к другому сундуку.",
++      "Ключи и записки: ключ можно найти, носить с собой или оставить на складе — и открыть им дверь или сундук.",
+       "Общий склад партии: добычу можно складывать вместе, положить и забрать может каждый, а ведущий видит, что где лежит.",
+       "Добыча и торговцы: ведущий выдаёт предметы, а у торговца можно купить или продать по его ценам и кассе."
+     ],
+     "en-EN": [
+       "Playing in a room with your GM: you join the room, your sheet goes to the GM, and their decisions — an effect, damage, a spent item — land on your sheet and are saved.",
++      "GM messages now arrive personally: the character card in the list shows a blue server icon, and when you sit down as that character a list of what happened opens.",
++      "The list is split into transmissions (locations, traders, terminals) and one-off commands (level, caps, healing, injuries); press Got it to close. With several characters bound to different GMs each one sees only its own messages, and the GM sees that a command was sent — delivery is settled at the table.",
+       "The GM sees your state: HP, radiation, conditions and key stats, with no need to ask for a screenshot.",
+-      "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list.",
+-      "A locked door keeps you out: until the lock is open you see nothing behind it — a key or a hack comes first.",
++      "Locations with rooms and passages: walk into a building, go down to the basement, find a chest — you move through places instead of scrolling one long list. A locked door keeps you out until the lock is open.",
+       "Lockpicking: a mini-game with cells based on Perception and difficulty, a limited number of attempts, and sometimes a choice between a key and a hack.",
+-      "Terminal hacking: four attempts, words, bracket hints and a board built from Intelligence. After a failure the GM decides whether to allow another approach or close the terminal.",
+-      "Keys and notes: a key can be found, carried with you or left in the party storage — and used to open a door or a chest.",
+-      "Gates: hacking one terminal can open the way further — into the next room or to another chest.",
++      "Terminal hacking: four attempts, words, bracket hints and a board built from Intelligence. Gates: hacking one terminal opens the way further — into the next room or to another chest.",
++      "Keys and notes: a key can be found, carried with you or left in the storage — and used to open a door or a chest.",
+       "Party storage: loot can be pooled, anyone can put things in or take them out, and the GM sees what is stored where.",
+       "Loot and traders: the GM hands out items, and at a trader you can buy or sell at their prices and with their caps."
+     ]
+diff --git a/src/room/playerFocusStore.js b/src/room/playerFocusStore.js
+new file mode 100644
+index 0000000..8dc10f9
+--- /dev/null
++++ b/src/room/playerFocusStore.js
+@@ -0,0 +1,20 @@
++// src/room/playerFocusStore.js
++// Патч 558: где сейчас сидит игрок.
++//
++// «Сидит в персонаже» = открыт любой экран персонажа (лист, экипировка,
++// инвентарь, перки), а не список персонажей. Список помечает домашнюю
++// вкладку как активную; окна Мастера и уведомления смотрят на этот флаг и не
++// всплывают поверх списка.
++
++import { create } from 'zustand';
++
++const usePlayerFocusStore = create((set) => ({
++  // null — «пока неизвестно»: так стартует тест и первый кадр приложения.
++  // Плашки трансляций в этом состоянии работают как раньше (patch 506/544),
++  // а окно-список ждёт явного «игрок внутри персонажа» (false).
++  homeFocused: null,
++  setHomeFocused: (value) => set({ homeFocused: Boolean(value) }),
++  resetForTests: () => set({ homeFocused: null }),
++}));
++
++export default usePlayerFocusStore;
+diff --git a/src/room/playerNoticesStore.js b/src/room/playerNoticesStore.js
+new file mode 100644
+index 0000000..20f33de
+--- /dev/null
++++ b/src/room/playerNoticesStore.js
+@@ -0,0 +1,111 @@
++// src/room/playerNoticesStore.js
++// Патч 558 — «список того, что происходит» у игрока.
++//
++// Слово владельца: «Списком, что происходит. При этом полагаю, что стоит
++// разделить. Трансляции и разовые команды. Если мастер прислал уровень, то
++// показать окном по типу релиза с кнопкой ок. А трансляцию держать, как
++// сейчас, но только конкретному персонажу».
++//
++// Склад уведомлений живёт на клиенте и привязан к ПЕРСОНАЖУ:
++//   translation — Мастер открыл локацию/торговца (трансляция мира);
++//   command     — разовая команда: уровень, крышки, лечение, увечье и т.п.
++// Пока персонаж не открыт, ничего не всплывает: на карточке в списке
++// загорается синяя иконка сервера, а окно со списком показывается, когда
++// игрок садится за этого персонажа.
++
++import { create } from 'zustand';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++export const PLAYER_NOTICE_KIND = Object.freeze({
++  TRANSLATION: 'translation',
++  COMMAND: 'command',
++});
++
++const STORAGE_KEY = 'positronium_player_notices_v1';
++const MAX_NOTICES = 100;
++
++let hydrating = null;
++
++const persist = (notices) => {
++  const tail = notices.slice(-MAX_NOTICES);
++  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tail)).catch(() => {});
++};
++
++const usePlayerNoticesStore = create((set, get) => ({
++  notices: [],
++  hydrated: false,
++
++  hydrate: async () => {
++    if (get().hydrated) return;
++    if (hydrating) return hydrating;
++    hydrating = (async () => {
++      let parsed = [];
++      try {
++        const raw = await AsyncStorage.getItem(STORAGE_KEY);
++        const list = raw ? JSON.parse(raw) : [];
++        parsed = Array.isArray(list) ? list.filter((item) => item && item.id && item.characterId) : [];
++      } catch {
++        parsed = [];
++      }
++      set({ notices: parsed, hydrated: true });
++      hydrating = null;
++    })();
++    return hydrating;
++  },
++
++  /** Одно уведомление на персонажа. Повтор с тем же id игнорируется. */
++  addNotice: (notice) => {
++    const id = String(notice?.id || '').trim();
++    const characterId = String(notice?.characterId || '').trim();
++    if (!id || !characterId) return false;
++    if (get().notices.some((item) => item.id === id)) return false;
++    const record = {
++      id,
++      characterId,
++      roomCode: String(notice.roomCode || ''),
++      roomName: String(notice.roomName || ''),
++      kind: notice.kind === PLAYER_NOTICE_KIND.TRANSLATION
++        ? PLAYER_NOTICE_KIND.TRANSLATION
++        : PLAYER_NOTICE_KIND.COMMAND,
++      text: String(notice.text || ''),
++      read: false,
++      at: Number(notice.at) || Date.now(),
++    };
++    const notices = [...get().notices, record].slice(-MAX_NOTICES);
++    set({ notices });
++    persist(notices);
++    return true;
++  },
++
++  /** «Понятно» в окне списка: всё прочитанное по этому персонажу. */
++  markReadForCharacter: (characterId) => {
++    const id = String(characterId || '').trim();
++    if (!id) return;
++    const notices = get().notices.map((item) => (
++      item.characterId === id && !item.read ? { ...item, read: true } : item
++    ));
++    set({ notices });
++    persist(notices);
++  },
++
++  resetForTests: async () => {
++    hydrating = null;
++    set({ notices: [], hydrated: false });
++    try {
++      await AsyncStorage.removeItem(STORAGE_KEY);
++    } catch {
++      // ignore
++    }
++  },
++}));
++
++export const unreadNoticesFor = (notices, characterId) => (
++  (Array.isArray(notices) ? notices : [])
++    .filter((item) => item && item.characterId === characterId && !item.read)
++);
++
++export const unreadNoticeCountFor = (notices, characterId) => (
++  unreadNoticesFor(notices, characterId).length
++);
++
++export default usePlayerNoticesStore;
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index fcae5ba..3102b78 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -490,18 +490,11 @@ const styles = StyleSheet.create({
+     borderColor: '#5a5a5a',
+     backgroundColor: '#232323',
+   },
+-  gmDeliveryPillDone: {
+-    borderColor: '#16a34a',
+-    backgroundColor: 'rgba(22, 163, 74, 0.14)',
+-  },
+   gmDeliveryPillText: {
+     color: '#d4d4d4',
+     fontSize: 11,
+     fontWeight: '600',
+   },
+-  gmDeliveryPillTextDone: {
+-    color: '#4ade80',
+-  },
+   gmGroupCommandBtn: {
+     flexDirection: 'row',
+     alignItems: 'center',
