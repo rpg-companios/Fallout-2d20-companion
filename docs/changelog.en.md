@@ -1,6 +1,36 @@
 # Changelog
 ---
 
+## GM messages arrive personally (patch 558)
+
+The owner's words: "nothing pops up over the character list — change the colour
+of the server icon (blue, for example). A list of what happened. Split
+transmissions from one-off commands: if the GM granted a level, show a
+release-style window with an OK button. A transmission never yields
+'delivered'. Keys stay as they are."
+
+- **Character list.** No pop-ups. On the card of the character that received
+  something the server icon turns blue (`#3b82f6`); green means online, grey
+  offline, as before.
+- **A list of what happened.** When the player sits down as that character one
+  window opens in the "What's new" style: a "Transmissions" section (locations,
+  traders, terminals) and a "One-off commands" section (level, caps, healing,
+  injuries). "Got it" marks everything read and clears the blue icon.
+- **Only its own character.** Every notice is stored on the client together with
+  its `characterId`. With several characters bound to different GMs each one sees
+  only its own messages.
+- **Transmissions.** The location/trader pill works as before but is shown only
+  to the open character and never over the character list.
+- **No "delivered".** The GM room bar shows the fact of sending — "Sent: N" —
+  instead of a delivery counter. Actual delivery is settled at the table.
+- **Keys and storage** are untouched.
+- **Acceptance.** New `player-notices-558` (9 checks): notice store, no window
+  over the list, both sections inside the character, "Got it", another character
+  sees nothing, blue icon, transmission only for the open character, fact of
+  sending for the GM, storage untouched.
+
+---
+
 ## Two tabs on the storage pane (patch 557)
 
 The owner's words: "the storage holds two tabs on its top edge with a 'bag' and

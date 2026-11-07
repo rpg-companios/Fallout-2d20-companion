@@ -490,17 +490,10 @@ const styles = StyleSheet.create({
     borderColor: '#5a5a5a',
     backgroundColor: '#232323',
   },
-  gmDeliveryPillDone: {
-    borderColor: '#16a34a',
-    backgroundColor: 'rgba(22, 163, 74, 0.14)',
-  },
   gmDeliveryPillText: {
     color: '#d4d4d4',
     fontSize: 11,
     fontWeight: '600',
-  },
-  gmDeliveryPillTextDone: {
-    color: '#4ade80',
   },
   gmGroupCommandBtn: {
     flexDirection: 'row',

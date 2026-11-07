@@ -8,7 +8,7 @@ import useUiModeStore from '../../src/room/uiModeStore';
 import useRoomStore, { onRoomDirective } from '../../src/room/roomStore';
 import { syncBoundCharacterToRoom } from '../../src/room/roomCharacterSync';
 import { syncCharacterToCloudIfEnabled } from '../cloudSync/googleDriveSync';
-import { showRawAlert } from '../alerts/alertService';
+import usePlayerNoticesStore, { PLAYER_NOTICE_KIND } from '../../src/room/playerNoticesStore';
 import { getCurrentLocale } from '../../i18n/locale';
 import {
   applyDirectiveToLiveCharacterStore,
@@ -167,16 +167,26 @@ export const processPendingDirectivesForPlayer = async () => {
         debugLog('gmDirective.syncSnapshot:failed', { message: syncErr?.message });
       }
 
+      // 558 (слово владельца): команда Мастера не всплывает поверх списка
+      // персонажей. Она ложится в список уведомлений ИМЕННО ЭТОГО персонажа —
+      // на карточке в списке загорается синяя иконка, а окно со списком
+      // показывается, когда игрок садится за этого персонажа.
       if (summaryLine) {
         const noteBlock = directive.note
-          ? `\n\n${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
+          ? ` ${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
           : '';
-        const alertTitle = directive.originRole === 'peer' || directive.kind === 'peer.consumable'
+        const fromPeer = directive.originRole === 'peer' || directive.kind === 'peer.consumable';
+        const text = fromPeer
           ? formatGm(tGm('envCombat.firstAid.peerReceivedTitle', locale), { from: directive.fromName || '—' })
-          : formatGm(tGm('commands.playerAlert.title', locale), { character: characterName });
-        showRawAlert({
-          title: alertTitle,
-          message: `${summaryLine}${noteBlock}`,
+          : `${summaryLine}${noteBlock}`;
+        usePlayerNoticesStore.getState().addNotice({
+          id: dedupeKey,
+          characterId,
+          roomCode,
+          roomName: room?.name || roomCode,
+          kind: PLAYER_NOTICE_KIND.COMMAND,
+          text,
+          at: Number(directive.createdAt) || Date.now(),
         });
       }
 

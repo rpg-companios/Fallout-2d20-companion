@@ -62,6 +62,7 @@ import useRoomStore, {
   setRoomClientFactoryForTests,
 } from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
+import usePlayerNoticesStore from '../../src/room/playerNoticesStore';
 import useCharacterStore from '../../src/store/characterStore';
 import { extractGmCharacterSummary } from '../../modules/fallout/gm/gmCharacterSummary';
 import { GM_DIRECTIVE_KIND } from '../../modules/fallout/gm/gmDirectives';
@@ -112,6 +113,7 @@ describe('Патч 481: отдельный навигатор Мастера (na
 
   beforeEach(async () => {
     alertsLog.length = 0;
+    await usePlayerNoticesStore.getState().resetForTests();
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.clear();
     }
@@ -414,7 +416,19 @@ describe('Патч 481: отдельный навигатор Мастера (na
     expect(appliedOnline).toHaveLength(1);
     expect(useCharacterStore.getState().level).toBe(3);
     expect(useCharacterStore.getState().skillsSaved).toBe(false);
-    expect(alertsLog.some((a) => String(a.message || '').includes('3') && String(a.message || '').includes('За спасение каравана'))).toBe(true);
+    // 558: команда не всплывает окном, а ложится в список уведомлений ИМЕННО
+    // ЭТОГО персонажа — на карточке в списке горит синяя иконка сервера.
+    const notices = usePlayerNoticesStore.getState().notices;
+    expect(alertsLog).toHaveLength(0);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({
+      characterId: 'char_online_1',
+      roomCode,
+      kind: 'command',
+      read: false,
+    });
+    expect(notices[0].text).toContain('3');
+    expect(notices[0].text).toContain('За спасение каравана');
 
     // Повторный вызов НЕ применяет команду второй раз (дедупликация!)
     const duplicateTry = await processPendingDirectivesForPlayer();

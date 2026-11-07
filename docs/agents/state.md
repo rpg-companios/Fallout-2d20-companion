@@ -1,5 +1,44 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-11-07 (558) — сообщения Мастера приходят лично персонажу
+
+Слово владельца (четыре ответа на вопросы обсуждения): «На списке персонажей
+ничего не всплывает — меняется цвет иконки сервера (например, синий)»;
+«Списком, что происходит. Трансляции и разовые команды. Если мастер прислал
+уровень — окно по типу релиза с кнопкой ок, а трансляцию держать, как сейчас,
+но только конкретному персонажу»; «Трансляция не даёт "доставлено", у поднятия
+уровня — факт отправки»; «Ключи не трогаем».
+
+- **Склад уведомлений.** Новый `src/room/playerNoticesStore.js`: записи
+  `{ id, characterId, roomCode, roomName, kind, text, read, at }` в
+  AsyncStorage (`positronium_player_notices_v1`), дедупликация по `id`,
+  `addNotice` / `markReadForCharacter` / `hydrate`, хелперы
+  `unreadNoticesFor` / `unreadNoticeCountFor`. Вид: `translation` | `command`.
+- **Фокус игрока.** Новый `src/room/playerFocusStore.js`: `homeFocused`
+  (`null` — неизвестно, `true` — на списке, `false` — внутри персонажа).
+  `HomeScreen` ставит его в `useFocusEffect` (true при фокусе, false в cleanup).
+- **Команды.** `PlayerDirectiveOverlay` больше не зовёт `showRawAlert`:
+  применяет команду как раньше, ack и снапшот не тронуты, а факт кладёт в
+  `addNotice({ kind: 'command' })` с id = прежний ключ дедупликации
+  `roomCode:directiveId:characterId`.
+- **Трансляции.** `PlayerLootTradeOverlay`: `focusedBindings` =
+  привязки только открытого персонажа; при `homeFocused === true` плашки не
+  строятся; новая сессия пишет `addNotice({ kind: 'translation' })` с именем
+  локации/торговца (`roomCode:session:sessionId:characterId`).
+- **Окно-список.** Новый `components/gm/PlayerNoticesModal.js` (каркас
+  «Что нового»): заголовок, подпись с именем персонажа, разделы «Трансляции» и
+  «Разовые команды», кнопка «Понятно» = `markReadForCharacter`. Показывается
+  только при `homeFocused === false` и наличии непрочитанного у открытого
+  персонажа; смонтирован в `App.js` рядом с оверлеями.
+- **Список персонажей.** `CharacterCell` получил `noticesCount`; цвет иконки
+  `serverIconColor = hasNotices ? '#3b82f6' : (serverOnline ? '#16a34a' : '#9ca3af')`.
+- **Мастер.** Панель комнаты: вместо «Доставлено (x/y)» — «Отправлено: N»
+  (`roomBar.sentBadge`), `ackedByCharacterIds` остался в протоколе.
+- **Тесты.** Новый `player-notices-558` (9 проверок); 481 проверяет уведомление
+  вместо алерта (`alertsLog` пуст); 456 — трёхзначный цвет иконки.
+- **Отсечка.** `patchs/baseline.json` → 558; 535/532 — 558/5/10, roadmap `**558**`.
+- **Не тронуто.** Ключи и склад (557), протокол комнаты, ack-очередь, `charCommands`.
+
 ## 2026-11-07 (557) — две вкладки на панели склада: вещи и ключи
 
 Слово владельца: «склад держит две вкладки на верхней границе с иконкой

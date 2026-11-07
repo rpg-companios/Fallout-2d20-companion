@@ -8,11 +8,21 @@ export const GM_DICTIONARIES = {
   'ru-RU': {
     roomBar: {
       groupCommand: 'Команда группе',
-      deliveryBadge: 'Команда: {acked}/{total}',
-      deliveryDone: 'Доставлено ({acked}/{total})',
+      sentBadge: 'Отправлено: {total}',
+      // 558: трансляция не даёт «доставлено» — у разовой команды пишем только
+      // факт отправки, фактическую доставку разбирают за столом.
+      sentHint: 'Фактическая доставка — за столом.',
       readonlyHint: 'Только просмотр · влияние на персонажей через команды и добычу',
       pcMode: 'ПК-режим',
       emptyPlayers: 'В этой комнате пока нет подключённых персонажей. Передайте адрес комнаты игрокам — их карточки со сводкой появятся здесь автоматически.',
+    },
+    notices: {
+      title: 'Сообщения Мастера',
+      subtitle: 'Персонаж: {character}',
+      sectionTranslations: 'Трансляции',
+      sectionCommands: 'Разовые команды',
+      translationLine: 'Мастер открыл: {name}',
+      ok: 'Понятно',
     },
     card: {
       levelShort: 'Ур. {level}',
@@ -415,11 +425,19 @@ export const GM_DICTIONARIES = {
   'en-EN': {
     roomBar: {
       groupCommand: 'Party Command',
-      deliveryBadge: 'Command: {acked}/{total}',
-      deliveryDone: 'Delivered ({acked}/{total})',
+      sentBadge: 'Sent: {total}',
+      sentHint: 'Actual delivery is settled at the table.',
       readonlyHint: 'Read-only view · affect characters via commands and loot/trade',
       pcMode: 'PC mode',
       emptyPlayers: 'No characters are connected to this room yet. Share the room code with your players — their live summary cards will appear here automatically.',
+    },
+    notices: {
+      title: 'Messages from the GM',
+      subtitle: 'Character: {character}',
+      sectionTranslations: 'Transmissions',
+      sectionCommands: 'One-off commands',
+      translationLine: 'GM opened: {name}',
+      ok: 'Got it',
     },
     card: {
       levelShort: 'Lv. {level}',
