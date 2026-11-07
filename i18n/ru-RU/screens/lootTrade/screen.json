@@ -328,7 +328,13 @@
     "hackContainerHint": "Взлом откроет содержимое",
     "gateAnd": "и",
     "exitToLocation": "Выход → {name}",
-    "passageBlocked": "Проход заблокирован"
+    "passageBlocked": "Проход заблокирован",
+    "quantityTitle": "Сколько переместить?",
+    "quantityAvailable": "доступно {count}",
+    "quantityConfirm": "Подтвердить",
+    "quantityCancel": "Отмена",
+    "quantityTotal": "Итого: {total}",
+    "quantityLeft": "останется {caps}"
   },
   "keyItems": {
     "title": "Ключи и записки",

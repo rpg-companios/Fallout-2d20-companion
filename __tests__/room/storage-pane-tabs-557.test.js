@@ -35,6 +35,7 @@ vi.mock('react-native', () => {
     Text: mk('Text'),
     TouchableOpacity: mk('TouchableOpacity'),
     ScrollView: mk('ScrollView'),
+    TextInput: mk('TextInput'),
   };
 });
 

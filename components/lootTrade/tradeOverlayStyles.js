@@ -404,6 +404,17 @@ export const tradeOverlayStyles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 3,
   },
+  // 561: количество — бейджем справа, а не частью названия.
+  rowQtyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    backgroundColor: '#1b1b1b',
+    marginLeft: 10,
+  },
+  rowQtyBadgeText: { color: '#d4af37', fontSize: 12, fontWeight: '700' },
   tradeRowBtns: {
     flexDirection: 'row',
     gap: 6,

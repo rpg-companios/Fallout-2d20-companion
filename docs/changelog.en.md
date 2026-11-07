@@ -1,6 +1,31 @@
 # Changelog
 ---
 
+## "How many to move?" in storage and at the trader (patch 561)
+
+The owner's words: "a tap transfers the item… a modal opens on top: how many to
+move? Then a cell with the number. Below it a slider… and two buttons, confirm and
+cancel". And: "the minus appears once the given amount is more than 1". And:
+"trader and storage work by one design".
+
+- **One design for two windows.** The quantity window is one shared component,
+  `TransferQuantityModal`, identical in storage and at the trader.
+- **Tap and long press.** A tap puts one piece into the buffer (as before), a long
+  press opens the quantity window and buffers the chosen amount.
+- **The window.** Title "How many to move?", then the item, the direction and
+  "available N", the number cell, "+" always, "−" only once the value is above 1
+  (its slot is reserved), a slider below, then Confirm / Cancel. The field never
+  shows an invalid number and stays within 1…remaining.
+- **Money.** At the trader the window shows the total for the chosen amount.
+- **The buffer stays.** The final exchange is the bottom button — nothing is
+  written before it.
+- **A cleaner row.** Per-row buttons are gone, the name took their space and wraps
+  to two lines, the quantity became a `×N` badge.
+- **Acceptance.** New `transfer-quantity-561` (10 checks) plus rewritten storage
+  checks in 556.
+
+---
+
 ## Every character sees its own transmission (patch 560)
 
 The owner's words: "a transmission is only available to the character you are

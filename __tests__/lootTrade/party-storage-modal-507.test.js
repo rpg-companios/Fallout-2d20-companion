@@ -16,6 +16,7 @@ vi.mock('react-native', () => {
     Text: mk('Text'),
     TouchableOpacity: mk('TouchableOpacity'),
     ScrollView: mk('ScrollView'),
+    TextInput: mk('TextInput'),
   };
 });
 vi.mock('../../i18n/locale', () => ({ useLocale: () => {}, getCurrentLocale: () => 'ru-RU' }));
