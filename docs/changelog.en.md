@@ -1,6 +1,30 @@
 # Changelog
 ---
 
+## PC mode for room cards (patch 555)
+
+The owner's words: "The switch will live in the room view. Do patch 555." Before
+this patch no PC mode existed — Settings only had "Admin screen" (access to the
+GM workspace), not a wide card layout.
+
+- **Where the switch is.** In the room bar, next to the command delivery pill and
+  the "Party Command" button: `gm-room-pc-mode-btn` labelled "PC mode". It is not
+  in the general Settings window — the setting is declared on the `room` surface.
+- **Explicit choice.** The mode is never inferred from window width: only a press
+  turns it on. The value is stored as a regular engine setting `gmPcMode`
+  (default off), so it survives restarts and tab switches.
+- **What changes on screen.** The card list becomes a wide centred column up to
+  960 px; each card gets more padding; all four sections (S.P.E.C.I.A.L. & skills,
+  armour & conditions, weapons & ammo, perks & inventory) are expanded at once,
+  the "expand all" button disappears and section headers stop being buttons.
+- **Perks with descriptions.** The character summary now returns `description` —
+  the effect text of the current perk rank; in PC mode perks render as
+  "name · rank" rows with that text instead of chips.
+- **Acceptance.** New `gm-pc-mode-555` (7 checks): the setting on the `room`
+  surface, choice persistence, ru/en labels, the button in the room bar, card
+  behaviour in both modes (real mount via react-test-renderer), and the perk
+  effect text in the summary.
+
 ## Release 5 — "What's new" notes (patch 554)
 
 The owner's words: "we need a new list of what went into the release". The list is

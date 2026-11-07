@@ -85,6 +85,7 @@ import useAppSettingsStore, {
   selectAdminScreenEnabled,
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
+  selectGmPcMode,
   selectPwaInstallDiagnosticsEnabled,
   selectUiMode,
 } from '../../../src/store/appSettingsStore';
@@ -506,6 +507,8 @@ export default function HomeScreen({ navigation }) {
   const uiMode = tabUiMode || storeUiMode;
   const { adminLicensed, gmCampaignsLicensed } = useAdminAccess();
   const rawAdminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+  // 555: ПК-режим карточек комнаты — переключатель в панели комнаты.
+  const gmPcMode = Boolean(useAppSettingsStore(selectGmPcMode));
   const adminScreenEnabled = Boolean(rawAdminScreenEnabled && adminLicensed);
   const isGmMode = uiMode === 'gm' && adminLicensed;
   const roomServerAvailable = isRoomServerConfigured();
@@ -1479,6 +1482,23 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
 
             <View style={styles.gmRoomRightGroup}>
+              <TouchableOpacity
+                testID="gm-room-pc-mode-btn"
+                style={[styles.gmPcModeBtn, gmPcMode && styles.gmPcModeBtnActive]}
+                onPress={() => setSettingValue('gmPcMode', !gmPcMode)}
+                activeOpacity={0.75}
+                accessibilityLabel={tGm('roomBar.pcMode', locale)}
+              >
+                <MaterialCommunityIcons
+                  name="monitor"
+                  size={15}
+                  color={gmPcMode ? '#f0e68c' : '#cccccc'}
+                />
+                <Text style={[styles.gmPcModeBtnText, gmPcMode && styles.gmPcModeBtnTextActive]}>
+                  {tGm('roomBar.pcMode', locale)}
+                </Text>
+              </TouchableOpacity>
+
               {latestGmDirective ? (() => {
                 const total = Array.isArray(latestGmDirective.targetCharacterIds)
                   ? latestGmDirective.targetCharacterIds.length
@@ -1538,11 +1558,12 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            <View style={styles.gmCardsListWrap}>
+            <View style={[styles.gmCardsListWrap, gmPcMode && styles.gmCardsListWrapPc]}>
               {displayedCharacters.map((cardItem) => (
                 <GmRoomCharacterCard
                   key={cardItem.id}
                   characterCard={cardItem}
+                  pcMode={gmPcMode}
                   onOpenCommand={(targetCard) => setGmCommandModal({
                     visible: true,
                     targetCharacter: targetCard,

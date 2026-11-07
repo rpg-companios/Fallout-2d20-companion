@@ -239,6 +239,9 @@ export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingVal
 // Комнаты мастера (gm-rooms): 'user' | 'gm'. Кнопка переключения — в шапке
 // главного экрана и показывается только при доступном сервере комнат.
 export const selectAdminScreenEnabled = (state) => state.getSettingValue('adminScreenEnabled');
+// ПК-режим карточек в окне комнаты Мастера (555): переключатель живёт в самой
+// панели комнаты, значение хранится как обычная настройка движка.
+export const selectGmPcMode = (state) => state.getSettingValue('gmPcMode');
 export const selectUiMode = (state) => state.getSettingValue('uiMode');
 export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');

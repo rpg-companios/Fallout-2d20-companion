@@ -24,6 +24,8 @@ const SPOILER_KEYS = [
 export default function GmRoomCharacterCard({
   characterCard,
   onOpenCommand,
+  // 555: ПК-режим включает широкую карточку со всеми раскрытыми разделами.
+  pcMode = false,
 }) {
   const locale = useLocale();
   const moduleLocale = useModuleLocale();
@@ -40,11 +42,16 @@ export default function GmRoomCharacterCard({
     [characterCard?.snapshotPayload, locale, moduleLocale],
   );
 
+  // В ПК-режиме все разделы раскрыты принудительно: сворачивать их нечего,
+  // поэтому заголовки перестают быть кнопками.
+  const isOpen = (key) => Boolean(pcMode) || Boolean(openMap[key]);
+
   const toggleSection = (key) => {
+    if (pcMode) return;
     setOpenMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const anyOpen = SPOILER_KEYS.some((k) => openMap[k]);
+  const anyOpen = SPOILER_KEYS.some((k) => isOpen(k));
   const toggleAll = () => {
     const nextVal = !anyOpen;
     setOpenMap({
@@ -63,7 +70,7 @@ export default function GmRoomCharacterCard({
   const { vitals } = summary;
 
   return (
-    <View style={styles.card} testID={`gm-char-card-${summary.id}`}>
+    <View style={[styles.card, pcMode && styles.cardPc]} testID={`gm-char-card-${summary.id}`}>
       {/* Шапка карточки: портрет, имя, происхождение, уровень, сеть и кнопка команды */}
       <View style={styles.headerRow}>
         <Image source={avatarSource} style={styles.avatar} resizeMode="cover" />
@@ -105,18 +112,20 @@ export default function GmRoomCharacterCard({
             </TouchableOpacity>
           ) : null}
 
-          <TouchableOpacity
-            testID={`gm-char-toggle-all-${summary.id}`}
-            style={styles.expandAllBtn}
-            onPress={toggleAll}
-            activeOpacity={0.75}
-          >
-            <MaterialCommunityIcons
-              name={anyOpen ? 'unfold-less-horizontal' : 'unfold-more-horizontal'}
-              size={16}
-              color="#f0e68c"
-            />
-          </TouchableOpacity>
+          {pcMode ? null : (
+            <TouchableOpacity
+              testID={`gm-char-toggle-all-${summary.id}`}
+              style={styles.expandAllBtn}
+              onPress={toggleAll}
+              activeOpacity={0.75}
+            >
+              <MaterialCommunityIcons
+                name={anyOpen ? 'unfold-less-horizontal' : 'unfold-more-horizontal'}
+                size={16}
+                color="#f0e68c"
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -179,19 +188,22 @@ export default function GmRoomCharacterCard({
           testID={`gm-spoiler-special-${summary.id}`}
           style={styles.spoilerHeader}
           onPress={() => toggleSection('specialAndSkills')}
-          activeOpacity={0.75}
+          activeOpacity={pcMode ? 1 : 0.75}
+          disabled={pcMode}
         >
           <Text style={styles.spoilerTitle}>
             {tGm('card.spoilers.specialAndSkills', locale)}
           </Text>
+          {pcMode ? null : (
           <MaterialCommunityIcons
-            name={openMap.specialAndSkills ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#f0e68c"
-          />
+              name={openMap.specialAndSkills ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#f0e68c"
+            />
+          )}
         </TouchableOpacity>
 
-        {openMap.specialAndSkills ? (
+        {isOpen('specialAndSkills') ? (
           <View style={styles.spoilerBody}>
             <View style={styles.specialRow}>
               {summary.attributes.map((attr) => (
@@ -246,19 +258,22 @@ export default function GmRoomCharacterCard({
           testID={`gm-spoiler-armor-${summary.id}`}
           style={styles.spoilerHeader}
           onPress={() => toggleSection('armorAndConditions')}
-          activeOpacity={0.75}
+          activeOpacity={pcMode ? 1 : 0.75}
+          disabled={pcMode}
         >
           <Text style={styles.spoilerTitle}>
             {tGm('card.spoilers.armorAndConditions', locale)}
           </Text>
+          {pcMode ? null : (
           <MaterialCommunityIcons
-            name={openMap.armorAndConditions ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#f0e68c"
-          />
+              name={openMap.armorAndConditions ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#f0e68c"
+            />
+          )}
         </TouchableOpacity>
 
-        {openMap.armorAndConditions ? (
+        {isOpen('armorAndConditions') ? (
           <View style={styles.spoilerBody}>
             <View style={styles.tableHeaderRow}>
               <Text style={[styles.tableHeaderCell, styles.zoneNameCol]}>
@@ -332,19 +347,22 @@ export default function GmRoomCharacterCard({
           testID={`gm-spoiler-weapons-${summary.id}`}
           style={styles.spoilerHeader}
           onPress={() => toggleSection('weaponsAndAmmo')}
-          activeOpacity={0.75}
+          activeOpacity={pcMode ? 1 : 0.75}
+          disabled={pcMode}
         >
           <Text style={styles.spoilerTitle}>
             {tGm('card.spoilers.weaponsAndAmmo', locale)} ({summary.weapons.length})
           </Text>
+          {pcMode ? null : (
           <MaterialCommunityIcons
-            name={openMap.weaponsAndAmmo ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#f0e68c"
-          />
+              name={openMap.weaponsAndAmmo ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#f0e68c"
+            />
+          )}
         </TouchableOpacity>
 
-        {openMap.weaponsAndAmmo ? (
+        {isOpen('weaponsAndAmmo') ? (
           <View style={styles.spoilerBody}>
             {summary.weapons.length === 0 ? (
               <Text style={styles.emptyHint}>{tGm('card.weapons.empty', locale)}</Text>
@@ -405,19 +423,22 @@ export default function GmRoomCharacterCard({
           testID={`gm-spoiler-perks-${summary.id}`}
           style={styles.spoilerHeader}
           onPress={() => toggleSection('perksAndInventory')}
-          activeOpacity={0.75}
+          activeOpacity={pcMode ? 1 : 0.75}
+          disabled={pcMode}
         >
           <Text style={styles.spoilerTitle}>
             {tGm('card.spoilers.perksAndInventory', locale)} ({summary.perks.length} / {summary.inventory.length})
           </Text>
+          {pcMode ? null : (
           <MaterialCommunityIcons
-            name={openMap.perksAndInventory ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#f0e68c"
-          />
+              name={openMap.perksAndInventory ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#f0e68c"
+            />
+          )}
         </TouchableOpacity>
 
-        {openMap.perksAndInventory ? (
+        {isOpen('perksAndInventory') ? (
           <View style={styles.spoilerBody}>
             <View style={styles.metaLine}>
               <Text style={styles.metaLabel}>{tGm('card.perks.trait', locale)}: </Text>
@@ -429,6 +450,20 @@ export default function GmRoomCharacterCard({
             <Text style={styles.subBlockHeader}>{tGm('card.perks.perksTitle', locale)}</Text>
             {summary.perks.length === 0 ? (
               <Text style={styles.emptyHint}>{tGm('card.perks.noPerks', locale)}</Text>
+            ) : pcMode ? (
+              <View style={styles.perkList}>
+                {summary.perks.map((p) => (
+                  <View key={p.key} style={styles.perkRow}>
+                    <Text style={styles.perkRowName}>
+                      {p.name}
+                      {p.rank > 1 ? ` · ${formatGm(tGm('card.perks.rankSuffix', locale), { rank: p.rank })}` : ''}
+                    </Text>
+                    {p.description ? (
+                      <IconText style={styles.perkRowDesc}>{p.description}</IconText>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
             ) : (
               <View style={styles.chipWrap}>
                 {summary.perks.map((p) => (
@@ -474,6 +509,10 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 12,
     marginBottom: 12,
+  },
+  cardPc: {
+    padding: 16,
+    marginBottom: 16,
   },
   headerRow: {
     flexDirection: 'row',
@@ -752,6 +791,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+  },
+  perkList: {
+    gap: 8,
+  },
+  perkRow: {
+    borderLeftWidth: 2,
+    borderLeftColor: '#d4af37',
+    paddingLeft: 8,
+  },
+  perkRowName: {
+    color: '#f0e68c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  perkRowDesc: {
+    color: '#d4d4d4',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
   perkChip: {
     backgroundColor: '#2b2a1e',
