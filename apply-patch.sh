@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-ARENA_BRANCH="arena/f90c80d8-fallout-2d20-companion"
+# Ветка сессии Arena, откуда берутся патчи. Имя ветки меняется от сессии
+# к сессии. Чтобы не править файл, ветку можно задать снаружи:
+#   APPLY_PATCH_BRANCH=arena/xxxx ./apply-patch.sh 553
+ARENA_BRANCH="${APPLY_PATCH_BRANCH:-arena/a97ebb5a-fallout-2d20-companion}"
 REMOTE="origin"
 
 ROOT_DIR="$(
@@ -62,9 +65,15 @@ usage() {
 Цель — сам ключевой патч или позже: дерево сразу приводится к нужному
 состоянию, поэтому установка последней версии — один шаг без перебора.
 
+Ветка сессии: по умолчанию берётся та, что записана в скрипте. Если сессия
+новая и имя ветки другое, задайте его переменной окружения — файл править
+не нужно:
+  APPLY_PATCH_BRANCH=arena/xxxxxxxx-fallout-2d20-companion ./apply-patch.sh 553
+
 Примеры:
   ./apply-patch.sh 308
   ./apply-patch.sh --status
+  APPLY_PATCH_BRANCH=arena/xxxxxxxx-fallout-2d20-companion ./apply-patch.sh 553
 USAGE
 }
 
