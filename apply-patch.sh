@@ -414,6 +414,15 @@ read_app_version() {
 PREV_VERSION="$(read_app_version || true)"
 BACKUP_CREATED=""
 
+# Понижение не поддерживается: если в дереве уже стоит версия новее
+# запрошенной, честно говорим об этом, а не идём по старой цепочке.
+if [[ "$MODE" != "status" && -n "${PREV_VERSION:-}" && "$PREV_VERSION" =~ ^[0-9]+[[:alnum:]]*$ ]] \
+  && number_lt "$PATCH_ID" "$PREV_VERSION"; then
+  echo "Дерево уже новее запрошенного: стоит версия $PREV_VERSION, запрошен №$PATCH_ID."
+  echo "Понижение установщик не делает. Ничего не меняю."
+  exit 0
+fi
+
 BASELINE_NUM="$(read_baseline_number || true)"
 BASELINE_NAME=""
 BASELINE_COMMIT=""
