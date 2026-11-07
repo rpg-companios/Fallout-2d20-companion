@@ -153,6 +153,20 @@ fi
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/arena-patches.XXXXXX")"
 
+# Установщик не откатывается вместе с деревом: приведение к отсечке
+# распаковывает её состояние, а там лежит прежняя копия скрипта (со старой
+# веткой). Поэтому сразу кладём на диск версию из загруженной ветки — она же
+# исполняется. Иначе следующий запуск ушёл бы на старую ветку.
+if [[ "$MODE" != "status" ]]; then
+  LATEST_SELF="$WORKDIR/apply-patch.latest.sh"
+  if git -C "$ROOT_DIR" show "${FETCHED_COMMIT}:apply-patch.sh" > "$LATEST_SELF" 2>/dev/null \
+    && [[ -s "$LATEST_SELF" ]] \
+    && ! cmp -s "$LATEST_SELF" "$ROOT_DIR/apply-patch.sh"; then
+    cp -- "$LATEST_SELF" "$ROOT_DIR/apply-patch.sh"
+    chmod +x -- "$ROOT_DIR/apply-patch.sh"
+  fi
+fi
+
 cleanup() {
   rm -rf -- "$WORKDIR"
   if [[ -n "${APPLY_PATCH_SELF:-}" ]]; then
@@ -354,7 +368,7 @@ sync_to_baseline() {
       cp -p "$ROOT_DIR/$f" "$preserve_dir/$f"
     done < "$plan_file"
 
-    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' ':(exclude)apply-patch.sh' | tar -x -C "$ROOT_DIR"
 
     while IFS=$'\t' read -r kind f; do
       [[ "$kind" == "PRESERVE" && -n "$f" && -f "$preserve_dir/$f" ]] || continue
@@ -364,7 +378,7 @@ sync_to_baseline() {
 
     stale="$(awk -F'\t' '$1 == "STALE" { print $2 }' "$plan_file" || true)"
   else
-    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' ':(exclude)apply-patch.sh' | tar -x -C "$ROOT_DIR"
     baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
     tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
     stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
