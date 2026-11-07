@@ -7,7 +7,7 @@ import {
   ScrollView
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
-import { shiftRange } from '../../../../../domain/range';
+import { baseRangeIndex, shiftRange } from '../../../../../domain/range';
 import { applyQualityGain } from '../../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../../../domain/weaponDisplay';
@@ -137,6 +137,16 @@ function getModDisplayName(mod) {
   return (mod.prefix || mod.name || '').trim();
 }
 
+// В модели дальность — канонический ключ ('Close'…'Extreme', см.
+// domain/range.js); локализуем её только на границе UI. Готовое локализованное
+// значение (rangeName из i18n-каталога) проходит как есть.
+function rangeDisplayLabel(weaponLike) {
+  const key = weaponLike?.range_name ?? weaponLike?.rangeName;
+  if (!key) return tWeaponsAndArmorScreen('weapon.rangeDefault');
+  const names = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
+  return names[key] || key;
+}
+
 function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   const selectedMods = Object.values(selectedBySlot).filter(Boolean);
   const baseName = baseWeapon.baseWeaponName ?? baseWeapon.name ?? '';
@@ -255,12 +265,13 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
 
   // Range is an ordinal scale; mods shift it by net steps (rangeShift), clamped
   // to Close..Extreme. Canonical logic lives in domain/range.js.
-  const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
-  const { name: range_name_key } = shiftRange(
-    baseWeapon.range ?? baseWeapon.range_index ?? baseWeapon.range_name ?? 'Close',
-    rangeShift,
-  );
-  const range_name = rangeNames[range_name_key] || range_name_key;
+  // База — МЕХАНИЧЕСКАЯ дальность (буква каталога / каноническое имя), не
+  // локализованный rangeName («Средняя»): иначе неизвестная строка давала
+  // «Близкую» и любой мод «снижал» дистанцию. Если механики дальности нет
+  // (ближний бой) — оставляем пусто, а не выдумываем Close.
+  const baseIdx = baseRangeIndex(baseWeapon);
+  const shifted = baseIdx == null ? null : shiftRange(baseIdx, rangeShift);
+  const range_name_key = shifted?.name ?? null;
   const effectsValue = effects.size ? JSON.stringify([...effects.values()]) : '–';
   const qualitiesValue = qualities.size ? JSON.stringify([...qualities.values()]) : '–';
 
@@ -277,7 +288,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     baseCost: costBase,
     resultCost: cost,
     rangeShift,
-    resultRange: range_name,
+    resultRange: range_name_key,
     baseDamageType: baseWeapon.damageType,
     resultDamageType: damage_type,
   });
@@ -289,7 +300,10 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     damage,
     fireRate: fire_rate,
     damageType: damage_type,
-    rangeName: range_name,
+    // Канонические поля (как в едином конвейере domain/enrichItem.js):
+    // localized-строка в модели не живёт — её подставляет UI по ключу.
+    range_index: shifted?.index,
+    range_name: range_name_key ?? undefined,
     qualities: qualitiesValue,
     effects: effectsValue,
     weight: String(weight),
@@ -558,7 +572,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
               <Text style={styles.weaponTitle}>{weapon?.name || tWeaponsAndArmorScreen('modals.unknownWeapon')}</Text>
               <Text style={styles.weaponStats}>
                 {tWeaponsAndArmorScreen('modals.weaponDamage')}: {weapon?.damage ?? 0} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {weapon?.fireRate ?? 0} |
-                {tWeaponsAndArmorScreen('modals.weaponRange')}: {weapon?.range_name ?? tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {weapon?.weight ?? 0} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {weapon?.cost ?? 0}
+                {tWeaponsAndArmorScreen('modals.weaponRange')}: {rangeDisplayLabel(weapon)} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {weapon?.weight ?? 0} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {weapon?.cost ?? 0}
               </Text>
             </View>
 
@@ -651,7 +665,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                   </Text>
                   <Text style={styles.previewStats}>
                     {tWeaponsAndArmorScreen('modals.weaponDamage')}: {modifiedWeapon.damage} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {modifiedWeapon.fireRate} |
-                    {tWeaponsAndArmorScreen('modals.weaponRange')}: {modifiedWeapon.range_name || tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
+                    {tWeaponsAndArmorScreen('modals.weaponRange')}: {rangeDisplayLabel(modifiedWeapon)} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
                   </Text>
                   <Text style={styles.previewEffects}>
                     {tWeaponsAndArmorScreen('modals.previewEffects')}: {resolveWeaponEffects(modifiedWeapon.effects)}

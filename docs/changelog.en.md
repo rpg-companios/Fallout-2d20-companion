@@ -1,6 +1,83 @@
 # Changelog
 ---
 
+## Range scale clarified (patch 553)
+
+Docs and acceptance only — game mechanics are unchanged.
+
+- **The owner's question.** "Wait, close range + a +1 range mod = long???" — fair:
+  in the before/after tables of patches 551 and 552 the +1 mod had Close in the
+  "before" column, as if one step skipped a category.
+- **How it actually works.** The scale uses adjacent categories: `Close → Medium →
+  Long → Extreme`. Exactly one step: Medium + a +1 mod = Long, Close + 1 = Medium.
+  Range never jumps over a category.
+- **What the old bug did.** The base range of any modded weapon was computed as
+  Close (the localized label was not recognized). So a +1 mod did not raise range to
+  Long — it merely restored the base Medium. The Short Scope, which changes no
+  range, left it at Close.
+- **What was fixed.** The tables in `docs/patch-551-install.md` and
+  `docs/patch-552-install.md` now follow the scale; the 551 acceptance test checks
+  the step explicitly (the index grows by exactly 1, the name is `Long`) and the
+  combination of the scope (0) with the long barrel (+1). No code or data changed.
+- **Acceptance.** Total: 285 files, 2640 checks, all green.
+
+---
+
+## Trained perk points for old saves, removal without debt (patch 552)
+
+Patch 551 fixed the perk itself, but the owner immediately found two consequences
+— and asked "which skills should give the points back when the perk is removed?".
+His decision: the player chooses, 2 points in total at most.
+
+- **Old saves get the points at once.** If Trained was taken before 551, the points
+  were already in the pool, but on a finished character the skill distribution was
+  closed, so they could not be spent. On load the distribution now opens again and
+  shows how many points are waiting (an alert explains where they came from). No need
+  to wait for the next level. A repeated load has nothing to reopen: the distribution
+  stays open until the points are placed, so there is no loop and no repeated alert.
+- **Removing the perk no longer leaves a debt.** Previously the pool shrank with a
+  floor at zero while spent points stayed on skills — the points could be farmed again
+  and again. Now the perk takes its points back: unspent points are consumed first
+  (if 1 point is still in the pool, only 1 is taken from skills), and the player
+  chooses the rest.
+- **How the player chooses.** A "Remove the perk “Trained”" window lists the skills
+  that have a reserve. You can take 2 points from one skill or 1 from two — 2 in total
+  at most. A tagged skill cannot go below 2, a regular one below 0; until the whole
+  amount is chosen the confirm button stays disabled. If the skills have no reserve,
+  the perk is not removed and the player sees an explanation.
+- **Weapon range with mods stays as in 551.** A scope does not change range; the
+  machine range code (`C`/`M`/`L`/`E`) drives the mechanics, and a mod without a range
+  change leaves range untouched. This is the 551 rule, unchanged by 552.
+- **Acceptance.** `educated-skill-debt-552` (19): pool and consumption maths,
+  minimums, removal plan, old saves (including the absence of a loop), perk removal
+  (2 from one skill, 1+1 from two, points still in the pool, mixed case), screen
+  wiring and RU/EN string parity. Total: 285 files, 2639 checks, all green.
+
+---
+
+## Trained perk and weapon range (patch 551)
+
+The owner found two bugs on the character sheet.
+
+- **Trained grants skill points.** The perk returned a fixed 2 points regardless of
+  rank, and the character screen never read them — the perk was dead. Now every rank
+  adds +2 points to the distribution pool (INT + 9 + level): "+1 rank to two skills or
+  +2 ranks to one" works, and the rank-6 ceiling is unchanged. Only active ranks count:
+  a perk switched off by the book grants nothing, and removing the perk returns the
+  pool to its base.
+- **A mod no longer lowers range.** The Short Scope on the hunting rifle turned Medium
+  into Close. The catalog stores range twice: as a machine letter (`M`) and as a
+  localized label ("Средняя"), and the mod pipeline read the label before the letter,
+  replacing an unrecognized string with zero — Close. Now the mechanics read only
+  machine sources, a mod without a range change leaves range untouched, and melee
+  weapons no longer get an invented range.
+- **Acceptance.** `educated-skill-points-551` (7) and `weapon-range-mod-steps-551` (8):
+  perk ranks and the pool, dormant/removed perk, store; range before and after the
+  scope, every hunting-rifle mod without `rangeModifier`, a one-step shift, localized
+  labels, melee. Total: 284 files, 2617 checks, all green.
+
+---
+
 ## Not enough bobby pins — stop (patch 550)
 
 The owner's ruling on the question surfaced by patch 549 acceptance: **"when bobby

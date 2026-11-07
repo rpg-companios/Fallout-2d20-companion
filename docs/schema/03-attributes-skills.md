@@ -51,6 +51,9 @@ UPPER_SNAKE_CASE everywhere`). Локализованные строки — т�
 `domain/contract.no-cyrillic.test.js`.
 
 База: очки навыков = `INT + 9 + (level-1)`. Тег даёт стартовые +2.
+Перки добавляют очки сверху: `perkBonuses.skillPoints` («Тренированный» —
++2 за каждый ранг, 551); пул считает `getSkillPointsAvailable` в
+`domain/characterCreation.js`. Потолок ранга при этом не меняется.
 Потолок = `skillMaxValue` (default 6; на 1 уровне ≤ 3).
 
 ### Что влияет на навык (источники)

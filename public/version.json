@@ -1,8 +1,10 @@
 {
-  "version": "550",
+  "version": "553",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Только документы и приёмка: исправлено описание дальности в таблицах «было/стало». Шкала дальности — соседние категории, шаг ровно один: «Средняя» + мод на +1 = «Дальняя», а «Близкая» + 1 = «Средняя». Раньше в документе у мода +1 в колонке «было» стояла «Близкая», из-за чего получалось, будто один шаг перепрыгивает категорию; на деле старый дефект показывал мод +1 как «Среднюю» (базовую), и до «Дальней» он не поднимал. Механика игры не менялась.",
+      "Старые сохранения с «Тренированным» получают пропущенные очки навыков сразу при загрузке: распределение навыков открывается заново, ждать нового уровня не нужно. Снятие перка больше не оставляет долг: перк забирает свои очки, а если они уже потрачены, игрок сам выбирает, с каких навыков снять — суммарно не больше 2 (2 с одного навыка или 1 с двух), тегированные навыки не опускаются ниже 2. Дальность оружия с модами остаётся как в 551: прицел её не меняет, механику задаёт машинный код дистанции, а мод без изменения дальности её не трогает.",
       "Стрелки перемещения в админке снова работают: перетаскивание позиций в дереве локации начиналось только в «пузырьковой» фазе опроса жеста, а решение принималось раньше — в фазе перехвата, поэтому строка не двигалась никогда. Теперь захват строки происходит в обеих фазах, порядок меняется перетаскиванием, а простое нажатие на стрелку порядок не меняет. Попутно исправлено: после выдачи локации подпись замка Мастера больше не превращается в техническую строку — человеческий текст сохраняется, а уже испорченные подписи восстанавливаются при чтении.",
       "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
       "Замок на локации снова работает как преграда входа: пока проверка не пройдена, игрок видит только замок/терминал, а содержимое, добыча и торговля внутри закрыты и в окне, и по WebSocket. Правило единое для сервера и игрока: непройденная проверка держит границу даже если старый сервер потерял флаг «заперто».",
@@ -150,10 +152,11 @@
       "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
-      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку.",
-      "Если заколок не хватает, взлом останавливается без расхода: одна заколка списывается ровно как одна, остаток больше не доедается — правило действует и по команде ведущего."
+      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
     ],
     "en-EN": [
+      "Docs and acceptance only: the range wording in the before/after tables is corrected. The range scale uses adjacent categories, exactly one step: Medium + a +1 mod = Long, while Close + 1 = Medium. The document previously showed Close in the \"before\" column for the +1 mod, as if one step skipped a category; in fact the old bug displayed the +1 mod as Medium (the base) and never raised it to Long. Game mechanics are unchanged.",
+      "Old saves with the Trained perk now receive the missed skill points immediately on load: the skill distribution opens again, no need to wait for the next level. Removing the perk no longer leaves a debt: the perk takes its points back, and if they are already spent, the player chooses which skills to lower — 2 points in total at most (2 from one skill or 1 from two), tagged skills never drop below 2. Weapon range with mods stays as in 551: a scope does not change range, the machine range code drives the mechanics, and a mod without a range change leaves range untouched.",
       "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
       "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
       "A lock on a location is an entry barrier again: until the check is passed, the player only sees the lock/terminal, while contents, looting and trading inside are blocked both in the window and over WebSocket. The rule is shared by server and player: an unpassed check holds the boundary even if a legacy server dropped the locked flag.",
@@ -301,8 +304,7 @@
       "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
       "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
-      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder.",
-      "When there are not enough bobby pins, picking stops without spending anything: one pin is spent exactly as one, the remainder is no longer partially consumed — the rule also applies to Game Master commands."
+      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
     ]
   }
 }

@@ -189,6 +189,15 @@ export interface CharacterActions {
     dormant: Array<{ id: string; rank: number; reason: string; need?: number; have?: number; code?: string; otherId?: string }>;
     shouldNotify: boolean;
   };
+  /**
+   * 552: старые сейвы с «Тренированным» — открыть распределение навыков,
+   * если в пуле есть нераспределённые очки. Идемпотентно.
+   */
+  unlockSkillDistributionIfPointsPending: () => {
+    unlocked: boolean;
+    points: number;
+    pending: number;
+  };
   /** Фабрика полей сеттингов (экс-эффект провайдера, патч 243). */
   ensureStateExtensionFields: () => void;
   /** Мост legacy-формата (массивы) → словари стора. */
@@ -362,6 +371,7 @@ export const NAMED_OP_KEYS = [
   'recalculateDerivedStats',
   'recalculatePerkBonuses',
   'reconcilePerksAtLoad',
+  'unlockSkillDistributionIfPointsPending',
   'ensureStateExtensionFields',
   'loadFromLegacyData',
   'exportToLegacyData',
