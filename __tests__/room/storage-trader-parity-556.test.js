@@ -140,9 +140,9 @@ describe('556: окно общего хранилища — как у торго
     expect(text).toContain('Предметы персонажа');
     expect(text).toContain('Аптечка');
     expect(text).toContain('Пулемёт');
-    // Буфер внутри каждой панели, как у торговца (забираю / отдаю).
-    expect(text).toContain('Забираю себе');
-    expect(text).toContain('Отдаю на склад');
+    // Пустой буфер места не занимает (557), а с вещами — стоит в панели.
+    expect(text).not.toContain('Забираю себе');
+    expect(text).not.toContain('Отдаю на склад');
     // Нижняя полоса: очистка и перенос.
     expect(text).toContain('Перенести');
     expect(renderer.root.findAllByProps({ testID: 'storage-commit-button' }).length).toBeGreaterThan(0);
@@ -159,10 +159,12 @@ describe('556: окно общего хранилища — как у торго
     const giveRow = renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0];
     await press(giveRow);
     expect(treeText(renderer)).toContain('К складу: 1');
+    expect(treeText(renderer)).toContain('Отдаю на склад');
 
     const takeRow = renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0];
     await press(takeRow);
     expect(treeText(renderer)).toContain('к себе: 1');
+    expect(treeText(renderer)).toContain('Забираю себе');
 
     // «Всё» на строке склада: остаток 2 из 3.
     await press(renderer.root.findAllByProps({ testID: 'storage-take-all-st_1' })[0]);

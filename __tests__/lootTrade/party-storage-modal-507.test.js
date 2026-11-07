@@ -51,6 +51,7 @@ describe('507: окно «Общее хранилище» в инвентаре'
           role: 'player',
           partyStorage: {
             revision: 1,
+            gmOnline: true,
             entries: [{
               entryId: 'st_1',
               item: { id: 'w1', name: 'Пулемёт', itemType: 'weapon' },
@@ -82,10 +83,19 @@ describe('507: окно «Общее хранилище» в инвентаре'
     expect(all.some((t) => t.includes('Общее хранилище'))).toBe(true);
     expect(all.some((t) => t.includes('Пулемёт'))).toBe(true);
     expect(all.some((t) => t.includes('Аптечка'))).toBe(true);
+    // Патч 557: пустой буфер места не занимает — подписи появляются, когда
+    // вещь уже отложена.
+    expect(all.some((t) => t.includes('Отдаю на склад'))).toBe(false);
+    await act(async () => {
+      renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0].props.onPress();
+      renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0].props.onPress();
+      await Promise.resolve();
+    });
+    const buffered = texts(renderer);
     // Патч 518: предметы сначала ложатся в буфер, перенос — по кнопке.
-    expect(all.some((t) => t.includes('Отдаю на склад'))).toBe(true);
-    expect(all.some((t) => t.includes('Забираю себе'))).toBe(true);
-    expect(all.some((t) => t.includes('Перенести'))).toBe(true);
+    expect(buffered.some((t) => t.includes('Отдаю на склад'))).toBe(true);
+    expect(buffered.some((t) => t.includes('Забираю себе'))).toBe(true);
+    expect(buffered.some((t) => t.includes('Перенести'))).toBe(true);
     // Настройки имени нет.
     expect(all.some((t) => t.toLowerCase().includes('переименовать'))).toBe(false);
     await act(async () => renderer.unmount());

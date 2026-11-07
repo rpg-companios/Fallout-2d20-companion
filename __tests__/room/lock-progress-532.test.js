@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('556');
+    expect(version.version).toBe('557');
     expect(version.release).toBe(5);
     expect(version.notes['ru-RU']).toHaveLength(10);
     expect(version.notes['en-EN']).toHaveLength(10);
-    expect(json('patchs/baseline.json').baseline).toBe('556');
+    expect(json('patchs/baseline.json').baseline).toBe('557');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **556**');
+    expect(roadmap).toContain('Текущая версия: **557**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');

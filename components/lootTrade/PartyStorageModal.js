@@ -89,6 +89,8 @@ const PartyStorageModal = ({
   const [catalog, setCatalog] = useState([]);
   // Как в окне торговца: на узком экране панели показываются по одной.
   const [mobileTab, setMobileTab] = useState('player');
+  // Патч 557: у панели склада две вкладки на верхней границе — вещи и ключи.
+  const [storageTab, setStorageTab] = useState('items');
 
   const room = useMemo(() => {
     const candidates = Object.entries(rooms || {}).filter(([, value]) => value?.partyStorage);
@@ -116,6 +118,7 @@ const PartyStorageModal = ({
     setTakeBuffer({});
     setSelectedKeyId(null);
     setMobileTab('player');
+    setStorageTab('items');
     if (isGm) {
       void db.getGmKeyItems().then((list) => setCatalog(list || [])).catch(() => setCatalog([]));
     }
@@ -257,34 +260,35 @@ const PartyStorageModal = ({
       </View>
 
       <ScrollView style={trade.paneScroll}>
-        {/* Серый курсив: уже отложено к себе со склада (снимется по «Перенести») */}
-        <View style={trade.bufferBox}>
-          <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
-          {takeLines.length === 0 ? (
-            <Text style={trade.emptyText}>—</Text>
-          ) : takeLines.map(([entryId, qty]) => (
-            <TouchableOpacity
-              key={`buf-take-${entryId}`}
-              testID={`storage-buffer-take-${entryId}`}
-              style={trade.bufferRow}
-              onPress={() => addTake(entryById(entryId), -1)}
-            >
-              <Text style={trade.bufferItalicText} numberOfLines={1}>
-                {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
-              </Text>
+        {/* Серый курсив: уже отложено к себе со склада (снимется по «Перенести»).
+            Пустой буфер места не занимает. */}
+        {takeLines.length > 0 && (
+          <View style={trade.bufferBox}>
+            <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
+            {takeLines.map(([entryId, qty]) => (
               <TouchableOpacity
-                testID={`storage-buffer-clear-take-${entryId}`}
-                style={trade.bufferClearAllBtn}
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  addTake(entryById(entryId), -qty);
-                }}
+                key={`buf-take-${entryId}`}
+                testID={`storage-buffer-take-${entryId}`}
+                style={trade.bufferRow}
+                onPress={() => addTake(entryById(entryId), -1)}
               >
-                <Text style={trade.bufferClearAllText}>✕</Text>
+                <Text style={trade.bufferItalicText} numberOfLines={1}>
+                  {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
+                </Text>
+                <TouchableOpacity
+                  testID={`storage-buffer-clear-take-${entryId}`}
+                  style={trade.bufferClearAllBtn}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    addTake(entryById(entryId), -qty);
+                  }}
+                >
+                  <Text style={trade.bufferClearAllText}>✕</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-        </View>
+            ))}
+          </View>
+          )}
 
         {(inventoryItems || []).length === 0 ? (
           <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
@@ -339,21 +343,55 @@ const PartyStorageModal = ({
     </View>
   );
 
-  // ── Панель «Общее хранилище»: что можно забрать ──
+  // ── Панель «Общее хранилище»: две вкладки на верхней границе ──
+  // Слово владельца (557): «склад держит две вкладки на верхней границе с
+  // иконкой "мешочек" и "ключ". 2 таба, занимают ровно ширину области склада.
+  // Вид панелей не меняется, меняется только отображение содержимого панели
+  // склада». Поэтому вкладки живут внутри правой панели, каждая — половина её
+  // ширины.
 
-  const renderStoragePane = () => (
-    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
-      <View style={trade.paneHeader}>
-        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
-      </View>
+  const renderStorageTabs = () => (
+    <View style={localStyles.storageTabs}>
+      <TouchableOpacity
+        testID="storage-pane-tab-items"
+        style={[localStyles.storageTab, storageTab === 'items' && localStyles.storageTabActive]}
+        onPress={() => setStorageTab('items')}
+        accessibilityLabel={tInventory('screen.storage.tabItems')}
+      >
+        <MaterialCommunityIcons
+          name="sack"
+          size={16}
+          color={storageTab === 'items' ? '#f0e68c' : '#cfcfcf'}
+        />
+        <Text style={[localStyles.storageTabText, storageTab === 'items' && localStyles.storageTabTextActive]}>
+          {tInventory('screen.storage.tabItems')}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        testID="storage-pane-tab-keys"
+        style={[localStyles.storageTab, localStyles.storageTabLast, storageTab === 'keys' && localStyles.storageTabActive]}
+        onPress={() => setStorageTab('keys')}
+        accessibilityLabel={tInventory('screen.storage.tabKeys')}
+      >
+        <MaterialCommunityIcons
+          name="key"
+          size={16}
+          color={storageTab === 'keys' ? '#f0e68c' : '#cfcfcf'}
+        />
+        <Text style={[localStyles.storageTabText, storageTab === 'keys' && localStyles.storageTabTextActive]}>
+          {tInventory('screen.storage.tabKeys')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-      <ScrollView style={trade.paneScroll}>
-        {/* Серый курсив: уже отложено на склад (снимется по «Перенести») */}
+  // Вкладка «вещи»: буфер и строки склада. Пустой буфер места не занимает.
+  const renderStorageItemsContent = () => (
+    <>
+      {giveLines.length > 0 && (
         <View style={trade.bufferBox}>
           <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferGive')}</Text>
-          {giveLines.length === 0 ? (
-            <Text style={trade.emptyText}>—</Text>
-          ) : giveLines.map(([id, qty]) => (
+          {giveLines.map(([id, qty]) => (
             <TouchableOpacity
               key={`buf-give-${id}`}
               testID={`storage-buffer-give-${id}`}
@@ -380,66 +418,63 @@ const PartyStorageModal = ({
             </TouchableOpacity>
           ))}
         </View>
+      )}
 
-        {items.length === 0 ? (
-          <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
-        ) : (
-          items.map((entry) => {
-            const buffered = takeBuffer[entry.entryId] || 0;
-            const remaining = Math.max(1, Number(entry.quantity) || 1) - buffered;
-            if (remaining <= 0) return null;
-            return (
-              <TouchableOpacity
-                key={entry.entryId}
-                testID={`storage-take-${entry.entryId}`}
-                style={[trade.tradeRow, !writable && trade.disabledBtn]}
-                disabled={busy || !writable}
-                onPress={() => addTake(entry)}
-              >
-                <View style={trade.tradeRowInfo}>
-                  <Text style={trade.tradeRowName} numberOfLines={1}>
-                    {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
-                  </Text>
-                </View>
-                <View style={trade.tradeRowBtns}>
+      {items.length === 0 ? (
+        <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
+      ) : (
+        items.map((entry) => {
+          const buffered = takeBuffer[entry.entryId] || 0;
+          const remaining = Math.max(1, Number(entry.quantity) || 1) - buffered;
+          if (remaining <= 0) return null;
+          return (
+            <TouchableOpacity
+              key={entry.entryId}
+              testID={`storage-take-${entry.entryId}`}
+              style={[trade.tradeRow, !writable && trade.disabledBtn]}
+              disabled={busy || !writable}
+              onPress={() => addTake(entry)}
+            >
+              <View style={trade.tradeRowInfo}>
+                <Text style={trade.tradeRowName} numberOfLines={1}>
+                  {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
+                </Text>
+              </View>
+              <View style={trade.tradeRowBtns}>
+                <TouchableOpacity
+                  testID={`storage-take-one-${entry.entryId}`}
+                  style={trade.miniMoveBtn}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    addTake(entry);
+                  }}
+                >
+                  <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
+                </TouchableOpacity>
+                {remaining > 1 && (
                   <TouchableOpacity
-                    testID={`storage-take-one-${entry.entryId}`}
-                    style={trade.miniMoveBtn}
+                    testID={`storage-take-all-${entry.entryId}`}
+                    style={trade.miniMoveAllBtn}
                     onPress={(e) => {
                       e?.stopPropagation?.();
-                      addTake(entry);
+                      addTake(entry, remaining);
                     }}
                   >
-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
+                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
                   </TouchableOpacity>
-                  {remaining > 1 && (
-                    <TouchableOpacity
-                      testID={`storage-take-all-${entry.entryId}`}
-                      style={trade.miniMoveAllBtn}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        addTake(entry, remaining);
-                      }}
-                    >
-                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
-    </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </>
   );
 
-  // ── Ключи: запись остаётся общей, забрать её нельзя ──
-
-  const renderKeysBlock = () => (
-    <View style={localStyles.keysBox}>
-      <Text style={[trade.paneHeaderTitle, localStyles.keysTitle]}>
-        {tLootTrade('keyItems.title')}
-      </Text>
+  // Вкладка «ключи»: запись остаётся общей, забрать её нельзя. У Мастера здесь
+  // же — трансляция ключей на склад.
+  const renderKeysContent = ({ gm = false } = {}) => (
+    <>
       {keys.length === 0
         ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
         : keys.map((key) => (
@@ -460,9 +495,45 @@ const PartyStorageModal = ({
             selectedKey.description || tLootTrade('keyItems.previewEmpty'),
             localStyles.keyCardText,
           )}
-          <Text style={localStyles.keyStays}>{tInventory('screen.storage.keyStays')}</Text>
+          {!gm && (
+            <Text style={localStyles.keyStays}>{tInventory('screen.storage.keyStays')}</Text>
+          )}
         </View>
       )}
+
+      {gm && (
+        <>
+          <Text style={[localStyles.keysTitle, { marginTop: 10 }]}>
+            {tInventory('screen.storage.issueKey')}
+          </Text>
+          {catalog.length === 0
+            ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
+            : catalog.map((record) => (
+              <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
+                <Text style={localStyles.keyName} numberOfLines={1}>{record.name}</Text>
+                <TouchableOpacity
+                  style={localStyles.issueBtn}
+                  disabled={busy || !room.storage.gmOnline}
+                  onPress={() => void issueKey(record)}
+                >
+                  <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+        </>
+      )}
+    </>
+  );
+
+  const renderStoragePane = () => (
+    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
+      <View style={trade.paneHeader}>
+        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
+      </View>
+      {renderStorageTabs()}
+      <ScrollView style={trade.paneScroll}>
+        {storageTab === 'items' ? renderStorageItemsContent() : renderKeysContent()}
+      </ScrollView>
     </View>
   );
 
@@ -504,8 +575,6 @@ const PartyStorageModal = ({
         )}
       </View>
 
-      {renderKeysBlock()}
-
       <View style={trade.barterFooter}>
         <View style={trade.barterBalanceCol}>
           <Text style={trade.barterBalanceText}>
@@ -545,84 +614,39 @@ const PartyStorageModal = ({
     </>
   );
 
-  // ── Окно Мастера: только просмотр состава и трансляция ключей ──
+  // ── Окно Мастера: тот же склад с двумя вкладками, но только просмотр ──
+  // и трансляция ключей (вкладка «ключи»).
 
   const renderGmBody = () => (
     <>
       <Text style={trade.modalDesc}>{tInventory('screen.storage.gmNoActions')}</Text>
 
       <View style={trade.twoPanesContainer}>
-        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
+        <View style={trade.pane}>
           <View style={trade.paneHeader}>
             <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
           </View>
+          {renderStorageTabs()}
           <ScrollView style={trade.paneScroll}>
-            {items.length === 0 ? (
-              <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
-            ) : (
-              items.map((entry) => (
-                <View
-                  key={entry.entryId}
-                  testID={`gm-storage-item-${entry.entryId}`}
-                  style={trade.tradeRow}
-                >
-                  <View style={trade.tradeRowInfo}>
-                    <Text style={trade.tradeRowName} numberOfLines={1}>
-                      {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
-                    </Text>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-
-        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
-          <View style={trade.paneHeader}>
-            <Text style={trade.paneHeaderTitle}>{tLootTrade('keyItems.title')}</Text>
-          </View>
-          <ScrollView style={trade.paneScroll}>
-            {keys.length === 0
-              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
-              : keys.map((key) => (
-                <TouchableOpacity
-                  key={key.entryId}
-                  testID={`storage-key-${key.keyItemId}`}
-                  style={localStyles.keyRow}
-                  onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
-                >
-                  <Text style={localStyles.keyName}>{key.name}</Text>
-                  <Text style={localStyles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
-                </TouchableOpacity>
-              ))}
-            {selectedKey && (
-              <View style={localStyles.keyCard}>
-                <Text style={localStyles.keyCardTitle}>{selectedKey.name}</Text>
-                {renderTextWithIcons(
-                  selectedKey.description || tLootTrade('keyItems.previewEmpty'),
-                  localStyles.keyCardText,
-                )}
-              </View>
-            )}
-
-            {/* Трансляция ключей — единственное действие Мастера со складом. */}
-            <Text style={[localStyles.keysTitle, { marginTop: 10 }]}>
-              {tInventory('screen.storage.issueKey')}
-            </Text>
-            {catalog.length === 0
-              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
-              : catalog.map((record) => (
-                <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
-                  <Text style={localStyles.keyName} numberOfLines={1}>{record.name}</Text>
-                  <TouchableOpacity
-                    style={localStyles.issueBtn}
-                    disabled={busy || !room.storage.gmOnline}
-                    onPress={() => void issueKey(record)}
+            {storageTab === 'items' ? (
+              items.length === 0 ? (
+                <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
+              ) : (
+                items.map((entry) => (
+                  <View
+                    key={entry.entryId}
+                    testID={`gm-storage-item-${entry.entryId}`}
+                    style={trade.tradeRow}
                   >
-                    <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                    <View style={trade.tradeRowInfo}>
+                      <Text style={trade.tradeRowName} numberOfLines={1}>
+                        {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )
+            ) : renderKeysContent({ gm: true })}
           </ScrollView>
         </View>
       </View>
@@ -696,14 +720,38 @@ const localStyles = StyleSheet.create({
   noRoom: { marginTop: 18, marginBottom: 18 },
   readOnly: { textAlign: 'center', marginTop: 10 },
   transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  keysBox: {
-    borderWidth: 1,
-    borderColor: '#29482d',
-    borderRadius: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 10,
-    maxHeight: 190,
+  // Две вкладки на верхней границе панели склада: каждая ровно половина
+  // ширины панели, поэтому вместе они занимают всю её ширину.
+  storageTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#d4af37',
+    backgroundColor: '#242424',
+  },
+  storageTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRightWidth: 1,
+    borderRightColor: '#4a4a4a',
+  },
+  storageTabLast: {
+    borderRightWidth: 0,
+  },
+  storageTabActive: {
+    backgroundColor: '#3a3a1e',
+  },
+  storageTabText: {
+    color: '#d4d4d4',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  storageTabTextActive: {
+    color: '#f0e68c',
   },
   keysTitle: { marginBottom: 6 },
   keyRow: {

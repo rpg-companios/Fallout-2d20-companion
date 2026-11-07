@@ -1,6 +1,29 @@
 # Changelog
 ---
 
+## Two tabs on the storage pane (patch 557)
+
+The owner's words: "the storage holds two tabs on its top edge with a 'bag' and
+a 'key' icon. 2 tabs, they take exactly the width of the storage area. The panes
+look unchanged, only what the storage pane shows changes."
+
+- **Tabs inside the pane.** On the top edge of the "Shared storage" pane there
+  are two tabs spanning its full width, half each: "Items" (bag icon) and
+  "Keys" (key icon). The active one is highlighted gold, like the pane title.
+- **What is inside.** "Items" keeps the usual exchange: the "To storage" buffer
+  and storage rows with "Withdraw" / "Withdraw all". "Keys" lists keys and
+  notes and lets you read a note; a record stays shared and cannot be withdrawn.
+- **More room to browse.** The separate "Keys and notes" block under the panes is
+  gone — on a phone it no longer eats the lists' height. The empty "To storage"
+  buffer is not drawn either: it appears only once items are actually buffered.
+- **Game Master.** The GM has the same storage with the same two tabs: "Items"
+  for viewing the contents, "Keys" for records and adding a key to storage.
+- **Untouched.** Server, protocol, store, transfer atomicity, JSON export and
+  import did not change.
+- **Acceptance.** New `storage-pane-tabs-557` (7 checks, real mount): two tabs at
+  half the pane width, content switching, reading a note, no keys block under the
+  panes, tabs on a phone, empty buffer, GM tabs and paired labels.
+
 ## Shared storage window built like the trader screen (patch 556)
 
 The owner's words: "About the shared storage window. It should have looked and

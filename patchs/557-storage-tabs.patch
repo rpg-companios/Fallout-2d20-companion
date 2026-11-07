@@ -1,0 +1,1094 @@
+diff --git a/__tests__/lootTrade/party-storage-modal-507.test.js b/__tests__/lootTrade/party-storage-modal-507.test.js
+index 6ec205f..c5f9d95 100644
+--- a/__tests__/lootTrade/party-storage-modal-507.test.js
++++ b/__tests__/lootTrade/party-storage-modal-507.test.js
+@@ -51,6 +51,7 @@ describe('507: окно «Общее хранилище» в инвентаре'
+           role: 'player',
+           partyStorage: {
+             revision: 1,
++            gmOnline: true,
+             entries: [{
+               entryId: 'st_1',
+               item: { id: 'w1', name: 'Пулемёт', itemType: 'weapon' },
+@@ -82,10 +83,19 @@ describe('507: окно «Общее хранилище» в инвентаре'
+     expect(all.some((t) => t.includes('Общее хранилище'))).toBe(true);
+     expect(all.some((t) => t.includes('Пулемёт'))).toBe(true);
+     expect(all.some((t) => t.includes('Аптечка'))).toBe(true);
++    // Патч 557: пустой буфер места не занимает — подписи появляются, когда
++    // вещь уже отложена.
++    expect(all.some((t) => t.includes('Отдаю на склад'))).toBe(false);
++    await act(async () => {
++      renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0].props.onPress();
++      renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0].props.onPress();
++      await Promise.resolve();
++    });
++    const buffered = texts(renderer);
+     // Патч 518: предметы сначала ложатся в буфер, перенос — по кнопке.
+-    expect(all.some((t) => t.includes('Отдаю на склад'))).toBe(true);
+-    expect(all.some((t) => t.includes('Забираю себе'))).toBe(true);
+-    expect(all.some((t) => t.includes('Перенести'))).toBe(true);
++    expect(buffered.some((t) => t.includes('Отдаю на склад'))).toBe(true);
++    expect(buffered.some((t) => t.includes('Забираю себе'))).toBe(true);
++    expect(buffered.some((t) => t.includes('Перенести'))).toBe(true);
+     // Настройки имени нет.
+     expect(all.some((t) => t.toLowerCase().includes('переименовать'))).toBe(false);
+     await act(async () => renderer.unmount());
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 68b19e6..e1eeeed 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('556');
++    expect(version.version).toBe('557');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('556');
++    expect(json('patchs/baseline.json').baseline).toBe('557');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **556**');
++    expect(roadmap).toContain('Текущая версия: **557**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 7ab9a80..a2bf1c1 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('556');
++    expect(version.version).toBe('557');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('556');
++    expect(json('patchs/baseline.json').baseline).toBe('557');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **556**');
++    expect(roadmap).toContain('Текущая версия: **557**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/storage-pane-tabs-557.test.js b/__tests__/room/storage-pane-tabs-557.test.js
+new file mode 100644
+index 0000000..957fb83
+--- /dev/null
++++ b/__tests__/room/storage-pane-tabs-557.test.js
+@@ -0,0 +1,238 @@
++// ПРИЁМОЧНЫЙ (патч 557): слово владельца — «склад держит две вкладки на
++// верхней границе с иконкой "мешочек" и "ключ". 2 таба, занимают ровно ширину
++// области склада. Вид панелей не меняется, меняется только отображение
++// содержимого панели склада».
++//
++// Проверяется поведением (окно монтируется по-настоящему):
++//   1) в панели склада ровно две вкладки, каждая — половина её ширины;
++//   2) первая показывает вещи, вторая — ключи и записки;
++//   3) ключи больше не занимают место под панелями;
++//   4) на телефоне вкладки работают внутри панели склада;
++//   5) у Мастера те же две вкладки, в «ключах» — выдача на склад;
++//   6) пустой буфер в панели места не занимает.
++import { describe, expect, it, vi, beforeEach } from 'vitest';
++import React from 'react';
++import { create, act } from 'react-test-renderer';
++import { readFileSync } from 'node:fs';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const h = vi.hoisted(() => ({
++  width: 1200,
++  rooms: {},
++  catalog: [],
++}));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
++    useWindowDimensions: () => ({ width: h.width, height: 900 }),
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => {
++  const React = require('react');
++  return {
++    MaterialCommunityIcons: ({ name, size, color, ...props }) => React.createElement('Icon', { name, ...props }),
++  };
++});
++
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => {}, getCurrentLocale: () => 'ru-RU' };
++});
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../db', () => ({
++  saveRoomStorage: vi.fn(async () => null),
++  getRoomStorage: vi.fn(async () => null),
++  getAllRoomStorages: vi.fn(async () => []),
++  getGmKeyItems: vi.fn(async () => h.catalog),
++}));
++vi.mock('../../src/utils/characterFileTransfer', () => ({
++  saveCharacter: vi.fn(async () => ({ success: true })),
++  loadCharacter: vi.fn(async () => null),
++}));
++vi.mock('../../src/room/roomStore', () => {
++  const hook = (selector) => selector({ rooms: h.rooms });
++  hook.getState = () => ({
++    rooms: h.rooms,
++    transferPartyStorage: vi.fn(async () => ({})),
++    addKeyItemToStorage: vi.fn(async () => ({})),
++    restorePartyStorage: vi.fn(async () => ({})),
++  });
++  return { default: hook };
++});
++
++import PartyStorageModal from '../../components/lootTrade/PartyStorageModal';
++
++const read = (rel) => readFileSync(rel, 'utf8');
++const treeText = (renderer) => JSON.stringify(renderer.toJSON());
++
++const baseRooms = () => ({
++  ROOM1: {
++    code: 'ROOM1',
++    role: 'player',
++    partyStorage: {
++      revision: 1,
++      gmOnline: true,
++      entries: [
++        {
++          entryId: 'st_1',
++          item: { id: 'w1', name: 'Пулемёт', itemType: 'weapon' },
++          name: 'Пулемёт',
++          itemType: 'weapon',
++          quantity: 3,
++        },
++        {
++          entryId: 'key_1',
++          kind: 'keyItem',
++          keyItemId: 'k1',
++          name: 'Пропуск',
++          itemType: 'keyItem',
++          quantity: 1,
++          description: 'Ключ от складской двери',
++        },
++      ],
++    },
++  },
++});
++
++const mount = async ({ width = 1200, gmView = false } = {}) => {
++  h.width = width;
++  let renderer = null;
++  await act(async () => {
++    renderer = create(
++      <PartyStorageModal
++        visible
++        gmView={gmView}
++        inventoryItems={[{ id: 'i1', name: 'Аптечка', itemType: 'chem', quantity: 2 }]}
++        onClose={() => {}}
++        onDepositLocal={() => {}}
++        onWithdrawLocal={() => {}}
++      />,
++    );
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const press = async (node) => {
++  await act(async () => {
++    node.props.onPress?.({ stopPropagation: () => {} });
++    await Promise.resolve();
++  });
++};
++
++const tabsOf = (renderer) => [
++  renderer.root.findAllByProps({ testID: 'storage-pane-tab-items' })[0],
++  renderer.root.findAllByProps({ testID: 'storage-pane-tab-keys' })[0],
++];
++
++describe('557: две вкладки на верхней границе панели склада', () => {
++  beforeEach(() => {
++    h.width = 1200;
++    h.rooms = baseRooms();
++    h.catalog = [{ id: 'gk1', name: 'Метка фракции', description: '' }];
++  });
++
++  it('в панели склада ровно две вкладки, каждая — половина ширины панели', async () => {
++    const renderer = await mount();
++    const [itemsTab, keysTab] = tabsOf(renderer);
++
++    expect(itemsTab).toBeTruthy();
++    expect(keysTab).toBeTruthy();
++
++    const styleOf = (node) => (Array.isArray(node.props.style) ? node.props.style : [node.props.style]);
++    for (const tab of [itemsTab, keysTab]) {
++      const flat = Object.assign({}, ...styleOf(tab).filter(Boolean));
++      // flex: 1 у каждой из двух вкладок = ровно половина ширины области склада.
++      expect(flat.flex).toBe(1);
++    }
++    // Вкладки живут в одной строке на верхней границе панели.
++    const rows = renderer.root.findAll((node) => {
++      const style = Array.isArray(node.props?.style) ? node.props.style : [node.props?.style];
++      const flat = Object.assign({}, ...style.filter(Boolean));
++      return flat.flexDirection === 'row' && flat.borderBottomColor === '#d4af37';
++    });
++    expect(rows.length).toBeGreaterThan(0);
++    // Подписи вкладок: мешочек и ключ.
++    expect(treeText(renderer)).toContain('Вещи');
++    expect(treeText(renderer)).toContain('Ключи');
++  });
++
++  it('первая вкладка показывает вещи, вторая — ключи и записки', async () => {
++    const renderer = await mount();
++    const [itemsTab, keysTab] = tabsOf(renderer);
++
++    expect(treeText(renderer)).toContain('Пулемёт');
++    expect(treeText(renderer)).not.toContain('Пропуск');
++
++    await press(keysTab);
++    expect(treeText(renderer)).toContain('Пропуск');
++    expect(treeText(renderer)).not.toContain('Пулемёт');
++
++    // Чтение записки — тем же нажатием на строку.
++    await press(renderer.root.findAllByProps({ testID: 'storage-key-k1' })[0]);
++    expect(treeText(renderer)).toContain('Ключ от складской двери');
++    expect(treeText(renderer)).toContain('Запись остаётся общей');
++
++    await press(itemsTab);
++    expect(treeText(renderer)).toContain('Пулемёт');
++    expect(treeText(renderer)).not.toContain('Пропуск');
++  });
++
++  it('ключи не занимают место под панелями: в окне нет отдельного блока ключей', async () => {
++    const renderer = await mount();
++    // До переключения на вкладку «ключи» записи в окне нет вообще.
++    expect(treeText(renderer)).not.toContain('Пропуск');
++    const modal = read('components/lootTrade/PartyStorageModal.js');
++    expect(modal).not.toContain('renderKeysBlock');
++  });
++
++  it('на телефоне вкладки работают внутри панели склада', async () => {
++    const renderer = await mount({ width: 420 });
++    await press(renderer.root.findAllByProps({ testID: 'storage-tab-storage' })[0]);
++
++    expect(treeText(renderer)).toContain('Пулемёт');
++    await press(renderer.root.findAllByProps({ testID: 'storage-pane-tab-keys' })[0]);
++    expect(treeText(renderer)).toContain('Пропуск');
++    expect(treeText(renderer)).not.toContain('Пулемёт');
++  });
++
++  it('пустой буфер в панели места не занимает', async () => {
++    const renderer = await mount();
++    expect(treeText(renderer)).not.toContain('Отдаю на склад');
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0]);
++    expect(treeText(renderer)).toContain('Отдаю на склад');
++  });
++
++  it('у Мастера те же две вкладки: состав склада и выдача ключей', async () => {
++    h.rooms = { ROOM1: { ...baseRooms().ROOM1, role: 'gm' } };
++    const renderer = await mount({ gmView: true });
++
++    expect(renderer.root.findAllByProps({ testID: 'gm-storage-item-st_1' }).length).toBeGreaterThan(0);
++    expect(treeText(renderer)).not.toContain('gm-issue-key');
++
++    await press(renderer.root.findAllByProps({ testID: 'storage-pane-tab-keys' })[0]);
++    expect(renderer.root.findAllByProps({ testID: 'gm-issue-key-gk1' }).length).toBeGreaterThan(0);
++    expect(treeText(renderer)).toContain('Пропуск');
++  });
++
++  it('подписи вкладок парные RU/EN', () => {
++    const ru = JSON.parse(read('i18n/ru-RU/screens/inventory/screen.json')).storage;
++    const en = JSON.parse(read('i18n/en-EN/screens/inventory/screen.json')).storage;
++    expect(ru.tabItems).toBe('Вещи');
++    expect(ru.tabKeys).toBe('Ключи');
++    expect(en.tabItems).toBe('Items');
++    expect(en.tabKeys).toBe('Keys');
++  });
++});
+diff --git a/__tests__/room/storage-trader-parity-556.test.js b/__tests__/room/storage-trader-parity-556.test.js
+index 5b53f6a..2549753 100644
+--- a/__tests__/room/storage-trader-parity-556.test.js
++++ b/__tests__/room/storage-trader-parity-556.test.js
+@@ -140,9 +140,9 @@ describe('556: окно общего хранилища — как у торго
+     expect(text).toContain('Предметы персонажа');
+     expect(text).toContain('Аптечка');
+     expect(text).toContain('Пулемёт');
+-    // Буфер внутри каждой панели, как у торговца (забираю / отдаю).
+-    expect(text).toContain('Забираю себе');
+-    expect(text).toContain('Отдаю на склад');
++    // Пустой буфер места не занимает (557), а с вещами — стоит в панели.
++    expect(text).not.toContain('Забираю себе');
++    expect(text).not.toContain('Отдаю на склад');
+     // Нижняя полоса: очистка и перенос.
+     expect(text).toContain('Перенести');
+     expect(renderer.root.findAllByProps({ testID: 'storage-commit-button' }).length).toBeGreaterThan(0);
+@@ -159,10 +159,12 @@ describe('556: окно общего хранилища — как у торго
+     const giveRow = renderer.root.findAllByProps({ testID: 'storage-give-i1' })[0];
+     await press(giveRow);
+     expect(treeText(renderer)).toContain('К складу: 1');
++    expect(treeText(renderer)).toContain('Отдаю на склад');
+ 
+     const takeRow = renderer.root.findAllByProps({ testID: 'storage-take-st_1' })[0];
+     await press(takeRow);
+     expect(treeText(renderer)).toContain('к себе: 1');
++    expect(treeText(renderer)).toContain('Забираю себе');
+ 
+     // «Всё» на строке склада: остаток 2 из 3.
+     await press(renderer.root.findAllByProps({ testID: 'storage-take-all-st_1' })[0]);
+diff --git a/components/lootTrade/PartyStorageModal.js b/components/lootTrade/PartyStorageModal.js
+index 85f3ebd..ad9f84f 100644
+--- a/components/lootTrade/PartyStorageModal.js
++++ b/components/lootTrade/PartyStorageModal.js
+@@ -89,6 +89,8 @@ const PartyStorageModal = ({
+   const [catalog, setCatalog] = useState([]);
+   // Как в окне торговца: на узком экране панели показываются по одной.
+   const [mobileTab, setMobileTab] = useState('player');
++  // Патч 557: у панели склада две вкладки на верхней границе — вещи и ключи.
++  const [storageTab, setStorageTab] = useState('items');
+ 
+   const room = useMemo(() => {
+     const candidates = Object.entries(rooms || {}).filter(([, value]) => value?.partyStorage);
+@@ -116,6 +118,7 @@ const PartyStorageModal = ({
+     setTakeBuffer({});
+     setSelectedKeyId(null);
+     setMobileTab('player');
++    setStorageTab('items');
+     if (isGm) {
+       void db.getGmKeyItems().then((list) => setCatalog(list || [])).catch(() => setCatalog([]));
+     }
+@@ -257,34 +260,35 @@ const PartyStorageModal = ({
+       </View>
+ 
+       <ScrollView style={trade.paneScroll}>
+-        {/* Серый курсив: уже отложено к себе со склада (снимется по «Перенести») */}
+-        <View style={trade.bufferBox}>
+-          <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
+-          {takeLines.length === 0 ? (
+-            <Text style={trade.emptyText}>—</Text>
+-          ) : takeLines.map(([entryId, qty]) => (
+-            <TouchableOpacity
+-              key={`buf-take-${entryId}`}
+-              testID={`storage-buffer-take-${entryId}`}
+-              style={trade.bufferRow}
+-              onPress={() => addTake(entryById(entryId), -1)}
+-            >
+-              <Text style={trade.bufferItalicText} numberOfLines={1}>
+-                {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
+-              </Text>
++        {/* Серый курсив: уже отложено к себе со склада (снимется по «Перенести»).
++            Пустой буфер места не занимает. */}
++        {takeLines.length > 0 && (
++          <View style={trade.bufferBox}>
++            <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferTake')}</Text>
++            {takeLines.map(([entryId, qty]) => (
+               <TouchableOpacity
+-                testID={`storage-buffer-clear-take-${entryId}`}
+-                style={trade.bufferClearAllBtn}
+-                onPress={(e) => {
+-                  e?.stopPropagation?.();
+-                  addTake(entryById(entryId), -qty);
+-                }}
++                key={`buf-take-${entryId}`}
++                testID={`storage-buffer-take-${entryId}`}
++                style={trade.bufferRow}
++                onPress={() => addTake(entryById(entryId), -1)}
+               >
+-                <Text style={trade.bufferClearAllText}>✕</Text>
++                <Text style={trade.bufferItalicText} numberOfLines={1}>
++                  {`+ ${entryById(entryId)?.name || entryId} ×${qty}`}
++                </Text>
++                <TouchableOpacity
++                  testID={`storage-buffer-clear-take-${entryId}`}
++                  style={trade.bufferClearAllBtn}
++                  onPress={(e) => {
++                    e?.stopPropagation?.();
++                    addTake(entryById(entryId), -qty);
++                  }}
++                >
++                  <Text style={trade.bufferClearAllText}>✕</Text>
++                </TouchableOpacity>
+               </TouchableOpacity>
+-            </TouchableOpacity>
+-          ))}
+-        </View>
++            ))}
++          </View>
++          )}
+ 
+         {(inventoryItems || []).length === 0 ? (
+           <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
+@@ -339,21 +343,55 @@ const PartyStorageModal = ({
+     </View>
+   );
+ 
+-  // ── Панель «Общее хранилище»: что можно забрать ──
+-
+-  const renderStoragePane = () => (
+-    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
+-      <View style={trade.paneHeader}>
+-        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
+-      </View>
++  // ── Панель «Общее хранилище»: две вкладки на верхней границе ──
++  // Слово владельца (557): «склад держит две вкладки на верхней границе с
++  // иконкой "мешочек" и "ключ". 2 таба, занимают ровно ширину области склада.
++  // Вид панелей не меняется, меняется только отображение содержимого панели
++  // склада». Поэтому вкладки живут внутри правой панели, каждая — половина её
++  // ширины.
++
++  const renderStorageTabs = () => (
++    <View style={localStyles.storageTabs}>
++      <TouchableOpacity
++        testID="storage-pane-tab-items"
++        style={[localStyles.storageTab, storageTab === 'items' && localStyles.storageTabActive]}
++        onPress={() => setStorageTab('items')}
++        accessibilityLabel={tInventory('screen.storage.tabItems')}
++      >
++        <MaterialCommunityIcons
++          name="sack"
++          size={16}
++          color={storageTab === 'items' ? '#f0e68c' : '#cfcfcf'}
++        />
++        <Text style={[localStyles.storageTabText, storageTab === 'items' && localStyles.storageTabTextActive]}>
++          {tInventory('screen.storage.tabItems')}
++        </Text>
++      </TouchableOpacity>
++      <TouchableOpacity
++        testID="storage-pane-tab-keys"
++        style={[localStyles.storageTab, localStyles.storageTabLast, storageTab === 'keys' && localStyles.storageTabActive]}
++        onPress={() => setStorageTab('keys')}
++        accessibilityLabel={tInventory('screen.storage.tabKeys')}
++      >
++        <MaterialCommunityIcons
++          name="key"
++          size={16}
++          color={storageTab === 'keys' ? '#f0e68c' : '#cfcfcf'}
++        />
++        <Text style={[localStyles.storageTabText, storageTab === 'keys' && localStyles.storageTabTextActive]}>
++          {tInventory('screen.storage.tabKeys')}
++        </Text>
++      </TouchableOpacity>
++    </View>
++  );
+ 
+-      <ScrollView style={trade.paneScroll}>
+-        {/* Серый курсив: уже отложено на склад (снимется по «Перенести») */}
++  // Вкладка «вещи»: буфер и строки склада. Пустой буфер места не занимает.
++  const renderStorageItemsContent = () => (
++    <>
++      {giveLines.length > 0 && (
+         <View style={trade.bufferBox}>
+           <Text style={trade.bufferHeader}>{tInventory('screen.storage.bufferGive')}</Text>
+-          {giveLines.length === 0 ? (
+-            <Text style={trade.emptyText}>—</Text>
+-          ) : giveLines.map(([id, qty]) => (
++          {giveLines.map(([id, qty]) => (
+             <TouchableOpacity
+               key={`buf-give-${id}`}
+               testID={`storage-buffer-give-${id}`}
+@@ -380,66 +418,63 @@ const PartyStorageModal = ({
+             </TouchableOpacity>
+           ))}
+         </View>
++      )}
+ 
+-        {items.length === 0 ? (
+-          <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
+-        ) : (
+-          items.map((entry) => {
+-            const buffered = takeBuffer[entry.entryId] || 0;
+-            const remaining = Math.max(1, Number(entry.quantity) || 1) - buffered;
+-            if (remaining <= 0) return null;
+-            return (
+-              <TouchableOpacity
+-                key={entry.entryId}
+-                testID={`storage-take-${entry.entryId}`}
+-                style={[trade.tradeRow, !writable && trade.disabledBtn]}
+-                disabled={busy || !writable}
+-                onPress={() => addTake(entry)}
+-              >
+-                <View style={trade.tradeRowInfo}>
+-                  <Text style={trade.tradeRowName} numberOfLines={1}>
+-                    {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
+-                  </Text>
+-                </View>
+-                <View style={trade.tradeRowBtns}>
++      {items.length === 0 ? (
++        <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
++      ) : (
++        items.map((entry) => {
++          const buffered = takeBuffer[entry.entryId] || 0;
++          const remaining = Math.max(1, Number(entry.quantity) || 1) - buffered;
++          if (remaining <= 0) return null;
++          return (
++            <TouchableOpacity
++              key={entry.entryId}
++              testID={`storage-take-${entry.entryId}`}
++              style={[trade.tradeRow, !writable && trade.disabledBtn]}
++              disabled={busy || !writable}
++              onPress={() => addTake(entry)}
++            >
++              <View style={trade.tradeRowInfo}>
++                <Text style={trade.tradeRowName} numberOfLines={1}>
++                  {`${getItemIcon(entry.itemType)} ${entry.name} ×${remaining}`}
++                </Text>
++              </View>
++              <View style={trade.tradeRowBtns}>
++                <TouchableOpacity
++                  testID={`storage-take-one-${entry.entryId}`}
++                  style={trade.miniMoveBtn}
++                  onPress={(e) => {
++                    e?.stopPropagation?.();
++                    addTake(entry);
++                  }}
++                >
++                  <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
++                </TouchableOpacity>
++                {remaining > 1 && (
+                   <TouchableOpacity
+-                    testID={`storage-take-one-${entry.entryId}`}
+-                    style={trade.miniMoveBtn}
++                    testID={`storage-take-all-${entry.entryId}`}
++                    style={trade.miniMoveAllBtn}
+                     onPress={(e) => {
+                       e?.stopPropagation?.();
+-                      addTake(entry);
++                      addTake(entry, remaining);
+                     }}
+                   >
+-                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawOne')}</Text>
++                    <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
+                   </TouchableOpacity>
+-                  {remaining > 1 && (
+-                    <TouchableOpacity
+-                      testID={`storage-take-all-${entry.entryId}`}
+-                      style={trade.miniMoveAllBtn}
+-                      onPress={(e) => {
+-                        e?.stopPropagation?.();
+-                        addTake(entry, remaining);
+-                      }}
+-                    >
+-                      <Text style={trade.miniMoveBtnText}>{tInventory('screen.storage.withdrawAll')}</Text>
+-                    </TouchableOpacity>
+-                  )}
+-                </View>
+-              </TouchableOpacity>
+-            );
+-          })
+-        )}
+-      </ScrollView>
+-    </View>
++                )}
++              </View>
++            </TouchableOpacity>
++          );
++        })
++      )}
++    </>
+   );
+ 
+-  // ── Ключи: запись остаётся общей, забрать её нельзя ──
+-
+-  const renderKeysBlock = () => (
+-    <View style={localStyles.keysBox}>
+-      <Text style={[trade.paneHeaderTitle, localStyles.keysTitle]}>
+-        {tLootTrade('keyItems.title')}
+-      </Text>
++  // Вкладка «ключи»: запись остаётся общей, забрать её нельзя. У Мастера здесь
++  // же — трансляция ключей на склад.
++  const renderKeysContent = ({ gm = false } = {}) => (
++    <>
+       {keys.length === 0
+         ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
+         : keys.map((key) => (
+@@ -460,9 +495,45 @@ const PartyStorageModal = ({
+             selectedKey.description || tLootTrade('keyItems.previewEmpty'),
+             localStyles.keyCardText,
+           )}
+-          <Text style={localStyles.keyStays}>{tInventory('screen.storage.keyStays')}</Text>
++          {!gm && (
++            <Text style={localStyles.keyStays}>{tInventory('screen.storage.keyStays')}</Text>
++          )}
+         </View>
+       )}
++
++      {gm && (
++        <>
++          <Text style={[localStyles.keysTitle, { marginTop: 10 }]}>
++            {tInventory('screen.storage.issueKey')}
++          </Text>
++          {catalog.length === 0
++            ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
++            : catalog.map((record) => (
++              <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
++                <Text style={localStyles.keyName} numberOfLines={1}>{record.name}</Text>
++                <TouchableOpacity
++                  style={localStyles.issueBtn}
++                  disabled={busy || !room.storage.gmOnline}
++                  onPress={() => void issueKey(record)}
++                >
++                  <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
++                </TouchableOpacity>
++              </View>
++            ))}
++        </>
++      )}
++    </>
++  );
++
++  const renderStoragePane = () => (
++    <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++      <View style={trade.paneHeader}>
++        <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
++      </View>
++      {renderStorageTabs()}
++      <ScrollView style={trade.paneScroll}>
++        {storageTab === 'items' ? renderStorageItemsContent() : renderKeysContent()}
++      </ScrollView>
+     </View>
+   );
+ 
+@@ -504,8 +575,6 @@ const PartyStorageModal = ({
+         )}
+       </View>
+ 
+-      {renderKeysBlock()}
+-
+       <View style={trade.barterFooter}>
+         <View style={trade.barterBalanceCol}>
+           <Text style={trade.barterBalanceText}>
+@@ -545,84 +614,39 @@ const PartyStorageModal = ({
+     </>
+   );
+ 
+-  // ── Окно Мастера: только просмотр состава и трансляция ключей ──
++  // ── Окно Мастера: тот же склад с двумя вкладками, но только просмотр ──
++  // и трансляция ключей (вкладка «ключи»).
+ 
+   const renderGmBody = () => (
+     <>
+       <Text style={trade.modalDesc}>{tInventory('screen.storage.gmNoActions')}</Text>
+ 
+       <View style={trade.twoPanesContainer}>
+-        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
++        <View style={trade.pane}>
+           <View style={trade.paneHeader}>
+             <Text style={trade.paneHeaderTitle}>{tInventory('screen.storage.title')}</Text>
+           </View>
++          {renderStorageTabs()}
+           <ScrollView style={trade.paneScroll}>
+-            {items.length === 0 ? (
+-              <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
+-            ) : (
+-              items.map((entry) => (
+-                <View
+-                  key={entry.entryId}
+-                  testID={`gm-storage-item-${entry.entryId}`}
+-                  style={trade.tradeRow}
+-                >
+-                  <View style={trade.tradeRowInfo}>
+-                    <Text style={trade.tradeRowName} numberOfLines={1}>
+-                      {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
+-                    </Text>
+-                  </View>
+-                </View>
+-              ))
+-            )}
+-          </ScrollView>
+-        </View>
+-
+-        <View style={[trade.pane, isWideLayout && trade.paneHalf]}>
+-          <View style={trade.paneHeader}>
+-            <Text style={trade.paneHeaderTitle}>{tLootTrade('keyItems.title')}</Text>
+-          </View>
+-          <ScrollView style={trade.paneScroll}>
+-            {keys.length === 0
+-              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
+-              : keys.map((key) => (
+-                <TouchableOpacity
+-                  key={key.entryId}
+-                  testID={`storage-key-${key.keyItemId}`}
+-                  style={localStyles.keyRow}
+-                  onPress={() => setSelectedKeyId((prev) => (prev === key.entryId ? null : key.entryId))}
+-                >
+-                  <Text style={localStyles.keyName}>{key.name}</Text>
+-                  <Text style={localStyles.keyRead}>{tInventory('screen.storage.readKey')}</Text>
+-                </TouchableOpacity>
+-              ))}
+-            {selectedKey && (
+-              <View style={localStyles.keyCard}>
+-                <Text style={localStyles.keyCardTitle}>{selectedKey.name}</Text>
+-                {renderTextWithIcons(
+-                  selectedKey.description || tLootTrade('keyItems.previewEmpty'),
+-                  localStyles.keyCardText,
+-                )}
+-              </View>
+-            )}
+-
+-            {/* Трансляция ключей — единственное действие Мастера со складом. */}
+-            <Text style={[localStyles.keysTitle, { marginTop: 10 }]}>
+-              {tInventory('screen.storage.issueKey')}
+-            </Text>
+-            {catalog.length === 0
+-              ? <Text style={trade.emptyText}>{tInventory('screen.storage.noKeyItems')}</Text>
+-              : catalog.map((record) => (
+-                <View key={record.id} testID={`gm-issue-key-${record.id}`} style={localStyles.issueRow}>
+-                  <Text style={localStyles.keyName} numberOfLines={1}>{record.name}</Text>
+-                  <TouchableOpacity
+-                    style={localStyles.issueBtn}
+-                    disabled={busy || !room.storage.gmOnline}
+-                    onPress={() => void issueKey(record)}
++            {storageTab === 'items' ? (
++              items.length === 0 ? (
++                <Text style={trade.emptyText}>{tInventory('screen.storage.empty')}</Text>
++              ) : (
++                items.map((entry) => (
++                  <View
++                    key={entry.entryId}
++                    testID={`gm-storage-item-${entry.entryId}`}
++                    style={trade.tradeRow}
+                   >
+-                    <Text style={localStyles.issueBtnText}>{tInventory('screen.storage.issueKey')}</Text>
+-                  </TouchableOpacity>
+-                </View>
+-              ))}
++                    <View style={trade.tradeRowInfo}>
++                      <Text style={trade.tradeRowName} numberOfLines={1}>
++                        {`${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
++                      </Text>
++                    </View>
++                  </View>
++                ))
++              )
++            ) : renderKeysContent({ gm: true })}
+           </ScrollView>
+         </View>
+       </View>
+@@ -696,14 +720,38 @@ const localStyles = StyleSheet.create({
+   noRoom: { marginTop: 18, marginBottom: 18 },
+   readOnly: { textAlign: 'center', marginTop: 10 },
+   transferRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+-  keysBox: {
+-    borderWidth: 1,
+-    borderColor: '#29482d',
+-    borderRadius: 5,
+-    paddingHorizontal: 12,
+-    paddingVertical: 8,
+-    marginTop: 10,
+-    maxHeight: 190,
++  // Две вкладки на верхней границе панели склада: каждая ровно половина
++  // ширины панели, поэтому вместе они занимают всю её ширину.
++  storageTabs: {
++    flexDirection: 'row',
++    borderBottomWidth: 1,
++    borderBottomColor: '#d4af37',
++    backgroundColor: '#242424',
++  },
++  storageTab: {
++    flex: 1,
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 6,
++    paddingVertical: 9,
++    paddingHorizontal: 8,
++    borderRightWidth: 1,
++    borderRightColor: '#4a4a4a',
++  },
++  storageTabLast: {
++    borderRightWidth: 0,
++  },
++  storageTabActive: {
++    backgroundColor: '#3a3a1e',
++  },
++  storageTabText: {
++    color: '#d4d4d4',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  storageTabTextActive: {
++    color: '#f0e68c',
+   },
+   keysTitle: { marginBottom: 6 },
+   keyRow: {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 691d978..996de67 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,25 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (557) — две вкладки на панели склада: вещи и ключи
++
++Слово владельца: «склад держит две вкладки на верхней границе с иконкой
++"мешочек" и "ключ". 2 таба, занимают ровно ширину области склада. Вид панелей
++не меняется, меняется только отображение содержимого панели склада».
++
++- **Вкладки.** В `PartyStorageModal` правая панель получила строку вкладок
++  `storageTabs` (два таба `flex: 1`, иконки `sack` и `key`, подписи
++  `screen.storage.tabItems` / `tabKeys`). Заголовок панели остался прежним.
++- **Содержимое.** `storageTab === 'items'` → `renderStorageItemsContent`
++  (буфер + строки склада); `'keys'` → `renderKeysContent` (список ключей,
++  чтение записки, у Мастера — выдача). Блок `renderKeysBlock` под панелями
++  удалён совсем, `keysBox` из стилей тоже.
++- **Пустой буфер** «Отдаю на склад» и «Забираю себе» не рисуется, пока в нём
++  нет вещей (жалоба владельца на занятое место).
++- **Мастер.** Одна панель на всю ширину с теми же двумя вкладками.
++- **Тесты.** Новый `storage-pane-tabs-557` (7 проверок); в 507 и 556 подписи
++  буфера проверяются после того, как вещь отложена.
++- **Отсечка.** `patchs/baseline.json` → 557; 535/532 — 557/5/10, roadmap `**557**`.
++
+ ## 2026-11-07 (556) — окно общего хранилища как у торговца, без денег
+ 
+ Слово владельца: «Оно должно было выглядеть и работать по аналогии с экраном
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4d52d0e..20caa8d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,29 @@
+ # Changelog
+ ---
+ 
++## Two tabs on the storage pane (patch 557)
++
++The owner's words: "the storage holds two tabs on its top edge with a 'bag' and
++a 'key' icon. 2 tabs, they take exactly the width of the storage area. The panes
++look unchanged, only what the storage pane shows changes."
++
++- **Tabs inside the pane.** On the top edge of the "Shared storage" pane there
++  are two tabs spanning its full width, half each: "Items" (bag icon) and
++  "Keys" (key icon). The active one is highlighted gold, like the pane title.
++- **What is inside.** "Items" keeps the usual exchange: the "To storage" buffer
++  and storage rows with "Withdraw" / "Withdraw all". "Keys" lists keys and
++  notes and lets you read a note; a record stays shared and cannot be withdrawn.
++- **More room to browse.** The separate "Keys and notes" block under the panes is
++  gone — on a phone it no longer eats the lists' height. The empty "To storage"
++  buffer is not drawn either: it appears only once items are actually buffered.
++- **Game Master.** The GM has the same storage with the same two tabs: "Items"
++  for viewing the contents, "Keys" for records and adding a key to storage.
++- **Untouched.** Server, protocol, store, transfer atomicity, JSON export and
++  import did not change.
++- **Acceptance.** New `storage-pane-tabs-557` (7 checks, real mount): two tabs at
++  half the pane width, content switching, reading a note, no keys block under the
++  panes, tabs on a phone, empty buffer, GM tabs and paired labels.
++
+ ## Shared storage window built like the trader screen (patch 556)
+ 
+ The owner's words: "About the shared storage window. It should have looked and
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4e0d2ca..d9fb57c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,31 @@
+ 
+ ---
+ 
++## Две вкладки на панели склада (патч 557)
++
++Слово владельца: «склад держит две вкладки на верхней границе с иконкой
++"мешочек" и "ключ". 2 таба, занимают ровно ширину области склада. Вид панелей
++не меняется, меняется только отображение содержимого панели склада».
++
++- **Вкладки в панели.** На верхней границе панели «Общее хранилище» — две
++  вкладки на всю её ширину, по половине каждая: «Вещи» (иконка мешка) и
++  «Ключи» (иконка ключа). Активная подсвечена золотым, как заголовок панели.
++- **Что внутри.** «Вещи» — прежний обмен: буфер «Отдаю на склад» и строки
++  склада с «Забрать» / «Забрать всё». «Ключи» — список ключей и записок с
++  чтением записки; запись по-прежнему остаётся общей, забрать её нельзя.
++- **Больше места для просмотра.** Отдельный блок «Ключи и записки» под
++  панелями удалён — на телефоне он больше не отнимает высоту у списков.
++  Пустой буфер «Отдаю на склад» тоже не рисуется: он появляется только когда
++  вещи уже отложены.
++- **Мастер.** У Мастера тот же склад с теми же двумя вкладками: «Вещи» —
++  просмотр состава, «Ключи» — записи и выдача ключа на склад.
++- **Что не тронуто.** Сервер, протокол, стор, атомарность переноса, экспорт и
++  импорт JSON не менялись.
++- **Приёмка.** Новый `storage-pane-tabs-557` (7 проверок, монтирование):
++  две вкладки по половине ширины панели, переключение содержимого, чтение
++  записки, отсутствие блока ключей под панелями, вкладки на телефоне, пустой
++  буфер, вкладки Мастера и парные подписи.
++
+ ## Окно общего хранилища по образцу торговца (патч 556)
+ 
+ Слово владельца: «Насчёт окна общего хранилища. Оно должно было выглядеть и
+diff --git a/docs/patch-557-install.md b/docs/patch-557-install.md
+new file mode 100644
+index 0000000..0e55362
+--- /dev/null
++++ b/docs/patch-557-install.md
+@@ -0,0 +1,62 @@
++# Установка патча 557: две вкладки на панели склада
++
++Патч подготовлен от состояния **версии 556**. Файл установки:
++`patchs/557-storage-tabs.patch`.
++
++> **Слово владельца:** «склад держит две вкладки на верхней границе с иконкой
++> "мешочек" и "ключ". 2 таба, занимают ровно ширину области склада. Вид панелей
++> не меняется, меняется только отображение содержимого панели склада».
++
++## Что меняется
++
++Только окно общего хранилища. Сервер, протокол, стор, атомарность переноса,
++экспорт и импорт JSON не трогались.
++
++| Файл | Что сделано |
++| --- | --- |
++| `components/lootTrade/PartyStorageModal.js` | на верхней границе панели «Общее хранилище» — две вкладки на всю её ширину (по половине): «Вещи» с иконкой мешка и «Ключи» с иконкой ключа. «Вещи» — буфер и строки склада, «Ключи» — записи и чтение. Отдельный блок ключей под панелями удалён; пустой буфер больше не рисуется. У Мастера — одна панель с теми же вкладками, в «ключах» — выдача на склад |
++| `i18n/ru-RU/screens/inventory/screen.json`, `i18n/en-EN/screens/inventory/screen.json` | подписи вкладок: «Вещи» / «Ключи» (Items / Keys) |
++| `__tests__/room/storage-pane-tabs-557.test.js` | новая приёмка: две вкладки по половине ширины панели, переключение содержимого, чтение записки, отсутствие блока ключей под панелями, вкладки на телефоне, пустой буфер, вкладки Мастера, парные подписи (7 проверок) |
++| `__tests__/room/storage-trader-parity-556.test.js`, `__tests__/lootTrade/party-storage-modal-507.test.js` | подписи буфера проверяются после того, как вещь отложена (пустой буфер не рисуется) |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 557 / `baseline` 557 / roadmap `**557**` |
++| `patchs/baseline.json` | отсечка 557 |
++| `public/version.json` | `version: 557`, релиз и заметки «Что нового» не менялись |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md` | запись патча 557, тезис 45 |
++
++## Как это выглядит
++
++1. Панель «Общее хранилище» остаётся той же панелью с тем же заголовком.
++2. На её верхней границе — две вкладки на всю ширину панели, по половине
++   каждая: мешок «Вещи» и ключ «Ключи». Активная подсвечена золотым.
++3. «Вещи» — привычный обмен: буфер «Отдаю на склад» и строки с «Забрать» /
++   «Забрать всё». Буфер появляется только когда вещи уже отложены.
++4. «Ключи» — список ключей и записок; нажатие на строку открывает текст, внизу
++   подпись «Запись остаётся общей: забрать её нельзя».
++5. На телефоне вкладки живут внутри панели склада: сначала выбираете панель
++   («Предметы персонажа» / «Общее хранилище»), потом вкладку внутри склада.
++6. У Мастера — те же две вкладки: состав склада и выдача ключей.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 557
++```
++
++После установки: `git add -A && git commit -m "Патч 557"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/storage-pane-tabs-557.test.js \
++  __tests__/room/storage-trader-parity-556.test.js \
++  __tests__/lootTrade/party-storage-modal-507.test.js \
++  __tests__/room/storage-two-panel-518.test.js \
++  __tests__/room/key-items-510.test.js
++npm run typecheck
++```
++
++Ожидаемо: 557 в `public/version.json` и `patchs/baseline.json`, 7 проверок нового
++файла зелёные, старые приёмки склада проходят.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 3cd8149..f4c385c 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **556**.
++Дата ревизии: 2026-11-07. Текущая версия: **557**.
+ 
+ ## Тезисы
+ 
+@@ -60,6 +60,16 @@
+ 
+ | 44 | **Окно общего хранилища — как у торговца, но без денег.** Окно склада собрано из тех же каркасов, что двупанельное окно торговца: шапка с иконкой и «Закрыть», переключатель панелей на телефоне, две панели с буфером внутри каждой, нижняя полоса «Очистить» / «Перенести». Обмен двусторонний: положить и забрать, по одной вещи или всё сразу; цены, наценки и касса не показываются и не считаются | ✅ сделано | **556** |
+ 
++| 45 | **Панель склада с двумя вкладками.** На верхней границе панели склада — два таба ровно на её ширину (по половине каждый): «мешочек» = вещи, «ключ» = записки и ключи. Вид панелей не меняется, меняется только содержимое панели склада; ключи больше не занимают место под панелями. У Мастера те же две вкладки, в «ключах» — выдача на склад. Пустой буфер в панели не рисуется | ✅ сделано | **557** |
++
++## Осталось после патча 557
++
++Патч 557 убрал блок ключей из-под панелей: у панели склада появились две
++вкладки — «Вещи» (мешочек) и «Ключи» (ключ), каждая ровно половина ширины
++панели. Пустой буфер больше не занимает место. Следующий шаг по слову
++владельца — раздел локаций и сундуков в пространстве Мастера; объём и место
++раздела ещё не подтверждены.
++
+ ## Осталось после патча 556
+ 
+ Патч 556 привёл окно общего хранилища к виду экрана торговца: те же панели,
+@@ -365,6 +375,7 @@
+ - `docs/patch-554-install.md` — установка релиза 5: новые заметки «Что нового» (554).
+ - `docs/patch-555-install.md` — ПК-режим карточек в окне комнаты Мастера (555).
+ - `docs/patch-556-install.md` — окно общего хранилища по образцу торговца, без денег (556).
++- `docs/patch-557-install.md` — две вкладки на панели склада: вещи и ключи (557).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 96cfcfc..1979a91 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -107,7 +107,9 @@
+     "withdrawOne": "Withdraw",
+     "withdrawAll": "Withdraw all",
+     "exchangeSummary": "To storage: {give} · to me: {take}",
+-    "exchangeEven": "A trade without money: pick items and press \"Transfer\""
++    "exchangeEven": "A trade without money: pick items and press \"Transfer\"",
++    "tabItems": "Items",
++    "tabKeys": "Keys"
+   },
+   "labels": {
+     "leftArm": "Left bracer",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 7da1404..96159aa 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -107,7 +107,9 @@
+     "withdrawOne": "Забрать",
+     "withdrawAll": "Забрать всё",
+     "exchangeSummary": "К складу: {give} · к себе: {take}",
+-    "exchangeEven": "Обмен без денег: выберите вещи и нажмите «Перенести»"
++    "exchangeEven": "Обмен без денег: выберите вещи и нажмите «Перенести»",
++    "tabItems": "Вещи",
++    "tabKeys": "Ключи"
+   },
+   "labels": {
+     "leftArm": "Левый наруч",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index e502d03..223870a 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "556"
++  "baseline": "557"
+ }
+diff --git a/public/version.json b/public/version.json
+index f543e8c..6814fe0 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "556",
++  "version": "557",
+   "release": 5,
+   "notes": {
+     "ru-RU": [
