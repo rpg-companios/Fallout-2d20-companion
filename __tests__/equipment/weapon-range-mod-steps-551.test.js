@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { applyWeaponMods, enrichWeaponItem } from '../../domain/enrichItem';
 import {
+  RANGE_ORDER,
   baseRangeIndex,
   rangeToIndex,
   rangeToName,
@@ -64,15 +65,39 @@ describe('Патч 551: «Короткий оптический» на охот�
     }
   });
 
-  it('мод с rangeModifier сдвигает дальность на шаг: +1 → «Дальняя»', () => {
+  it('мод с rangeModifier сдвигает дальность ровно на шаг: Средняя +1 = Дальняя', () => {
     // «Длинный ствол» (+1 к дальности) подходит охотничьей винтовке.
     const longBarrel = catalog.weaponMods.find(
       (m) => m.rangeModifier?.op === '+' && (m.applies_to_ids || []).includes('weapon_hunting_rifle'),
     );
     expect(longBarrel).toBeTruthy();
+    expect(longBarrel.rangeModifier).toEqual({ op: '+', value: 1 });
     const result = enrich('weapon_hunting_rifle', { [longBarrel.slot]: longBarrel.id });
-    expect(result.range_index).toBe(rangeToIndex('M') + Number(longBarrel.rangeModifier.value));
-    expect(result.range_name).not.toBe('Close');
+    expect(result.range_index).toBe(rangeToIndex('M') + 1);
+    // Средняя (M) + 1 шаг = Дальняя (L). Через категорию шкала не прыгает.
+    expect(result.range_name).toBe('Long');
+  });
+
+  it('шкала дальности: шаг = соседняя категория, прицел без rangeModifier шага не даёт', () => {
+    expect(RANGE_ORDER).toEqual(['Close', 'Medium', 'Long', 'Extreme']);
+    const longBarrel = catalog.weaponMods.find(
+      (m) => m.rangeModifier?.op === '+' && (m.applies_to_ids || []).includes('weapon_hunting_rifle'),
+    );
+    const withScope = enrich('weapon_hunting_rifle', { Sight: 'mod_short_scope' });
+    const withLongBarrel = enrich('weapon_hunting_rifle', { [longBarrel.slot]: longBarrel.id });
+
+    // База и «Короткий оптический» — одна и та же «Средняя».
+    expect(withScope.range_index).toBe(rangeToIndex('M'));
+    expect(withScope.range_name).toBe('Medium');
+    // +1 поднимает ровно на одну категорию, а не через одну.
+    expect(withLongBarrel.range_index - withScope.range_index).toBe(1);
+    expect(withLongBarrel.range_name).toBe('Long');
+    // Сочетание прицела (0) и длинного ствола (+1) даёт тот же один шаг.
+    const both = enrich('weapon_hunting_rifle', {
+      Sight: 'mod_short_scope',
+      [longBarrel.slot]: longBarrel.id,
+    });
+    expect(both.range_index).toBe(withLongBarrel.range_index);
   });
 });
 

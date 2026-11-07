@@ -1,0 +1,439 @@
+diff --git a/__tests__/equipment/weapon-range-mod-steps-551.test.js b/__tests__/equipment/weapon-range-mod-steps-551.test.js
+index 7b2fa3e..ef90ebc 100644
+--- a/__tests__/equipment/weapon-range-mod-steps-551.test.js
++++ b/__tests__/equipment/weapon-range-mod-steps-551.test.js
+@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { applyWeaponMods, enrichWeaponItem } from '../../domain/enrichItem';
+ import {
++  RANGE_ORDER,
+   baseRangeIndex,
+   rangeToIndex,
+   rangeToName,
+@@ -64,15 +65,39 @@ describe('Патч 551: «Короткий оптический» на охот
+     }
+   });
+ 
+-  it('мод с rangeModifier сдвигает дальность на шаг: +1 → «Дальняя»', () => {
++  it('мод с rangeModifier сдвигает дальность ровно на шаг: Средняя +1 = Дальняя', () => {
+     // «Длинный ствол» (+1 к дальности) подходит охотничьей винтовке.
+     const longBarrel = catalog.weaponMods.find(
+       (m) => m.rangeModifier?.op === '+' && (m.applies_to_ids || []).includes('weapon_hunting_rifle'),
+     );
+     expect(longBarrel).toBeTruthy();
++    expect(longBarrel.rangeModifier).toEqual({ op: '+', value: 1 });
+     const result = enrich('weapon_hunting_rifle', { [longBarrel.slot]: longBarrel.id });
+-    expect(result.range_index).toBe(rangeToIndex('M') + Number(longBarrel.rangeModifier.value));
+-    expect(result.range_name).not.toBe('Close');
++    expect(result.range_index).toBe(rangeToIndex('M') + 1);
++    // Средняя (M) + 1 шаг = Дальняя (L). Через категорию шкала не прыгает.
++    expect(result.range_name).toBe('Long');
++  });
++
++  it('шкала дальности: шаг = соседняя категория, прицел без rangeModifier шага не даёт', () => {
++    expect(RANGE_ORDER).toEqual(['Close', 'Medium', 'Long', 'Extreme']);
++    const longBarrel = catalog.weaponMods.find(
++      (m) => m.rangeModifier?.op === '+' && (m.applies_to_ids || []).includes('weapon_hunting_rifle'),
++    );
++    const withScope = enrich('weapon_hunting_rifle', { Sight: 'mod_short_scope' });
++    const withLongBarrel = enrich('weapon_hunting_rifle', { [longBarrel.slot]: longBarrel.id });
++
++    // База и «Короткий оптический» — одна и та же «Средняя».
++    expect(withScope.range_index).toBe(rangeToIndex('M'));
++    expect(withScope.range_name).toBe('Medium');
++    // +1 поднимает ровно на одну категорию, а не через одну.
++    expect(withLongBarrel.range_index - withScope.range_index).toBe(1);
++    expect(withLongBarrel.range_name).toBe('Long');
++    // Сочетание прицела (0) и длинного ствола (+1) даёт тот же один шаг.
++    const both = enrich('weapon_hunting_rifle', {
++      Sight: 'mod_short_scope',
++      [longBarrel.slot]: longBarrel.id,
++    });
++    expect(both.range_index).toBe(withLongBarrel.range_index);
+   });
+ });
+ 
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index 3a23279..04443f5 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('552');
++    expect(version.version).toBe('553');
+     expect(version.release).toBe(4);
+     expect(version.notes['ru-RU']).toHaveLength(150);
+     expect(version.notes['en-EN']).toHaveLength(150);
+-    expect(json('patchs/baseline.json').baseline).toBe('552');
++    expect(json('patchs/baseline.json').baseline).toBe('553');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -278,15 +278,16 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
+     expect(read('patchs/551-educated-and-range.patch')).toContain('getSkillPointsAvailable');
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
++    expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **552**');
++    expect(roadmap).toContain('Текущая версия: **553**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 552');
++    expect(roadmap).toContain('Осталось после патча 553');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -300,6 +301,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('docs/patch-550-install.md')).toContain('550');
+     expect(read('docs/patch-551-install.md')).toContain('551');
+     expect(read('docs/patch-552-install.md')).toContain('552');
++    expect(read('docs/patch-553-install.md')).toContain('553');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index c8f68b5..4331d6a 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('552');
++    expect(version.version).toBe('553');
+     expect(version.release).toBe(4);
+     expect(version.notes['ru-RU']).toHaveLength(150);
+     expect(version.notes['en-EN']).toHaveLength(150);
+-    expect(json('patchs/baseline.json').baseline).toBe('552');
++    expect(json('patchs/baseline.json').baseline).toBe('553');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -462,15 +462,16 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
+     expect(read('patchs/551-educated-and-range.patch')).toContain('getSkillPointsAvailable');
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
++    expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **552**');
++    expect(roadmap).toContain('Текущая версия: **553**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+     expect(roadmap).toContain('| 31 |');
+     expect(roadmap).toContain('| 32 |');
+     expect(roadmap).toContain('| 33 |');
+-    expect(roadmap).toContain('Осталось после патча 552');
++    expect(roadmap).toContain('Осталось после патча 553');
+     expect(read('docs/patch-540-install.md')).toContain('540');
+     expect(read('docs/patch-541-install.md')).toContain('541');
+     expect(read('docs/patch-542-install.md')).toContain('542');
+@@ -484,6 +485,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('docs/patch-550-install.md')).toContain('550');
+     expect(read('docs/patch-551-install.md')).toContain('551');
+     expect(read('docs/patch-552-install.md')).toContain('552');
++    expect(read('docs/patch-553-install.md')).toContain('553');
+     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
+   });
+ });
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4587a47..bfaf361 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,22 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (553) — пояснение шкалы дальности (только документы и приёмка)
++
++Вопрос владельца: «в смысле короткая дистанция + мод на +1 дистанцию =
++дальняя???». Ошибка была в таблицах, не в механике.
++
++- **Факт шкалы.** `RANGE_ORDER = ['Close','Medium','Long','Extreme']`, шаг ровно
++  один: «Средняя» + 1 = «Дальняя»; «Близкая» + 1 = «Средняя».
++- **Проверка старого кода** (`git show 6e4d3bd:domain/enrichItem.js` + `range.js`,
++  прогон на i18n-записи винтовки): база считалась из локализованного `rangeName`
++  («Средняя») → `rangeToIndex` = `null` → `?? 0` = «Близкая». Отсюда: прицел без
++  `rangeModifier` давал «Близкую», а мод +1 давал «Среднюю» (не «Дальнюю»).
++- **Исправлено.** Таблицы в `docs/patch-551-install.md` (строка про длинный ствол)
++  и `docs/patch-552-install.md`; в приёмку 551 добавлен явный тест шага шкалы и
++  сочетания прицела (0) + длинного ствола (+1). Код и данные не менялись.
++- **Приёмка:** 9 проверок в `weapon-range-mod-steps-551`; всего **285 файлов /
++  2640 проверок**, exit 0.
++
+ ## 2026-11-07 (552) — очки «Тренированного» у старых сейвов и снятие перка без долга
+ 
+ Владелец принял два решения по следствиям 551: старым сейвам открывать
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c873e76..a7ae4bb 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,28 @@
+ # Changelog
+ ---
+ 
++## Range scale clarified (patch 553)
++
++Docs and acceptance only — game mechanics are unchanged.
++
++- **The owner's question.** "Wait, close range + a +1 range mod = long???" — fair:
++  in the before/after tables of patches 551 and 552 the +1 mod had Close in the
++  "before" column, as if one step skipped a category.
++- **How it actually works.** The scale uses adjacent categories: `Close → Medium →
++  Long → Extreme`. Exactly one step: Medium + a +1 mod = Long, Close + 1 = Medium.
++  Range never jumps over a category.
++- **What the old bug did.** The base range of any modded weapon was computed as
++  Close (the localized label was not recognized). So a +1 mod did not raise range to
++  Long — it merely restored the base Medium. The Short Scope, which changes no
++  range, left it at Close.
++- **What was fixed.** The tables in `docs/patch-551-install.md` and
++  `docs/patch-552-install.md` now follow the scale; the 551 acceptance test checks
++  the step explicitly (the index grows by exactly 1, the name is `Long`) and the
++  combination of the scope (0) with the long barrel (+1). No code or data changed.
++- **Acceptance.** Total: 285 files, 2640 checks, all green.
++
++---
++
+ ## Trained perk points for old saves, removal without debt (patch 552)
+ 
+ Patch 551 fixed the perk itself, but the owner immediately found two consequences
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e1db79d..02f008d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,29 @@
+ 
+ ---
+ 
++## Пояснение шкалы дальности (патч 553)
++
++Только документы и приёмка — механика игры не менялась.
++
++- **Вопрос владельца.** «В смысле короткая дистанция + мод на +1 дистанцию =
++  дальняя???» — справедливый: в таблицах «было/стало» патчей 551 и 552 у мода +1
++  в колонке «было» стояла «Близкая», и выходило, будто один шаг перепрыгивает
++  категорию.
++- **Как на самом деле.** Шкала — соседние категории: `Близкая → Средняя →
++  Дальняя → Экстремальная`. Шаг ровно один: «Средняя» + мод +1 = «Дальняя»,
++  «Близкая» + 1 = «Средняя». Через категорию дальность не прыгает.
++- **Что было при старом дефекте.** База любого модифицированного оружия
++  считалась «Близкой» (локализованная подпись не распознавалась). Поэтому мод +1
++  не поднимал дальность до «Дальней» — он лишь возвращал базовую «Среднюю».
++  «Короткий оптический» без изменения дальности оставлял «Близкую».
++- **Что исправлено.** Таблицы в `docs/patch-551-install.md` и
++  `docs/patch-552-install.md` приведены к шкале; приёмка 551 дополнена проверкой
++  шага (индекс растёт ровно на 1, имя `Long`) и сочетания прицела (0) с длинным
++  стволом (+1). Код и данные не тронуты.
++- **Приёмка.** Итого 285 файлов, 2640 проверок, всё зелёное.
++
++---
++
+ ## Очки «Тренированного» у старых сейвов и снятие перка без долга (патч 552)
+ 
+ Патч 551 починил сам перк, но владелец сразу нашёл два следствия — и задал
+diff --git a/docs/patch-551-install.md b/docs/patch-551-install.md
+index b301b08..3956a4c 100644
+--- a/docs/patch-551-install.md
++++ b/docs/patch-551-install.md
+@@ -54,7 +54,7 @@
+ | «Тренированный» погас по книге (уровень) | 2 очка «в никуда» | 0 очков |
+ | Перк снят | — | пул возвращается к базе |
+ | Охотничья винтовка + «Короткий оптический» | «Средняя» → «Близкая» | «Средняя» (без изменений) |
+-| Охотничья винтовка + мод с `rangeModifier +1` (длинный ствол) | «Средняя» → «Близкая» (из-за того же дефекта) | «Дальняя» |
++| Охотничья винтовка + мод с `rangeModifier +1` («Длинный ствол») | «Средняя»: мод лишь возвращал базу после дефекта, шага вверх не было | «Дальняя» (Средняя + 1 шаг) |
+ | Оружие ближнего боя + мод | дальность «Close» у меча | дальность пустая (не выдумывается) |
+ | Установка мода без `rangeModifier` | дальность могла «упасть» | дальность не меняется |
+ 
+diff --git a/docs/patch-552-install.md b/docs/patch-552-install.md
+index 645c5e0..efa9895 100644
+--- a/docs/patch-552-install.md
++++ b/docs/patch-552-install.md
+@@ -82,7 +82,7 @@
+ | --- | --- | --- |
+ | Охотничья винтовка без модов | «Средняя» | «Средняя» |
+ | + «Короткий оптический» | «Близкая» | «Средняя» |
+-| + мод с `rangeModifier +1` | «Близкая» | «Дальняя» |
++| + «Длинный ствол» (`rangeModifier +1`) | «Средняя» (мод +1 лишь возвращал базу после дефекта) | «Дальняя» (Средняя + 1 шаг) |
+ | Меч + мод | придуманная дальность | пусто |
+ 
+ ## Границы
+diff --git a/docs/patch-553-install.md b/docs/patch-553-install.md
+new file mode 100644
+index 0000000..626cd51
+--- /dev/null
++++ b/docs/patch-553-install.md
+@@ -0,0 +1,72 @@
++# Установка патча 553: пояснение шкалы дальности
++
++Патч подготовлен от состояния **версии 552**. Файл установки:
++`patchs/553-range-table-fix.patch`.
++
++> **Вопрос владельца:** «В смысле короткая дистанция + мод на +1 дистанцию =
++> дальняя???».
++
++**Механика игры не менялась.** Патч 553 исправляет только описание дальности в
++таблицах «было/стало» и добавляет проверку шага шкалы в приёмку 551.
++
++## Что было не так в документах
++
++В таблицах установок 551 и 552 у мода с `rangeModifier +1` («Длинный ствол»)
++в колонке «было» стояла «Близкая». Получалось, будто один шаг перепрыгивает
++категорию: «Близкая» + 1 = «Дальняя». Это неверно.
++
++На самом деле шкала — **соседние категории**:
++
++```
++Близкая (C) → Средняя (M) → Дальняя (L) → Экстремальная (E)
++```
++
++Один шаг = одна соседняя категория: «Средняя» + 1 = «Дальняя», «Близкая» + 1 =
++«Средняя». Через категорию дальность не прыгает.
++
++## Как вёл себя старый дефект (проверено прогоном кода до 551)
++
++| Оружие / мод | Старый код (до 551) | Сейчас (551 и далее) |
++| --- | --- | --- |
++| Охотничья винтовка без модов | «Средняя» (показывалась буква `M`) | «Средняя» |
++| + «Короткий оптический» (без `rangeModifier`) | «Близкая» | «Средняя» |
++| + «Длинный ствол» (`rangeModifier +1`) | «Средняя» — мод лишь возвращал базу, шага вверх не было | «Дальняя» |
++| + прицел и длинный ствол вместе | «Средняя» | «Дальняя» |
++| Меч + мод | придуманная дальность | пусто |
++
++Причина: база считалась из **локализованной подписи** `rangeName` («Средняя»),
++парсер её не узнавал и подставлял `0` — «Близкая». Поэтому мод +1 не поднимал
++оружие до «Дальней», а только компенсировал дефект.
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `docs/patch-551-install.md` | строка про мод +1: в «было» теперь «Средняя» с пояснением, что шага вверх не было |
++| `docs/patch-552-install.md` | та же строка таблицы приведена к шкале |
++| `__tests__/equipment/weapon-range-mod-steps-551.test.js` | точные ожидания: индекс растёт ровно на 1, имя `Long`; новый тест шага шкалы и сочетания прицела (0) + длинного ствола (+1) |
++| `docs/agents/state.md`, `docs/roadmap.md`, `docs/changelog.*.md`, `public/version.json`, `patchs/baseline.json` | запись 553, тезис 43, версия/отсечка 553 |
++
++Код приложения, данные каталога и словари не менялись.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 553
++```
++
++**Сервер комнат обновлять не нужно**: изменений в рантайме нет.
++
++## Проверки
++
++- `npm run typecheck`: успешно.
++- `npm test`: **285 файлов / 2640 проверок, всё зелёное**.
++- `npm run build`: веб-сборка Expo проходит.
++
++## Откат
++
++`git apply -R patchs/553-range-table-fix.patch` вернёт документы и версию к
++состоянию 552.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index a0b32b4..a03caf2 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **552**.
++Дата ревизии: 2026-11-07. Текущая версия: **553**.
+ 
+ ## Тезисы
+ 
+@@ -56,6 +56,18 @@
+ 
+ | 42 | **Долг и старые сейвы «Тренированного».** Пропущенные очки навыков начисляются старым сейвам сразу при загрузке и распределение навыков открывается заново (ждать нового уровня не нужно, повторных открытий нет). Снятие перка забирает его очки: если они потрачены, игрок сам выбирает навыки — суммарно не больше 2 (2 с одного или 1 с двух), минимумы 0/2 соблюдаются, «молчаливого» долга не остаётся | ✅ сделано | 552 |
+ 
++## Осталось после патча 553
++
++Патч 553 — только документы и приёмка. Вопрос владельца «в смысле короткая
++дистанция + мод на +1 = дальняя?» вскрыл ошибку в таблицах установок 551/552:
++у мода +1 в колонке «было» стояла «Близкая», и выходило, будто один шаг
++перепрыгивает категорию. На деле шкала `Близкая → Средняя → Дальняя →
++Экстремальная` и шаг ровно один: «Средняя» + 1 = «Дальняя», «Близкая» + 1 =
++«Средняя». Старый дефект показывал базу модифицированного оружия как
++«Близкую», поэтому мод +1 не поднимал дальность до «Дальней», а лишь возвращал
++«Среднюю». Код не менялся; приёмка 551 дополнена проверкой шага шкалы и
++сочетания прицела (0) с длинным стволом (+1). Открытых вопросов нет.
++
+ ## Осталось после патча 552
+ 
+ Патч 552 закрыл два следствия 551, найденные владельцем. **Старые сейвы**: перк
+@@ -70,6 +82,8 @@
+ 2, обычные не ниже 0. Открытых вопросов по листу персонажа не осталось; дальность
+ оружия с модами остаётся по правилу 551 (прицел дистанцию не меняет).
+ 
++| 43 | **Пояснение шкалы дальности.** Исправлены таблицы «было/стало» в установках 551 и 552: мод +1 поднимает на одну соседнюю категорию («Средняя» → «Дальняя»), а не через категорию; при старом дефекте мод +1 показывал «Среднюю» и до «Дальней» не поднимал. Приёмка 551 закрепляет шаг шкалы и сочетание прицела (0) с длинным стволом (+1). Механика не менялась | ✅ сделано (документы) | 553 |
++
+ ## Осталось после патча 551
+ 
+ Патч 551 закрыл две ошибки, найденные владельцем в листе персонажа. **«Тренированный»** больше не «мёртвый» перк: каркас `educated.js` отдавал фиксированные 2 очка независимо от ранга, а экран персонажа вообще не читал `perkBonuses.skillPoints` — теперь бонус считается за каждый ранг (+2) и прибавляется к пулу распределения, поэтому «+1 ранг двум навыкам или +2 ранга одному» действительно работает; потолок 6-го ранга не изменился. **Дальность оружия с модами** больше не «падает»: в i18n-каталоге `rangeName` — локализованный текст («Средняя»), а конвейер модов читал его раньше машинной буквы `range` и при нераспознанной строке подставлял «Близкую». Теперь механика читает только машинные источники (буква/каноническое имя/индекс), мод без `rangeModifier` дальность не трогает, а у оружия ближнего боя дальность не выдумывается вовсе.
+@@ -318,6 +332,7 @@
+ - `docs/patch-546-install.md` — замок локации как преграда входа (546).
+ - `docs/patch-547-install.md` — сигнал об успешном взломе (547).
+ - `docs/patch-552-install.md` — очки «Тренированного» у старых сейвов и снятие перка без долга (552).
++- `docs/patch-553-install.md` — пояснение шкалы дальности, исправление таблиц (553).
+ - `docs/ui-modals-rules.md` — дизайн модалок: брать каркас ближайшего окна.
+ - `docs/ui-alerts-rules.md` — уведомления и подтверждения.
+ - `docs/architecture/engine-charter.md` — устав, инварианты, предохранители.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 1d8b33b..68e8e50 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "552"
++  "baseline": "553"
+ }
+diff --git a/public/version.json b/public/version.json
+index 5a93621..d820181 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "552",
++  "version": "553",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Только документы и приёмка: исправлено описание дальности в таблицах «было/стало». Шкала дальности — соседние категории, шаг ровно один: «Средняя» + мод на +1 = «Дальняя», а «Близкая» + 1 = «Средняя». Раньше в документе у мода +1 в колонке «было» стояла «Близкая», из-за чего получалось, будто один шаг перепрыгивает категорию; на деле старый дефект показывал мод +1 как «Среднюю» (базовую), и до «Дальней» он не поднимал. Механика игры не менялась.",
+       "Старые сохранения с «Тренированным» получают пропущенные очки навыков сразу при загрузке: распределение навыков открывается заново, ждать нового уровня не нужно. Снятие перка больше не оставляет долг: перк забирает свои очки, а если они уже потрачены, игрок сам выбирает, с каких навыков снять — суммарно не больше 2 (2 с одного навыка или 1 с двух), тегированные навыки не опускаются ниже 2. Дальность оружия с модами остаётся как в 551: прицел её не меняет, механику задаёт машинный код дистанции, а мод без изменения дальности её не трогает.",
+       "Стрелки перемещения в админке снова работают: перетаскивание позиций в дереве локации начиналось только в «пузырьковой» фазе опроса жеста, а решение принималось раньше — в фазе перехвата, поэтому строка не двигалась никогда. Теперь захват строки происходит в обеих фазах, порядок меняется перетаскиванием, а простое нажатие на стрелку порядок не меняет. Попутно исправлено: после выдачи локации подпись замка Мастера больше не превращается в техническую строку — человеческий текст сохраняется, а уже испорченные подписи восстанавливаются при чтении.",
+       "Успешный взлом больше не предлагает «ещё подход»: после ACCESS GRANTED замок и терминал показывают успех и кнопку «Закрыть», которая передаёт сигнал о взломе и открывает доступ к содержимому. Исправлено окно игрока: сигнал победы доходит и в локальном резерве (сервер без протокола мини-игр), поэтому после взлома замка или терминала можно пройти дальше.",
+@@ -151,10 +152,10 @@
+       "Ответ «Нет» оставляет карточку терминала на экране с отметкой «Закрыт»: ни взломать, ни посмотреть его нельзя, пока ведущий не транслирует терминал заново.",
+       "Пока ведущий не принял решение, повторно взломать терминал нельзя, а провал теперь явно виден игроку — доска больше не перезапускается молча по старым настройкам.",
+       "Настройки терминала, изменённые ведущим прямо во время попытки, теперь не теряются и сразу учитываются на новой доске после ответа «Да».",
+-      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку.",
+-      "Если заколок не хватает, взлом останавливается без расхода: одна заколка списывается ровно как одна, остаток больше не доедается — правило действует и по команде ведущего."
++      "Перетаскивание карточек и строк в дереве локаций теперь работает по одному общему механизму: нажатие на стрелку без движения больше не переносит карточку в локацию или папку."
+     ],
+     "en-EN": [
++      "Docs and acceptance only: the range wording in the before/after tables is corrected. The range scale uses adjacent categories, exactly one step: Medium + a +1 mod = Long, while Close + 1 = Medium. The document previously showed Close in the \"before\" column for the +1 mod, as if one step skipped a category; in fact the old bug displayed the +1 mod as Medium (the base) and never raised it to Long. Game mechanics are unchanged.",
+       "Old saves with the Trained perk now receive the missed skill points immediately on load: the skill distribution opens again, no need to wait for the next level. Removing the perk no longer leaves a debt: the perk takes its points back, and if they are already spent, the player chooses which skills to lower — 2 points in total at most (2 from one skill or 1 from two), tagged skills never drop below 2. Weapon range with mods stays as in 551: a scope does not change range, the machine range code drives the mechanics, and a mod without a range change leaves range untouched.",
+       "Move arrows in the admin screen work again: dragging positions in the location tree only started in the bubble phase of gesture negotiation, while the decision was taken earlier in the capture phase, so a row never moved. The row is now claimed in both phases, dragging reorders it, and a plain tap on the arrow no longer changes the order. Also fixed: after issuing a location the GM's lock note no longer turns into a technical string — the human text is preserved, and already corrupted notes are restored on read.",
+       "A successful hack no longer offers another attempt: after ACCESS GRANTED the lock and the terminal show success and a Close button that transmits the hack signal and opens access to the contents. Fixed the player window: the victory signal now arrives in the local fallback too (server without the mini-game protocol), so after picking a lock or hacking a terminal you can proceed.",
+@@ -303,8 +304,7 @@
+       "Answering «No» keeps the terminal card on screen with a «Closed» badge: it can neither be hacked nor viewed until the Game Master broadcasts it again.",
+       "Until the Game Master decides, hacking again is blocked and the failure is clearly shown to the player — the board no longer restarts silently with stale settings.",
+       "Terminal settings changed by the Game Master during an attempt are no longer lost: the new board after «Yes» uses them right away.",
+-      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder.",
+-      "When there are not enough bobby pins, picking stops without spending anything: one pin is spent exactly as one, the remainder is no longer partially consumed — the rule also applies to Game Master commands."
++      "Dragging cards and location tree rows now shares one mechanism: tapping an arrow without moving no longer drops the card into a location or a folder."
+     ]
+   }
+ }

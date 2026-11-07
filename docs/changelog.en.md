@@ -1,6 +1,28 @@
 # Changelog
 ---
 
+## Range scale clarified (patch 553)
+
+Docs and acceptance only — game mechanics are unchanged.
+
+- **The owner's question.** "Wait, close range + a +1 range mod = long???" — fair:
+  in the before/after tables of patches 551 and 552 the +1 mod had Close in the
+  "before" column, as if one step skipped a category.
+- **How it actually works.** The scale uses adjacent categories: `Close → Medium →
+  Long → Extreme`. Exactly one step: Medium + a +1 mod = Long, Close + 1 = Medium.
+  Range never jumps over a category.
+- **What the old bug did.** The base range of any modded weapon was computed as
+  Close (the localized label was not recognized). So a +1 mod did not raise range to
+  Long — it merely restored the base Medium. The Short Scope, which changes no
+  range, left it at Close.
+- **What was fixed.** The tables in `docs/patch-551-install.md` and
+  `docs/patch-552-install.md` now follow the scale; the 551 acceptance test checks
+  the step explicitly (the index grows by exactly 1, the name is `Long`) and the
+  combination of the scope (0) with the long barrel (+1). No code or data changed.
+- **Acceptance.** Total: 285 files, 2640 checks, all green.
+
+---
+
 ## Trained perk points for old saves, removal without debt (patch 552)
 
 Patch 551 fixed the perk itself, but the owner immediately found two consequences

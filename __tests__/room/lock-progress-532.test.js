@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
 
   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
     const version = json('public/version.json');
-    expect(version.version).toBe('552');
+    expect(version.version).toBe('553');
     expect(version.release).toBe(4);
     expect(version.notes['ru-RU']).toHaveLength(150);
     expect(version.notes['en-EN']).toHaveLength(150);
-    expect(json('patchs/baseline.json').baseline).toBe('552');
+    expect(json('patchs/baseline.json').baseline).toBe('553');
     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
@@ -462,15 +462,16 @@ describe('532/534: строки, документы и версия', () => {
     expect(read('patchs/550-pin-spend-stop.patch')).toContain('not-enough-pins');
     expect(read('patchs/551-educated-and-range.patch')).toContain('getSkillPointsAvailable');
     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+    expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
     const roadmap = read('docs/roadmap.md');
-    expect(roadmap).toContain('Текущая версия: **552**');
+    expect(roadmap).toContain('Текущая версия: **553**');
     expect(roadmap).toContain('| 28 |');
     expect(roadmap).toContain('| 29 |');
     expect(roadmap).toContain('| 30 |');
     expect(roadmap).toContain('| 31 |');
     expect(roadmap).toContain('| 32 |');
     expect(roadmap).toContain('| 33 |');
-    expect(roadmap).toContain('Осталось после патча 552');
+    expect(roadmap).toContain('Осталось после патча 553');
     expect(read('docs/patch-540-install.md')).toContain('540');
     expect(read('docs/patch-541-install.md')).toContain('541');
     expect(read('docs/patch-542-install.md')).toContain('542');
@@ -484,6 +485,7 @@ describe('532/534: строки, документы и версия', () => {
     expect(read('docs/patch-550-install.md')).toContain('550');
     expect(read('docs/patch-551-install.md')).toContain('551');
     expect(read('docs/patch-552-install.md')).toContain('552');
+    expect(read('docs/patch-553-install.md')).toContain('553');
     expect(read('docs/location-level-design.md')).toContain('Переходы между локациями');
   });
 });
