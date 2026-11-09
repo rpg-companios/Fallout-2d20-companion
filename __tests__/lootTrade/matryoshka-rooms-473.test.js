@@ -337,7 +337,12 @@ describe('Patch 473 — Matryoshka organization, sorting, multi-room Locations &
     // 3. При создании сундука/торговца нет привязки к комнате — есть опциональная привязка к локации, а у локации мультивыбор комнат
     expect(formModalSrc).toContain('selectedRoomCodes');
     expect(formModalSrc).toContain('selectedHubIds');
-    expect(formModalSrc).toContain("tLootTrade('form.bindHubsLabel')");
+    // 563: привязка к локации — обычное поле «Локация» (как «Родительская
+    // локация» у локации), а не поиск по складу; дополнительные локации —
+    // отдельной строкой ниже (бродячий торговец).
+    expect(formModalSrc).toContain("tLootTrade('form.primaryLocationLabel')");
+    expect(formModalSrc).toContain('container-form-primary-location');
+    expect(formModalSrc).toContain("tLootTrade('form.extraLocationsLabel')");
     expect(formModalSrc).toContain("tLootTrade('form.roomsMultiLabel')");
 
     // 4. Внутри открытой комнаты Мастера есть кнопка ⋮ с «Редактировать» и «Удалить»

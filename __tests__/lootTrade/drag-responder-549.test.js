@@ -10,9 +10,33 @@ import { create, act } from 'react-test-renderer';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+// Патч 563: мок обязан повторять НАСТОЯЩИЙ PanResponder, иначе тест охраняет
+// выдуманный контракт. В react-native panHandlers — это пропсы системы
+// ответственности (`onStartShouldSetResponder*`), и они зовут обработчики
+// конфига (`onStartShouldSetPanResponder*`). Пока мок отдавал конфиг как есть,
+// тест «проходил» на хуке, у которого нагрузка строки не заявлялась никогда.
 vi.mock('react-native', () => ({
-  // Как настоящий PanResponder: конфиг становится набором обработчиков.
-  PanResponder: { create: (config) => ({ panHandlers: config }) },
+  PanResponder: {
+    create: (config) => ({
+      panHandlers: {
+        onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
+          ? config.onStartShouldSetPanResponder(e) : false),
+        onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
+          ? config.onStartShouldSetPanResponderCapture(e) : false),
+        onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
+          ? config.onMoveShouldSetPanResponder(e) : false),
+        onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
+          ? config.onMoveShouldSetPanResponderCapture(e) : false),
+        onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
+        onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
+        onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
+        onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
+        onResponderReject: (e) => config.onPanResponderReject?.(e),
+        onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
+        onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
+      },
+    }),
+  },
 }));
 
 import useDragResponder from '../../src/ui/useDragResponder.js';
@@ -36,19 +60,21 @@ const mountHook = (options) => {
  *  findWantsResponder — цикл `// capture` возвращает результат немедленно.)
  */
 const negotiate = (handlers, kind = 'start') => {
+  // RN опрашивает только эти четыре пропса — пан-имена здесь не работают.
   const capture = kind === 'start'
-    ? 'onStartShouldSetPanResponderCapture'
-    : 'onMoveShouldSetPanResponderCapture';
+    ? 'onStartShouldSetResponderCapture'
+    : 'onMoveShouldSetResponderCapture';
   const bubble = kind === 'start'
-    ? 'onStartShouldSetPanResponder'
-    : 'onMoveShouldSetPanResponder';
-  if (handlers[capture]?.() === true) return 'capture';
-  if (handlers[bubble]?.() === true) return 'bubble';
+    ? 'onStartShouldSetResponder'
+    : 'onMoveShouldSetResponder';
+  if (handlers[capture]?.({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } }) === true) return 'capture';
+  if (handlers[bubble]?.({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } }) === true) return 'bubble';
   return null;
 };
 
-const grant = (handlers, x0 = 10, y0 = 20) => handlers.onPanResponderGrant({}, { x0, y0 });
-const move = (handlers, x, y) => handlers.onPanResponderMove({}, { moveX: x, moveY: y });
+const grant = (handlers, x0 = 10, y0 = 20) => handlers.onResponderGrant({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 1 } }, { x0, y0 });
+const move = (handlers, x, y) => handlers.onResponderMove({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 2 } }, { moveX: x, moveY: y });
+const release = (handlers) => handlers.onResponderRelease({}, {});
 
 describe('549: хук заявляет жест в обеих фазах опроса', () => {
   it('capture принимает решение, и перенос всё равно начинается', () => {
@@ -59,7 +85,7 @@ describe('549: хук заявляет жест в обеих фазах опр�
     act(() => {
       grant(api.panHandlers);
       move(api.panHandlers, 40, 60);
-      api.panHandlers.onPanResponderRelease({}, {});
+      release(api.panHandlers);
     });
     expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, { id: 'a' });
     expect(onEnd).toHaveBeenCalledWith({ pageX: 40, pageY: 60 }, { id: 'a' }, { cancelled: false, moved: true });
@@ -68,7 +94,7 @@ describe('549: хук заявляет жест в обеих фазах опр�
   it('bubble-путь остаётся рабочим, если платформа опросила только его', () => {
     const onStart = vi.fn();
     const { api } = mountHook({ payload: 'p', onStart });
-    expect(api.panHandlers.onStartShouldSetPanResponder()).toBe(true);
+    expect(api.panHandlers.onStartShouldSetResponder({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } })).toBe(true);
     act(() => grant(api.panHandlers));
     expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, 'p');
   });
@@ -89,12 +115,12 @@ describe('549: хук заявляет жест в обеих фазах опр�
     act(() => {
       expect(negotiate(rowA)).toBe('capture');
       grant(rowA);
-      rowA.onPanResponderRelease({}, {});
+      release(rowA);
     });
     act(() => {
       expect(negotiate(rowB)).toBe('capture');
       grant(rowB);
-      rowB.onPanResponderRelease({}, {});
+      release(rowB);
     });
     expect(onStart.mock.calls.map(([, payload]) => payload.id)).toEqual(['a', 'b']);
   });
@@ -120,7 +146,7 @@ describe('549: перенос засчитывает только настоящ
     act(() => {
       negotiate(api.panHandlers);
       grant(api.panHandlers, 30, 40);
-      api.panHandlers.onPanResponderRelease({}, {});
+      release(api.panHandlers);
     });
     expect(onEnd).toHaveBeenCalledWith({ pageX: 30, pageY: 40 }, 'p', { cancelled: false, moved: false });
   });
@@ -133,7 +159,7 @@ describe('549: перенос засчитывает только настоящ
       negotiate(api.panHandlers);
       grant(api.panHandlers);
       move(api.panHandlers, 0, 0);
-      api.panHandlers.onPanResponderRelease({}, {});
+      release(api.panHandlers);
     });
     expect(onMove).not.toHaveBeenCalled();
     expect(onEnd.mock.calls[0][2].moved).toBe(false);
@@ -146,7 +172,7 @@ describe('549: перенос засчитывает только настоящ
       negotiate(api.panHandlers);
       grant(api.panHandlers);
       move(api.panHandlers, 50, 70);
-      api.panHandlers.onPanResponderTerminate({}, {});
+      api.panHandlers.onResponderTerminate({}, {});
     });
     expect(onEnd).toHaveBeenCalledWith({ pageX: 50, pageY: 70 }, 'p', { cancelled: true, moved: true });
   });
@@ -158,7 +184,7 @@ describe('549: перенос засчитывает только настоящ
       negotiate(api.panHandlers);
       grant(api.panHandlers);
       move(api.panHandlers, 77, 88);
-      api.panHandlers.onPanResponderRelease({}, { moveX: 0, moveY: 0 });
+      release(api.panHandlers);
     });
     expect(onEnd.mock.calls[0][0]).toEqual({ pageX: 77, pageY: 88 });
   });
@@ -167,7 +193,7 @@ describe('549: перенос засчитывает только настоящ
 describe('549: жест не отдаётся наружу и уважает запрет', () => {
   it('ScrollView не получает жест обратно, нативный скролл заблокирован', () => {
     const { api } = mountHook({});
-    expect(api.panHandlers.onPanResponderTerminationRequest()).toBe(false);
+    expect(api.panHandlers.onResponderTerminationRequest()).toBe(false);
     expect(api.panHandlers.onShouldBlockNativeResponder()).toBe(true);
   });
 
@@ -177,7 +203,7 @@ describe('549: жест не отдаётся наружу и уважает з�
     expect(negotiate(api.panHandlers)).toBeNull();
     act(() => grant(api.panHandlers));
     expect(onStart).not.toHaveBeenCalled();
-    expect(api.handlersFor({ id: 'row' }).onStartShouldSetPanResponderCapture()).toBe(false);
+    expect(api.handlersFor({ id: 'row' }).onStartShouldSetResponderCapture({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } })).toBe(false);
   });
 
   it('отказ системы не оставляет призрак переноса', () => {
@@ -186,10 +212,10 @@ describe('549: жест не отдаётся наружу и уважает з�
     act(() => {
       negotiate(api.panHandlers);
       grant(api.panHandlers);
-      api.panHandlers.onPanResponderReject({}, {});
+      api.panHandlers.onResponderReject({}, {});
     });
     expect(api.draggingRef.current).toBe(false);
-    act(() => { api.panHandlers.onPanResponderRelease({}, {}); });
+    act(() => { release(api.panHandlers); });
     expect(onEnd).not.toHaveBeenCalled();
   });
 });

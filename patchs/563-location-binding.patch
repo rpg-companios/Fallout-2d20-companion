@@ -1,0 +1,2353 @@
+diff --git a/__tests__/lootTrade/drag-responder-549.test.js b/__tests__/lootTrade/drag-responder-549.test.js
+index cfbf375..9a57946 100644
+--- a/__tests__/lootTrade/drag-responder-549.test.js
++++ b/__tests__/lootTrade/drag-responder-549.test.js
+@@ -10,9 +10,33 @@ import { create, act } from 'react-test-renderer';
+ 
+ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+ 
++// Патч 563: мок обязан повторять НАСТОЯЩИЙ PanResponder, иначе тест охраняет
++// выдуманный контракт. В react-native panHandlers — это пропсы системы
++// ответственности (`onStartShouldSetResponder*`), и они зовут обработчики
++// конфига (`onStartShouldSetPanResponder*`). Пока мок отдавал конфиг как есть,
++// тест «проходил» на хуке, у которого нагрузка строки не заявлялась никогда.
+ vi.mock('react-native', () => ({
+-  // Как настоящий PanResponder: конфиг становится набором обработчиков.
+-  PanResponder: { create: (config) => ({ panHandlers: config }) },
++  PanResponder: {
++    create: (config) => ({
++      panHandlers: {
++        onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
++          ? config.onStartShouldSetPanResponder(e) : false),
++        onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
++          ? config.onStartShouldSetPanResponderCapture(e) : false),
++        onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
++          ? config.onMoveShouldSetPanResponder(e) : false),
++        onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
++          ? config.onMoveShouldSetPanResponderCapture(e) : false),
++        onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
++        onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
++        onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
++        onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
++        onResponderReject: (e) => config.onPanResponderReject?.(e),
++        onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
++        onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
++      },
++    }),
++  },
+ }));
+ 
+ import useDragResponder from '../../src/ui/useDragResponder.js';
+@@ -36,19 +60,21 @@ const mountHook = (options) => {
+  *  findWantsResponder — цикл `// capture` возвращает результат немедленно.)
+  */
+ const negotiate = (handlers, kind = 'start') => {
++  // RN опрашивает только эти четыре пропса — пан-имена здесь не работают.
+   const capture = kind === 'start'
+-    ? 'onStartShouldSetPanResponderCapture'
+-    : 'onMoveShouldSetPanResponderCapture';
++    ? 'onStartShouldSetResponderCapture'
++    : 'onMoveShouldSetResponderCapture';
+   const bubble = kind === 'start'
+-    ? 'onStartShouldSetPanResponder'
+-    : 'onMoveShouldSetPanResponder';
+-  if (handlers[capture]?.() === true) return 'capture';
+-  if (handlers[bubble]?.() === true) return 'bubble';
++    ? 'onStartShouldSetResponder'
++    : 'onMoveShouldSetResponder';
++  if (handlers[capture]?.({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } }) === true) return 'capture';
++  if (handlers[bubble]?.({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } }) === true) return 'bubble';
+   return null;
+ };
+ 
+-const grant = (handlers, x0 = 10, y0 = 20) => handlers.onPanResponderGrant({}, { x0, y0 });
+-const move = (handlers, x, y) => handlers.onPanResponderMove({}, { moveX: x, moveY: y });
++const grant = (handlers, x0 = 10, y0 = 20) => handlers.onResponderGrant({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 1 } }, { x0, y0 });
++const move = (handlers, x, y) => handlers.onResponderMove({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 2 } }, { moveX: x, moveY: y });
++const release = (handlers) => handlers.onResponderRelease({}, {});
+ 
+ describe('549: хук заявляет жест в обеих фазах опроса', () => {
+   it('capture принимает решение, и перенос всё равно начинается', () => {
+@@ -59,7 +85,7 @@ describe('549: хук заявляет жест в обеих фазах опр
+     act(() => {
+       grant(api.panHandlers);
+       move(api.panHandlers, 40, 60);
+-      api.panHandlers.onPanResponderRelease({}, {});
++      release(api.panHandlers);
+     });
+     expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, { id: 'a' });
+     expect(onEnd).toHaveBeenCalledWith({ pageX: 40, pageY: 60 }, { id: 'a' }, { cancelled: false, moved: true });
+@@ -68,7 +94,7 @@ describe('549: хук заявляет жест в обеих фазах опр
+   it('bubble-путь остаётся рабочим, если платформа опросила только его', () => {
+     const onStart = vi.fn();
+     const { api } = mountHook({ payload: 'p', onStart });
+-    expect(api.panHandlers.onStartShouldSetPanResponder()).toBe(true);
++    expect(api.panHandlers.onStartShouldSetResponder({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } })).toBe(true);
+     act(() => grant(api.panHandlers));
+     expect(onStart).toHaveBeenCalledWith({ pageX: 10, pageY: 20 }, 'p');
+   });
+@@ -89,12 +115,12 @@ describe('549: хук заявляет жест в обеих фазах опр
+     act(() => {
+       expect(negotiate(rowA)).toBe('capture');
+       grant(rowA);
+-      rowA.onPanResponderRelease({}, {});
++      release(rowA);
+     });
+     act(() => {
+       expect(negotiate(rowB)).toBe('capture');
+       grant(rowB);
+-      rowB.onPanResponderRelease({}, {});
++      release(rowB);
+     });
+     expect(onStart.mock.calls.map(([, payload]) => payload.id)).toEqual(['a', 'b']);
+   });
+@@ -120,7 +146,7 @@ describe('549: перенос засчитывает только настоящ
+     act(() => {
+       negotiate(api.panHandlers);
+       grant(api.panHandlers, 30, 40);
+-      api.panHandlers.onPanResponderRelease({}, {});
++      release(api.panHandlers);
+     });
+     expect(onEnd).toHaveBeenCalledWith({ pageX: 30, pageY: 40 }, 'p', { cancelled: false, moved: false });
+   });
+@@ -133,7 +159,7 @@ describe('549: перенос засчитывает только настоящ
+       negotiate(api.panHandlers);
+       grant(api.panHandlers);
+       move(api.panHandlers, 0, 0);
+-      api.panHandlers.onPanResponderRelease({}, {});
++      release(api.panHandlers);
+     });
+     expect(onMove).not.toHaveBeenCalled();
+     expect(onEnd.mock.calls[0][2].moved).toBe(false);
+@@ -146,7 +172,7 @@ describe('549: перенос засчитывает только настоящ
+       negotiate(api.panHandlers);
+       grant(api.panHandlers);
+       move(api.panHandlers, 50, 70);
+-      api.panHandlers.onPanResponderTerminate({}, {});
++      api.panHandlers.onResponderTerminate({}, {});
+     });
+     expect(onEnd).toHaveBeenCalledWith({ pageX: 50, pageY: 70 }, 'p', { cancelled: true, moved: true });
+   });
+@@ -158,7 +184,7 @@ describe('549: перенос засчитывает только настоящ
+       negotiate(api.panHandlers);
+       grant(api.panHandlers);
+       move(api.panHandlers, 77, 88);
+-      api.panHandlers.onPanResponderRelease({}, { moveX: 0, moveY: 0 });
++      release(api.panHandlers);
+     });
+     expect(onEnd.mock.calls[0][0]).toEqual({ pageX: 77, pageY: 88 });
+   });
+@@ -167,7 +193,7 @@ describe('549: перенос засчитывает только настоящ
+ describe('549: жест не отдаётся наружу и уважает запрет', () => {
+   it('ScrollView не получает жест обратно, нативный скролл заблокирован', () => {
+     const { api } = mountHook({});
+-    expect(api.panHandlers.onPanResponderTerminationRequest()).toBe(false);
++    expect(api.panHandlers.onResponderTerminationRequest()).toBe(false);
+     expect(api.panHandlers.onShouldBlockNativeResponder()).toBe(true);
+   });
+ 
+@@ -177,7 +203,7 @@ describe('549: жест не отдаётся наружу и уважает з
+     expect(negotiate(api.panHandlers)).toBeNull();
+     act(() => grant(api.panHandlers));
+     expect(onStart).not.toHaveBeenCalled();
+-    expect(api.handlersFor({ id: 'row' }).onStartShouldSetPanResponderCapture()).toBe(false);
++    expect(api.handlersFor({ id: 'row' }).onStartShouldSetResponderCapture({ nativeEvent: { touches: [1] }, touchHistory: { numberActiveTouches: 1 } })).toBe(false);
+   });
+ 
+   it('отказ системы не оставляет призрак переноса', () => {
+@@ -186,10 +212,10 @@ describe('549: жест не отдаётся наружу и уважает з
+     act(() => {
+       negotiate(api.panHandlers);
+       grant(api.panHandlers);
+-      api.panHandlers.onPanResponderReject({}, {});
++      api.panHandlers.onResponderReject({}, {});
+     });
+     expect(api.draggingRef.current).toBe(false);
+-    act(() => { api.panHandlers.onPanResponderRelease({}, {}); });
++    act(() => { release(api.panHandlers); });
+     expect(onEnd).not.toHaveBeenCalled();
+   });
+ });
+diff --git a/__tests__/lootTrade/gm-screen-behaviour-549.test.js b/__tests__/lootTrade/gm-screen-behaviour-549.test.js
+index 9547ec0..39680e9 100644
+--- a/__tests__/lootTrade/gm-screen-behaviour-549.test.js
++++ b/__tests__/lootTrade/gm-screen-behaviour-549.test.js
+@@ -59,9 +59,32 @@ vi.mock('react-native', () => {
+     ScrollView: host('ScrollView'),
+     ActivityIndicator: host('ActivityIndicator'),
+     Image: host('Image'),
+-    // Как настоящий PanResponder: конфиг превращается в набор обработчиков,
+-    // а решение о захвате принимает система ответственности (capture первым).
+-    PanResponder: { create: (config) => ({ panHandlers: config }) },
++    // Патч 563: мок повторяет НАСТОЯЩИЙ PanResponder. `panHandlers` — это
++    // пропсы системы ответственности (`onStartShouldSetResponder*`), они зовут
++    // обработчики конфига (`onStartShouldSetPanResponder*`). Пока мок отдавал
++    // конфиг как есть, тест одобрял хук, у которого нагрузка строки не
++    // заявлялась вообще, — и ручка дерева была мертва в бою (548/549).
++    PanResponder: {
++      create: (config) => ({
++        panHandlers: {
++          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
++            ? config.onStartShouldSetPanResponder(e) : false),
++          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
++            ? config.onStartShouldSetPanResponderCapture(e) : false),
++          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
++            ? config.onMoveShouldSetPanResponder(e) : false),
++          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
++            ? config.onMoveShouldSetPanResponderCapture(e) : false),
++          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
++          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
++          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
++          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
++          onResponderReject: (e) => config.onPanResponderReject?.(e),
++          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
++          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
++        },
++      }),
++    },
+   };
+ });
+ 
+@@ -203,10 +226,15 @@ const mountScreen = async () => {
+  * сразу; bubble зовётся только если capture отказался. Тест 545 звал bubble
+  * руками и потому не увидел мёртвую ручку (баг 548).
+  */
++const touchEvent = () => ({
++  nativeEvent: { touches: [1] },
++  touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 1 },
++});
++
+ const negotiate = (handle) => {
+-  if (handle.props.onStartShouldSetPanResponderCapture?.() === true) return 'capture';
+-  if (handle.props.onStartShouldSetResponderCapture?.() === true) return 'capture';
+-  if (handle.props.onStartShouldSetPanResponder?.() === true) return 'bubble';
++  // RN опрашивает только пропсы системы ответственности.
++  if (handle.props.onStartShouldSetResponderCapture?.(touchEvent()) === true) return 'capture';
++  if (handle.props.onStartShouldSetResponder?.(touchEvent()) === true) return 'bubble';
+   return null;
+ };
+ 
+@@ -215,17 +243,17 @@ const dragTo = async (renderer, handleTestID, target, { move = true } = {}) => {
+   let phase = null;
+   await act(async () => {
+     phase = negotiate(handle);
+-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
++    handle.props.onResponderGrant({ touchHistory: { numberActiveTouches: 1 } }, { x0: 0, y0: 0 });
+     await Promise.resolve();
+   });
+   if (move) {
+     await act(async () => {
+-      handle.props.onPanResponderMove({}, { moveX: target.x + 5, moveY: target.y + 5 });
++      handle.props.onResponderMove({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 2 } }, { moveX: target.x + 5, moveY: target.y + 5 });
+       await Promise.resolve();
+     });
+   }
+   await act(async () => {
+-    handle.props.onPanResponderRelease({}, { moveX: target.x + 5, moveY: target.y + 5 });
++    handle.props.onResponderRelease({}, { moveX: target.x + 5, moveY: target.y + 5 });
+     await Promise.resolve();
+     await Promise.resolve();
+   });
+@@ -291,7 +319,7 @@ describe('549: стрелки сетки работают в реальном п
+     h.cards = [hub('town'), loot('chest')];
+     const renderer = await mountScreen();
+     const handle = one(renderer.root, 'card-drag-chest');
+-    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
++    expect(handle.props.onResponderTerminationRequest()).toBe(false);
+     expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
+     await act(async () => renderer.unmount());
+   });
+diff --git a/__tests__/lootTrade/matryoshka-rooms-473.test.js b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+index 344c663..755b184 100644
+--- a/__tests__/lootTrade/matryoshka-rooms-473.test.js
++++ b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+@@ -337,7 +337,12 @@ describe('Patch 473 — Matryoshka organization, sorting, multi-room Locations &
+     // 3. При создании сундука/торговца нет привязки к комнате — есть опциональная привязка к локации, а у локации мультивыбор комнат
+     expect(formModalSrc).toContain('selectedRoomCodes');
+     expect(formModalSrc).toContain('selectedHubIds');
+-    expect(formModalSrc).toContain("tLootTrade('form.bindHubsLabel')");
++    // 563: привязка к локации — обычное поле «Локация» (как «Родительская
++    // локация» у локации), а не поиск по складу; дополнительные локации —
++    // отдельной строкой ниже (бродячий торговец).
++    expect(formModalSrc).toContain("tLootTrade('form.primaryLocationLabel')");
++    expect(formModalSrc).toContain('container-form-primary-location');
++    expect(formModalSrc).toContain("tLootTrade('form.extraLocationsLabel')");
+     expect(formModalSrc).toContain("tLootTrade('form.roomsMultiLabel')");
+ 
+     // 4. Внутри открытой комнаты Мастера есть кнопка ⋮ с «Редактировать» и «Удалить»
+diff --git a/__tests__/room/admin-reorder-arrows-548.test.js b/__tests__/room/admin-reorder-arrows-548.test.js
+index d00677f..655231f 100644
+--- a/__tests__/room/admin-reorder-arrows-548.test.js
++++ b/__tests__/room/admin-reorder-arrows-548.test.js
+@@ -5,10 +5,10 @@
+ // `findWantsResponder` (react-native-web: modules/useResponderEvents/
+ // ResponderSystem.js) идёт по CAPTURE-фазе сверху вниз и принимает решение
+ // СРАЗУ, как только обработчик вернул true; bubble-фаза после этого не
+-// опрашивается. Ручка дерева отдавала `onStartShouldSetPanResponderCapture:
++// опрашивается. Ручка дерева отдавала `onStartShouldSetResponderCapture:
+ // () => true`, а контекст строки (`parentId`, `childId`, братья) писала только
+-// в `onStartShouldSetPanResponder`. Поэтому `dragContextRef.current` оставался
+-// null, `onPanResponderGrant` выходил по `if (!context) return`, и стрелка не
++// в `onStartShouldSetResponder`. Поэтому `dragContextRef.current` оставался
++// null, `onResponderGrant` выходил по `if (!context) return`, и стрелка не
+ // перетаскивалась никогда.
+ //
+ // Тест 545 этого не увидел: он звал bubble-обработчик руками, чего живой
+@@ -52,7 +52,27 @@ vi.mock('react-native', () => {
+     Image: host('Image'),
+     useWindowDimensions: () => ({ width: 420, height: 800 }),
+     // Как настоящий PanResponder: конфиг превращается в набор обработчиков.
+-    PanResponder: { create: (config) => ({ panHandlers: config }) },
++    PanResponder: {
++      create: (config) => ({
++        panHandlers: {
++          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
++            ? config.onStartShouldSetPanResponder(e) : false),
++          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
++            ? config.onStartShouldSetPanResponderCapture(e) : false),
++          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
++            ? config.onMoveShouldSetPanResponder(e) : false),
++          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
++            ? config.onMoveShouldSetPanResponderCapture(e) : false),
++          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
++          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
++          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
++          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
++          onResponderReject: (e) => config.onPanResponderReject?.(e),
++          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
++          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
++        },
++      }),
++    },
+   };
+ });
+ 
+@@ -128,11 +148,11 @@ const setRowBounds = (ids, startY = 0) => {
+  */
+ const negotiate = (handle, kind = 'start') => {
+   const capture = kind === 'start'
+-    ? 'onStartShouldSetPanResponderCapture'
+-    : 'onMoveShouldSetPanResponderCapture';
++    ? 'onStartShouldSetResponderCapture'
++    : 'onMoveShouldSetResponderCapture';
+   const bubble = kind === 'start'
+-    ? 'onStartShouldSetPanResponder'
+-    : 'onMoveShouldSetPanResponder';
++    ? 'onStartShouldSetResponder'
++    : 'onMoveShouldSetResponder';
+   if (handle.props[capture]?.() === true) return 'capture';
+   if (handle.props[bubble]?.() === true) return 'bubble';
+   return null;
+@@ -151,9 +171,9 @@ const dragLikeNative = (renderer, childId, targetId, kind = 'start') => {
+   let phase = null;
+   act(() => {
+     phase = negotiate(handle, kind);
+-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
+-    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
+-    handle.props.onPanResponderRelease();
++    handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
++    handle.props.onResponderMove({}, { moveX: 10, moveY: target.y + 5 });
++    handle.props.onResponderRelease();
+   });
+   return phase;
+ };
+@@ -192,10 +212,10 @@ describe('548: стрелка дерева работает при настоя
+     setRowBounds(['shop', 'chest', 'mayor']);
+     const handle = handleOf(renderer, 'chest');
+     act(() => {
+-      expect(handle.props.onStartShouldSetPanResponder()).toBe(true);
+-      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
+-      handle.props.onPanResponderMove({}, { moveX: 10, moveY: 5 });
+-      handle.props.onPanResponderRelease();
++      expect(handle.props.onStartShouldSetResponder()).toBe(true);
++      handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
++      handle.props.onResponderMove({}, { moveX: 10, moveY: 5 });
++      handle.props.onResponderRelease();
+     });
+     expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
+   });
+@@ -226,8 +246,8 @@ describe('548: стрелка дерева работает при настоя
+     const handle = handleOf(renderer, 'chest');
+     act(() => {
+       negotiate(handle);
+-      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
+-      handle.props.onPanResponderRelease();
++      handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
++      handle.props.onResponderRelease();
+     });
+     expect(onReorderChildren).not.toHaveBeenCalled();
+   });
+@@ -235,7 +255,7 @@ describe('548: стрелка дерева работает при настоя
+   it('ручка не отдаёт жест ScrollView и блокирует нативный скролл', () => {
+     const renderer = mountTree(cards(), vi.fn());
+     const handle = handleOf(renderer, 'chest');
+-    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
++    expect(handle.props.onResponderTerminationRequest()).toBe(false);
+     expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
+   });
+ });
+@@ -246,10 +266,15 @@ describe('548: обе группы стрелок и защита от возв
+     // теперь живёт, — иначе проверка запрещала бы переиспользование и снова
+     // разводила копии по файлам (именно так и появился баг 548).
+     const hook = read('src/ui/useDragResponder.js');
+-    expect(hook).toContain('onStartShouldSetPanResponderCapture: () => claim(rowPayload)');
+-    expect(hook).toContain('onMoveShouldSetPanResponderCapture: () => claim(rowPayload)');
+-    expect(hook).toContain('onStartShouldSetPanResponder: () => claim(rowPayload)');
+-    expect(hook).toContain('onMoveShouldSetPanResponder: () => claim(rowPayload)');
++    // 563: props системы ответственности называются onStartShouldSetResponder*.
++    // Пан-имена (onStartShouldSetPanResponder*) — это ключи КОНФИГА PanResponder,
++    // у View таких пропсов нет; до 563 именно на них и был мёртв драг.
++    expect(hook).toContain('onStartShouldSetResponderCapture: wrap(');
++    expect(hook).toContain('onMoveShouldSetResponderCapture: wrap(');
++    expect(hook).toContain('onStartShouldSetResponder: wrap(');
++    expect(hook).toContain('onMoveShouldSetResponder: wrap(');
++    expect(hook).toContain('claim(rowPayload)');
++    expect(hook).toContain('ЗАКОН ИМЁН');
+     // Причина бага зафиксирована в коде, чтобы её не вернули «упрощением».
+     expect(hook).toContain('548');
+     expect(hook).toContain('capture');
+diff --git a/__tests__/room/gm-decision-535.test.js b/__tests__/room/gm-decision-535.test.js
+index fff3ed7..cd4ed38 100644
+--- a/__tests__/room/gm-decision-535.test.js
++++ b/__tests__/room/gm-decision-535.test.js
+@@ -255,11 +255,11 @@ describe('535: протокол, клиент, строки и документ
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('562');
++    expect(version.version).toBe('563');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('562');
++    expect(json('patchs/baseline.json').baseline).toBe('563');
+     expect(read('patchs/535-gm-decision.patch')).toContain('gm.decisionRequest');
+     expect(read('patchs/536-lock-status-blocks.patch')).toContain('lock-rules-block');
+     expect(read('patchs/537-location-level-design.patch')).toContain('location-level-design');
+@@ -280,7 +280,7 @@ describe('535: протокол, клиент, строки и документ
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **562**');
++    expect(roadmap).toContain('Текущая версия: **563**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/__tests__/room/hub-order-drag-545.test.js b/__tests__/room/hub-order-drag-545.test.js
+index dbbf733..4789ff4 100644
+--- a/__tests__/room/hub-order-drag-545.test.js
++++ b/__tests__/room/hub-order-drag-545.test.js
+@@ -40,7 +40,27 @@ vi.mock('react-native', () => {
+     ScrollView: host('ScrollView'),
+     Image: host('Image'),
+     useWindowDimensions: () => ({ width: 420, height: 800 }),
+-    PanResponder: { create: (config) => ({ panHandlers: config }) },
++    PanResponder: {
++      create: (config) => ({
++        panHandlers: {
++          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
++            ? config.onStartShouldSetPanResponder(e) : false),
++          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
++            ? config.onStartShouldSetPanResponderCapture(e) : false),
++          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
++            ? config.onMoveShouldSetPanResponder(e) : false),
++          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
++            ? config.onMoveShouldSetPanResponderCapture(e) : false),
++          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
++          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
++          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
++          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
++          onResponderReject: (e) => config.onPanResponderReject?.(e),
++          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
++          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
++        },
++      }),
++    },
+   };
+ });
+ 
+@@ -186,10 +206,10 @@ const dragRow = (renderer, childId, targetId) => {
+   expect(handle, childId).toBeTruthy();
+   const target = mockLayout.bounds[`hub-tree-row-${targetId}`];
+   act(() => {
+-    handle.props.onStartShouldSetPanResponder();
+-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
+-    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
+-    handle.props.onPanResponderRelease();
++    handle.props.onStartShouldSetResponder();
++    handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
++    handle.props.onResponderMove({}, { moveX: 10, moveY: target.y + 5 });
++    handle.props.onResponderRelease();
+   });
+ };
+ 
+diff --git a/__tests__/room/location-binding-563.test.js b/__tests__/room/location-binding-563.test.js
+new file mode 100644
+index 0000000..34b8f9c
+--- /dev/null
++++ b/__tests__/room/location-binding-563.test.js
+@@ -0,0 +1,530 @@
++// __tests__/room/location-binding-563.test.js
++// ПРИЁМОЧНЫЙ (патч 563): привязка к локации — в обе стороны, и настоящее
++// перемещение сущностей в дереве.
++//
++// Слово владельца: «Я всё ещё в локации не могу перемещать сущности. И нужна
++// тождественность привязки терминалов/замков к локации и наоборот. Если я в
++// терминале/замке выбираю локацию, то они туда встраиваются. А не только через
++// локацию». Уточнил: ручка в дереве не меняет порядок (сломанный драг), поле
++// «Локация» есть, но выбор ничего не делает; «в нескольких локациях — могут,
++// например "бродячий" торговец»; перетаскивание — и порядок, и переезд.
++//
++// Почему поведением. Все прежние проверки читали исходник строками. Из-за этого
++// прожили две настоящие поломки: хук заявлял нагрузку строки псевдо-пропсами
++// (драг в дереве был мёртв), а выбор локации в форме терялся, если Мастер не
++// нажимал вариант в списке. Здесь всё проверяется на смонтированном экране и
++// на записях в БД.
++import { describe, expect, it, beforeEach, vi } from 'vitest';
++import React, { act } from 'react';
++import { create } from 'react-test-renderer';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++const h = vi.hoisted(() => ({ cards: [], keyItems: [], saved: [], bounds: {} }));
++
++vi.mock('react-native', () => {
++  const React = require('react');
++  const host = (name) => ({ children, ...props }) => React.createElement(name, props, children);
++  const measurable = (name) => React.forwardRef(({ children, ...props }, ref) => {
++    React.useImperativeHandle(ref, () => ({
++      measureInWindow: (cb) => {
++        const b = h.bounds[props.testID] || { x: 0, y: 0, width: 240, height: 60 };
++        cb(b.x, b.y, b.width, b.height);
++      },
++    }));
++    return React.createElement(name, props, children);
++  });
++  return {
++    Platform: { OS: 'web', select: (o) => o.web ?? o.default },
++    StyleSheet: {
++      create: (s) => s,
++      flatten: (s) => (Array.isArray(s) ? Object.assign({}, ...s.filter(Boolean)) : s || {}),
++      hairlineWidth: 1,
++    },
++    Dimensions: { get: () => ({ width: 1200, height: 900 }) },
++    useWindowDimensions: () => ({ width: 1200, height: 900 }),
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: measurable('View'),
++    Text: host('Text'),
++    TextInput: host('TextInput'),
++    TouchableOpacity: measurable('TouchableOpacity'),
++    Pressable: host('Pressable'),
++    ScrollView: host('ScrollView'),
++    ActivityIndicator: host('ActivityIndicator'),
++    KeyboardAvoidingView: host('KeyboardAvoidingView'),
++    Image: host('Image'),
++    // Настоящий PanResponder: props системы ответственности зовут обработчики
++    // конфига. Именно этот слой и был «удобно» замокан в 549.
++    PanResponder: {
++      create: (config) => ({
++        panHandlers: {
++          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
++            ? config.onStartShouldSetPanResponder(e) : false),
++          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
++            ? config.onStartShouldSetPanResponderCapture(e) : false),
++          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
++            ? config.onMoveShouldSetPanResponder(e) : false),
++          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
++            ? config.onMoveShouldSetPanResponderCapture(e) : false),
++          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
++          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
++          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
++          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
++          onResponderReject: (e) => config.onPanResponderReject?.(e),
++          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
++          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
++        },
++      }),
++    },
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: (props) => React.createElement('MaterialCommunityIcons', props),
++  FontAwesome5: (props) => React.createElement('FontAwesome5', props),
++}));
++vi.mock('@react-navigation/native', () => ({
++  useFocusEffect: (cb) => { React.useEffect(() => { cb(); }, [cb]); },
++}));
++
++vi.mock('../../db', async () => {
++  // Как настоящий saveGmContainer: сущность нормализуется и получает id.
++  // Раньше мок возвращал черновик как есть — и «новый сундук в локацию»
++  // записывался ссылкой на null, чего настоящая БД не делает.
++  const { normalizeContainerEntity: normalize } = await import('../../domain/lootTrade.js');
++  return {
++  getGmContainersList: vi.fn(async () => h.cards),
++  getGmKeyItems: vi.fn(async () => h.keyItems),
++  getCharacterFolders: vi.fn(async () => [{ id: 'f1', name: 'Кампания' }]),
++  getFolderRooms: vi.fn(async () => [{ folder_id: 'f1', code: 'ROOM1', owner_token: 't1' }]),
++  getGmContainerById: vi.fn(async (id) => h.cards.find((c) => c.id === id) || null),
++  saveGmContainer: vi.fn(async (card) => {
++    const saved = normalize(card);
++    h.saved.push(saved);
++    const idx = h.cards.findIndex((c) => c.id === saved.id);
++    if (idx >= 0) h.cards[idx] = saved; else h.cards.push(saved);
++    return saved;
++  }),
++  saveGmKeyItem: vi.fn(async (item) => item),
++  deleteGmContainer: vi.fn(async () => {}),
++  duplicateGmContainer: vi.fn(async (id) => ({ ...h.cards.find((c) => c.id === id), id: `${id}-copy` })),
++  };
++});
++
++vi.mock('../../i18n/locale', async (importOriginal) => {
++  const actual = await importOriginal();
++  return { ...actual, useLocale: () => 'ru-RU', useModuleLocale: () => 'ru-RU' };
++});
++vi.mock('../../components/screens/LootTradeScreen/logic/lootTradeI18n', () => ({
++  tLootTrade: (key) => key,
++  formatLootTrade: (key, values) => (values ? `${key}:${JSON.stringify(values)}` : key),
++}));
++vi.mock('../../components/screens/HomeScreen/logic/homeScreenI18n', () => ({ tHomeScreen: (key) => key }));
++vi.mock('../../components/screens/HomeScreen/logic/localeLabel', () => ({ getLocaleLabel: () => 'Русский' }));
++
++vi.mock('../../src/store/appSettingsStore', () => {
++  const use = (sel) => sel({ setValue: vi.fn() });
++  use.getState = () => ({ setValue: vi.fn() });
++  return { default: use };
++});
++vi.mock('../../src/room/uiModeStore', () => {
++  const state = { tabUiMode: 'gm', gmInspectingCharacter: false, setTabUiMode: vi.fn(), setGmInspectingCharacter: vi.fn() };
++  const use = (sel) => sel(state);
++  use.getState = () => state;
++  return { default: use };
++});
++vi.mock('../../src/room/roomStore', () => {
++  const state = { rooms: {}, status: 'offline' };
++  const use = (sel) => sel(state);
++  use.getState = () => state;
++  return { default: use, roomSupportsTerminalProtocol: () => false };
++});
++vi.mock('../../src/room/roomCharacterSync', () => ({ buildGmRoomCharacterCards: () => [] }));
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn(),
++  syncAllCharactersWithCloud: vi.fn(async () => {}),
++  deleteGmContainerFromCloudIfEnabled: vi.fn(async () => {}),
++  openCloudFolderInDrive: vi.fn(),
++}));
++vi.mock('../../components/alerts/alertService', () => ({
++  confirmAlert: vi.fn(async () => true),
++  showAlert: vi.fn(),
++  showRawAlert: vi.fn(),
++}));
++vi.mock('../../src/lootTrade/gmSessionPersistence', () => ({
++  flushPendingEmptyLootPrompts: vi.fn(async () => {}),
++  subscribeGmContainerUpdates: () => () => {},
++}));
++vi.mock('../../src/premium/adminAccessGate', async (importOriginal) => ({
++  ...(await importOriginal()),
++  guardAdminAction: () => true,
++  useAdminAccess: () => ({
++    adminLicensed: true, gmCampaignsLicensed: true, gmLootTradeLicensed: true, gmEnvCombatLicensed: true,
++  }),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++
++// Тяжёлые модалки, не участвующие в проверках, глушим. Дерево, карточки и
++// форма параметров — НАСТОЯЩИЕ.
++vi.mock('../../components/screens/LootTradeScreen/modals/KeyItemFormModal', () => ({
++  default: () => React.createElement('KeyItemFormModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/ContainerCatalogModal', () => ({
++  default: () => React.createElement('ContainerCatalogModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/ContainerItemConfigModal', () => ({
++  default: () => React.createElement('ContainerItemConfigModal'),
++}));
++vi.mock('../../components/screens/LootTradeScreen/modals/IssueContainerModal', () => ({
++  default: () => React.createElement('IssueContainerModal'),
++}));
++vi.mock('../../components/lootTrade/PartyStorageModal', () => ({
++  default: () => React.createElement('PartyStorageModal'),
++}));
++
++import LootTradeScreen from '../../components/screens/LootTradeScreen/LootTradeScreen.js';
++import HubChildPickerModal from '../../components/screens/LootTradeScreen/modals/HubChildPickerModal.js';
++import { showRawAlert } from '../../components/alerts/alertService';
++import { CONTAINER_KIND, normalizeContainerEntity } from '../../domain/lootTrade.js';
++import {
++  locateContainer,
++  planLocationBinding,
++  planMoveIntoLocation,
++} from '../../domain/hubBindings.js';
++
++const hub = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.HUB, name: id, inRoot: true, ...extra,
++});
++const loot = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.LOOT, name: id, inRoot: true, items: [], ...extra,
++});
++const terminal = (id, extra = {}) => normalizeContainerEntity({
++  id, kind: CONTAINER_KIND.TERMINAL, name: id, inRoot: true, difficulty: 2, ...extra,
++});
++
++const findAll = (root, testID) => root.findAll((n) => n.props?.testID === testID);
++const one = (root, testID) => {
++  const [node] = findAll(root, testID);
++  expect(node, testID).toBeTruthy();
++  return node;
++};
++const textOf = (node) => {
++  if (node == null) return '';
++  if (typeof node === 'string' || typeof node === 'number') return String(node);
++  if (Array.isArray(node)) return node.map(textOf).join('');
++  if (node.children) return node.children.map(textOf).join('');
++  return '';
++};
++
++const mountScreen = async () => {
++  let renderer;
++  await act(async () => {
++    renderer = create(React.createElement(LootTradeScreen));
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++  return renderer;
++};
++
++const touchEvent = () => ({
++  nativeEvent: { touches: [1] },
++  touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 1 },
++});
++
++/** Жест так, как его ведёт RN: сначала опрос capture, потом grant → move → release. */
++const dragTo = async (renderer, handleTestID, target, { move = true } = {}) => {
++  const handle = one(renderer.root, handleTestID);
++  let phase = null;
++  await act(async () => {
++    if (handle.props.onStartShouldSetResponderCapture?.(touchEvent()) === true) phase = 'capture';
++    else if (handle.props.onStartShouldSetResponder?.(touchEvent()) === true) phase = 'bubble';
++    handle.props.onResponderGrant({ touchHistory: { numberActiveTouches: 1 } }, { x0: 0, y0: 0 });
++    await Promise.resolve();
++  });
++  if (move) {
++    await act(async () => {
++      handle.props.onResponderMove(
++        { touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 2 } },
++        { moveX: target.x + 5, moveY: target.y + 5 },
++      );
++      await Promise.resolve();
++    });
++  }
++  await act(async () => {
++    handle.props.onResponderRelease({}, {});
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++  return phase;
++};
++
++beforeEach(() => {
++  h.cards = [];
++  h.keyItems = [];
++  h.saved = [];
++  h.bounds = {};
++  vi.clearAllMocks();
++});
++
++describe('563: закон привязки — один на обе стороны', () => {
++  it('локация хранит родителя у себя, остальные — в родителе', () => {
++    const town = hub('town', { parentLocationId: 'region' });
++    const chest = loot('chest', { inRoot: false });
++    const all = [town, hub('region'), hub('cave', { links: [{ containerId: 'chest' }] }), chest];
++    expect(locateContainer(town, all)).toEqual({ primary: 'region', all: ['region'] });
++    expect(locateContainer(chest, all).all).toEqual(['cave']);
++  });
++
++  it('план: основная локация первой, дополнительные — тоже, лишние снимаются', () => {
++    const town = hub('town');
++    const cave = hub('cave', { links: [{ containerId: 'chest', locked: true, lockLabel: 'замок' }] });
++    const chest = loot('chest', { inRoot: false });
++    const plan = planLocationBinding({
++      container: chest,
++      primaryHubId: 'town',
++      extraHubIds: ['cave'],
++      allContainers: [town, cave, chest],
++    });
++    // town получает ссылку, порядок прежних ссылок не ломается
++    expect(plan.hubUpdates.find((u) => u.id === 'town').links.map((l) => l.containerId)).toEqual(['chest']);
++    // cave уже держал ссылку — её не дублируем и не теряем подпись замка
++    expect(plan.hubUpdates.some((u) => u.id === 'cave')).toBe(false);
++    // inRoot пишется только когда меняется; «не на корне» — это не true
++    expect(plan.containerPatch.inRoot).not.toBe(true);
++  });
++
++  it('«— нет —» возвращает сущность на экран карточек', () => {
++    const town = hub('town', { links: [{ containerId: 'chest' }] });
++    const chest = loot('chest', { inRoot: false });
++    const plan = planLocationBinding({ container: chest, primaryHubId: '', allContainers: [town, chest] });
++    expect(plan.hubUpdates[0].links).toEqual([]);
++    expect(plan.containerPatch.inRoot).toBe(true);
++  });
++
++  it('перенос: из старой локации снимается, в новую встаёт, прочие остаются', () => {
++    const town = hub('town', { links: [{ containerId: 'trader' }] });
++    const cave = hub('cave');
++    const camp = hub('camp', { links: [{ containerId: 'trader' }] });
++    const trader = normalizeContainerEntity({
++      id: 'trader', kind: CONTAINER_KIND.MERCHANT, name: 'trader', inRoot: false, caps: 50,
++    });
++    const plan = planMoveIntoLocation({
++      container: trader,
++      targetHubId: 'cave',
++      fromHubId: 'town',
++      allContainers: [town, cave, camp, trader],
++    });
++    const byId = Object.fromEntries(plan.hubUpdates.map((u) => [u.id, u.links.map((l) => l.containerId)]));
++    expect(byId.town).toEqual([]);          // из текущей локации снят
++    expect(byId.cave).toEqual(['trader']);  // в новую встал
++    expect(byId.camp).toBeUndefined();      // «бродячий» остался в третьей
++  });
++
++  it('вложенную локацию двигаем полем родителя, а не ссылками', () => {
++    const town = hub('town');
++    const cave = hub('cave', { parentLocationId: 'town', inRoot: false });
++    const plan = planMoveIntoLocation({
++      container: cave, targetHubId: 'town2', fromHubId: 'town', allContainers: [town, cave, hub('town2')],
++    });
++    expect(plan.hubUpdates).toEqual([]);
++    expect(plan.containerPatch).toEqual({ parentLocationId: 'town2', inRoot: false });
++  });
++});
++
++describe('563: порядок в дереве меняется руками Мастера', () => {
++  const townWithChildren = () => [
++    hub('town', { childOrder: ['shop', 'chest'], links: [{ containerId: 'chest' }, { containerId: 'shop' }] }),
++    loot('chest', { inRoot: false }),
++    normalizeContainerEntity({ id: 'shop', kind: CONTAINER_KIND.MERCHANT, name: 'shop', inRoot: false, caps: 100 }),
++  ];
++
++  const openHub = async (renderer) => {
++    const card = one(renderer.root, 'card-town');
++    await act(async () => { card.props.onPress(); await Promise.resolve(); });
++  };
++
++  it('перетаскивание ручки сохраняет новый порядок', async () => {
++    h.cards = townWithChildren();
++    h.bounds['hub-tree-row-shop'] = { x: 0, y: 0, width: 300, height: 30 };
++    h.bounds['hub-tree-row-chest'] = { x: 0, y: 30, width: 300, height: 30 };
++    const renderer = await mountScreen();
++    await openHub(renderer);
++
++    const phase = await dragTo(renderer, 'hub-tree-reorder-chest', { x: 0, y: 0 });
++    expect(phase).toBe('capture');
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave, 'порядок должен дойти до БД').toBeTruthy();
++    expect(townSave.childOrder).toEqual(['chest', 'shop']);
++    await act(async () => renderer.unmount());
++  });
++
++  it('бросок строки на вложенную локацию переносит сущность в неё', async () => {
++    h.cards = [
++      hub('town', {
++        childOrder: ['cave', 'chest'],
++        links: [{ containerId: 'chest' }, { containerId: 'cave' }],
++      }),
++      hub('cave', { parentLocationId: 'town', inRoot: false }),
++      loot('chest', { inRoot: false }),
++    ];
++    h.bounds['hub-tree-row-cave'] = { x: 0, y: 0, width: 300, height: 30 };
++    h.bounds['hub-tree-row-chest'] = { x: 0, y: 30, width: 300, height: 30 };
++    const renderer = await mountScreen();
++    await openHub(renderer);
++
++    await dragTo(renderer, 'hub-tree-reorder-chest', { x: 0, y: 0 });
++
++    const caveSave = h.saved.filter((c) => c.id === 'cave').pop();
++    expect(caveSave?.links?.map((l) => l.containerId), 'сундук должен встать в пещеру').toEqual(['chest']);
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave?.links?.map((l) => l.containerId), 'из локации-источника ссылка снимается')
++      .not.toContain('chest');
++    await act(async () => renderer.unmount());
++  });
++
++  it('нажатие без движения ничего не переносит и не переставляет', async () => {
++    h.cards = townWithChildren();
++    h.bounds['hub-tree-row-shop'] = { x: 0, y: 0, width: 300, height: 30 };
++    h.bounds['hub-tree-row-chest'] = { x: 0, y: 30, width: 300, height: 30 };
++    const renderer = await mountScreen();
++    await openHub(renderer);
++    await dragTo(renderer, 'hub-tree-reorder-chest', { x: 0, y: 0 }, { move: false });
++    expect(h.saved.filter((c) => c.id === 'town' && c.childOrder)).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('563: из локации можно добавить сущность', () => {
++  it('кнопка «Добавить в локацию» открывает выбор — раньше он не открывался никогда', async () => {
++    h.cards = [hub('town'), loot('chest', { inRoot: true })];
++    const renderer = await mountScreen();
++    const card = one(renderer.root, 'card-town');
++    await act(async () => { card.props.onPress(); await Promise.resolve(); });
++
++    const addBtn = one(renderer.root, 'hub-tree-add-child');
++    await act(async () => { addBtn.props.onPress(); await Promise.resolve(); });
++
++    const picker = renderer.root.findAll((n) => n.type === HubChildPickerModal);
++    expect(picker.length).toBeGreaterThan(0);
++    expect(picker[0].props.visible).toBe(true);
++    expect(picker[0].props.hub?.id).toBe('town');
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('563: созданное внутри локации остаётся в ней', () => {
++  it('«Создать сундук» из выбора локации сразу кладёт его в эту локацию', async () => {
++    h.cards = [hub('town')];
++    const renderer = await mountScreen();
++    const card = one(renderer.root, 'card-town');
++    await act(async () => { card.props.onPress(); await Promise.resolve(); });
++
++    const addBtn = one(renderer.root, 'hub-tree-add-child');
++    await act(async () => { addBtn.props.onPress(); await Promise.resolve(); });
++
++    const createLoot = one(renderer.root, 'hub-picker-create-loot');
++    await act(async () => { createLoot.props.onPress(); await Promise.resolve(); });
++
++    const nameInput = one(renderer.root, 'container-form-name');
++    await act(async () => { nameInput.props.onChangeText('ящик'); await Promise.resolve(); });
++    const saveBtn = one(renderer.root, 'container-form-save');
++    await act(async () => { saveBtn.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
++
++    // Последняя запись — после применения привязки (первая — черновик).
++    const created = h.saved.filter((c) => c.name === 'ящик').pop();
++    expect(created, 'сундук должен сохраниться').toBeTruthy();
++    expect(created.inRoot, 'он нужен в локации, а не на корне').toBe(false);
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave?.links?.map((l) => l.containerId)).toContain(created.id);
++    await act(async () => renderer.unmount());
++  });
++});
++
++describe('563: «Локация» в параметрах терминала встраивает его в локацию', () => {
++  const openEditor = async (renderer, cardId) => {
++    const card = one(renderer.root, `card-${cardId}`);
++    const menuBtn = card.findAll((n) => n.props?.accessibilityLabel === 'card.openMenu')[0];
++    await act(async () => { menuBtn.props.onPress(); await Promise.resolve(); });
++    const editItem = renderer.root
++      .findAll((n) => typeof n.props?.onPress === 'function')
++      .find((n) => textOf(n).trim() === 'card.edit');
++    await act(async () => { editItem.props.onPress(); await Promise.resolve(); });
++  };
++
++  const formRoot = (renderer) => {
++    const [node] = renderer.root.findAll((n) => typeof n.props?.onSave === 'function' && n.props?.kind);
++    expect(node, 'форма параметров должна быть открыта').toBeTruthy();
++    return node;
++  };
++
++  it('выбор локации в поле «Локация» пишет ссылку в эту локацию', async () => {
++    h.cards = [hub('town'), terminal('term')];
++    const renderer = await mountScreen();
++    await openEditor(renderer, 'term');
++    const form = formRoot(renderer);
++
++    const trigger = form.findAll((n) => n.props?.testID === 'container-form-primary-location-toggle')[0];
++    await act(async () => { trigger.props.onPress(); await Promise.resolve(); });
++    const option = form.findAll((n) => typeof n.props?.onPress === 'function' && textOf(n).trim() === 'town')[0];
++    expect(option, 'локация должна быть в списке выбора').toBeTruthy();
++    await act(async () => { option.props.onPress(); await Promise.resolve(); });
++
++    const saveBtn = form.findAll((n) => n.props?.testID === 'container-form-save')[0];
++    await act(async () => { saveBtn.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
++
++    const townSave = h.saved.filter((c) => c.id === 'town').pop();
++    expect(townSave?.links?.map((l) => l.containerId)).toEqual(['term']);
++    const termSave = h.saved.filter((c) => c.id === 'term').pop();
++    expect(termSave?.inRoot, 'терминал уходит с экрана карточек в локацию').toBe(false);
++    await act(async () => renderer.unmount());
++  });
++
++  it('дополнительная локация не теряется: терминал живёт в двух', async () => {
++    h.cards = [hub('town'), hub('cave'), terminal('term')];
++    const renderer = await mountScreen();
++    await openEditor(renderer, 'term');
++    const form = formRoot(renderer);
++
++    const trigger = form.findAll((n) => n.props?.testID === 'container-form-primary-location-toggle')[0];
++    await act(async () => { trigger.props.onPress(); await Promise.resolve(); });
++    const townOption = form.findAll((n) => typeof n.props?.onPress === 'function' && textOf(n).trim() === 'town')[0];
++    await act(async () => { townOption.props.onPress(); await Promise.resolve(); });
++
++    const hubInput = form.findAll((n) => n.props?.testID === 'hub-combobox-input')[0];
++    await act(async () => { hubInput.props.onChangeText('cave'); await Promise.resolve(); });
++    await act(async () => {
++      hubInput.props.onKeyPress({ nativeEvent: { key: 'Tab' }, preventDefault: () => {} });
++      await Promise.resolve();
++    });
++
++    const saveBtn = form.findAll((n) => n.props?.testID === 'container-form-save')[0];
++    await act(async () => { saveBtn.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
++
++    const linked = h.saved
++      .filter((c) => c.kind === CONTAINER_KIND.HUB)
++      .reduce((acc, c) => {
++        const ids = (c.links || []).map((l) => l.containerId);
++        return ids.includes('term') ? [...acc, c.id] : acc;
++      }, []);
++    expect([...new Set(linked)].sort()).toEqual(['cave', 'town']);
++    await act(async () => renderer.unmount());
++  });
++
++  it('набранный, но не выбранный текст не теряется молча — форма говорит об этом', async () => {
++    h.cards = [hub('town'), terminal('term')];
++    const renderer = await mountScreen();
++    await openEditor(renderer, 'term');
++    const form = formRoot(renderer);
++
++    const hubInput = form.findAll((n) => n.props?.testID === 'hub-combobox-input')[0];
++    await act(async () => { hubInput.props.onChangeText('zzz'); await Promise.resolve(); });
++    const saveBtn = form.findAll((n) => n.props?.testID === 'container-form-save')[0];
++    await act(async () => { saveBtn.props.onPress(); await Promise.resolve(); });
++
++    expect(showRawAlert).toHaveBeenCalled();
++    expect(String(showRawAlert.mock.calls[0][0]?.title || '')).toContain('form.locationNotPicked');
++    expect(h.saved.filter((c) => c.kind === CONTAINER_KIND.HUB)).toHaveLength(0);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/room/lock-progress-532.test.js b/__tests__/room/lock-progress-532.test.js
+index 1335ca8..6facb8e 100644
+--- a/__tests__/room/lock-progress-532.test.js
++++ b/__tests__/room/lock-progress-532.test.js
+@@ -436,11 +436,11 @@ describe('532/534: строки, документы и версия', () => {
+ 
+   it('версия, отсечка установщика, roadmap и файл патча на месте', () => {
+     const version = json('public/version.json');
+-    expect(version.version).toBe('562');
++    expect(version.version).toBe('563');
+     expect(version.release).toBe(5);
+     expect(version.notes['ru-RU']).toHaveLength(10);
+     expect(version.notes['en-EN']).toHaveLength(10);
+-    expect(json('patchs/baseline.json').baseline).toBe('562');
++    expect(json('patchs/baseline.json').baseline).toBe('563');
+     expect(read('patchs/532-lock-progress.patch')).toContain('resumeLockGame');
+     expect(read('patchs/533-rollback-ui.patch')).toContain('borderWidth: 1.5');
+     expect(read('patchs/534-restore-lock-ui.patch')).toContain('lock-progress-saved');
+@@ -464,7 +464,7 @@ describe('532/534: строки, документы и версия', () => {
+     expect(read('patchs/552-educated-skill-debt.patch')).toContain('unlockSkillDistributionIfPointsPending');
+     expect(read('patchs/553-range-table-fix.patch')).toContain('RANGE_ORDER');
+     const roadmap = read('docs/roadmap.md');
+-    expect(roadmap).toContain('Текущая версия: **562**');
++    expect(roadmap).toContain('Текущая версия: **563**');
+     expect(roadmap).toContain('| 28 |');
+     expect(roadmap).toContain('| 29 |');
+     expect(roadmap).toContain('| 30 |');
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 3644e9e..77d0958 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -53,6 +53,7 @@ import {
+   resolveQuantitySpec,
+   sortContainersForRoot,
+ } from '../../../domain/lootTrade';
++import { planLocationBinding, planMoveIntoLocation } from '../../../domain/hubBindings';
+ import { getItemPrice, getItemWeight, resolveItem } from '../../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import {
+@@ -496,6 +497,9 @@ export default function LootTradeScreen() {
+     () => containers.find((c) => c.id === activeContainerId) || null,
+     [containers, activeContainerId],
+   );
++  // Патч 563: если Мастер смотрит внутрь локации, созданные здесь сундук/
++  // терминал/замок сразу встают в неё (поле «Локация» предзаполнено).
++  const activeHubId = activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer.id : '';
+   const activeTerminalStates = useMemo(() => {
+     if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL
+       && activeContainer?.kind !== CONTAINER_KIND.LOCK) return [];
+@@ -789,36 +793,42 @@ export default function LootTradeScreen() {
+     });
+   };
+ 
+-  const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
++  /**
++   * Патч 563: привязка к локации пишется ОДНИМ законом (domain/hubBindings) —
++   * и из формы предмета, и из дерева. Раньше каждый вход знал только своё поле,
++   * поэтому «из локации» работало, а «из терминала» нет.
++   *
++   * `bindings` = { primary: 'id локации', extras: ['другая локация'] } — основная
++   * плюс «ещё локации» (бродячий торговец). Старый вызов с массивом id
++   * поддерживается: первый id считается основной.
++   */
++  const handleSaveContainerForm = async (draft, capsRollInfo, bindings = null) => {
+     if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+     const cleanDraft = { ...draft };
+     delete cleanDraft.__isDuplicateDraft;
+ 
+-    if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
+-      cleanDraft.inRoot = selectedHubIds.length === 0;
+-    }
++    const requested = Array.isArray(bindings)
++      ? { primary: bindings[0] || '', extras: bindings.slice(1) }
++      : (bindings && typeof bindings === 'object' ? bindings : null);
+ 
+     const saved = await persistAndSyncContainer(cleanDraft);
+-
+-    if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
+-      const targetHubSet = new Set(selectedHubIds);
++    let boundId = '';
++    if (requested) {
+       const currentList = await db.getGmContainersList();
+-      for (const item of currentList) {
+-        if (item.kind !== CONTAINER_KIND.HUB) continue;
+-        const hasLink = (item.links || []).some((l) => l.containerId === saved.id);
+-        const shouldHaveLink = targetHubSet.has(item.id);
+-        if (shouldHaveLink && !hasLink) {
+-          await persistAndSyncContainer({
+-            ...item,
+-            links: [...(item.links || []), { containerId: saved.id, locked: false, lockLabel: '' }],
+-          });
+-        } else if (!shouldHaveLink && hasLink) {
+-          await persistAndSyncContainer({
+-            ...item,
+-            links: (item.links || []).filter((l) => l.containerId !== saved.id),
+-          });
+-        }
++      const plan = planLocationBinding({
++        container: saved,
++        primaryHubId: requested.primary,
++        extraHubIds: requested.extras,
++        allContainers: currentList,
++      });
++      for (const update of plan.hubUpdates) {
++        const hub = currentList.find((item) => item.id === update.id);
++        if (hub) await persistAndSyncContainer({ ...hub, links: update.links });
+       }
++      if (Object.keys(plan.containerPatch).length > 0) {
++        await persistAndSyncContainer({ ...saved, ...plan.containerPatch });
++      }
++      boundId = requested.primary || '';
+     }
+ 
+     setFormModal(null);
+@@ -826,6 +836,15 @@ export default function LootTradeScreen() {
+     // только что сохранённая карточка сразу открывалась в детальный экран.
+     // Привязка к локациям всё равно записана выше, так что скрытого
+     // перехода в локацию не требуется.
++    // 563: видимое подтверждение привязки — чтобы «выбрал локацию» не приходилось
++    // проверять глазами по дереву. Показываем только когда локация реально задана.
++    if (boundId) {
++      const hubName = containers.find((c) => c?.id === boundId)?.name || boundId;
++      showTimedBanner(formatLootTrade(tLootTrade('detail.locationBound'), {
++        name: saved.name,
++        location: hubName,
++      }));
++    }
+     if (capsRollInfo?.rolled) {
+       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
+         dice: capsRollInfo.diceCount,
+@@ -1495,6 +1514,17 @@ export default function LootTradeScreen() {
+     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+   };
+ 
++  // Патч 563: новая вещь, созданная из локации, сразу встаёт в неё — форма
++  // открывается с заполненным полем «Локация» (initialLinkedHubIds).
++  const handleCreateHubChild = (kind) => {
++    setHubPickerOpen(false);
++    setFormModal({
++      kind: kind || CONTAINER_KIND.LOOT,
++      initialContainer: null,
++      prefillHubId: activeHubId,
++    });
++  };
++
+   const handleRemoveHubChild = async (childId) => {
+     if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
+     const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
+@@ -1515,6 +1545,50 @@ export default function LootTradeScreen() {
+     await persistAndSyncContainer({ ...parent, childOrder });
+   };
+ 
++  /**
++   * Патч 563: перенос сущности в другую локацию — перетаскиванием строки на
++   * строку-локацию в дереве. Источник (дерево, из которого тащат) снимаем, цель
++   * добавляем; прочие привязки не трогаем — бродячий торговец остаётся там, где
++   * стоял.
++   */
++  const handleMoveRowToLocation = async ({ containerId, targetHubId, fromHubId } = {}) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
++    const child = containers.find((c) => c?.id === containerId);
++    const targetHub = containers.find((c) => c?.id === targetHubId && c.kind === CONTAINER_KIND.HUB);
++    if (!child || !targetHub || child.id === targetHub.id) return;
++
++    // Локацию нельзя вложить в собственного потомка — тот же закон, что у карточек.
++    if (child.kind === CONTAINER_KIND.HUB && wouldCreateParentCycle(child.id, targetHub.id)) {
++      showRawAlert({ title: tLootTrade('form.locationCycle') });
++      return;
++    }
++
++    const plan = planMoveIntoLocation({
++      container: child,
++      targetHubId: targetHub.id,
++      fromHubId,
++      allContainers: containers,
++    });
++    for (const update of plan.hubUpdates) {
++      const hub = containers.find((item) => item?.id === update.id);
++      if (hub) await persistAndSyncContainer({ ...hub, links: update.links });
++    }
++    if (Object.keys(plan.containerPatch).length > 0) {
++      await persistAndSyncContainer({ ...child, ...plan.containerPatch });
++    }
++    showTimedBanner(formatLootTrade(tLootTrade('detail.locationBound'), {
++      name: child.name,
++      location: targetHub.name,
++    }));
++  };
++
++  // Патч 563: из локации тоже можно добавить сущность — окно выбора контейнеров
++  // было смонтировано, но не открывалось ни одной кнопкой (hubPickerOpen).
++  const handleOpenHubChildPicker = () => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB) return;
++    setHubPickerOpen(true);
++  };
++
+   // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
+   // «Блокировать» спрашивает причину (пусто = «Проход заблокирован»),
+   // «Открыть» снимает блок и чистит причину.
+@@ -1918,7 +1992,7 @@ export default function LootTradeScreen() {
+                           key={cell.id}
+                           iconName="map-marker-multiple"
+                           label={tLootTrade('actions.createHub')}
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null, prefillHubId: activeHubId })}
+                         />
+                       );
+                     }
+@@ -1928,7 +2002,7 @@ export default function LootTradeScreen() {
+                           key={cell.id}
+                           iconName="treasure-chest"
+                           label={tLootTrade('actions.createLoot')}
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOOT, initialContainer: null })}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOOT, initialContainer: null, prefillHubId: activeHubId })}
+                         />
+                       );
+                     }
+@@ -1938,7 +2012,7 @@ export default function LootTradeScreen() {
+                           key={cell.id}
+                           iconName="sack"
+                           label={tLootTrade('actions.createMerchant')}
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.MERCHANT, initialContainer: null })}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.MERCHANT, initialContainer: null, prefillHubId: activeHubId })}
+                         />
+                       );
+                     }
+@@ -1948,7 +2022,7 @@ export default function LootTradeScreen() {
+                           key={cell.id}
+                           iconName="console"
+                           label={tLootTrade('actions.createTerminal')}
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null })}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null, prefillHubId: activeHubId })}
+                         />
+                       );
+                     }
+@@ -1959,7 +2033,7 @@ export default function LootTradeScreen() {
+                           iconName="lock"
+                           label={tLootTrade('actions.createLock')}
+                           testID="create-lock-cell"
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOCK, initialContainer: null })}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOCK, initialContainer: null, prefillHubId: activeHubId })}
+                         />
+                       );
+                     }
+@@ -2501,6 +2575,8 @@ export default function LootTradeScreen() {
+                 onMoveNestedOut={handleMoveNestedLocationOut}
+                 onTogglePassage={handleTogglePassage}
+                 onReorderChildren={handleReorderHubChildren}
++                onMoveRow={handleMoveRowToLocation}
++                onAddChild={handleOpenHubChildPicker}
+               />
+             </>
+           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
+@@ -2631,7 +2707,7 @@ export default function LootTradeScreen() {
+         initialLinkedHubIds={
+           formModal?.initialContainer?.id
+             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
+-            : []
++            : [formModal?.prefillHubId].filter(Boolean)
+         }
+         onQuickCreateHub={handleQuickCreateHub}
+         onSave={handleSaveContainerForm}
+@@ -2644,6 +2720,7 @@ export default function LootTradeScreen() {
+         allContainers={containers}
+         roomByCode={roomByCode}
+         onAddChild={handleAddHubChild}
++        onCreateChild={handleCreateHubChild}
+         onClose={() => setHubPickerOpen(false)}
+       />
+ 
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index c44067c..9966482 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -70,6 +70,9 @@ const ContainerFormModal = ({
+ 
+   const [name, setName] = useState('');
+   const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
++  // Патч 563: «Локация» — первое поле формы, как у локации «Родительская
++  // локация». selectedHubIds хранит ДОПОЛНИТЕЛЬНЫЕ локации (бродячий торговец).
++  const [primaryHubId, setPrimaryHubId] = useState('');
+   const [selectedHubIds, setSelectedHubIds] = useState([]);
+   const [extraCreatedHubs, setExtraCreatedHubs] = useState([]);
+   const [hubQuery, setHubQuery] = useState('');
+@@ -113,7 +116,10 @@ const ContainerFormModal = ({
+       setSelectedHubIds([]);
+     } else {
+       setSelectedRoomCodes([]);
+-      setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
++      const linked = Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : [];
++      // Первая привязка — основная локация, остальные — дополнительные.
++      setPrimaryHubId(linked[0] || '');
++      setSelectedHubIds(linked.slice(1));
+     }
+     setDescription(initialContainer?.description || '');
+     setDifficulty(Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1)));
+@@ -171,8 +177,11 @@ const ContainerFormModal = ({
+   );
+ 
+   const selectedHubObjects = useMemo(
+-    () => selectedHubIds.map((id) => combinedHubs.find((h) => h.id === id)).filter(Boolean),
+-    [selectedHubIds, combinedHubs],
++    () => selectedHubIds
++      .filter((id) => id !== primaryHubId)
++      .map((id) => combinedHubs.find((h) => h.id === id))
++      .filter(Boolean),
++    [selectedHubIds, primaryHubId, combinedHubs],
+   );
+ 
+   const toggleRoomCode = (code) => {
+@@ -275,12 +284,23 @@ const ContainerFormModal = ({
+       }
+     }
+ 
+-    let finalSelectedHubIds = selectedHubIds;
+-    if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
+-      if (!finalSelectedHubIds.includes(hubSuggestion.exactHub.id)) {
+-        finalSelectedHubIds = [...finalSelectedHubIds, hubSuggestion.exactHub.id];
++    // Патч 563: порядок = [основная, ...дополнительные]; первый id экран считает
++    // основной локацией. Набранный, но не выбранный текст НЕ теряется молча.
++    let extras = selectedHubIds.filter((id) => id !== primaryHubId);
++    if (!isHub && hubQuery.trim().length > 0) {
++      if (hubSuggestion.exactHub) {
++        if (!extras.includes(hubSuggestion.exactHub.id)
++          && hubSuggestion.exactHub.id !== primaryHubId) {
++          extras = [...extras, hubSuggestion.exactHub.id];
++        }
++      } else if (!hubSuggestion.bestMatch) {
++        showRawAlert({ title: tLootTrade('form.locationNotPicked') });
++        return;
+       }
+     }
++    const finalSelectedHubIds = isHub
++      ? null
++      : [primaryHubId, ...extras].filter(Boolean);
+ 
+     const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
+     const roomRecord = isHub
+@@ -329,7 +349,7 @@ const ContainerFormModal = ({
+         isCatalogHub: isHub ? isCatalogHub : false,
+       },
+       capsRollInfo,
+-      isHub ? null : finalSelectedHubIds,
++      finalSelectedHubIds,
+     );
+   };
+ 
+@@ -464,7 +484,22 @@ const ContainerFormModal = ({
+               </>
+             ) : (
+               <>
+-                <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
++                {/* Патч 563: «Локация» — обычное поле выбора, как «Родительская
++                    локация» у локации. Выбрал — точка встроена туда; «— нет —» —
++                    вернулась на экран карточек. Дополнительные локации нужны
++                    редко (бродячий торговец), поэтому идут отдельной строкой. */}
++                <Text style={styles.label}>{tLootTrade('form.primaryLocationLabel')}</Text>
++                <LocationSelect
++                  testID="container-form-primary-location"
++                  value={primaryHubId}
++                  onChange={setPrimaryHubId}
++                  options={combinedHubs}
++                  placeholder={tLootTrade('form.locationNone')}
++                />
++                <Text style={styles.hintText}>{tLootTrade('form.primaryLocationHint')}</Text>
++
++                <Text style={styles.label}>{tLootTrade('form.extraLocationsLabel')}</Text>
++                <Text style={styles.hintText}>{tLootTrade('form.extraLocationsHint')}</Text>
+ 
+                 {selectedHubObjects.length > 0 && (
+                   <View style={styles.selectedHubPills}>
+@@ -602,7 +637,7 @@ const ContainerFormModal = ({
+                   </View>
+                 )}
+ 
+-                <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
++                <Text style={styles.hintText}>{tLootTrade('form.extraLocationsHint')}</Text>
+               </>
+             )}
+ 
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+index 0484584..f4f3fd2 100644
+--- a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -21,6 +21,7 @@ const HubChildPickerModal = ({
+   allContainers = [],
+   roomByCode = {},
+   onAddChild,
++  onCreateChild,
+   onClose,
+ }) => {
+   useLocale();
+@@ -98,6 +99,30 @@ const HubChildPickerModal = ({
+             )}
+           </ScrollView>
+ 
++          {/* Патч 563: если нужной вещи ещё нет — её создают ЗДЕСЬ, и она сразу
++              встаёт в эту локацию (форма откроется с заполненной «Локацией»). */}
++          {typeof onCreateChild === 'function' && (
++            <View style={styles.createRow}>
++              <Text style={styles.createTitle}>{tLootTrade('detail.hubPickerCreateTitle')}</Text>
++              {[
++                [CONTAINER_KIND.LOOT, 'treasure-chest', 'actions.createLoot'],
++                [CONTAINER_KIND.MERCHANT, 'sack', 'actions.createMerchant'],
++                [CONTAINER_KIND.TERMINAL, 'console', 'actions.createTerminal'],
++                [CONTAINER_KIND.LOCK, 'lock', 'actions.createLock'],
++              ].map(([kind, icon, labelKey]) => (
++                <TouchableOpacity
++                  key={kind}
++                  style={styles.createBtn}
++                  testID={`hub-picker-create-${kind}`}
++                  onPress={() => onCreateChild(kind)}
++                >
++                  <MaterialCommunityIcons name={icon} size={16} color={ADMIN_MODAL_PALETTE.accent} />
++                  <Text style={styles.createBtnText}>{tLootTrade(labelKey)}</Text>
++                </TouchableOpacity>
++              ))}
++            </View>
++          )}
++
+           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+             <Text style={styles.closeBtnText}>{tLootTrade('detail.hubPickerClose')}</Text>
+           </TouchableOpacity>
+@@ -197,6 +222,27 @@ const styles = StyleSheet.create({
+     fontSize: 12,
+     fontWeight: '700',
+   },
++  createRow: {
++    borderTopWidth: 1,
++    borderTopColor: ADMIN_MODAL_PALETTE.border,
++    paddingTop: 8,
++    marginTop: 8,
++    gap: 6,
++  },
++  createTitle: {
++    color: ADMIN_MODAL_PALETTE.mutedText,
++    fontSize: 12,
++  },
++  createBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    paddingVertical: 6,
++  },
++  createBtnText: {
++    color: ADMIN_MODAL_PALETTE.text,
++    fontSize: 13,
++  },
+   closeBtn: {
+     marginTop: 16,
+     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+diff --git a/components/screens/LootTradeScreen/modals/HubTreeView.js b/components/screens/LootTradeScreen/modals/HubTreeView.js
+index 5208e98..aec07c0 100644
+--- a/components/screens/LootTradeScreen/modals/HubTreeView.js
++++ b/components/screens/LootTradeScreen/modals/HubTreeView.js
+@@ -52,6 +52,8 @@ const HubTreeView = ({
+   onMoveNestedOut,
+   onTogglePassage,
+   onReorderChildren,
++  onMoveRow,
++  onAddChild,
+ }) => {
+   useLocale();
+   const [expanded, setExpanded] = useState(() => new Set());
+@@ -64,6 +66,8 @@ const HubTreeView = ({
+   const activeDragRef = useRef(null);
+   const reorderRef = useRef(onReorderChildren);
+   reorderRef.current = onReorderChildren;
++  const moveRowRef = useRef(onMoveRow);
++  moveRowRef.current = onMoveRow;
+   const [dragPreview, setDragPreview] = useState(null);
+ 
+   const list = Array.isArray(containers) ? containers : [];
+@@ -122,6 +126,30 @@ const HubTreeView = ({
+       .filter(Boolean);
+   };
+ 
++  /**
++   * Потомки узла: в них нельзя вкладывать сам узел (цикл матрёшки). Считаем по
++   * обоим видам связи — вложенным локациям и links.
++   */
++  const descendantsOfId = (id) => {
++    const out = new Set([id]);
++    const queue = [id];
++    let guard = 0;
++    while (queue.length > 0 && guard < 500) {
++      guard += 1;
++      const current = queue.shift();
++      for (const child of list) {
++        if (!child?.id || out.has(child.id)) continue;
++        const isNested = String(child.parentLocationId || '') === current;
++        const isLinked = (byId.get(current)?.links || [])
++          .some((link) => String(link?.containerId || '') === child.id);
++        if (!isNested && !isLinked) continue;
++        out.add(child.id);
++        queue.push(child.id);
++      }
++    }
++    return out;
++  };
++
+   const toggleExpanded = (id) => {
+     setExpanded((prev) => {
+       const next = new Set(prev);
+@@ -132,9 +160,9 @@ const HubTreeView = ({
+ 
+   // Патч 545: перетаскивание меняет порядок только среди строк одного
+   // родителя. Границы строк измеряются в окне, как у карточек на сетке.
+-  const measureSiblingRows = (siblingIds) => {
++  const measureRows = (ids) => {
+     const bounds = {};
+-    for (const id of siblingIds) {
++    for (const id of ids) {
+       const ref = rowRefs.current[id];
+       if (ref?.measureInWindow) {
+         ref.measureInWindow((x, y, width, height) => {
+@@ -145,6 +173,23 @@ const HubTreeView = ({
+     return bounds;
+   };
+ 
++  /**
++   * Патч 563: цель переезда — ЛЮБАЯ строка-локация под пальцем, не только сосед.
++   * Свою строку и своих потомков не берём: вложить локацию в собственный
++   * потомок нельзя (цикл ловит и сервер, но подсвечивать его незачем).
++   */
++  const locationUnderPoint = (drag, point) => {
++    if (!drag || !point) return null;
++    for (const [id, b] of Object.entries(drag.bounds || {})) {
++      if (id === drag.childId || drag.forbiddenIds?.has?.(id)) continue;
++      if (!drag.hubIds?.has?.(id)) continue;
++      if (b
++        && point.x >= b.x && point.x <= b.x + b.width
++        && point.y >= b.y && point.y <= b.y + b.height) return id;
++    }
++    return null;
++  };
++
+   const siblingAtPoint = (drag, point) => {
+     if (!drag || !point) return null;
+     for (const id of drag.siblingIds) {
+@@ -167,6 +212,16 @@ const HubTreeView = ({
+     // в соседнюю строку и молча переставить позицию. Признак движения даёт
+     // общий хук (патч 549) — правило одно для всех экранов.
+     if (!moved) return;
++    // 563: бросили на строку-локацию — сущность переезжает туда.
++    const overLocationId = drag.overLocationId || locationUnderPoint(drag, drag.point);
++    if (overLocationId && typeof moveRowRef.current === 'function') {
++      moveRowRef.current({
++        containerId: drag.childId,
++        targetHubId: overLocationId,
++        fromHubId: drag.parentId,
++      });
++      return;
++    }
+     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
+     if (!targetId || targetId === drag.childId) return;
+     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
+@@ -185,22 +240,30 @@ const HubTreeView = ({
+     enabled: typeof onReorderChildren === 'function',
+     onStart: (point, context) => {
+       if (!context) return;
++      const visibleRowIds = Object.keys(rowRefs.current);
+       activeDragRef.current = {
+         ...context,
+-        bounds: measureSiblingRows(context.siblingIds),
++        bounds: measureRows(visibleRowIds),
++        hubIds: new Set(list.filter((c) => c?.kind === CONTAINER_KIND.HUB).map((c) => c.id)),
++        forbiddenIds: descendantsOfId(context.childId),
+         overId: null,
++        overLocationId: null,
+         point: { x: point.pageX, y: point.pageY },
+       };
+-      setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
++      setDragPreview({
++        parentId: context.parentId, childId: context.childId, overId: null, overLocationId: null,
++      });
+     },
+     onMove: (point) => {
+       const drag = activeDragRef.current;
+       if (!drag) return;
+       drag.point = { x: point.pageX, y: point.pageY };
+-      const overId = siblingAtPoint(drag, drag.point);
+-      if (overId !== drag.overId) {
++      const overLocationId = locationUnderPoint(drag, drag.point);
++      const overId = overLocationId ? null : siblingAtPoint(drag, drag.point);
++      if (overId !== drag.overId || overLocationId !== drag.overLocationId) {
+         drag.overId = overId;
+-        setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
++        drag.overLocationId = overLocationId;
++        setDragPreview((prev) => (prev ? { ...prev, overId, overLocationId } : prev));
+       }
+     },
+     onEnd: (_point, _context, meta) => finishDrag(meta),
+@@ -337,9 +400,14 @@ const HubTreeView = ({
+     // Патч 545: ручка перестановки есть у строк с братьями внутри одного
+     // родителя (включая раскрытую вложенную локацию). Ключи не трогаем.
+     const siblingIds = parentNode ? childrenOf(parentNode).map((kid) => kid.container.id) : [];
+-    const canReorder = Boolean(parentNode && siblingIds.length > 1 && typeof onReorderChildren === 'function');
++    // 563: ручка нужна и для порядка (≥2 брата), и для переезда в другую
++    // локацию — иначе переносить можно было бы только с сетки карточек.
++    const canReorder = Boolean(parentNode
++      && (siblingIds.length > 1 || typeof onMoveRow === 'function')
++      && typeof onReorderChildren === 'function');
+     const isDragging = dragPreview?.childId === container.id;
+-    const isDropTarget = dragPreview?.overId === container.id;
++    const isDropTarget = dragPreview?.overId === container.id
++      || dragPreview?.overLocationId === container.id;
+ 
+     return (
+       <View key={container.id} style={[styles.node, { marginLeft: depth * 16 }]}>
+@@ -515,9 +583,26 @@ const HubTreeView = ({
+     <ScrollView style={styles.scroll} nestedScrollEnabled>
+       {dragPreview ? (
+         <Text testID="hub-tree-reorder-hint" style={styles.reorderHint}>
+-          {tLootTrade('detail.hubReorderHint')}
++          {tLootTrade(dragPreview.overLocationId ? 'detail.hubDropIntoHint' : 'detail.hubReorderHint')}
+         </Text>
+       ) : null}
++      {/* 563: из локации тоже можно добавить сущность — окно выбора было
++          смонтировано, но не открывалось ни одной кнопкой. */}
++      {typeof onAddChild === 'function' ? (
++        <TouchableOpacity
++          testID="hub-tree-add-child"
++          style={styles.addChildBtn}
++          onPress={() => onAddChild()}
++          accessibilityRole="button"
++        >
++          <MaterialCommunityIcons
++            name="plus-circle-outline"
++            size={16}
++            color={ADMIN_MODAL_PALETTE.gold}
++          />
++          <Text style={styles.addChildBtnText}>{tLootTrade('detail.hubAddChild')}</Text>
++        </TouchableOpacity>
++      ) : null}
+       {directKids.length === 0 && directKeyIds.length === 0 ? (
+         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+       ) : (
+@@ -592,6 +677,24 @@ const styles = StyleSheet.create({
+     paddingVertical: 6,
+   },
+   // Патч 545: ручка и подсветка перестановки — в палитре соседних модалок.
++  addChildBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 6,
++    alignSelf: 'flex-start',
++    paddingVertical: 6,
++    paddingHorizontal: 10,
++    marginBottom: 8,
++    borderRadius: 8,
++    borderWidth: 1,
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
++  },
++  addChildBtnText: {
++    color: ADMIN_MODAL_PALETTE.gold,
++    fontSize: 12,
++    fontWeight: '600',
++  },
+   dragHandle: {
+     width: 24,
+     height: 24,
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 6c13347..6a656b8 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,38 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-11-07 (563) — привязка к локации в обе стороны и живой драг в дереве
++
++Слово владельца: «Я всё ещё в локации не могу перемещать сущности. И нужна
++тождественность привязки терминалов/замков к локации и наоборот. Если я в
++терминале/замке выбираю локацию, то они туда встраиваются. А не только через
++локацию». Уточнил: сломан порядок строк в дереве; поле «Локация» есть, но выбор
++ничего не делает; в нескольких локациях — могут («бродячий» торговец);
++перетаскивание — и порядок, и переезд.
++
++- **Драг не начинался.** `useDragResponder` собирал `panHandlers`/`handlersFor`
++  из имён КОНФИГА (`onStartShouldSetPanResponderCapture`, `onPanResponderGrant`),
++  а `View` опрашивается пропсами `onStartShouldSetResponder[Capture]` /
++  `onResponderGrant|Move|Release`. Жест не начинался ни в capture, ни в bubble,
++  `activeDragRef` оставался пуст. Сетка работала только потому, что
++  подписывалась на ответ самого PanResponder. Теперь `withRowPayload` оборачивает
++  responder-пропсы: сначала исходный обработчик, затем `claim(rowPayload)`.
++- **Привязка.** `domain/hubBindings.js` (новый) — один закон: ссылка живёт в
++  родителе (`parentLocationId` у локации, `links` у остальных). Форма, дерево и
++  переезд применяют `planLocationBinding` / `planMoveIntoLocation`; несколько
++  локаций сохранены (основная первой в `links`, лишние не трогаются).
++- **Форма.** «Локация» — обычное поле выбора первым, «Ещё локации» — ниже;
++  набранный-но-не-выбранный текст останавливает сохранение (`form.locationNotPicked`)
++  вместо тихой потери (это и был `links=null`).
++- **Дерево.** `measureRows` + `locationUnderPoint` + `descendantsOfId`: бросив
++  строку на строку-локацию, Мастер переносит сущность внутрь (перенос важнее
++  порядка), в собственного потомка — отказ; «Добавить в локацию» открывает выбор,
++  оттуда же можно создать вещь сразу в этой локации (`prefillHubId`).
++- **Тесты.** Новый `__tests__/room/location-binding-563.test.js` (13 проверок
++  поведением). Моки `PanResponder` в 549/548/545 переделаны на честные: props
++  системы ответственности → обработчики конфига; мок `{panHandlers: config}` и
++  был причиной, по которой баг жил. 473 смотрит на поле «Локация».
++- **Отсечка.** `patchs/baseline.json` → 563; 535/532 — 563/5/10, roadmap `**563**`.
++
+ ## 2026-11-07 (562) — длинные названия читаются целиком
+ 
+ Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1fdf1c9..cb5e5d2 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,37 @@
+ # Changelog
++
+ ---
+ 
++## "Location binding in both directions" (patch 563)
++
++The owner's words: "I still can't move entities inside a location. And terminal/lock
++and location binding must be identical both ways. If I pick a location inside a
++terminal or a lock, they should embed there. Not only through the location."
++
++- **The tree handle never started a drag.** The drag hook claimed the row payload
++  with pseudo-props (`onStartShouldSetPanResponderCapture` and friends) that a
++  `View` does not have: React Native Web asks for `onStartShouldSetResponder*`.
++  No phase ever started the gesture, so row order never moved. Props now use the
++  platform names while the config keys stay where `PanResponder.create` reads them.
++  The card grid only worked because it subscribed to PanResponder's own answer —
++  that is where the mismatch came from.
++- **"Location" in terminal and lock settings** is a normal picker now, like the
++  "Parent location" of a location: pick one and the object is embedded there,
++  "— none —" returns it to the card grid. Extra locations stay on their own row:
++  a wandering merchant lives in several and keeps working.
++- **One law for every entry point.** `domain/hubBindings.js`: a binding always
++  lives on the parent — `parentLocationId` for a location, a `links` entry on the
++  location for a chest, merchant, terminal or lock. The form, the tree and the
++  move all write the same thing, so "works through the location, not from the
++  terminal" no longer reproduces.
++- **Nothing typed is silently dropped.** If the binding field has text but no
++  option was picked, the form says so instead of losing it.
++- **Moving in the tree.** Dropping a row onto a location row moves the entity
++  inside (the source location's link is removed, other bindings stay), while
++  dragging among siblings still reorders them. Moving a node into its own
++  descendant is rejected. "Add to location" opens the picker, and from there a
++  new item can be created right inside that location.
++
+ ## "Long names read in full" (patch 562)
+ 
+ The owner's words: "Long names must read in full. Pay attention to two-word base
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index b31b453..e32df14 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,36 @@
+ 
+ ---
+ 
++## «Привязка к локации — в обе стороны» (патч 563)
++
++Слово владельца: «Я всё ещё в локации не могу перемещать сущности. И нужна
++тождественность привязки терминалов/замков к локации и наоборот. Если я в
++терминале/замке выбираю локацию, то они туда встраиваются. А не только через
++локацию».
++
++- **Ручка в дереве не работала.** Хук перетаскивания заявлял нагрузку строки
++  псевдо-пропсами (`onStartShouldSetPanResponderCapture` и подобными), которых у
++  `View` не существует: React Native Web опрашивает `onStartShouldSetResponder*`.
++  Жест не начинался ни в одной фазе, порядок строк стоял на месте. Теперь props
++  называются как у платформы, а имена конфига остались там, где их читает
++  `PanResponder.create`. Сетка работала только потому, что подписывалась на
++  ответ самого PanResponder — оттуда и брался разнобой.
++- **«Локация» в параметрах терминала/замка** стало обычным полем выбора, как
++  «Родительская локация» у локации: выбрал — точка встроена туда, «— нет —» —
++  вернулась на экран карточек. Дополнительные локации остались отдельной
++  строкой: бродячий торговец живёт в нескольких, и это не ломается.
++- **Один закон на все входы.** `domain/hubBindings.js`: привязка всегда живёт в
++  родителе — у локации это её `parentLocationId`, у сундука/торговца/терминала/
++  замка — ссылка в `links` локации. Форма, дерево и переезд пишут одно и то же,
++  поэтому «через локацию работает, из терминала нет» больше не воспроизводится.
++- **Набранное не теряется молча.** Если в поле привязки что-то набрано, но
++  вариант не выбран, форма говорит об этом вместо тихой потери.
++- **Переезд в дереве.** Бросок строки на строку-локацию переносит сущность
++  внутрь (из старой локации ссылка снимается, прочие остаются), а перетаскивание
++  среди соседей по-прежнему меняет порядок. Перенос в собственного потомка
++  отклоняется. «Добавить в локацию» открывает выбор, из него же можно создать
++  новую вещь сразу в этой локации.
++
+ ## «Длинные названия читаются целиком» (патч 562)
+ 
+ Слово владельца: «Длинные названия должны читаться целиком. Обрати внимание на
+diff --git a/docs/design-location-binding-563.md b/docs/design-location-binding-563.md
+new file mode 100644
+index 0000000..dc8b669
+--- /dev/null
++++ b/docs/design-location-binding-563.md
+@@ -0,0 +1,101 @@
++# Привязка к локации: один закон на обе стороны (патч 563)
++
++Слово владельца:
++
++> «Я всё ещё в локации не могу перемещать сущности. И нужна тождественность
++> привязки терминалов/замков к локации и наоборот. Если я в терминале/замке
++> выбираю локацию, то они туда встраиваются. А не только через локацию.»
++
++Уточнения, полученные вопросами: сломано **перетаскивание порядка строк** в
++дереве; поле «Локация» у терминала/замка **есть, но выбор ничего не делает**;
++сущность **может** жить в нескольких локациях («например, "бродячий" торговец»);
++перетаскивание должно делать **и порядок, и переезд**.
++
++## 1. Почему ручка в дереве ничего не делала
++
++React Native Web опрашивает владельца жеста пропсами системы ответственности:
++
++```
++onStartShouldSetResponder[Capture]
++onMoveShouldSetResponder[Capture]
++onResponderGrant / Move / Release / Terminate / Reject
++```
++
++Хук `src/ui/useDragResponder.js` собирал `panHandlers` и `handlersFor` из
++**имён конфига** (`onStartShouldSetPanResponderCapture`, `onPanResponderGrant`,
++…). У `View` таких пропсов нет — вызов не приходил, `activeDragRef` оставался
++пустым, `finishDrag` не срабатывал. Сетка карточек работала только потому, что
++подписывалась на ответ **самого** PanResponder (`panHandlers` в чистом виде),
++а не на собственный пересобранный объект. Отсюда «в сетке двигается, в дереве
++нет» — два пути через один и тот же код.
++
++**Исправление.** `withRowPayload(rowPayload)` оборачивает именно responder-пропсы:
++каждый сначала зовёт исходный обработчик PanResponder (он сам решает про фазу),
++затем заявляет нагрузку строки через `claim(rowPayload)`. Имена конфига остались
++там, где их читает `PanResponder.create`.
++
++## 2. Где живёт привязка
++
++Ссылка всегда хранится **в родителе**, и полей ровно два:
++
++| Что | Где ссылка |
++| --- | --- |
++| локация внутри локации | `child.parentLocationId` |
++| сундук / торговец / терминал / замок | `hub.links[].containerId` |
++
++До 563 существовали две независимые правки: форма предмета знала только свои
++поля, дерево — только свои. Поэтому «через локацию работает, из терминала нет».
++Теперь решение принимается одной чистой функцией в `domain/hubBindings.js`:
++
++* `locateContainer(container, allContainers)` — где сущность сейчас (одна точка
++  правды для формы, дерева и баннера);
++* `planLocationBinding({ container, primaryHubId, extraHubIds, allContainers })` —
++  что записать: `containerPatch` для самой сущности и `hubUpdates` для локаций;
++* `planMoveIntoLocation({ container, targetHubId, fromHubId, allContainers })` —
++  переезд: из источника снять, в цель добавить, прочие привязки не трогать.
++
++Новых полей у ребёнка не появляется. Иначе появятся две правды, которые
++разъедутся при первом же переносе, — ровно то, что и случилось.
++
++## 3. Несколько локаций
++
++Основная локация идёт первой в `links` (её и читают карточка и дерево),
++дополнительные — после неё. Снятие из одной локации не трогает остальные:
++«бродячий» торговец остаётся там, где стоял. `inRoot` — не флаг «вложенности», а
++следствие: сущность с корня уходит, если у неё есть хоть одна локация, и
++возвращается, когда локаций не осталось.
++
++## 4. Что видит Мастер
++
++- **Параметры терминала/замка/торговца/сундука.** Сверху «Локация» — обычное
++  поле выбора, как «Родительская локация» у локации. Ниже «Ещё локации» — поиск
++  по складу для тех редких случаев, когда сущность нужна в нескольких местах.
++- **Набранное не теряется молча.** Если в поле что-то набрано, но вариант не
++  выбран, сохранение останавливается с подсказкой: раньше текст просто исчезал
++  вместе с привязкой.
++- **Дерево локации.** Ручка перетаскивает строку: среди соседей — порядок,
++  на строку-локацию — переезд внутрь (переезд приоритетнее). Перенос в
++  собственного потомка отклоняется.
++- **«Добавить в локацию»** открывает выбор существующих вещей; оттуда же можно
++  создать новую — она сразу встанет в открытую локацию (поле «Локация»
++  предзаполнено).
++
++## 5. Проверки
++
++`__tests__/room/location-binding-563.test.js` — 13 проверок поведением, а не
++поиском строк в исходнике:
++
++1. закон привязки: где живёт ссылка, порядок основной/дополнительных, возврат на
++   корень, переезд с сохранением третьей локации, вложенная локация двигается
++   полем родителя;
++2. драг в дереве на смонтированном экране: порядок доходит до БД; бросок на
++   строку-локацию переносит сущность; нажатие без движения ничего не меняет;
++3. «Добавить в локацию» действительно открывает выбор;
++4. форма терминала: выбор локации пишет ссылку в неё и снимает с корня;
++   дополнительная локация не теряется; набранный-но-не-выбранный текст даёт
++   подсказку вместо тихой потери;
++5. создание сундука из локации кладёт его в эту локацию.
++
++Старые моки `PanResponder: { create: (config) => ({ panHandlers: config }) }`
++переделаны на честные (props системы ответственности → обработчики конфига):
++549, 548, 545. Из-за них и жил баг.
+diff --git a/docs/patch-563-install.md b/docs/patch-563-install.md
+new file mode 100644
+index 0000000..c519df0
+--- /dev/null
++++ b/docs/patch-563-install.md
+@@ -0,0 +1,95 @@
++# Установка патча 563: привязка к локации в обе стороны
++
++Патч подготовлен от состояния **версии 562**. Файл установки:
++`patchs/563-location-binding.patch`.
++
++> **Слова владельца:** «Я всё ещё в локации не могу перемещать сущности. И нужна
++> тождественность привязки терминалов/замков к локации и наоборот. Если я в
++> терминале/замке выбираю локацию, то они туда встраиваются. А не только через
++> локацию».
++
++## Что меняется
++
++| Файл | Что сделано |
++| --- | --- |
++| `src/ui/useDragResponder.js` | **причина бага.** `withRowPayload(rowPayload)` оборачивает responder-пропсы (`onStartShouldSetResponder[Capture]`, `onMoveShouldSetResponder[Capture]`): сначала исходный обработчик PanResponder, затем `claim(rowPayload)`. Раньше в props уходили имена конфига, которых `View` не знает, — жест не начинался |
++| `domain/hubBindings.js` | **новый.** Один закон привязки: `locateContainer`, `planLocationBinding`, `planMoveIntoLocation`, `isLocationNode`. Ссылка живёт в родителе: `parentLocationId` у локации, `links` у остальных |
++| `components/screens/LootTradeScreen/modals/ContainerFormModal.js` | «Локация» — обычное поле выбора (первое), ниже «Ещё локации» для нескольких мест; набранный-но-не-выбранный текст останавливает сохранение подсказкой `form.locationNotPicked`; в `onSave` уходит массив «основная + дополнительные» |
++| `components/screens/LootTradeScreen/LootTradeScreen.js` | `handleSaveContainerForm` применяет `planLocationBinding` и показывает подтверждение; новые `handleMoveRowToLocation`, `handleOpenHubChildPicker`, `handleCreateHubChild`; `prefillHubId` — созданное внутри локации сразу встаёт в неё |
++| `components/screens/LootTradeScreen/modals/HubTreeView.js` | настоящий драг: `measureRows`, `locationUnderPoint`, `descendantsOfId` (запрет переноса в потомка), `overLocationId` (бросок на локацию важнее порядка); кнопка `hub-tree-add-child` |
++| `components/screens/LootTradeScreen/modals/HubChildPickerModal.js` | из выбора «Добавить в локацию» можно создать новую вещь — сразу в эту локацию |
++| `i18n/ru-RU/.../lootTrade/screen.json`, `i18n/en-EN/.../lootTrade/screen.json` | `form.primaryLocationLabel/Hint`, `form.extraLocationsLabel/Hint`, `form.locationNotPicked`, `detail.hubAddChild`, `detail.hubDropIntoHint`, `detail.locationBound`, `detail.hubPickerCreateTitle` |
++| `__tests__/room/location-binding-563.test.js` | **новая приёмка** (13 проверок поведением: закон привязки, драг в дереве, переезд в локацию, форма терминала, создание из локации) |
++| `__tests__/lootTrade/drag-responder-549.test.js`, `gm-screen-behaviour-549.test.js`, `__tests__/room/admin-reorder-arrows-548.test.js`, `hub-order-drag-545.test.js` | моки `PanResponder` стали честными: props системы ответственности → обработчики конфига. Прежний мок `create: (config) => ({ panHandlers: config })` и был причиной, по которой баг жил |
++| `__tests__/lootTrade/matryoshka-rooms-473.test.js` | проверка формы смотрит на поле «Локация» вместо старого поиска по складу |
++| `__tests__/room/gm-decision-535.test.js`, `__tests__/room/lock-progress-532.test.js` | защёлки версии: 563 / `baseline` 563 / roadmap `**563**` |
++| `patchs/baseline.json`, `public/version.json` | отсечка и версия 563 |
++| `docs/changelog.ru.md`, `docs/changelog.en.md`, `docs/roadmap.md`, `docs/agents/state.md`, `docs/design-location-binding-563.md` | записи патча, тезис 51, документ о законе привязки |
++
++## Как это выглядит
++
++Параметры терминала или замка:
++
++```
++Локация            [ Ниптон ▾ ]
++В терминале выбрал локацию — терминал в ней и лежит.
++
++Ещё локации
++[ поиск по складу ]           (только если нужен «бродячий» случай)
++```
++
++Дерево локации:
++
++```
++⇅  Пещера        (локация)   Параметры
++⇅  Сундук                    Параметры   ← тянем за ⇅ на строку «Пещера»
++   └ Пещера
++⇅  Торговец                  Параметры
+++ Добавить в локацию
++```
++
++Перетаскивание среди соседей меняет порядок; бросок на строку-локацию — переносит
++внутрь. Перенос в собственного потомка отклоняется.
++
++## Что НЕ менялось
++
++- Поля хранения (`links`, `parentLocationId`, `childOrder`) и
++  `saveGmContainer`/`normalizeContainerEntity` — только чтение и запись тем же
++  путём.
++- Протокол комнаты, выдача точек игрокам, мини-игры взлома, склад и торговец.
++- Порядок строк внутри локации (545) — тот же `childOrder`, просто теперь ручка
++  действительно начинает жест.
++
++## Установка через консоль
++
++```bash
++git fetch --no-tags origin arena/a97ebb5a-fallout-2d20-companion
++git show FETCH_HEAD:apply-patch.sh > apply-patch.sh
++chmod +x apply-patch.sh
++./apply-patch.sh 563
++```
++
++После установки: `git add -A && git commit -m "Патч 563"`.
++
++## Проверка
++
++```bash
++npx vitest run __tests__/room/location-binding-563.test.js \
++  __tests__/lootTrade/drag-responder-549.test.js \
++  __tests__/lootTrade/gm-screen-behaviour-549.test.js \
++  __tests__/room/admin-reorder-arrows-548.test.js \
++  __tests__/room/hub-order-drag-545.test.js
++npx tsc --noEmit
++```
++
++Глазами:
++
++1. Открыть локацию с двумя-тремя строками, потянуть ручку ⇅ — порядок меняется и
++   остаётся после перезагрузки.
++2. Притянуть строку сундука на строку-локацию — сундук оказывается внутри, из
++   старой локации исчезает.
++3. Открыть параметры терминала, выбрать локацию, сохранить — терминал пропадает
++   с экрана карточек и появляется в дереве этой локации.
++4. Набрать в «Ещё локации» название, не выбирая вариант, и нажать «Сохранить» —
++   форма останавливается с подсказкой, а не теряет текст.
++5. «Добавить в локацию» → «Создать сундук» → назвать — сундук сразу внутри.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 5adf526..3b2137b 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -5,7 +5,7 @@
+ > таблицу ниже, раздел «Осталось» и дублирует список оставшихся тезисов в
+ > ответе владельцу. Этот файл — источник истины для порядка шагов.
+ 
+-Дата ревизии: 2026-11-07. Текущая версия: **562**.
++Дата ревизии: 2026-11-07. Текущая версия: **563**.
+ 
+ ## Тезисы
+ 
+@@ -72,6 +72,17 @@
+ 
+ | 50 | **Длинные названия читаются целиком.** Строка предмета в складе и у торговца стала двухуровневой: сверху базовое имя целиком — включая двухсловные «Боевой карабин» и «Двуствольный дробовик», вместе с качествами и переименованием прикладом, — снизу полные имена установленных модов серым. Ничего не обрезается: строка переносится, многоточия нет. Разбор идёт по настоящему имени предмета, поэтому ни одно слово не теряется и подпись не врёт | ✅ сделано | **562** |
+ 
++| 51 | **Привязка к локации — в обе стороны.** «Локация» в параметрах терминала/замка стала обычным полем выбора: выбрал — точка встроена туда и ушла с корня карточек. Дополнительные локации остались (бродячий торговец живёт в нескольких). Один закон `domain/hubBindings` на форму, дерево и переезд вместо двух разных полей; набранный, но не выбранный текст больше не теряется молча. В дереве локации настоящий драг: порядок строк меняется перетаскиванием ручки, бросок строки на строку-локацию переносит сущность внутрь. «Добавить в локацию» открывает выбор, из него же можно создать новую вещь сразу в этой локации | ✅ сделано | **563** |
++
++## Осталось после патча 563
++
++Патч 563 закрыл обе половины просьбы владельца: в локации снова можно двигать
++сущности (порядок строк ручкой, переезд броском на строку-локацию), и привязка
++стала тождественной — выбор локации в терминале/замке встраивает их туда, а
++добавление из локации работает тем же законом. Следующий шаг по слову владельца
++— раздел локаций и сундуков в пространстве Мастера; объём и место раздела ещё не
++подтверждены.
++
+ ## Осталось после патча 562
+ 
+ Патч 562 сделал имена в складе, у торговца и в списке лута читаемыми без
+@@ -431,6 +442,8 @@
+ - `docs/patch-559-install.md` — трансляция как раньше, эффекты окном при входе (559).
+ - `docs/patch-560-install.md` — трансляция личная для персонажа, сигнал — синяя иконка (560).
+ - `docs/patch-561-install.md` — «сколько переместить?» в складе и у торговца (561).
++- `docs/patch-563-install.md` — привязка к локации в обе стороны и настоящий драг в дереве (563).
++- `docs/design-location-binding-563.md` — один закон привязки: где живёт ссылка и почему (563).
+ - `docs/patch-562-install.md` — длинные названия читаются целиком (562).
+ - `docs/design-item-name-562.md` — разбор имени предмета: что и почему не режем (562).
+ - `docs/design-storage-quantity-561.md` — обсуждение количества и читаемости строк (561).
+diff --git a/domain/hubBindings.js b/domain/hubBindings.js
+new file mode 100644
+index 0000000..2a48cbc
+--- /dev/null
++++ b/domain/hubBindings.js
+@@ -0,0 +1,145 @@
++// domain/hubBindings.js
++// Патч 563 — «тождественность привязки терминалов/замков к локации и наоборот».
++//
++// Слово владельца: «Если я в терминале/замке выбираю локацию, то они туда
++// встраиваются. А не только через локацию». И: «Могут [лежать в нескольких],
++// например "бродячий" торговец».
++//
++// Откуда путаница. Привязка живёт ТОЛЬКО в родителе и в двух разных полях:
++//   - сундук/торговец/терминал/замок — `hub.links[].containerId`;
++//   - локация-в-локации — `child.parentLocationId`.
++// Правок было две разных: одна в форме предмета, другая в дереве локации, и
++// каждая знала только своё поле. Отсюда «через локацию работает, из терминала
++// нет». Здесь ОДИН закон на все входы: что видно в дереве, то и записывается из
++// формы, и наоборот. Никаких новых полей у ребёнка не появляется — иначе появятся
++// две правды, которые разъедутся при первом же переносе.
++import { CONTAINER_KIND } from './lootTrade';
++
++const text = (value) => String(value ?? '').trim();
++
++/** Кем является узел для графа: локация хранит родителя у СЕБЯ, остальные — в родителе. */
++export const isLocationNode = (container) => container?.kind === CONTAINER_KIND.HUB;
++
++/**
++ * Где сейчас лежит сущность — один ответ для всех экранов.
++ * Локация: её `parentLocationId`. Остальные: все локации, у которых она в links.
++ *
++ * @returns {{ primary: string, all: string[] }}
++ */
++export const locateContainer = (container, allContainers = []) => {
++  const list = Array.isArray(allContainers) ? allContainers : [];
++  if (!container?.id) return { primary: '', all: [] };
++  if (isLocationNode(container)) {
++    const parent = text(container.parentLocationId);
++    return { primary: parent, all: parent ? [parent] : [] };
++  }
++  const ids = [];
++  for (const hub of list) {
++    if (!hub || hub.kind !== CONTAINER_KIND.HUB || hub.id === container.id) continue;
++    if ((hub.links || []).some((link) => text(link?.containerId) === container.id)) ids.push(hub.id);
++  }
++  return { primary: ids[0] || '', all: ids };
++};
++
++const linkFor = (containerId) => ({ containerId, locked: false, lockLabel: '' });
++
++/**
++ * План записи: что сохранить ребёнку и какие локации переписать.
++ * Чистая функция — экран только применяет результат через persistAndSyncContainer.
++ *
++ * Семантика та же, что у человека перед глазами: «основная локация» + «ещё
++ * локации». Основная первой попадает в links, чтобы дерево и карточка читали её
++ * первой; порядок остальных сохраняется.
++ *
++ * @param {object} params
++ * @param {object} params.container      — сохраняемая сущность
++ * @param {string} params.primaryHubId   — основная локация ('' = на корень)
++ * @param {string[]} [params.extraHubIds] — дополнительные локации (бродячий торговец)
++ * @param {object[]} params.allContainers — все контейнеры Мастера
++ * @returns {{ containerPatch: object, hubUpdates: Array<{id: string, links: object[]}> }}
++ */
++export const planLocationBinding = ({
++  container,
++  primaryHubId = '',
++  extraHubIds = [],
++  allContainers = [],
++}) => {
++  const target = container || {};
++  const list = Array.isArray(allContainers) ? allContainers : [];
++  const primary = text(primaryHubId);
++  const extras = [];
++  const seen = new Set(primary ? [primary] : []);
++  for (const id of Array.isArray(extraHubIds) ? extraHubIds : []) {
++    const clean = text(id);
++    if (!clean || seen.has(clean)) continue;
++    seen.add(clean);
++    extras.push(clean);
++  }
++  const nextIds = [...(primary ? [primary] : []), ...extras];
++
++  if (isLocationNode(target)) {
++    const current = text(target.parentLocationId);
++    const containerPatch = current === primary
++      ? {}
++      : { parentLocationId: primary, inRoot: !primary };
++    return { containerPatch, hubUpdates: [] };
++  }
++
++  const hubUpdates = [];
++  for (const hub of list) {
++    if (!hub || hub.kind !== CONTAINER_KIND.HUB || hub.id === target.id) continue;
++    const links = Array.isArray(hub.links) ? hub.links : [];
++    const has = links.some((link) => text(link?.containerId) === target.id);
++    const should = nextIds.includes(hub.id);
++    if (has === should) continue;
++    const nextLinks = should
++      ? [
++        // Основная локация — первой, чтобы «Где лежит» читалось однозначно.
++        ...(hub.id === primary ? [linkFor(target.id)] : []),
++        ...links.filter((link) => text(link?.containerId) !== target.id),
++        ...(hub.id === primary ? [] : [linkFor(target.id)]),
++      ]
++      : links.filter((link) => text(link?.containerId) !== target.id);
++    hubUpdates.push({ id: hub.id, links: nextLinks });
++  }
++  // Ребёнок, привязанный хоть куда-то, с корня уходит; без локаций — возвращается.
++  const inRoot = nextIds.length === 0 ? true : false;
++  const containerPatch = target.inRoot === inRoot ? {} : { inRoot };
++  return { containerPatch, hubUpdates };
++};
++
++/**
++ * Перенос из одной локации в другую (перетаскиванием строки в дереве или через
++ * «Переместить»). Источник убираем, цель добавляем, прочие привязки не трогаем:
++ * бродячий торговец остаётся в тех локациях, где стоял.
++ *
++ * @param {object} params
++ * @param {object} params.container
++ * @param {string} params.targetHubId
++ * @param {string} [params.fromHubId] — из какой локации тащим (её и снимаем)
++ * @param {object[]} params.allContainers
++ */
++export const planMoveIntoLocation = ({
++  container,
++  targetHubId,
++  fromHubId = '',
++  allContainers = [],
++}) => {
++  const target = container || {};
++  const to = text(targetHubId);
++  if (!to || to === target.id) return { containerPatch: {}, hubUpdates: [] };
++  if (isLocationNode(target)) {
++    return planLocationBinding({ container: target, primaryHubId: to, allContainers });
++  }
++  const current = locateContainer(target, allContainers).all;
++  const from = text(fromHubId);
++  const extras = current.filter((id) => id !== from && id !== to);
++  return planLocationBinding({
++    container: target,
++    primaryHubId: to,
++    extraHubIds: extras,
++    allContainers,
++  });
++};
++
++export default { locateContainer, planLocationBinding, planMoveIntoLocation, isLocationNode };
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index b8f07a4..cf39b38 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -125,7 +125,12 @@
+     "locationGateHint": "You can enter the location only by passing both obstacles (AND) or one of them (OR).",
+     "locationTreeKey": "key:",
+     "locationTreeEmptyNode": "Empty for now. Drag a location here with the arrows or add objects.",
+-    "lockPinEstimate": "Roughly {count} bobby pins at skill 0"
++    "lockPinEstimate": "Roughly {count} bobby pins at skill 0",
++    "primaryLocationLabel": "Location",
++    "primaryLocationHint": "Where this point lives. Pick one and it is placed inside; “— none —” sends it back to the cards screen.",
++    "extraLocationsLabel": "More locations",
++    "extraLocationsHint": "Only if it sits in several — a wandering trader, for instance.",
++    "locationNotPicked": "No location picked. Tap a variant in the list — typed text alone is not a choice."
+   },
+   "detail": {
+     "backToList": "← Back to containers",
+@@ -190,7 +195,10 @@
+     "passageReasonTitle": "Block reason (optional)",
+     "passageReasonPlaceholder": "e.g. rubble",
+     "hubReorderHandle": "Drag «{name}» to reorder",
+-    "hubReorderHint": "Drop on a row at the same level: the order is saved and players see the same order."
++    "hubReorderHint": "Drop on a row at the same level: the order is saved and players see the same order.",
++    "hubAddChild": "Add to location",
++    "hubDropIntoHint": "Drop on a location to move it there",
++    "locationBound": "“{name}” is now in “{location}”"
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index c221ef8..8f278b4 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -126,7 +126,12 @@
+     "locationGateHint": "Войти в локацию можно, только пройдя обе преграды (И) или одну из них (ИЛИ).",
+     "locationTreeKey": "ключ:",
+     "locationTreeEmptyNode": "Пока пусто. Перетащите сюда локацию стрелками или добавьте объекты.",
+-    "lockPinEstimate": "Ориентировочно {count} отмычек при навыке 0"
++    "lockPinEstimate": "Ориентировочно {count} отмычек при навыке 0",
++    "primaryLocationLabel": "Локация",
++    "primaryLocationHint": "Где лежит эта точка. Выбрали — она сразу встроена в локацию; «— нет —» — вернулась на экран карточек.",
++    "extraLocationsLabel": "Ещё локации",
++    "extraLocationsHint": "Только если лежит в нескольких — например бродячий торговец.",
++    "locationNotPicked": "Локация не выбрана. Нажмите на вариант в списке — просто набранный текст не считается выбором."
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
+@@ -191,7 +196,10 @@
+     "passageReasonTitle": "Причина перекрытия (необязательно)",
+     "passageReasonPlaceholder": "Например: обвал",
+     "hubReorderHandle": "Перетащить «{name}» — сменить порядок",
+-    "hubReorderHint": "Отпустите на строке того же уровня: порядок сохранится и будет тем же у игрока."
++    "hubReorderHint": "Отпустите на строке того же уровня: порядок сохранится и будет тем же у игрока.",
++    "hubAddChild": "Добавить в локацию",
++    "hubDropIntoHint": "Отпустите на локации — сущность переедет туда",
++    "locationBound": "«{name}» — в локации «{location}»"
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 2e42001..06aad86 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "562"
++  "baseline": "563"
+ }
+diff --git a/public/version.json b/public/version.json
+index ff4cd13..ed1d01b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "562",
++  "version": "563",
+   "release": 5,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/ui/useDragResponder.js b/src/ui/useDragResponder.js
+index 370fda8..d0aa028 100644
+--- a/src/ui/useDragResponder.js
++++ b/src/ui/useDragResponder.js
+@@ -115,26 +115,46 @@ export default function useDragResponder({
+     },
+   })).current;
+ 
+-  // Базовые обработчики одной карточки.
+-  const panHandlers = useRef({
+-    ...responder.panHandlers,
+-    onStartShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
+-    onMoveShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
+-    onStartShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
+-    onMoveShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
+-  }).current;
++  /**
++   * Патч 563: ЗАКОН ИМЁН. У `View` нет пропсов `onStartShouldSetPanResponder*` —
++   * это имена КОНФИГА `PanResponder.create`. Пропсы системы ответственности
++   * называются `onStartShouldSetResponder*`, и именно их опрашивает RN
++   * (`node_modules/react-native-web/dist/vendor/react-native/PanResponder/index.js`:
++   * `panHandlers.onStartShouldSetResponderCapture` зовёт
++   * `config.onStartShouldSetPanResponderCapture`).
++   *
++   * До 563 хук подмешивал в `panHandlers` «пан-имена»: RN их не читает, значит
++   * нагрузка строки не заявлялась ВООБЩЕ, `onStart` получал `undefined`, и драг
++   * в дереве локации был мёртв всегда (548 «починили» его тем же способом).
++   *
++   * Здесь обработчики строятся по настоящим именам. Каждый сначала зовёт
++   * исходный обработчик PanResponder (он ведёт внутреннее состояние жеста:
++   * x0/y0, moveX/moveY), и только потом заявляет нагрузку строки.
++   */
++  const withRowPayload = useCallback((rowPayload) => {
++    const wrap = (original) => (event) => {
++      if (typeof original === 'function') original(event);
++      return claim(rowPayload);
++    };
++    return {
++      ...responder.panHandlers,
++      onStartShouldSetResponderCapture: wrap(responder.panHandlers.onStartShouldSetResponderCapture),
++      onStartShouldSetResponder: wrap(responder.panHandlers.onStartShouldSetResponder),
++      onMoveShouldSetResponderCapture: wrap(responder.panHandlers.onMoveShouldSetResponderCapture),
++      onMoveShouldSetResponder: wrap(responder.panHandlers.onMoveShouldSetResponder),
++    };
++  }, [claim, responder]);
++
++  // Базовые обработчики одной карточки: нагрузка задана на уровне хука.
++  const panHandlersRef = useRef(null);
++  if (!panHandlersRef.current) panHandlersRef.current = withRowPayload(CURRENT_PAYLOAD);
++  const panHandlers = panHandlersRef.current;
+ 
+   /**
+    * Обработчики для строки списка со СВОЕЙ нагрузкой. Нагрузка заявляется в
+    * capture-фазе — именно она принимает решение в живом браузере.
+    */
+-  const handlersFor = useCallback((rowPayload) => ({
+-    ...responder.panHandlers,
+-    onStartShouldSetPanResponderCapture: () => claim(rowPayload),
+-    onMoveShouldSetPanResponderCapture: () => claim(rowPayload),
+-    onStartShouldSetPanResponder: () => claim(rowPayload),
+-    onMoveShouldSetPanResponder: () => claim(rowPayload),
+-  }), [claim, responder]);
++  const handlersFor = useCallback((rowPayload) => withRowPayload(rowPayload), [withRowPayload]);
+ 
+   return { panHandlers, handlersFor, draggingRef };
+ }

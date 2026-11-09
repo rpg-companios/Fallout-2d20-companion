@@ -70,6 +70,9 @@ const ContainerFormModal = ({
 
   const [name, setName] = useState('');
   const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
+  // Патч 563: «Локация» — первое поле формы, как у локации «Родительская
+  // локация». selectedHubIds хранит ДОПОЛНИТЕЛЬНЫЕ локации (бродячий торговец).
+  const [primaryHubId, setPrimaryHubId] = useState('');
   const [selectedHubIds, setSelectedHubIds] = useState([]);
   const [extraCreatedHubs, setExtraCreatedHubs] = useState([]);
   const [hubQuery, setHubQuery] = useState('');
@@ -113,7 +116,10 @@ const ContainerFormModal = ({
       setSelectedHubIds([]);
     } else {
       setSelectedRoomCodes([]);
-      setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
+      const linked = Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : [];
+      // Первая привязка — основная локация, остальные — дополнительные.
+      setPrimaryHubId(linked[0] || '');
+      setSelectedHubIds(linked.slice(1));
     }
     setDescription(initialContainer?.description || '');
     setDifficulty(Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1)));
@@ -171,8 +177,11 @@ const ContainerFormModal = ({
   );
 
   const selectedHubObjects = useMemo(
-    () => selectedHubIds.map((id) => combinedHubs.find((h) => h.id === id)).filter(Boolean),
-    [selectedHubIds, combinedHubs],
+    () => selectedHubIds
+      .filter((id) => id !== primaryHubId)
+      .map((id) => combinedHubs.find((h) => h.id === id))
+      .filter(Boolean),
+    [selectedHubIds, primaryHubId, combinedHubs],
   );
 
   const toggleRoomCode = (code) => {
@@ -275,12 +284,23 @@ const ContainerFormModal = ({
       }
     }
 
-    let finalSelectedHubIds = selectedHubIds;
-    if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
-      if (!finalSelectedHubIds.includes(hubSuggestion.exactHub.id)) {
-        finalSelectedHubIds = [...finalSelectedHubIds, hubSuggestion.exactHub.id];
+    // Патч 563: порядок = [основная, ...дополнительные]; первый id экран считает
+    // основной локацией. Набранный, но не выбранный текст НЕ теряется молча.
+    let extras = selectedHubIds.filter((id) => id !== primaryHubId);
+    if (!isHub && hubQuery.trim().length > 0) {
+      if (hubSuggestion.exactHub) {
+        if (!extras.includes(hubSuggestion.exactHub.id)
+          && hubSuggestion.exactHub.id !== primaryHubId) {
+          extras = [...extras, hubSuggestion.exactHub.id];
+        }
+      } else if (!hubSuggestion.bestMatch) {
+        showRawAlert({ title: tLootTrade('form.locationNotPicked') });
+        return;
       }
     }
+    const finalSelectedHubIds = isHub
+      ? null
+      : [primaryHubId, ...extras].filter(Boolean);
 
     const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
     const roomRecord = isHub
@@ -329,7 +349,7 @@ const ContainerFormModal = ({
         isCatalogHub: isHub ? isCatalogHub : false,
       },
       capsRollInfo,
-      isHub ? null : finalSelectedHubIds,
+      finalSelectedHubIds,
     );
   };
 
@@ -464,7 +484,22 @@ const ContainerFormModal = ({
               </>
             ) : (
               <>
-                <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
+                {/* Патч 563: «Локация» — обычное поле выбора, как «Родительская
+                    локация» у локации. Выбрал — точка встроена туда; «— нет —» —
+                    вернулась на экран карточек. Дополнительные локации нужны
+                    редко (бродячий торговец), поэтому идут отдельной строкой. */}
+                <Text style={styles.label}>{tLootTrade('form.primaryLocationLabel')}</Text>
+                <LocationSelect
+                  testID="container-form-primary-location"
+                  value={primaryHubId}
+                  onChange={setPrimaryHubId}
+                  options={combinedHubs}
+                  placeholder={tLootTrade('form.locationNone')}
+                />
+                <Text style={styles.hintText}>{tLootTrade('form.primaryLocationHint')}</Text>
+
+                <Text style={styles.label}>{tLootTrade('form.extraLocationsLabel')}</Text>
+                <Text style={styles.hintText}>{tLootTrade('form.extraLocationsHint')}</Text>
 
                 {selectedHubObjects.length > 0 && (
                   <View style={styles.selectedHubPills}>
@@ -602,7 +637,7 @@ const ContainerFormModal = ({
                   </View>
                 )}
 
-                <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
+                <Text style={styles.hintText}>{tLootTrade('form.extraLocationsHint')}</Text>
               </>
             )}
 

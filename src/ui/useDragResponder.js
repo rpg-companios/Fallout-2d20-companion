@@ -115,26 +115,46 @@ export default function useDragResponder({
     },
   })).current;
 
-  // Базовые обработчики одной карточки.
-  const panHandlers = useRef({
-    ...responder.panHandlers,
-    onStartShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
-    onMoveShouldSetPanResponderCapture: () => claim(CURRENT_PAYLOAD),
-    onStartShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
-    onMoveShouldSetPanResponder: () => claim(CURRENT_PAYLOAD),
-  }).current;
+  /**
+   * Патч 563: ЗАКОН ИМЁН. У `View` нет пропсов `onStartShouldSetPanResponder*` —
+   * это имена КОНФИГА `PanResponder.create`. Пропсы системы ответственности
+   * называются `onStartShouldSetResponder*`, и именно их опрашивает RN
+   * (`node_modules/react-native-web/dist/vendor/react-native/PanResponder/index.js`:
+   * `panHandlers.onStartShouldSetResponderCapture` зовёт
+   * `config.onStartShouldSetPanResponderCapture`).
+   *
+   * До 563 хук подмешивал в `panHandlers` «пан-имена»: RN их не читает, значит
+   * нагрузка строки не заявлялась ВООБЩЕ, `onStart` получал `undefined`, и драг
+   * в дереве локации был мёртв всегда (548 «починили» его тем же способом).
+   *
+   * Здесь обработчики строятся по настоящим именам. Каждый сначала зовёт
+   * исходный обработчик PanResponder (он ведёт внутреннее состояние жеста:
+   * x0/y0, moveX/moveY), и только потом заявляет нагрузку строки.
+   */
+  const withRowPayload = useCallback((rowPayload) => {
+    const wrap = (original) => (event) => {
+      if (typeof original === 'function') original(event);
+      return claim(rowPayload);
+    };
+    return {
+      ...responder.panHandlers,
+      onStartShouldSetResponderCapture: wrap(responder.panHandlers.onStartShouldSetResponderCapture),
+      onStartShouldSetResponder: wrap(responder.panHandlers.onStartShouldSetResponder),
+      onMoveShouldSetResponderCapture: wrap(responder.panHandlers.onMoveShouldSetResponderCapture),
+      onMoveShouldSetResponder: wrap(responder.panHandlers.onMoveShouldSetResponder),
+    };
+  }, [claim, responder]);
+
+  // Базовые обработчики одной карточки: нагрузка задана на уровне хука.
+  const panHandlersRef = useRef(null);
+  if (!panHandlersRef.current) panHandlersRef.current = withRowPayload(CURRENT_PAYLOAD);
+  const panHandlers = panHandlersRef.current;
 
   /**
    * Обработчики для строки списка со СВОЕЙ нагрузкой. Нагрузка заявляется в
    * capture-фазе — именно она принимает решение в живом браузере.
    */
-  const handlersFor = useCallback((rowPayload) => ({
-    ...responder.panHandlers,
-    onStartShouldSetPanResponderCapture: () => claim(rowPayload),
-    onMoveShouldSetPanResponderCapture: () => claim(rowPayload),
-    onStartShouldSetPanResponder: () => claim(rowPayload),
-    onMoveShouldSetPanResponder: () => claim(rowPayload),
-  }), [claim, responder]);
+  const handlersFor = useCallback((rowPayload) => withRowPayload(rowPayload), [withRowPayload]);
 
   return { panHandlers, handlersFor, draggingRef };
 }

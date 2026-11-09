@@ -125,7 +125,12 @@
     "locationGateHint": "You can enter the location only by passing both obstacles (AND) or one of them (OR).",
     "locationTreeKey": "key:",
     "locationTreeEmptyNode": "Empty for now. Drag a location here with the arrows or add objects.",
-    "lockPinEstimate": "Roughly {count} bobby pins at skill 0"
+    "lockPinEstimate": "Roughly {count} bobby pins at skill 0",
+    "primaryLocationLabel": "Location",
+    "primaryLocationHint": "Where this point lives. Pick one and it is placed inside; “— none —” sends it back to the cards screen.",
+    "extraLocationsLabel": "More locations",
+    "extraLocationsHint": "Only if it sits in several — a wandering trader, for instance.",
+    "locationNotPicked": "No location picked. Tap a variant in the list — typed text alone is not a choice."
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -190,7 +195,10 @@
     "passageReasonTitle": "Block reason (optional)",
     "passageReasonPlaceholder": "e.g. rubble",
     "hubReorderHandle": "Drag «{name}» to reorder",
-    "hubReorderHint": "Drop on a row at the same level: the order is saved and players see the same order."
+    "hubReorderHint": "Drop on a row at the same level: the order is saved and players see the same order.",
+    "hubAddChild": "Add to location",
+    "hubDropIntoHint": "Drop on a location to move it there",
+    "locationBound": "“{name}” is now in “{location}”"
   },
   "catalog": {
     "titleLoot": "Add to Container",

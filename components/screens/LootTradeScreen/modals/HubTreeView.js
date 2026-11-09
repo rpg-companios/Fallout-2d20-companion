@@ -52,6 +52,8 @@ const HubTreeView = ({
   onMoveNestedOut,
   onTogglePassage,
   onReorderChildren,
+  onMoveRow,
+  onAddChild,
 }) => {
   useLocale();
   const [expanded, setExpanded] = useState(() => new Set());
@@ -64,6 +66,8 @@ const HubTreeView = ({
   const activeDragRef = useRef(null);
   const reorderRef = useRef(onReorderChildren);
   reorderRef.current = onReorderChildren;
+  const moveRowRef = useRef(onMoveRow);
+  moveRowRef.current = onMoveRow;
   const [dragPreview, setDragPreview] = useState(null);
 
   const list = Array.isArray(containers) ? containers : [];
@@ -122,6 +126,30 @@ const HubTreeView = ({
       .filter(Boolean);
   };
 
+  /**
+   * Потомки узла: в них нельзя вкладывать сам узел (цикл матрёшки). Считаем по
+   * обоим видам связи — вложенным локациям и links.
+   */
+  const descendantsOfId = (id) => {
+    const out = new Set([id]);
+    const queue = [id];
+    let guard = 0;
+    while (queue.length > 0 && guard < 500) {
+      guard += 1;
+      const current = queue.shift();
+      for (const child of list) {
+        if (!child?.id || out.has(child.id)) continue;
+        const isNested = String(child.parentLocationId || '') === current;
+        const isLinked = (byId.get(current)?.links || [])
+          .some((link) => String(link?.containerId || '') === child.id);
+        if (!isNested && !isLinked) continue;
+        out.add(child.id);
+        queue.push(child.id);
+      }
+    }
+    return out;
+  };
+
   const toggleExpanded = (id) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -132,9 +160,9 @@ const HubTreeView = ({
 
   // Патч 545: перетаскивание меняет порядок только среди строк одного
   // родителя. Границы строк измеряются в окне, как у карточек на сетке.
-  const measureSiblingRows = (siblingIds) => {
+  const measureRows = (ids) => {
     const bounds = {};
-    for (const id of siblingIds) {
+    for (const id of ids) {
       const ref = rowRefs.current[id];
       if (ref?.measureInWindow) {
         ref.measureInWindow((x, y, width, height) => {
@@ -143,6 +171,23 @@ const HubTreeView = ({
       }
     }
     return bounds;
+  };
+
+  /**
+   * Патч 563: цель переезда — ЛЮБАЯ строка-локация под пальцем, не только сосед.
+   * Свою строку и своих потомков не берём: вложить локацию в собственный
+   * потомок нельзя (цикл ловит и сервер, но подсвечивать его незачем).
+   */
+  const locationUnderPoint = (drag, point) => {
+    if (!drag || !point) return null;
+    for (const [id, b] of Object.entries(drag.bounds || {})) {
+      if (id === drag.childId || drag.forbiddenIds?.has?.(id)) continue;
+      if (!drag.hubIds?.has?.(id)) continue;
+      if (b
+        && point.x >= b.x && point.x <= b.x + b.width
+        && point.y >= b.y && point.y <= b.y + b.height) return id;
+    }
+    return null;
   };
 
   const siblingAtPoint = (drag, point) => {
@@ -167,6 +212,16 @@ const HubTreeView = ({
     // в соседнюю строку и молча переставить позицию. Признак движения даёт
     // общий хук (патч 549) — правило одно для всех экранов.
     if (!moved) return;
+    // 563: бросили на строку-локацию — сущность переезжает туда.
+    const overLocationId = drag.overLocationId || locationUnderPoint(drag, drag.point);
+    if (overLocationId && typeof moveRowRef.current === 'function') {
+      moveRowRef.current({
+        containerId: drag.childId,
+        targetHubId: overLocationId,
+        fromHubId: drag.parentId,
+      });
+      return;
+    }
     const targetId = drag.overId || siblingAtPoint(drag, drag.point);
     if (!targetId || targetId === drag.childId) return;
     const nextOrder = locationGraph.moveChildInOrder(drag.siblingIds, drag.childId, targetId);
@@ -185,22 +240,30 @@ const HubTreeView = ({
     enabled: typeof onReorderChildren === 'function',
     onStart: (point, context) => {
       if (!context) return;
+      const visibleRowIds = Object.keys(rowRefs.current);
       activeDragRef.current = {
         ...context,
-        bounds: measureSiblingRows(context.siblingIds),
+        bounds: measureRows(visibleRowIds),
+        hubIds: new Set(list.filter((c) => c?.kind === CONTAINER_KIND.HUB).map((c) => c.id)),
+        forbiddenIds: descendantsOfId(context.childId),
         overId: null,
+        overLocationId: null,
         point: { x: point.pageX, y: point.pageY },
       };
-      setDragPreview({ parentId: context.parentId, childId: context.childId, overId: null });
+      setDragPreview({
+        parentId: context.parentId, childId: context.childId, overId: null, overLocationId: null,
+      });
     },
     onMove: (point) => {
       const drag = activeDragRef.current;
       if (!drag) return;
       drag.point = { x: point.pageX, y: point.pageY };
-      const overId = siblingAtPoint(drag, drag.point);
-      if (overId !== drag.overId) {
+      const overLocationId = locationUnderPoint(drag, drag.point);
+      const overId = overLocationId ? null : siblingAtPoint(drag, drag.point);
+      if (overId !== drag.overId || overLocationId !== drag.overLocationId) {
         drag.overId = overId;
-        setDragPreview((prev) => (prev ? { ...prev, overId } : prev));
+        drag.overLocationId = overLocationId;
+        setDragPreview((prev) => (prev ? { ...prev, overId, overLocationId } : prev));
       }
     },
     onEnd: (_point, _context, meta) => finishDrag(meta),
@@ -337,9 +400,14 @@ const HubTreeView = ({
     // Патч 545: ручка перестановки есть у строк с братьями внутри одного
     // родителя (включая раскрытую вложенную локацию). Ключи не трогаем.
     const siblingIds = parentNode ? childrenOf(parentNode).map((kid) => kid.container.id) : [];
-    const canReorder = Boolean(parentNode && siblingIds.length > 1 && typeof onReorderChildren === 'function');
+    // 563: ручка нужна и для порядка (≥2 брата), и для переезда в другую
+    // локацию — иначе переносить можно было бы только с сетки карточек.
+    const canReorder = Boolean(parentNode
+      && (siblingIds.length > 1 || typeof onMoveRow === 'function')
+      && typeof onReorderChildren === 'function');
     const isDragging = dragPreview?.childId === container.id;
-    const isDropTarget = dragPreview?.overId === container.id;
+    const isDropTarget = dragPreview?.overId === container.id
+      || dragPreview?.overLocationId === container.id;
 
     return (
       <View key={container.id} style={[styles.node, { marginLeft: depth * 16 }]}>
@@ -515,8 +583,25 @@ const HubTreeView = ({
     <ScrollView style={styles.scroll} nestedScrollEnabled>
       {dragPreview ? (
         <Text testID="hub-tree-reorder-hint" style={styles.reorderHint}>
-          {tLootTrade('detail.hubReorderHint')}
+          {tLootTrade(dragPreview.overLocationId ? 'detail.hubDropIntoHint' : 'detail.hubReorderHint')}
         </Text>
+      ) : null}
+      {/* 563: из локации тоже можно добавить сущность — окно выбора было
+          смонтировано, но не открывалось ни одной кнопкой. */}
+      {typeof onAddChild === 'function' ? (
+        <TouchableOpacity
+          testID="hub-tree-add-child"
+          style={styles.addChildBtn}
+          onPress={() => onAddChild()}
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons
+            name="plus-circle-outline"
+            size={16}
+            color={ADMIN_MODAL_PALETTE.gold}
+          />
+          <Text style={styles.addChildBtnText}>{tLootTrade('detail.hubAddChild')}</Text>
+        </TouchableOpacity>
       ) : null}
       {directKids.length === 0 && directKeyIds.length === 0 ? (
         <Text style={styles.emptyText}>{tLootTrade('detail.emptyHubNodes')}</Text>
@@ -592,6 +677,24 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   // Патч 545: ручка и подсветка перестановки — в палитре соседних модалок.
+  addChildBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+  },
+  addChildBtnText: {
+    color: ADMIN_MODAL_PALETTE.gold,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   dragHandle: {
     width: 24,
     height: 24,

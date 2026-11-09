@@ -1,5 +1,36 @@
 # Changelog
+
 ---
+
+## "Location binding in both directions" (patch 563)
+
+The owner's words: "I still can't move entities inside a location. And terminal/lock
+and location binding must be identical both ways. If I pick a location inside a
+terminal or a lock, they should embed there. Not only through the location."
+
+- **The tree handle never started a drag.** The drag hook claimed the row payload
+  with pseudo-props (`onStartShouldSetPanResponderCapture` and friends) that a
+  `View` does not have: React Native Web asks for `onStartShouldSetResponder*`.
+  No phase ever started the gesture, so row order never moved. Props now use the
+  platform names while the config keys stay where `PanResponder.create` reads them.
+  The card grid only worked because it subscribed to PanResponder's own answer —
+  that is where the mismatch came from.
+- **"Location" in terminal and lock settings** is a normal picker now, like the
+  "Parent location" of a location: pick one and the object is embedded there,
+  "— none —" returns it to the card grid. Extra locations stay on their own row:
+  a wandering merchant lives in several and keeps working.
+- **One law for every entry point.** `domain/hubBindings.js`: a binding always
+  lives on the parent — `parentLocationId` for a location, a `links` entry on the
+  location for a chest, merchant, terminal or lock. The form, the tree and the
+  move all write the same thing, so "works through the location, not from the
+  terminal" no longer reproduces.
+- **Nothing typed is silently dropped.** If the binding field has text but no
+  option was picked, the form says so instead of losing it.
+- **Moving in the tree.** Dropping a row onto a location row moves the entity
+  inside (the source location's link is removed, other bindings stay), while
+  dragging among siblings still reorders them. Moving a node into its own
+  descendant is rejected. "Add to location" opens the picker, and from there a
+  new item can be created right inside that location.
 
 ## "Long names read in full" (patch 562)
 

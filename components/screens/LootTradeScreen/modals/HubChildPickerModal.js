@@ -21,6 +21,7 @@ const HubChildPickerModal = ({
   allContainers = [],
   roomByCode = {},
   onAddChild,
+  onCreateChild,
   onClose,
 }) => {
   useLocale();
@@ -97,6 +98,30 @@ const HubChildPickerModal = ({
               })
             )}
           </ScrollView>
+
+          {/* Патч 563: если нужной вещи ещё нет — её создают ЗДЕСЬ, и она сразу
+              встаёт в эту локацию (форма откроется с заполненной «Локацией»). */}
+          {typeof onCreateChild === 'function' && (
+            <View style={styles.createRow}>
+              <Text style={styles.createTitle}>{tLootTrade('detail.hubPickerCreateTitle')}</Text>
+              {[
+                [CONTAINER_KIND.LOOT, 'treasure-chest', 'actions.createLoot'],
+                [CONTAINER_KIND.MERCHANT, 'sack', 'actions.createMerchant'],
+                [CONTAINER_KIND.TERMINAL, 'console', 'actions.createTerminal'],
+                [CONTAINER_KIND.LOCK, 'lock', 'actions.createLock'],
+              ].map(([kind, icon, labelKey]) => (
+                <TouchableOpacity
+                  key={kind}
+                  style={styles.createBtn}
+                  testID={`hub-picker-create-${kind}`}
+                  onPress={() => onCreateChild(kind)}
+                >
+                  <MaterialCommunityIcons name={icon} size={16} color={ADMIN_MODAL_PALETTE.accent} />
+                  <Text style={styles.createBtnText}>{tLootTrade(labelKey)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Text style={styles.closeBtnText}>{tLootTrade('detail.hubPickerClose')}</Text>
@@ -196,6 +221,27 @@ const styles = StyleSheet.create({
     color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
+  },
+  createRow: {
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_MODAL_PALETTE.border,
+    paddingTop: 8,
+    marginTop: 8,
+    gap: 6,
+  },
+  createTitle: {
+    color: ADMIN_MODAL_PALETTE.mutedText,
+    fontSize: 12,
+  },
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  createBtnText: {
+    color: ADMIN_MODAL_PALETTE.text,
+    fontSize: 13,
   },
   closeBtn: {
     marginTop: 16,

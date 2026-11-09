@@ -5,10 +5,10 @@
 // `findWantsResponder` (react-native-web: modules/useResponderEvents/
 // ResponderSystem.js) идёт по CAPTURE-фазе сверху вниз и принимает решение
 // СРАЗУ, как только обработчик вернул true; bubble-фаза после этого не
-// опрашивается. Ручка дерева отдавала `onStartShouldSetPanResponderCapture:
+// опрашивается. Ручка дерева отдавала `onStartShouldSetResponderCapture:
 // () => true`, а контекст строки (`parentId`, `childId`, братья) писала только
-// в `onStartShouldSetPanResponder`. Поэтому `dragContextRef.current` оставался
-// null, `onPanResponderGrant` выходил по `if (!context) return`, и стрелка не
+// в `onStartShouldSetResponder`. Поэтому `dragContextRef.current` оставался
+// null, `onResponderGrant` выходил по `if (!context) return`, и стрелка не
 // перетаскивалась никогда.
 //
 // Тест 545 этого не увидел: он звал bubble-обработчик руками, чего живой
@@ -52,7 +52,27 @@ vi.mock('react-native', () => {
     Image: host('Image'),
     useWindowDimensions: () => ({ width: 420, height: 800 }),
     // Как настоящий PanResponder: конфиг превращается в набор обработчиков.
-    PanResponder: { create: (config) => ({ panHandlers: config }) },
+    PanResponder: {
+      create: (config) => ({
+        panHandlers: {
+          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
+            ? config.onStartShouldSetPanResponder(e) : false),
+          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
+            ? config.onStartShouldSetPanResponderCapture(e) : false),
+          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
+            ? config.onMoveShouldSetPanResponder(e) : false),
+          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
+            ? config.onMoveShouldSetPanResponderCapture(e) : false),
+          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
+          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
+          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
+          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
+          onResponderReject: (e) => config.onPanResponderReject?.(e),
+          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
+          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
+        },
+      }),
+    },
   };
 });
 
@@ -128,11 +148,11 @@ const setRowBounds = (ids, startY = 0) => {
  */
 const negotiate = (handle, kind = 'start') => {
   const capture = kind === 'start'
-    ? 'onStartShouldSetPanResponderCapture'
-    : 'onMoveShouldSetPanResponderCapture';
+    ? 'onStartShouldSetResponderCapture'
+    : 'onMoveShouldSetResponderCapture';
   const bubble = kind === 'start'
-    ? 'onStartShouldSetPanResponder'
-    : 'onMoveShouldSetPanResponder';
+    ? 'onStartShouldSetResponder'
+    : 'onMoveShouldSetResponder';
   if (handle.props[capture]?.() === true) return 'capture';
   if (handle.props[bubble]?.() === true) return 'bubble';
   return null;
@@ -151,9 +171,9 @@ const dragLikeNative = (renderer, childId, targetId, kind = 'start') => {
   let phase = null;
   act(() => {
     phase = negotiate(handle, kind);
-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
-    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
-    handle.props.onPanResponderRelease();
+    handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
+    handle.props.onResponderMove({}, { moveX: 10, moveY: target.y + 5 });
+    handle.props.onResponderRelease();
   });
   return phase;
 };
@@ -192,10 +212,10 @@ describe('548: стрелка дерева работает при настоя�
     setRowBounds(['shop', 'chest', 'mayor']);
     const handle = handleOf(renderer, 'chest');
     act(() => {
-      expect(handle.props.onStartShouldSetPanResponder()).toBe(true);
-      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
-      handle.props.onPanResponderMove({}, { moveX: 10, moveY: 5 });
-      handle.props.onPanResponderRelease();
+      expect(handle.props.onStartShouldSetResponder()).toBe(true);
+      handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
+      handle.props.onResponderMove({}, { moveX: 10, moveY: 5 });
+      handle.props.onResponderRelease();
     });
     expect(onReorderChildren).toHaveBeenCalledWith('town', ['chest', 'shop', 'mayor']);
   });
@@ -226,8 +246,8 @@ describe('548: стрелка дерева работает при настоя�
     const handle = handleOf(renderer, 'chest');
     act(() => {
       negotiate(handle);
-      handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
-      handle.props.onPanResponderRelease();
+      handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
+      handle.props.onResponderRelease();
     });
     expect(onReorderChildren).not.toHaveBeenCalled();
   });
@@ -235,7 +255,7 @@ describe('548: стрелка дерева работает при настоя�
   it('ручка не отдаёт жест ScrollView и блокирует нативный скролл', () => {
     const renderer = mountTree(cards(), vi.fn());
     const handle = handleOf(renderer, 'chest');
-    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
+    expect(handle.props.onResponderTerminationRequest()).toBe(false);
     expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
   });
 });
@@ -246,10 +266,15 @@ describe('548: обе группы стрелок и защита от возв�
     // теперь живёт, — иначе проверка запрещала бы переиспользование и снова
     // разводила копии по файлам (именно так и появился баг 548).
     const hook = read('src/ui/useDragResponder.js');
-    expect(hook).toContain('onStartShouldSetPanResponderCapture: () => claim(rowPayload)');
-    expect(hook).toContain('onMoveShouldSetPanResponderCapture: () => claim(rowPayload)');
-    expect(hook).toContain('onStartShouldSetPanResponder: () => claim(rowPayload)');
-    expect(hook).toContain('onMoveShouldSetPanResponder: () => claim(rowPayload)');
+    // 563: props системы ответственности называются onStartShouldSetResponder*.
+    // Пан-имена (onStartShouldSetPanResponder*) — это ключи КОНФИГА PanResponder,
+    // у View таких пропсов нет; до 563 именно на них и был мёртв драг.
+    expect(hook).toContain('onStartShouldSetResponderCapture: wrap(');
+    expect(hook).toContain('onMoveShouldSetResponderCapture: wrap(');
+    expect(hook).toContain('onStartShouldSetResponder: wrap(');
+    expect(hook).toContain('onMoveShouldSetResponder: wrap(');
+    expect(hook).toContain('claim(rowPayload)');
+    expect(hook).toContain('ЗАКОН ИМЁН');
     // Причина бага зафиксирована в коде, чтобы её не вернули «упрощением».
     expect(hook).toContain('548');
     expect(hook).toContain('capture');

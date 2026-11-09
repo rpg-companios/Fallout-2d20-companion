@@ -59,9 +59,32 @@ vi.mock('react-native', () => {
     ScrollView: host('ScrollView'),
     ActivityIndicator: host('ActivityIndicator'),
     Image: host('Image'),
-    // Как настоящий PanResponder: конфиг превращается в набор обработчиков,
-    // а решение о захвате принимает система ответственности (capture первым).
-    PanResponder: { create: (config) => ({ panHandlers: config }) },
+    // Патч 563: мок повторяет НАСТОЯЩИЙ PanResponder. `panHandlers` — это
+    // пропсы системы ответственности (`onStartShouldSetResponder*`), они зовут
+    // обработчики конфига (`onStartShouldSetPanResponder*`). Пока мок отдавал
+    // конфиг как есть, тест одобрял хук, у которого нагрузка строки не
+    // заявлялась вообще, — и ручка дерева была мертва в бою (548/549).
+    PanResponder: {
+      create: (config) => ({
+        panHandlers: {
+          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
+            ? config.onStartShouldSetPanResponder(e) : false),
+          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
+            ? config.onStartShouldSetPanResponderCapture(e) : false),
+          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
+            ? config.onMoveShouldSetPanResponder(e) : false),
+          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
+            ? config.onMoveShouldSetPanResponderCapture(e) : false),
+          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
+          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
+          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
+          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
+          onResponderReject: (e) => config.onPanResponderReject?.(e),
+          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
+          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
+        },
+      }),
+    },
   };
 });
 
@@ -203,10 +226,15 @@ const mountScreen = async () => {
  * сразу; bubble зовётся только если capture отказался. Тест 545 звал bubble
  * руками и потому не увидел мёртвую ручку (баг 548).
  */
+const touchEvent = () => ({
+  nativeEvent: { touches: [1] },
+  touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 1 },
+});
+
 const negotiate = (handle) => {
-  if (handle.props.onStartShouldSetPanResponderCapture?.() === true) return 'capture';
-  if (handle.props.onStartShouldSetResponderCapture?.() === true) return 'capture';
-  if (handle.props.onStartShouldSetPanResponder?.() === true) return 'bubble';
+  // RN опрашивает только пропсы системы ответственности.
+  if (handle.props.onStartShouldSetResponderCapture?.(touchEvent()) === true) return 'capture';
+  if (handle.props.onStartShouldSetResponder?.(touchEvent()) === true) return 'bubble';
   return null;
 };
 
@@ -215,17 +243,17 @@ const dragTo = async (renderer, handleTestID, target, { move = true } = {}) => {
   let phase = null;
   await act(async () => {
     phase = negotiate(handle);
-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
+    handle.props.onResponderGrant({ touchHistory: { numberActiveTouches: 1 } }, { x0: 0, y0: 0 });
     await Promise.resolve();
   });
   if (move) {
     await act(async () => {
-      handle.props.onPanResponderMove({}, { moveX: target.x + 5, moveY: target.y + 5 });
+      handle.props.onResponderMove({ touchHistory: { numberActiveTouches: 1, mostRecentTimeStamp: 2 } }, { moveX: target.x + 5, moveY: target.y + 5 });
       await Promise.resolve();
     });
   }
   await act(async () => {
-    handle.props.onPanResponderRelease({}, { moveX: target.x + 5, moveY: target.y + 5 });
+    handle.props.onResponderRelease({}, { moveX: target.x + 5, moveY: target.y + 5 });
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -291,7 +319,7 @@ describe('549: стрелки сетки работают в реальном п
     h.cards = [hub('town'), loot('chest')];
     const renderer = await mountScreen();
     const handle = one(renderer.root, 'card-drag-chest');
-    expect(handle.props.onPanResponderTerminationRequest()).toBe(false);
+    expect(handle.props.onResponderTerminationRequest()).toBe(false);
     expect(handle.props.onShouldBlockNativeResponder()).toBe(true);
     await act(async () => renderer.unmount());
   });

@@ -53,6 +53,7 @@ import {
   resolveQuantitySpec,
   sortContainersForRoot,
 } from '../../../domain/lootTrade';
+import { planLocationBinding, planMoveIntoLocation } from '../../../domain/hubBindings';
 import { getItemPrice, getItemWeight, resolveItem } from '../../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import {
@@ -496,6 +497,9 @@ export default function LootTradeScreen() {
     () => containers.find((c) => c.id === activeContainerId) || null,
     [containers, activeContainerId],
   );
+  // Патч 563: если Мастер смотрит внутрь локации, созданные здесь сундук/
+  // терминал/замок сразу встают в неё (поле «Локация» предзаполнено).
+  const activeHubId = activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer.id : '';
   const activeTerminalStates = useMemo(() => {
     if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL
       && activeContainer?.kind !== CONTAINER_KIND.LOCK) return [];
@@ -789,36 +793,42 @@ export default function LootTradeScreen() {
     });
   };
 
-  const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
+  /**
+   * Патч 563: привязка к локации пишется ОДНИМ законом (domain/hubBindings) —
+   * и из формы предмета, и из дерева. Раньше каждый вход знал только своё поле,
+   * поэтому «из локации» работало, а «из терминала» нет.
+   *
+   * `bindings` = { primary: 'id локации', extras: ['другая локация'] } — основная
+   * плюс «ещё локации» (бродячий торговец). Старый вызов с массивом id
+   * поддерживается: первый id считается основной.
+   */
+  const handleSaveContainerForm = async (draft, capsRollInfo, bindings = null) => {
     if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
     const cleanDraft = { ...draft };
     delete cleanDraft.__isDuplicateDraft;
 
-    if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
-      cleanDraft.inRoot = selectedHubIds.length === 0;
-    }
+    const requested = Array.isArray(bindings)
+      ? { primary: bindings[0] || '', extras: bindings.slice(1) }
+      : (bindings && typeof bindings === 'object' ? bindings : null);
 
     const saved = await persistAndSyncContainer(cleanDraft);
-
-    if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
-      const targetHubSet = new Set(selectedHubIds);
+    let boundId = '';
+    if (requested) {
       const currentList = await db.getGmContainersList();
-      for (const item of currentList) {
-        if (item.kind !== CONTAINER_KIND.HUB) continue;
-        const hasLink = (item.links || []).some((l) => l.containerId === saved.id);
-        const shouldHaveLink = targetHubSet.has(item.id);
-        if (shouldHaveLink && !hasLink) {
-          await persistAndSyncContainer({
-            ...item,
-            links: [...(item.links || []), { containerId: saved.id, locked: false, lockLabel: '' }],
-          });
-        } else if (!shouldHaveLink && hasLink) {
-          await persistAndSyncContainer({
-            ...item,
-            links: (item.links || []).filter((l) => l.containerId !== saved.id),
-          });
-        }
+      const plan = planLocationBinding({
+        container: saved,
+        primaryHubId: requested.primary,
+        extraHubIds: requested.extras,
+        allContainers: currentList,
+      });
+      for (const update of plan.hubUpdates) {
+        const hub = currentList.find((item) => item.id === update.id);
+        if (hub) await persistAndSyncContainer({ ...hub, links: update.links });
       }
+      if (Object.keys(plan.containerPatch).length > 0) {
+        await persistAndSyncContainer({ ...saved, ...plan.containerPatch });
+      }
+      boundId = requested.primary || '';
     }
 
     setFormModal(null);
@@ -826,6 +836,15 @@ export default function LootTradeScreen() {
     // только что сохранённая карточка сразу открывалась в детальный экран.
     // Привязка к локациям всё равно записана выше, так что скрытого
     // перехода в локацию не требуется.
+    // 563: видимое подтверждение привязки — чтобы «выбрал локацию» не приходилось
+    // проверять глазами по дереву. Показываем только когда локация реально задана.
+    if (boundId) {
+      const hubName = containers.find((c) => c?.id === boundId)?.name || boundId;
+      showTimedBanner(formatLootTrade(tLootTrade('detail.locationBound'), {
+        name: saved.name,
+        location: hubName,
+      }));
+    }
     if (capsRollInfo?.rolled) {
       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
         dice: capsRollInfo.diceCount,
@@ -1495,6 +1514,17 @@ export default function LootTradeScreen() {
     await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
   };
 
+  // Патч 563: новая вещь, созданная из локации, сразу встаёт в неё — форма
+  // открывается с заполненным полем «Локация» (initialLinkedHubIds).
+  const handleCreateHubChild = (kind) => {
+    setHubPickerOpen(false);
+    setFormModal({
+      kind: kind || CONTAINER_KIND.LOOT,
+      initialContainer: null,
+      prefillHubId: activeHubId,
+    });
+  };
+
   const handleRemoveHubChild = async (childId) => {
     if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
     const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
@@ -1513,6 +1543,50 @@ export default function LootTradeScreen() {
     if (!childOrder.length) return;
     if (childOrder.join('\u0000') === (parent.childOrder || []).join('\u0000')) return;
     await persistAndSyncContainer({ ...parent, childOrder });
+  };
+
+  /**
+   * Патч 563: перенос сущности в другую локацию — перетаскиванием строки на
+   * строку-локацию в дереве. Источник (дерево, из которого тащат) снимаем, цель
+   * добавляем; прочие привязки не трогаем — бродячий торговец остаётся там, где
+   * стоял.
+   */
+  const handleMoveRowToLocation = async ({ containerId, targetHubId, fromHubId } = {}) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+    const child = containers.find((c) => c?.id === containerId);
+    const targetHub = containers.find((c) => c?.id === targetHubId && c.kind === CONTAINER_KIND.HUB);
+    if (!child || !targetHub || child.id === targetHub.id) return;
+
+    // Локацию нельзя вложить в собственного потомка — тот же закон, что у карточек.
+    if (child.kind === CONTAINER_KIND.HUB && wouldCreateParentCycle(child.id, targetHub.id)) {
+      showRawAlert({ title: tLootTrade('form.locationCycle') });
+      return;
+    }
+
+    const plan = planMoveIntoLocation({
+      container: child,
+      targetHubId: targetHub.id,
+      fromHubId,
+      allContainers: containers,
+    });
+    for (const update of plan.hubUpdates) {
+      const hub = containers.find((item) => item?.id === update.id);
+      if (hub) await persistAndSyncContainer({ ...hub, links: update.links });
+    }
+    if (Object.keys(plan.containerPatch).length > 0) {
+      await persistAndSyncContainer({ ...child, ...plan.containerPatch });
+    }
+    showTimedBanner(formatLootTrade(tLootTrade('detail.locationBound'), {
+      name: child.name,
+      location: targetHub.name,
+    }));
+  };
+
+  // Патч 563: из локации тоже можно добавить сущность — окно выбора контейнеров
+  // было смонтировано, но не открывалось ни одной кнопкой (hubPickerOpen).
+  const handleOpenHubChildPicker = () => {
+    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB) return;
+    setHubPickerOpen(true);
   };
 
   // Патч 543: перекрыть/открыть проход локации из дерева хаба. Кнопка
@@ -1918,7 +1992,7 @@ export default function LootTradeScreen() {
                           key={cell.id}
                           iconName="map-marker-multiple"
                           label={tLootTrade('actions.createHub')}
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null, prefillHubId: activeHubId })}
                         />
                       );
                     }
@@ -1928,7 +2002,7 @@ export default function LootTradeScreen() {
                           key={cell.id}
                           iconName="treasure-chest"
                           label={tLootTrade('actions.createLoot')}
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOOT, initialContainer: null })}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOOT, initialContainer: null, prefillHubId: activeHubId })}
                         />
                       );
                     }
@@ -1938,7 +2012,7 @@ export default function LootTradeScreen() {
                           key={cell.id}
                           iconName="sack"
                           label={tLootTrade('actions.createMerchant')}
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.MERCHANT, initialContainer: null })}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.MERCHANT, initialContainer: null, prefillHubId: activeHubId })}
                         />
                       );
                     }
@@ -1948,7 +2022,7 @@ export default function LootTradeScreen() {
                           key={cell.id}
                           iconName="console"
                           label={tLootTrade('actions.createTerminal')}
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null })}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null, prefillHubId: activeHubId })}
                         />
                       );
                     }
@@ -1959,7 +2033,7 @@ export default function LootTradeScreen() {
                           iconName="lock"
                           label={tLootTrade('actions.createLock')}
                           testID="create-lock-cell"
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOCK, initialContainer: null })}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.LOCK, initialContainer: null, prefillHubId: activeHubId })}
                         />
                       );
                     }
@@ -2501,6 +2575,8 @@ export default function LootTradeScreen() {
                 onMoveNestedOut={handleMoveNestedLocationOut}
                 onTogglePassage={handleTogglePassage}
                 onReorderChildren={handleReorderHubChildren}
+                onMoveRow={handleMoveRowToLocation}
+                onAddChild={handleOpenHubChildPicker}
               />
             </>
           ) : (activeContainer.kind === CONTAINER_KIND.TERMINAL
@@ -2631,7 +2707,7 @@ export default function LootTradeScreen() {
         initialLinkedHubIds={
           formModal?.initialContainer?.id
             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
-            : []
+            : [formModal?.prefillHubId].filter(Boolean)
         }
         onQuickCreateHub={handleQuickCreateHub}
         onSave={handleSaveContainerForm}
@@ -2644,6 +2720,7 @@ export default function LootTradeScreen() {
         allContainers={containers}
         roomByCode={roomByCode}
         onAddChild={handleAddHubChild}
+        onCreateChild={handleCreateHubChild}
         onClose={() => setHubPickerOpen(false)}
       />
 

@@ -40,7 +40,27 @@ vi.mock('react-native', () => {
     ScrollView: host('ScrollView'),
     Image: host('Image'),
     useWindowDimensions: () => ({ width: 420, height: 800 }),
-    PanResponder: { create: (config) => ({ panHandlers: config }) },
+    PanResponder: {
+      create: (config) => ({
+        panHandlers: {
+          onStartShouldSetResponder: (e) => (config.onStartShouldSetPanResponder
+            ? config.onStartShouldSetPanResponder(e) : false),
+          onStartShouldSetResponderCapture: (e) => (config.onStartShouldSetPanResponderCapture
+            ? config.onStartShouldSetPanResponderCapture(e) : false),
+          onMoveShouldSetResponder: (e) => (config.onMoveShouldSetPanResponder
+            ? config.onMoveShouldSetPanResponder(e) : false),
+          onMoveShouldSetResponderCapture: (e) => (config.onMoveShouldSetPanResponderCapture
+            ? config.onMoveShouldSetPanResponderCapture(e) : false),
+          onResponderGrant: (e, g) => config.onPanResponderGrant?.(e, g),
+          onResponderMove: (e, g) => config.onPanResponderMove?.(e, g),
+          onResponderRelease: (e, g) => config.onPanResponderRelease?.(e, g),
+          onResponderTerminate: (e) => config.onPanResponderTerminate?.(e),
+          onResponderReject: (e) => config.onPanResponderReject?.(e),
+          onResponderTerminationRequest: () => config.onPanResponderTerminationRequest?.() ?? true,
+          onShouldBlockNativeResponder: () => config.onShouldBlockNativeResponder?.() ?? false,
+        },
+      }),
+    },
   };
 });
 
@@ -186,10 +206,10 @@ const dragRow = (renderer, childId, targetId) => {
   expect(handle, childId).toBeTruthy();
   const target = mockLayout.bounds[`hub-tree-row-${targetId}`];
   act(() => {
-    handle.props.onStartShouldSetPanResponder();
-    handle.props.onPanResponderGrant({}, { x0: 0, y0: 0 });
-    handle.props.onPanResponderMove({}, { moveX: 10, moveY: target.y + 5 });
-    handle.props.onPanResponderRelease();
+    handle.props.onStartShouldSetResponder();
+    handle.props.onResponderGrant({}, { x0: 0, y0: 0 });
+    handle.props.onResponderMove({}, { moveX: 10, moveY: target.y + 5 });
+    handle.props.onResponderRelease();
   });
 };
 
