@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Навигация — Fallout 2d20 — русский справочник</title>
+<meta name="description" content="Русскоязычное фанатское справочное издание по настольной ролевой игре «Fallout: The Roleplaying Game» (Fallout 2d20): оружие, броня, происхождения, бестиарий.">
+<link rel="icon" href="assets/img/perks/images/default.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,400..900;1,700..900&family=PT+Sans:wght@400;700&family=Noto+Sans:wght@400;700;800&family=Roboto:wght@400;700;800&family=Roboto+Slab:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="css/site.css?v=0.27.2">
+<script>
+try { var savedFont = window.localStorage.getItem('heading-font'); if (savedFont) document.documentElement.style.setProperty('--heading-font', savedFont); } catch (e) {}
+</script>
+
+</head>
+<body>
+<div class="fontbar" role="region" aria-label="Временная панель выбора шрифта заголовков">
+  <span class="fontbar-label">Шрифт заголовков</span>
+  <button type="button" class="fontbar-option" data-stack='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif' style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue','Noto Sans','Liberation Sans',Arial,sans-serif">Bootstrap: system-ui</button>
+  <button type="button" class="fontbar-option" data-stack='"PT Sans", "Arial", sans-serif' style="font-family:'PT Sans',Arial,sans-serif">PT Sans</button>
+  <button type="button" class="fontbar-option" data-stack='"Noto Sans", "Arial", sans-serif' style="font-family:'Noto Sans',Arial,sans-serif">Noto Sans</button>
+  <button type="button" class="fontbar-option" data-stack='"Roboto", "Arial", sans-serif' style="font-family:'Roboto',Arial,sans-serif">Roboto</button>
+  <button type="button" class="fontbar-option" data-stack='"Roboto Slab", "Georgia", serif' style="font-family:'Roboto Slab',Georgia,serif">Roboto Slab</button>
+  <button type="button" class="fontbar-reset" title="Вернуть Bootstrap: system-ui">По умолчанию</button>
+  <span class="fontbar-note">временная оценка</span>
+</div>
+<nav class="plate-nav" aria-label="Разделы">
+  <a class="plate plate-blue" href="index.html"><span class="plate-title">Главная</span></a>
+  <a class="plate plate-orange" href="origins.html"><span class="plate-title">Происхождения</span></a>
+  <a class="plate plate-green" href="gear.html"><span class="plate-title">Снаряжение</span></a>
+  <a class="plate plate-pink" href="perks.html"><span class="plate-title">Перки</span></a>
+  <a class="plate plate-blue" href="bestiary.html"><span class="plate-title">Бестиарий</span></a>
+  <a class="plate plate-green" href="forum.html"><span class="plate-title">Форум</span></a>
+</nav>
+<header class="site-header">
+  <div class="container">
+    <button class="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="site-nav-list"></button>
+<nav class="site-nav" id="site-nav-list" aria-label="Разделы"><ul><li><a href="index.html">Главная</a></li><li><a href="origins.html">Происхождения</a></li><li><a href="gear.html">Снаряжение</a></li><li><a href="perks.html">Перки</a></li><li><a href="bestiary.html">Бестиарий</a></li><li><a href="forum.html">Форум</a></li></ul></nav>
+  </div>
+</header>
+
+<section class="section container">
+  <h1 class="page-title">Навигация</h1>
+  <p class="lead">Карта справочника: все доступные в первой версии разделы.</p>
+  <ul class="nav-list"><li><a href="index.html"><span>Главная</span><small>стартовая страница</small></a></li><li><a href="gear.html"><span>Снаряжение</span><small>оружие, броня, еда, напитки</small></a></li><li><a href="weapons.html"><span>Оружие</span><small>6 категорий</small></a></li><li><a href="armor.html"><span>Броня</span><small>кожаная, металлическая, силовая</small></a></li><li><a href="food.html"><span>Еда</span><small>готовые, сырые, консервы</small></a></li><li><a href="bestiary.html"><span>Бестиарий</span><small>5 групп существ</small></a></li><li><a href="origins.html"><span>Происхождения</span><small>19 происхождений</small></a></li><li><a href="perks.html"><span>Перки</span><small>185 перков из компаньона</small></a></li></ul>
+  <p class="soon"><b>Скоро:</b> Форум · Правила игры · Новости · карточки предметов и существ · поиск · версия для печати.</p>
+</section>
+<footer class="site-footer">
+  <div class="container">
+    <div>© 2026 Fallout 2d20. Designed by ВКБ-Сервис.</div>
+    <div>Фанатский проект по мотивам «Fallout: The Roleplaying Game». Не связан с Bethesda и Modiphius Entertainment.</div>
+  </div>
+</footer>
+<button class="back-to-top" type="button" aria-label="Наверх">↑</button>
+<script>
+(function () {
+  var btn = document.querySelector('.back-to-top');
+  if (!btn) return;
+  var onScroll = function () { btn.classList.toggle('visible', window.scrollY > 240); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  btn.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  onScroll();
+})();
+</script>
+<script>
+(function () {
+  var bar = document.querySelector('.fontbar');
+  if (!bar) return;
+  var options = Array.prototype.slice.call(bar.querySelectorAll('.fontbar-option'));
+  function mark(stack) {
+    options.forEach(function (o) { o.classList.toggle('is-active', o.getAttribute('data-stack') === stack); });
+  }
+  var saved = null;
+  try { saved = window.localStorage.getItem('heading-font'); } catch (e) {}
+  mark(saved || options[0].getAttribute('data-stack'));
+  options.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var stack = b.getAttribute('data-stack');
+      document.documentElement.style.setProperty('--heading-font', stack);
+      try { window.localStorage.setItem('heading-font', stack); } catch (e) {}
+      mark(stack);
+    });
+  });
+  bar.querySelector('.fontbar-reset').addEventListener('click', function () {
+    document.documentElement.style.removeProperty('--heading-font');
+    try { window.localStorage.removeItem('heading-font'); } catch (e) {}
+    mark(options[0].getAttribute('data-stack'));
+  });
+})();
+</script>
+<script>
+(function () {
+  var burger = document.querySelector('.burger');
+  var nav = document.getElementById('site-nav-list');
+  if (burger && nav) {
+    burger.addEventListener('click', function () {
+      var open = nav.classList.toggle('open');
+      burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      burger.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+    });
+  }
+})();
+</script>
+</body>
+</html>
