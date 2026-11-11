@@ -150,13 +150,20 @@ function modules(position, page) {
    шесть равных плашек (bootstrap 2+2+2+2+2+2). Ниже 768px скрыта —
    там чёрная полоса с бургером (.site-header). Промежуточного состояния
    (чёрная полоса с горизонтальным меню) НЕ существует. */
+const PLATE_IMG = {
+  'plate-blue':   ['assets/img/plates/lblue-2.png', 483, 122],
+  'plate-orange': ['assets/img/plates/orange.png',  448, 103],
+  'plate-green':  ['assets/img/plates/green.png',   483, 112],
+  'plate-pink':   ['assets/img/plates/pink.png',    482, 111],
+};
 function plateNavHtml(page) {
   const items = (CFG.nav || []).filter((i) => i.plate);
   if (!items.length) return '';
   const links = items
     .map((i) => {
       const current = page.slug === i.href.replace(/\.html$/, '') ? ' aria-current="page"' : '';
-      return `<a class="plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><span class="plate-title">${esc(i.label)}</span></a>`;
+      const [img, w, h] = PLATE_IMG[i.plate] || ['assets/img/plates/lblue-2.png', 483, 122];
+      return `<a class="plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><img class="plate-bg" src="${img}" alt="" width="${w}" height="${h}"><span class="plate-title">${esc(i.label)}</span></a>`;
     })
     .join('\n  ');
   return `<nav class="plate-nav" aria-label="Разделы">

@@ -452,17 +452,27 @@ h1.page-title {
   .plate-nav .plate {
     flex: 1 1 0;
     margin: 0;
-    padding: 0.625rem 0; /* ваш SPPB: 10px 0px — только ваши значения, без подгонки под PNG */
+    position: relative; /* якорь для absolute-текста поверх плашки */
+    display: block; /* как на живом сайте: плашка = обычная адаптивная картинка, высота считается сама */
+    padding: 0.625rem 0; /* ваш SPPB: 10px 0px — минимум, если картинка вдруг не загрузится */
+    background-image: none; /* фон не нужен — плашка теперь <img> */
+    min-height: 2.5rem;
     font-size: 1rem; /* ваш SPPB: 16px */
     line-height: 1rem; /* ваш SPPB: 16px */
     font-weight: 600; /* Semi Bold */
     letter-spacing: normal;
     white-space: nowrap;
     text-decoration: none;
-    background-repeat: no-repeat;   /* SPPB: Background Repeat = No Repeat */
-    background-attachment: inherit; /* SPPB: Background Attachment = Inherit */
-    background-position: center center; /* SPPB: Background Position = Center Center */
-    background-size: contain; /* SPPB: Contain — дословно, как вы скинули; никакой своей подгонки */
+  }
+  /* плашка — обычная картинка во всю ширину ссылки (Bootstrap img-fluid логика):
+     высота всегда пропорциональна ширине, независимо от контейнера — без пикселей */
+  .plate-nav .plate-bg { display: block; width: 100%; height: auto; }
+  .plate-nav .plate-title {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .site-header { display: none; }
 }
@@ -471,7 +481,6 @@ h1.page-title {
 @media (min-width: 768px) and (max-width: 1023px) {
   .plate-nav .plate { font-size: 0.75rem; line-height: 1.2; } /* узкая полоса: только уменьшить кегль, без изменения отступов */
 }
-.plate-nav .plate-title { display: inline-block; }
 /* ваш hover, перенесённый дословно (.sppb-addon-header a:hover .sppb-addon-title):
    подчёркивание currentColor + scale(1.05) + inline-block */
 .plate-nav .plate:hover .plate-title {
