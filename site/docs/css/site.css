@@ -369,19 +369,7 @@ h1.page-title {
   padding: 15px 0; /* ваша SPPB-строка с секциями: Padding Laptop 15px 0px */
 }
 .toc-group { padding: 0 2px; }
-/* «Фоновые плашки» убраны по запросу владельца: заголовки групп оглавления — обычный текст */
-.toc-heading {
-  font-family: var(--heading-font);
-  font-size: 16.5px;
-  line-height: 1.25;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #171717;
-  margin: 0 0 10px;
-  padding: 0 0 6px;
-  border-bottom: 2px solid var(--link);
-}
+/* «Бейджи» — ваши растянутые плашки (menu-item-bg-*.png), как на живом сайте */
 /* Параметры из вашего SPPB: Color FFFFFF 100% · Text Shadow 1px 3px 5px ·
    Alignment center · Background: No Repeat, Cover, Center Center, без overlay ·
    Spacing/Padding (Laptop): 15px 0px 15px 0px · верстка bootstrap 4+4+4 */
