@@ -452,7 +452,8 @@ h1.page-title {
   .plate-nav .plate {
     flex: 1 1 0;
     margin: 0;
-    padding: 10px 0; /* SPPB: ячейка 10px 0px */
+    padding: 13px 0; /* ≈42px высота ячейки: тянем плашки в их родном соотношении (~4.1:1) —
+                          иначе halftone-точечник сплющивается в полосы. 10px из SPPB давало 36px */
     font-size: 16px; /* SPPB: Semi Bold 16px / 16px */
     line-height: 16px;
     font-weight: 600; /* Semi Bold */
@@ -469,7 +470,7 @@ h1.page-title {
 /* узкая полоса 768–1023px: 16px в строгом 6-колоночном flex переполнялся бы —
    уменьшаем только там; на десктопе (≥1024px) ровно 16px как в SPPB */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .plate-nav .plate { font-size: 11px; line-height: 14px; padding: 8px 0; }
+  .plate-nav .plate { font-size: 11px; line-height: 14px; padding: 10px 4px; }
 }
 .plate-nav .plate-title { display: inline-block; }
 /* ваш hover, перенесённый дословно (.sppb-addon-header a:hover .sppb-addon-title):
