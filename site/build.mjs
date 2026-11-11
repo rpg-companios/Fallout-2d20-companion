@@ -304,10 +304,8 @@ const TOC_GROUPS = [
   ]},
 ];
 
-const PLATES = ['blue', 'blue', 'blue', 'green', 'green', 'green', 'orange', 'orange', 'orange', 'pink'];
 function tocHtml() {
-  const groups = TOC_GROUPS.map((g, i) => {
-    const plate = PLATES[i] || 'pink';
+  const groups = TOC_GROUPS.map((g) => {
     const lis = g.items
       .map(([label, href]) =>
         href
@@ -315,7 +313,7 @@ function tocHtml() {
           : `<li><span class="toc-soon" title="Перенос со старого сайта — следующий этап">${esc(label)}<em>скоро</em></span></li>`
       )
       .join('');
-    return `<section class="toc-group"><h3 class="plate plate-${plate}">${esc(g.t)}</h3><ul class="toc-list">${lis}</ul></section>`;
+    return `<section class="toc-group"><h3 class="toc-heading">${esc(g.t)}</h3><ul class="toc-list">${lis}</ul></section>`;
   }).join('');
   return `<div class="toc">${groups}</div>`;
 }
