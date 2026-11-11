@@ -460,9 +460,9 @@ h1.page-title {
     white-space: nowrap;
     text-decoration: none;
     background-repeat: no-repeat;   /* SPPB: Background Repeat = No Repeat */
-    background-size: contain;       /* SPPB: Background Size = Contain */
     background-attachment: inherit; /* SPPB: Background Attachment = Inherit */
     background-position: center center; /* SPPB: Background Position = Center Center */
+    /* размер наследуется от .plate: 100% 100% — плашка во всю ячейку, как на живом сайте */
   }
   .site-header { display: none; }
 }
