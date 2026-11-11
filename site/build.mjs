@@ -150,15 +150,22 @@ function modules(position, page) {
    ниже — бургер (чёрная полоса), как на живом сайте. Bootstrap 5 (assets/vendor/bootstrap).
    Пункты (title_link модуля): Главная → /, Происхождения → proiskhozhdeniya,
    Снаряжение → 524, Перки → perki26, Бестиарий → 543, Форум → 661. */
+const PLATE_IMG = {
+  'plate-blue':   ['assets/img/plates/lblue-2.png', 483, 122],
+  'plate-orange': ['assets/img/plates/orange.png',  448, 103],
+  'plate-green':  ['assets/img/plates/green.png',   483, 112],
+  'plate-pink':   ['assets/img/plates/pink.png',    482, 111],
+};
 function plateNavHtml(page) {
   const items = (CFG.nav || []).filter((i) => i.plate);
   if (!items.length) return '';
   const links = items
     .map((i) => {
       const current = page.slug === i.href.replace(/\.html$/, '') ? ' aria-current="page"' : '';
-      // плашка = якорь с background-image (так SPPB и рендерит heading-аддон),
-      // Bootstrap-колонка row-cols-xl-6 = ровно 16.666667% из модуля
-      return `<a class="col plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><span class="plate-title">${esc(i.label)}</span></a>`;
+      const [img, w, h] = PLATE_IMG[i.plate] || ['assets/img/plates/lblue-2.png', 483, 122];
+      // на живом сайте плашки рендерятся в полный рост колонки (width 100%, высота из
+      // пропорций картинки) — это даёт вид image-24; contain в 36px высоты давал «мышей»
+      return `<a class="col plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><img class="plate-bg" src="${img}" alt="" width="${w}" height="${h}"><span class="plate-title">${esc(i.label)}</span></a>`;
     })
     .join('\n  ');
   return `<nav class="plate-nav row row-cols-xl-6 g-2" aria-label="Разделы">
