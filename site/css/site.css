@@ -493,6 +493,10 @@ h1.page-title {
   text-decoration: underline;
   text-decoration-thickness: 2px;
 }
+.plate-nav .plate:hover, .plate-nav .plate:focus-visible {
+  color: #ffffff; /* hover цвета НЕ меняет (оригинал): только подчёркивание + scale(1.05) */
+  text-decoration: none;
+}
 .plate-nav .plate:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
 
 /* ---------- перки (ваш helix custom.css + js) ---------- */
