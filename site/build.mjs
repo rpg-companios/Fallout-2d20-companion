@@ -96,7 +96,7 @@ function modulesFor(position, pageSlug) {
 function renderModule(m, page) {
   switch (m.type) {
     case 'menu': {
-      // aria-current: и для бургер-меню (<768px), и для плашек (≥768px)
+      // aria-current: и для бургер-меню (<1200px), и для плашек (≥1200px)
       const isCurrent = (href) => page.slug === href.replace(/\.html$/, '');
       const items = CFG.nav
         .map((i) => {
@@ -144,29 +144,24 @@ function modules(position, page) {
   return modulesFor(position, page.slug).map((m) => renderModule(m, page)).join('\n');
 }
 
-/* ---------- плашечная навигация (≥768px) ----------
-   Из вашего image-21 и параметров плашек (SPPB): растянутые плашки menu-item-bg-*,
-   белые CAPS, Text Shadow 1px 3px 5px, выравнивание по центру, строка 5px 0,
-   шесть равных плашек (bootstrap 2+2+2+2+2+2). Ниже 768px скрыта —
-   там чёрная полоса с бургером (.site-header). Промежуточного состояния
-   (чёрная полоса с горизонтальным меню) НЕ существует. */
-const PLATE_IMG = {
-  'plate-blue':   ['assets/img/plates/lblue-2.png', 483, 122],
-  'plate-orange': ['assets/img/plates/orange.png',  448, 103],
-  'plate-green':  ['assets/img/plates/green.png',   483, 112],
-  'plate-pink':   ['assets/img/plates/pink.png',    482, 111],
-};
+/* ---------- плашечная навигация: секция «Fallout main» (SPPB-модуль, topmenu) ----------
+   Источник: экспорт модуля template-767a2a5b….json — вёрстку НЕ придумываем:
+   layout 2+2+2+2+2+2 (6 × 16.666667%), row-cols-xl-6; видна ТОЛЬКО на xl (hidden_lg/md/sm/xs = 1),
+   ниже — бургер (чёрная полоса), как на живом сайте. Bootstrap 5 (assets/vendor/bootstrap).
+   Пункты (title_link модуля): Главная → /, Происхождения → proiskhozhdeniya,
+   Снаряжение → 524, Перки → perki26, Бестиарий → 543, Форум → 661. */
 function plateNavHtml(page) {
   const items = (CFG.nav || []).filter((i) => i.plate);
   if (!items.length) return '';
   const links = items
     .map((i) => {
       const current = page.slug === i.href.replace(/\.html$/, '') ? ' aria-current="page"' : '';
-      const [img, w, h] = PLATE_IMG[i.plate] || ['assets/img/plates/lblue-2.png', 483, 122];
-      return `<a class="plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><img class="plate-bg" src="${img}" alt="" width="${w}" height="${h}"><span class="plate-title">${esc(i.label)}</span></a>`;
+      // плашка = якорь с background-image (так SPPB и рендерит heading-аддон),
+      // Bootstrap-колонка row-cols-xl-6 = ровно 16.666667% из модуля
+      return `<a class="col plate ${esc(i.plate)}" href="${esc(i.href)}"${current}><span class="plate-title">${esc(i.label)}</span></a>`;
     })
     .join('\n  ');
-  return `<nav class="plate-nav" aria-label="Разделы">
+  return `<nav class="plate-nav row row-cols-xl-6 g-2" aria-label="Разделы">
   ${links}
 </nav>`;
 }
@@ -186,6 +181,7 @@ function layout(page, bodyHtml) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,400..900;1,700..900&family=PT+Sans:wght@400;700&family=Noto+Sans:wght@400;700;800&family=Roboto:wght@400;700;800&family=Roboto+Slab:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="assets/vendor/bootstrap/bootstrap.min.css?v=5.3.3">
 <link rel="stylesheet" href="css/site.css?v=${esc(PKG.version)}">
 ${FONT_HEAD_SCRIPT}
 ${modules('head', page)}
@@ -536,6 +532,7 @@ for (const page of pages) {
 // static assets
 if (existsSync(join(ROOT, 'css'))) cpSync(join(ROOT, 'css'), join(OUT, 'css'), { recursive: true });
 if (existsSync(join(ROOT, 'assets/img'))) cpSync(join(ROOT, 'assets/img'), join(OUT, 'assets/img'), { recursive: true });
+if (existsSync(join(ROOT, 'assets/vendor'))) cpSync(join(ROOT, 'assets/vendor'), join(OUT, 'assets/vendor'), { recursive: true });
 writeFileSync(join(OUT, '.nojekyll'), '');
 
 // sitemap + robots

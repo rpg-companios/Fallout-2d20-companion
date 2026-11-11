@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,400..900;1,700..900&family=PT+Sans:wght@400;700&family=Noto+Sans:wght@400;700;800&family=Roboto:wght@400;700;800&family=Roboto+Slab:wght@400;700;800&display=swap">
-<link rel="stylesheet" href="css/site.css?v=0.27.11">
+<link rel="stylesheet" href="assets/vendor/bootstrap/bootstrap.min.css?v=5.3.3">
+<link rel="stylesheet" href="css/site.css?v=0.28.0">
 <script>
 try { var savedFont = window.localStorage.getItem('heading-font'); if (savedFont) document.documentElement.style.setProperty('--heading-font', savedFont); } catch (e) {}
 </script>
@@ -26,13 +27,13 @@ try { var savedFont = window.localStorage.getItem('heading-font'); if (savedFont
   <button type="button" class="fontbar-reset" title="Вернуть Bootstrap: system-ui">По умолчанию</button>
   <span class="fontbar-note">временная оценка</span>
 </div>
-<nav class="plate-nav" aria-label="Разделы">
-  <a class="plate plate-blue" href="index.html"><img class="plate-bg" src="assets/img/plates/lblue-2.png" alt="" width="483" height="122"><span class="plate-title">Главная</span></a>
-  <a class="plate plate-orange" href="origins.html"><img class="plate-bg" src="assets/img/plates/orange.png" alt="" width="448" height="103"><span class="plate-title">Происхождения</span></a>
-  <a class="plate plate-green" href="gear.html"><img class="plate-bg" src="assets/img/plates/green.png" alt="" width="483" height="112"><span class="plate-title">Снаряжение</span></a>
-  <a class="plate plate-pink" href="perks.html"><img class="plate-bg" src="assets/img/plates/pink.png" alt="" width="482" height="111"><span class="plate-title">Перки</span></a>
-  <a class="plate plate-blue" href="bestiary.html" aria-current="page"><img class="plate-bg" src="assets/img/plates/lblue-2.png" alt="" width="483" height="122"><span class="plate-title">Бестиарий</span></a>
-  <a class="plate plate-green" href="forum.html"><img class="plate-bg" src="assets/img/plates/green.png" alt="" width="483" height="112"><span class="plate-title">Форум</span></a>
+<nav class="plate-nav row row-cols-xl-6 g-2" aria-label="Разделы">
+  <a class="col plate plate-blue" href="index.html"><span class="plate-title">Главная</span></a>
+  <a class="col plate plate-orange" href="origins.html"><span class="plate-title">Происхождения</span></a>
+  <a class="col plate plate-green" href="gear.html"><span class="plate-title">Снаряжение</span></a>
+  <a class="col plate plate-pink" href="perks.html"><span class="plate-title">Перки</span></a>
+  <a class="col plate plate-blue" href="bestiary.html" aria-current="page"><span class="plate-title">Бестиарий</span></a>
+  <a class="col plate plate-green" href="forum.html"><span class="plate-title">Форум</span></a>
 </nav>
 <header class="site-header">
   <div class="container">
