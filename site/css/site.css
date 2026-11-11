@@ -454,16 +454,22 @@ h1.page-title {
   }
   .plate-nav .plate {
     position: relative; /* якорь для absolute-текста поверх плашки */
-    display: block;
-    padding: 0;
-    background-image: none; /* плашка = <img>, фон не нужен */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* SPPB heading-аддон, дословно из модуля: No Repeat / Contain / Inherit / 50% 50% */
+    background-repeat: no-repeat;
+    background-position: 50% 50%;
+    background-size: contain;
+    background-attachment: inherit;
+    background-color: transparent;
     font-size: 1rem; /* heading_typography: 16px, line-height 16 */
     line-height: 1rem;
     font-weight: 600;
+    letter-spacing: normal;
     white-space: nowrap;
     text-decoration: none;
   }
-  .plate-nav .plate-bg { display: block; width: 100%; height: auto; }
   .plate-nav .plate-title {
     position: absolute;
     inset: 0;
