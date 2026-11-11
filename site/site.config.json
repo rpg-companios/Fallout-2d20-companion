@@ -1,0 +1,116 @@
+{
+  "$schema": "https://example.com/site.schema.json (TODO: локальная схема в блоке 3 конвейера)",
+  "url": "https://fallout-2d20.ru",
+  "lang": "ru",
+  "title": "Fallout 2d20 — русский справочник",
+  "description": "Русскоязычное фанатское справочное издание по настольной ролевой игре «Fallout: The Roleplaying Game» (Fallout 2d20): оружие, броня, происхождения, бестиарий.",
+  "nav": [
+    { "label": "Главная", "href": "index.html", "plate": "plate-blue" },
+    { "label": "Происхождения", "href": "origins.html", "plate": "plate-orange" },
+    { "label": "Снаряжение", "href": "gear.html", "plate": "plate-green" },
+    { "label": "Перки", "href": "perks.html", "plate": "plate-pink" },
+    { "label": "Бестиарий", "href": "bestiary.html", "plate": "plate-blue" },
+    { "label": "Форум", "href": "forum.html", "plate": "plate-green" }
+  ],
+  "pages": [
+    {
+      "slug": "index",
+      "type": "home",
+      "title": "Главная",
+      "noindex": false
+    },
+    {
+      "slug": "nav",
+      "type": "nav",
+      "title": "Навигация",
+      "lead": "Карта справочника: все доступные в первой версии разделы."
+    },
+    {
+      "slug": "gear",
+      "type": "hub",
+      "title": "Снаряжение",
+      "lead": "Всё, что можно найти, подобрать и унести в убежище: оружие, броня, еда и напитки.",
+      "cards": [
+        { "title": "Оружие", "text": "Стрелковое, ближнее, энергетическое, гранаты, тяжёлое и метательное.", "img": "assets/img/hubs/small-guns.png", "link": "weapons.html", "cta": "Открыть" },
+        { "title": "Броня", "text": "Кожаная, металлическая и силовая — от курток рейдеров до Т-60 и X-01.", "img": "assets/img/hubs/armor-leather.png", "link": "armor.html", "cta": "Открыть" },
+        { "title": "Еда", "text": "Готовые блюда, сырые ингредиенты и консервы сомнительного срока годности.", "img": "assets/img/hubs/food-cooked.png", "link": "food.html", "cta": "Открыть" },
+        { "title": "Напитки", "text": "Нука-Кола, филтвейл, вода и всё, что льётся. Статья готовится.", "img": "assets/img/hubs/drinks.png", "cta": "Скоро" }
+      ]
+    },
+    {
+      "slug": "perks",
+      "type": "perks",
+      "title": "Перки",
+      "lead": "185 перков из приложения Fallout 2d20: ранги, требования и описания."
+    },
+    {
+      "slug": "forum",
+      "type": "soon",
+      "title": "Форум",
+      "lead": "Раздел в разработке.",
+      "text": "Здесь будет сообщество fallout-2d20.ru: обсуждения, вопросы по правилам и обмен опытом. Форум откроется после запуска основного справочника."
+    },
+    {
+      "slug": "weapons",
+      "type": "hub",
+      "title": "Оружие",
+      "lead": "Стрелковое, ближнее, энергетическое, гранаты, тяжёлое и метательное оружие. Карточки разделов — первый этаж; карточка предмета появится на следующем этапе.",
+      "cards": [
+        { "title": "Стрелковое", "text": "Пистолеты, пистолеты-пулемёты, карабины и винтовки ближнего и среднего радиуса.", "img": "assets/img/hubs/small-guns.png" },
+        { "title": "Ближнее и рукопашный бой", "text": "Ножи, топоры, трубы, бейты биты и всё, что помещается в одну руку с гневом.", "img": "assets/img/hubs/melee.png" },
+        { "title": "Энергетическое", "text": "Лазеры, плазма, Гамма-пушка ужаса и прочие предметы с батареей вместо пороха.", "img": "assets/img/hubs/energy.png" },
+        { "title": "Гранаты и взрывчатка", "text": "Осколочные, ядерные, импульсные и прочие способы очистить комнату.", "img": "assets/img/hubs/explosives.png" },
+        { "title": "Тяжёлое", "text": "Миниганы, огнемёты, автоматические гранатомёты и тяжёлая ответственность.", "img": "assets/img/hubs/heavy.png" },
+        { "title": "Метательное", "text": "Ножи, томагавки, лассо и дротики — для тех, кто учился метать ещё до Большой войны.", "img": "assets/img/hubs/thrown.png" }
+      ]
+    },
+    {
+      "slug": "armor",
+      "type": "hub",
+      "title": "Броня",
+      "lead": "Лёгкая и тяжёлая защита Пустоши: от кожаных курток до силовой брони.",
+      "cards": [
+        { "title": "Кожаная", "text": "Кожаная, налобники и прочая лёгкая защита кочевника.", "img": "assets/img/hubs/armor-leather.png" },
+        { "title": "Металлическая", "text": "Сталь, композит и каска, в которой не стыдно идти на рейд.", "img": "assets/img/hubs/armor-metal.png" },
+        { "title": "Силовая", "text": "Экзоскелеты Т-45, Т-51, Т-60 и X-01. Включая Экскаваторную силовую броню.", "img": "assets/img/hubs/armor-power.png" }
+      ]
+    },
+    {
+      "slug": "food",
+      "type": "hub",
+      "title": "Еда",
+      "lead": "Что найти у костра в Пустоши и что из этого можно съесть без последствий. Или с последствиями — если так хочется.",
+      "cards": [
+        { "title": "Готовые блюда", "text": "Сразу съедобное: макароны «БламКо», мясо гнуса и пироги Дутня.", "img": "assets/img/hubs/food-cooked.png" },
+        { "title": "Сырые ингредиенты", "text": "Сырые продукты и мясо до обработки — почти всё требует готовки.", "img": "assets/img/hubs/food-raw.png" },
+        { "title": "Консервы и запасы", "text": "Долго хранимые банки и банки сомнительного срока годности.", "img": "assets/img/hubs/food-preserved.png" }
+      ]
+    },
+    {
+      "slug": "bestiary",
+      "type": "hub",
+      "title": "Бестиарий",
+      "lead": "Кого стоит остерегаться на дороге: животные, мутанты, роботы и рейдеры.",
+      "cards": [
+        { "title": "Животные и насекомые", "text": "Гнусы, дутени, собаки и прочие местные жители без подписи в трудовой книжке.", "img": "assets/img/hubs/beast-animals.png" },
+        { "title": "Мутировавшие гуманоиды", "text": "Супермутанты и прочие те, кто выбрал насилие ради эволюционного преимущества.", "img": "assets/img/hubs/beast-mutated.png" },
+        { "title": "Роботы", "text": "Протектроны, секьюритроны, штурмотроны, мистеры Помощники и робомозги.", "img": "assets/img/hubs/beast-robots.png" },
+        { "title": "Рейдеры", "text": "Человеческая ветка эволюции с упором на ржавчину и грубость.", "img": "assets/img/hubs/beast-raiders.png" },
+        { "title": "Супермутанты", "text": "Отдельно от гуманоидов: иерархия, поведение и тактика выживания.", "img": "assets/img/hubs/beast-supermutant.png" }
+      ]
+    },
+    {
+      "slug": "origins",
+      "type": "origins",
+      "title": "Происхождения",
+      "lead": "Откуда ваш персонаж пришёл в Пустошь. Девятнадцать происхождений из основного набора и дополнений."
+    }
+  ],
+  "modules": [
+    { "id": "menu", "type": "menu", "position": "nav", "pages": "*" },
+    { "id": "crumbs", "type": "breadcrumbs", "position": "breadcrumbs", "pages": ["weapons", "armor", "food", "bestiary", "origins", "gear", "perks", "forum"] },
+    { "id": "vault-promo", "type": "promo-vault", "position": "main-bottom", "pages": ["index"] },
+    { "id": "back-to-top", "type": "back-to-top", "position": "footer", "pages": "*" },
+    { "id": "metrika", "type": "metrics", "position": "head", "pages": "*", "enabled": false }
+  ]
+}
